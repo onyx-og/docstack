@@ -15,6 +15,11 @@ import Class from './utils/dbManager/Class';
 import { setPatchCount } from './utils/dbManager/datamodel';
 import Attribute from './utils/dbManager/Attribute';
 import { EventEmitter } from 'node:events';
+import { resolve } from 'node:path';
+
+let envPath = process.env.ENVFILE || "./.env";
+envPath = resolve(process.cwd(), envPath);
+dotenv.config({ path: envPath });
 
 class DocStack extends EventEmitter {
     private app: Express;
@@ -75,6 +80,7 @@ class DocStack extends EventEmitter {
         this.app.use(logRequest)
         // Enable CORS for all routes
         if (process.env.NODE_ENV === 'development') {
+            logger.info("Development environment. Enabling CORS for :8080");
             this.app.use(cors({
                 origin: 'http://localhost:8080',
                 // Replace with the origin of webpack dev server

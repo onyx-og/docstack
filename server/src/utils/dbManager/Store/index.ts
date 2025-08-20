@@ -10,8 +10,14 @@ import { AttributeModel, AttributeTypeDecimal,
 // import ReferenceAttribute, { AttributeTypeReference } from "../Reference";
 import { decryptString } from "../../../utils/crypto";
 import { importJsonFile } from "../datamodel";
+import { resolve } from "node:path";
+import * as dotenv from "dotenv";
 
-const logger = getLogger().child({module: "Store"})
+const logger = getLogger().child({module: "Store"});
+
+let envPath = process.env.ENVFILE || "./.env";
+envPath = resolve(process.cwd(), envPath)
+dotenv.config({ path: envPath })
 
 export const BASE_SCHEMA: AttributeModel[] = [
     { name: "_id", type: "string", config: { maxLength: 100 } },

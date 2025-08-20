@@ -4,4 +4,14 @@ example/
 jest.config.ts
 webpack.config.js
 
-# Generated files
+# Example files
+example/
+
+# PouchDB database and logs
+log/
+db-*/
+combined.log
+errors.log
+
+.env
+example.env

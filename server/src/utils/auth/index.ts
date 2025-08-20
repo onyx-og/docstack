@@ -1,13 +1,15 @@
 import { decryptString, encryptString, hashStringEpoch } from "../crypto";
 import Store, {Document} from '../dbManager/Store';
 import jwt from 'jsonwebtoken';
+import fs from "node:fs";
 import dotenv from 'dotenv';
-import Class from "../dbManager/Class";
 import getLogger from "../logger";
+import { resolve } from "node:path";
 
 const logger = getLogger().child({module: "auth"})
 
-const envPath = '.env';
+let envPath = process.env.ENVFILE || "./.env";
+envPath = resolve(process.cwd(), envPath);
 
 dotenv.config({ path: envPath });
 
@@ -48,9 +50,11 @@ export const login = async (username: string, password: string) => {
         return { responseCode: 404, body: { error: 'User not found'} }
     }
 
+    logger.info("Stored password", {encrypted: userDoc.password});
+    logger.info("Received password", {encrypted: password});
     const storedDecryptedPsw = decryptString(userDoc.password)
     const receivedDecryptedPsw = decryptString(password);
-
+    logger.info("Password comparison", {stored: storedDecryptedPsw, received: receivedDecryptedPsw});
     if ( receivedDecryptedPsw === storedDecryptedPsw) {
         // Create session document
         const UserSessionClass = await (globalThis.store as Store).getClass("UserSession");
@@ -83,7 +87,8 @@ export const login = async (username: string, password: string) => {
 
 // Setups admin user using environment values
 export const setupAdminUser = async () => {
-    console.log("setupAdminUser - setting up admin user")
+    console.log("setupAdminUser - setting up admin user");
+    console.log(dotenv.parse(fs.readFileSync(envPath)))
     const adminUsername = process.env.ADMIN_USERNAME;
     const adminPassword = process.env.ADMIN_PASSWORD;
 

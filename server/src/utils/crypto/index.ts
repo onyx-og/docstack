@@ -1,10 +1,10 @@
 import crypto from "crypto"
 import dotenv from 'dotenv';
-import fs from 'fs';
 import { resolve } from 'node:path';
-import process from "node:process"
+import process from "node:process";
+import fs from "node:fs";
 
-const envPath = '.env';
+const envPath = process.env.ENVFILE || "./.env";
 
 dotenv.config({ path: envPath }); 
 
@@ -50,18 +50,27 @@ export const updateEnvFile = (config: {
     [key: string]: string;
 }) => {
     const envFilePath = resolve(process.cwd(), envPath);
-    console.log("updateEnvFile - got path", envFilePath)
-    const envConfig = dotenv.parse(fs.readFileSync(envFilePath));
+    console.log(`updateEnvFile - preparing to update .env file at path: "${envFilePath}"`);
 
-    for (const [key, value] of Object.entries(config)) {
-        envConfig[key] = value;
+    try {
+        const envConfig = dotenv.parse(fs.readFileSync(envFilePath));
+
+        for (const [key, value] of Object.entries(config)) {
+            envConfig[key] = value;
+        }
+
+        const envContent = Object.entries(envConfig)
+            .map(([key, value]) => `${key}="${value}"`)
+            .join('\n');
+
+        fs.writeFileSync(envFilePath, envContent);
+    } catch (e) {
+        const errMsg = `updateEnvFile - Error while updating env file at path ${envFilePath}: ${e}` ;
+        console.error(errMsg);
+        throw new Error(errMsg)
     }
-
-    const envContent = Object.entries(envConfig)
-        .map(([key, value]) => `${key}="${value}"`)
-        .join('\n');
-
-    fs.writeFileSync(envFilePath, envContent);
+    console.log(`updateEnvFile - successfully updated .env file at path: "${envFilePath}"`);
+    dotenv.config({ override: true, path: envFilePath});
 };
 
 export const generatePswKeys = () => {
@@ -73,8 +82,8 @@ export const generatePswKeys = () => {
     const { publicKey, privateKey } = generatePair();
     updateEnvFile({"PSW_PUBLIC_KEY": publicKey, "PSW_PRIVATE_KEY": privateKey});
     console.log("Key pair generated successfully. Reloading .env file...");
-    dotenv.config({ override: true })
 }
+
 export const generateJwtKeys = () => {
     let keys = checkKeyPairPresence(["JWT_PUBLIC_KEY", "JWT_PRIVATE_KEY"]);
     if (keys.length === 0) {
@@ -84,7 +93,6 @@ export const generateJwtKeys = () => {
     const { publicKey, privateKey } = generatePair();
     updateEnvFile({"JWT_PUBLIC_KEY": publicKey, "JWT_PRIVATE_KEY": privateKey});
     console.log("JWT key pair generated successfully. Reloading .env file...");
-    dotenv.config({ override: true })
 }
 
 export const encryptString = (stringToEncrypt: string) => {
@@ -97,7 +105,7 @@ export const encryptString = (stringToEncrypt: string) => {
             oaepHash: "sha256",
         },
         // We convert the data string to a buffer using `Buffer.from`
-        Buffer.from(stringToEncrypt)
+        Buffer.from(stringToEncrypt) as Uint8Array
     );
 
     return encryptedData.toString("base64");
@@ -129,7 +137,7 @@ export const decryptData = (encryptedData: Buffer) => {
               padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
               oaepHash: "sha256",
             },
-            encryptedData
+            encryptedData as Uint8Array
           );
           
         // The decrypted data is of the Buffer type, which we can convert to a
