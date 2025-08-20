@@ -99,9 +99,13 @@ class Class {
     }
 
     static async buildFromModel(space: Store, classModel: ClassModel) {
+        logger.info("buildFromModel - Instantiate from model", {classModel});
         // let parentClassModel = (classModel.parentClass ? await space.getClassModel(classModel.parentClass) : null);
         // let parentClass = (parentClassModel ? await Class.buildFromModel(space, parentClassModel) : null);
+
+        // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
         let classObj: Class = await Class.create(space, classModel.name, classModel.type, classModel.type);
+        // [TODO] Redundancy: classObj.setModel updates the model again from the one provided
         classObj.setModel(classModel);
         return classObj;
     }
@@ -165,11 +169,22 @@ class Class {
 
     // Set model should be called only after fetching the latest model from db
     private setModel( model: ClassModel ) {
-        logger.info("setModel - got incoming model", {model: model})
+        logger.info("setModel - got incoming model", {model: model});
+        // Retreive current class model
         let currentModel = this.getModel();
+        // Set model arg to the overwrite of the current model with the given one 
         model = Object.assign(currentModel, model);
         this.schema = this.schema || []
-        model.schema = [ ...model.schema, ...(this.schema)]
+        // model.schema = [ ...model.schema, ...(this.schema)]
+        // Create a Map from the current (this.schema) for efficient lookup
+        const schemaMap = new Map(this.schema.map(item => [item.name, item]));
+        // Iterate over the provided (model.schema) array and add/update items in the Map
+        model.schema.forEach(item => {
+            schemaMap.set(item.name, item); // This will overwrite existing keys
+        });
+
+        // Convert the Map values back to the model schema
+        model.schema = Array.from(schemaMap.values());
         // let _model = Object.assign(currentModel, {...model, schema: this.schema});
         this.attributes = []
         for (let attribute of model.schema) {
@@ -327,9 +342,11 @@ class Class {
 
     async addOrUpdateCard(params: {[key:string]: any}, cardId?: string) {
         if (cardId) return this.updateCard(cardId, params);
-
+        logger.info("addOrUpdateCard - received params", {params});
         // attempt to retrieve card by primary key
         let filter = {}
+        let primaryKeys = this.getPrimaryKeys();
+        logger.info("addOrUpdateCard - got primary keys", {primaryKeys});
         this.getPrimaryKeys().reduce(
             (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
             filter,
