@@ -90,8 +90,8 @@ class Attribute {
 
     static async build( attributeObj: Attribute ) {
         let classObj = attributeObj.getClass();
-        let surfer = classObj.getSpace();
-        if ( surfer ) {
+        let store = classObj.getSpace();
+        if ( store ) {
             await classObj.addAttribute(attributeObj);
             return attributeObj;
         } else {

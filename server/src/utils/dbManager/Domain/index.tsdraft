@@ -1,7 +1,7 @@
 import { AttributeModel } from "../Attribute";
 import Class, { ClassModel } from "../Class"
 import ReferenceAttribute from "../Reference";
-import Surfer, { Document }  from "../Surfer";
+import Store, { Document }  from "../Store";
 
 export type DomainModel = ClassModel & {
     name: string,
@@ -21,7 +21,7 @@ class Domain extends Class {
     targetClass: string[];
     public relationType: "one-to-one" | "one-to-many" | "many-to-many";
 
-    constructor(space: Surfer, name: string, title: string,  sourceClass: string[], targetClass: string[], relationType: "one-to-one" | "one-to-many" | "many-to-many", parentDomain?: Domain) {
+    constructor(space: Store, name: string, title: string,  sourceClass: string[], targetClass: string[], relationType: "one-to-one" | "one-to-many" | "many-to-many", parentDomain?: Domain) {
         super(space, name, "domain", title, parentDomain);
         this.sourceClass = sourceClass;
         this.targetClass = targetClass;
@@ -39,7 +39,7 @@ class Domain extends Class {
         }
     }
 
-    static async buildFromModel(space: Surfer, domainModel: DomainModel) {
+    static async buildFromModel(space: Store, domainModel: DomainModel) {
         let parentDomainModel = (domainModel.parentDomain ? await space.getDomainModel(domainModel.parentDomain) : null);
         let parentDomain = (parentDomainModel ? await Domain.buildFromModel(space, parentDomainModel) : null);
         let domainObj = new Domain(space, domainModel.name, domainModel.title, domainModel.sourceClass, domainModel.targetClass, domainModel.relationType, parentDomain);
@@ -47,7 +47,7 @@ class Domain extends Class {
         return domainObj;
     }
 
-    static async fetch( space: Surfer, domainName: string ) {
+    static async fetch( space: Store, domainName: string ) {
         let domainModel = await space.getDomainModel(domainName);
         if ( domainModel ) {
             return Domain.buildFromModel(space, domainModel);

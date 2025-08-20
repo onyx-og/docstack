@@ -1,5 +1,5 @@
 import { decryptString, encryptString, hashStringEpoch } from "../crypto";
-import Surfer, {Document} from '../dbManager/Surfer';
+import Store, {Document} from '../dbManager/Store';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import Class from "../dbManager/Class";
@@ -39,7 +39,7 @@ export const login = async (username: string, password: string) => {
     }
 
     // Add your login logic here
-    const userDoc = await globalThis.surfer.findDocument({
+    const userDoc = await globalThis.store.findDocument({
         "type": "User",
         username: { $eq: username },
     }) as Document
@@ -53,7 +53,7 @@ export const login = async (username: string, password: string) => {
 
     if ( receivedDecryptedPsw === storedDecryptedPsw) {
         // Create session document
-        const UserSessionClass = await (globalThis.surfer as Surfer).getClass("UserSession");
+        const UserSessionClass = await (globalThis.store as Store).getClass("UserSession");
         const sessionCard = await UserSessionClass.addOrUpdateCard({
             username: userDoc.username,  //PK
             sessionId: hashStringEpoch(userDoc.username),  //unique
@@ -95,7 +95,7 @@ export const setupAdminUser = async () => {
         throw new Error("Can't configure admin user because of missing password");
     }
 
-    const UserClass = await (globalThis.surfer as Surfer).getClass("User");
+    const UserClass = await (globalThis.store as Store).getClass("User");
     // check if the admin user already exists
     // we consider as admin user the one that has the same username as in the env configs
     const userAdminCards = await UserClass.getCards({

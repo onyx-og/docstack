@@ -11,7 +11,7 @@ import { AttributeModel, AttributeTypeDecimal,
 import { decryptString } from "../../../utils/crypto";
 import { importJsonFile } from "../datamodel";
 
-const logger = getLogger().child({module: "Surfer"})
+const logger = getLogger().child({module: "Store"})
 
 export const BASE_SCHEMA: AttributeModel[] = [
     { name: "_id", type: "string", config: { maxLength: 100 } },
@@ -75,7 +75,7 @@ export interface SystemDoc {
     startupTime: number;
 }
 
-type SurferOptions = {
+type StoreOptions = {
     plugins: PouchDB.Plugin[]
 } & PouchDB.Configuration.DatabaseConfiguration 
 
@@ -83,11 +83,11 @@ type CachedClass = Class & {
     ttl: number
 }
 
-class Surfer {
+class Store {
     private db: PouchDB.Database<{}> = undefined;
     private lastDocId: number;
     private connection: string;
-    private options: SurferOptions;
+    private options: StoreOptions;
     private static appVersion: string = "0.0.1";
     private cache: {
         [className: string]: CachedClass
@@ -97,7 +97,7 @@ class Surfer {
         // Private constructor to prevent direct instantiation
     }
 
-    private async initialize(conn: string, options?: SurferOptions) {
+    private async initialize(conn: string, options?: StoreOptions) {
         // Store the connection string and options
         this.connection = conn;
         this.options = options;
@@ -140,11 +140,11 @@ class Surfer {
     }
 
     // asynchronous factory method
-    public static async create(conn: string, options?: SurferOptions): Promise<Surfer> {
-        const surfer = new Surfer();
-        await surfer.initialize(conn, options);
-        await surfer.initdb()
-        return surfer;
+    public static async create(conn: string, options?: StoreOptions): Promise<Store> {
+        const store = new Store();
+        await store.initialize(conn, options);
+        await store.initdb()
+        return store;
     }
     
     async getLastDocId() {
@@ -259,7 +259,7 @@ class Surfer {
         if (!systemDoc) {
             _systemDoc = {
                 _id: "~system",
-                appVersion: Surfer.appVersion,
+                appVersion: Store.appVersion,
                 dbInfo: dbInfo,
                 schemaVersion: undefined,
                 startupTime: (new Date()).valueOf()
@@ -272,7 +272,7 @@ class Surfer {
             // apply patches if needed
             let schemaVersion = await this.applyPatches(systemDoc.schemaVersion);
             _systemDoc = { ...systemDoc,
-                appVersion: Surfer.appVersion,
+                appVersion: Store.appVersion,
                 dbInfo: dbInfo,
                 schemaVersion: schemaVersion,
                 startupTime: (new Date()).valueOf()
@@ -334,7 +334,7 @@ class Surfer {
         }
     }
 
-    // static async build( that: Surfer ) {
+    // static async build( that: Store ) {
     //     let result = await that.initdb();
     //     return result;
     // }
@@ -894,4 +894,4 @@ class Surfer {
     } */
 }
 
-export default Surfer
+export default Store

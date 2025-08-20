@@ -2,7 +2,7 @@ import { Button } from "alenite-design";
 import { useAppDispatch } from "hooks";
 import { useCallback } from "react";
 import { logout } from "features/auth";
-import { testRequest } from "features/surfer";
+import { testRequest } from "features/store";
 
 const Dashboard = () => {
     const dispatch = useAppDispatch()

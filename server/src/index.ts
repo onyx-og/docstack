@@ -6,7 +6,7 @@ dotenv.config({ path: './.env' })
 import getLogger, {logRequest} from "./utils/logger"
 import test from './utils/dbManager/test';
 import { generateJwtKeys, generatePswKeys } from './utils/crypto';
-import Surfer from './utils/dbManager/Surfer';
+import Store from './utils/dbManager/Store';
 import { login, JWTAuthPayload, setupAdminUser } from './utils/auth';
 // import memoryAdapter from "pouchdb-adapter-memory"
 import cookieParser from 'cookie-parser';
@@ -20,11 +20,11 @@ class DocStack extends EventEmitter {
     private app: Express;
     private dbName: string;
     private readyState: boolean; 
-    private surfer: Surfer;
+    private store: Store;
 
     private async initInstance(dbName: string) {
         // TODO instead of fixed "db-test" allow the configuration of "test" part
-        const surfer = await Surfer.create(`db-${dbName}`, {
+        const store = await Store.create(`db-${dbName}`, {
             // defaults to leveldb
             // adapter: 'memory', 
             plugins: [
@@ -32,8 +32,8 @@ class DocStack extends EventEmitter {
             // memoryAdapter
             ]
         });
-        this.surfer = surfer;
-        globalThis.surfer = this.surfer;
+        this.store = store;
+        globalThis.store = this.store;
         await setupAdminUser();
         this.readyState = true;
         this.emit('ready') // TODO: consider wether to provide args
@@ -41,14 +41,14 @@ class DocStack extends EventEmitter {
 
     async resetDb() {
         try {
-            await this.surfer.reset();
+            await this.store.reset();
         } catch (e) {
             throw new Error(e);
         }
     }
 
-    public getSurfer() {
-        return this.surfer;
+    public getStore() {
+        return this.store;
     }
 
     public getReadyState() {
@@ -120,7 +120,7 @@ class DocStack extends EventEmitter {
                 } else {
                     // Check whether the session is still valid
                     const { sessionId } = payload;
-                    const UserSessionClass = await this.surfer.getClass("UserSession");
+                    const UserSessionClass = await this.store.getClass("UserSession");
                     const sessionCards = await UserSessionClass.getCards({
                         sessionId: { $eq: sessionId },
                         sessionStatus: { $eq: "active" }
@@ -181,7 +181,7 @@ class DocStack extends EventEmitter {
                 if (!conn) {
                     throw new Error("Connection name not provided");
                 }
-                await Surfer.clear(conn);
+                await Store.clear(conn);
                 return res.status(200).json({ success: true, message: 'Internal database cleared' });
             } catch (e) {
                 logger.error("Error during database clear", e);
@@ -203,7 +203,7 @@ class DocStack extends EventEmitter {
 
             try {
                 const newClass = await Class.create(
-                    this.surfer, name, type as string, description as string
+                    this.store, name, type as string, description as string
                 );
                 logger.info("create-class", `class '${name}' created successfully.`,
                     {classModel: newClass.getModel()}
@@ -225,7 +225,7 @@ class DocStack extends EventEmitter {
 
             try {
                 // Loads the class object
-                let classObj = await this.surfer.getClass(className);
+                let classObj = await this.store.getClass(className);
                 let newAttribute = await Attribute.create(classObj, name, type, config);
                 logger.info(`create-attribute - Attribute '${name}' added to class '${className}'`, 
                     {attributeModel: newAttribute.getModel()}
@@ -256,5 +256,5 @@ class DocStack extends EventEmitter {
     }
 }
 
-export { Surfer, Class, Attribute, getLogger }
+export { Store, Class, Attribute, getLogger }
 export {DocStack};

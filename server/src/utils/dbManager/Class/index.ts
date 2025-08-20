@@ -1,10 +1,10 @@
 import Attribute, { AttributeModel, AttributeType } from '../Attribute'
-import Surfer, { Document } from '../Surfer';
+import Store, { Document } from '../Store';
 // import DbManager from '..';
 import getLogger from "../../../utils/logger";
 // import ReferenceAttribute from '../Reference';
 
-const logger = getLogger().child({module: "Surfer"})
+const logger = getLogger().child({module: "Store"})
 
 const CLASS_TYPE = "class";
 const SUPERCLASS_TYPE = "superclass";
@@ -19,7 +19,7 @@ export type ClassModel = Document & {
     
 }
 class Class {
-    private space?: Surfer | null;
+    private space?: Store | null;
     private name: string;
     private type: string;
     private description: string;
@@ -64,7 +64,7 @@ class Class {
     }
 
     private init(
-        space: Surfer | null,
+        space: Store | null,
         name: string,
         type: string,
         description: string,
@@ -86,7 +86,7 @@ class Class {
     }
 
     public static async create(
-        space: Surfer,
+        space: Store,
         name: string,
         type: string = "class",
         description: string,
@@ -98,7 +98,7 @@ class Class {
         return _class;
     }
 
-    static async buildFromModel(space: Surfer, classModel: ClassModel) {
+    static async buildFromModel(space: Store, classModel: ClassModel) {
         // let parentClassModel = (classModel.parentClass ? await space.getClassModel(classModel.parentClass) : null);
         // let parentClass = (parentClassModel ? await Class.buildFromModel(space, parentClassModel) : null);
         let classObj: Class = await Class.create(space, classModel.name, classModel.type, classModel.type);
@@ -106,7 +106,7 @@ class Class {
         return classObj;
     }
 
-    static async fetch( space: Surfer, className: string ) {
+    static async fetch( space: Store, className: string ) {
         let classModel = await space.getClassModel(className);
         if ( classModel ) {
             return Class.buildFromModel(space, classModel);
