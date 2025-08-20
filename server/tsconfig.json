@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "sourceMap": true,
+    "target": "es2017",
+    "allowJs": true,
+    "module": "NodeNext",
+    "outDir": "../lib",
+    "baseUrl": "./src",
+    "skipLibCheck": true,
+    "alwaysStrict": true,
+    "noImplicitAny": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
