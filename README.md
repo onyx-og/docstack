@@ -1,4 +1,4 @@
-# couchsurfer
+# DocStack
 A framework to build and mantain PouchDB databases
 
 ## Configuration

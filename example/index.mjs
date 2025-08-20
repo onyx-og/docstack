@@ -1,7 +1,7 @@
-import {CouchSurfer, Attribute} from "../lib/index.js";
+import {DocStack, Attribute} from "../lib/index.js";
 
-const couch = new CouchSurfer();
-const app = couch.getApp();
+const stack = new DocStack();
+const app = stack.getApp();
 
 const port = process.env.SERVER_PORT || 5000;
 

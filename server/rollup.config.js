@@ -7,7 +7,7 @@ export default {
   output: {
     dir: 'lib',
     format: 'umd',
-    name: 'couchsurfer'
+    name: 'docstack'
   },
   plugins: [replace({
     'process.env.BUILDING': 1

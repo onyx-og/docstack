@@ -1,8 +1,8 @@
-import {CouchSurfer} from "./src"
+import {DocStack} from "./src"
 
-const couchsurfer = new CouchSurfer()
+const stack = new DocStack()
 
-const app = couchsurfer.getApp();
+const app = stack.getApp();
 
 const port = process.env.SERVER_PORT || 5000;
 

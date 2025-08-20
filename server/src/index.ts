@@ -16,7 +16,7 @@ import { setPatchCount } from './utils/dbManager/datamodel';
 import Attribute from './utils/dbManager/Attribute';
 import { EventEmitter } from 'node:events';
 
-class CouchSurfer extends EventEmitter {
+class DocStack extends EventEmitter {
     private app: Express;
     private dbName: string;
     private readyState: boolean; 
@@ -67,7 +67,7 @@ class CouchSurfer extends EventEmitter {
         dbName: string;
     }) {
         super();
-        this.dbName = (config && config.dbName) ? config.dbName : "couchsurfer";
+        this.dbName = (config && config.dbName) ? config.dbName : "docstack";
         const logger = getLogger().child({module: "express"})
         this.app = express();
         this.readyState = false;
@@ -248,7 +248,7 @@ class CouchSurfer extends EventEmitter {
         setPatchCount()
         // setTimeout(test, 1000)
         this.initInstance(this.dbName)
-        this.on("ready", () => logger.info("CouchSurfer successfully initialized"))
+        this.on("ready", () => logger.info("DocStack successfully initialized"))
     }
 
     public getApp() {
@@ -257,4 +257,4 @@ class CouchSurfer extends EventEmitter {
 }
 
 export { Surfer, Class, Attribute, getLogger }
-export {CouchSurfer};
+export {DocStack};

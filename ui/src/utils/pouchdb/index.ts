@@ -3,7 +3,7 @@ import { Middleware } from '@reduxjs/toolkit';
 
 const db = new PouchDB('redux_state');
 
-// In the future use the client versio of CouchSurfer to save the state
+// In the future use the client versio of DocStack to save the state
 export const saveState = async (state: any) => {
   try {
     const doc = await db.get('state');

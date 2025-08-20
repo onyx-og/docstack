@@ -1,15 +1,15 @@
 {
-  "name": "pouchsurfer",
+  "name": "docstack",
   "version": "0.0.1",
   "main": "lib/index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/onyxcodes/couchsurfer.git"
+    "url": "git+https://github.com/onyx-og/docstack"
   },
   "license": "CC-BY-SA-4.0",
-  "author": "Onyx <onyxganda@gmail.com> (https://onxy.ac)",
+  "author": "Onyx <hello@onyx.ac> (https://onxy.ac)",
   "contributors": [
-    "Onyx <onyxganda@gmail.com> (https://onyx.ac)"
+    "Onyx <hello@onyx.ac> (https://onyx.ac)"
   ],
   "eslintConfig": {
     "extends": [
