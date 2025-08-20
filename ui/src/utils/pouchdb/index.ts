@@ -7,6 +7,8 @@ const db = new PouchDB('redux_state');
 export const saveState = async (state: any) => {
   try {
     const doc = await db.get('state');
+    console.log("saveState - current doc", {doc});
+    console.log("saveState - provided state", {state});
     await db.put({ ...doc, state });
   } catch (err: any) {
     if (err.status === 404) {
@@ -23,6 +25,7 @@ type StateDoc = PouchDB.Core.IdMeta & PouchDB.Core.GetMeta & {
 export const loadState = async () => {
   try {
     const doc = await db.get('state') as StateDoc;
+    console.log("loadState - loaded doc", doc)
     return doc.state;
   } catch (err: any) {
     if (err.status === 404) {
@@ -35,8 +38,8 @@ export const loadState = async () => {
 };
 
 // Middleware to Sync Redux State with PouchDB
-export const  pouchdbMiddleware: Middleware = store => next => action => {
+export const  pouchdbMiddleware: Middleware = store => next => async action => {
+  //await saveState(store.getState());
   const result = next(action);
-  saveState(store.getState());
   return result;
 };

@@ -1,5 +1,5 @@
 import { createAsyncThunk, createReducer } from '@reduxjs/toolkit';
-
+import { saveState as saveStateLocal } from 'utils/pouchdb';
 const doTestRequest = async () => {
     // Include credentials in development mode (different port)
     var credentialsConfig: RequestCredentials = process.env.NODE_ENV === "development" ? 'include' : 'same-origin';
@@ -21,6 +21,12 @@ export const testRequest = createAsyncThunk('testRequest', async (data: any, thu
     return response;
 })
 
+export const saveState = createAsyncThunk('saveState', async (data: boolean, thunkApi) => {
+    const state = thunkApi.getState();
+    console.log("saveStateAction - Got state", state);
+    await saveStateLocal(state);
+})
+
 const initialState = {
     test: 'test'
 }
@@ -28,6 +34,9 @@ const initialState = {
 const reducer = createReducer(initialState, builder => { builder
     .addCase(testRequest.fulfilled, (state, action) => {
         console.log(action.payload);
+    })
+    .addCase(saveState.fulfilled, (state, action) => {
+        
     })
 })
 

@@ -2,24 +2,30 @@ import { Button } from "alenite-design";
 import { useAppDispatch } from "hooks";
 import { useCallback } from "react";
 import { logout } from "features/auth";
-import { testRequest } from "features/store";
+import { saveState } from "features/store"
+// import { testRequest } from "store";
 
 const Dashboard = () => {
     const dispatch = useAppDispatch()
 
     const doLogout = useCallback( () => {
         dispatch(logout(true));
-    }, [dispatch])
+    }, [dispatch]);
 
-    const doRequest = useCallback( () => {
-        dispatch(testRequest(true));
-    }, [dispatch])
+    const doSaveState = useCallback( () => {
+        dispatch(saveState(true));
+    },[dispatch]);
+
+    // const doRequest = useCallback( () => {
+    //     dispatch(testRequest(true));
+    // }, [dispatch])
 
     return (
         <div>
         <h1>Dashboard</h1>
-        <Button type="default" onClick={doRequest}>Test request</Button>
+        {/* <Button type="default" onClick={doRequest}>Test request</Button> */}
         <Button type="primary" onClick={doLogout}>Logout</Button>
+        <Button type="primary" onClick={doSaveState}>Save State</Button>
         </div>
     );
 }

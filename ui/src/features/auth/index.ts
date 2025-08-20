@@ -80,17 +80,4 @@ const auth = createReducer(initialState, builder => { builder
   })
 });
 
-const authSlice = createSlice({
-  name: 'auth',
-  initialState,
-  reducers: {
-    login: (state) => {
-      state.isAuthenticated = true;
-    },
-    logout: (state) => {
-      state.isAuthenticated = false;
-    },
-  },
-});
-
 export default auth;
