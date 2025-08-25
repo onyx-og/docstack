@@ -1,7 +1,7 @@
 import { configureStore, Dispatch } from '@reduxjs/toolkit';
 import ui, { UIState } from 'features/ui';
 import authReducer, {AuthState} from 'features/auth';
-import { loadState, pouchdbMiddleware } from 'utils/pouchdb';
+import { loadState, pouchdbMiddleware } from 'utils/docstack';
 
 export type AppDispatch = typeof store.dispatch;
 

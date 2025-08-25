@@ -1,4 +1,4 @@
-import { Button } from "alenite-design";
+import { Button } from "@prismal/react";
 import { useAppDispatch } from "hooks";
 import { useCallback } from "react";
 import { logout } from "features/auth";

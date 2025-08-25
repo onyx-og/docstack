@@ -1,0 +1,107 @@
+{
+  "version": "0.0.1",
+  "docs": [
+    {
+      "_id": "User",
+      "name": "User",
+      "description": "A user class for secure login",
+      "type": "class",
+      "schema": [
+        {
+          "name": "username",
+          "type": "string",
+          "config": {
+            "maxLength": 50,
+            "isArray": false
+          }
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "config": {
+            "maxLength": 50,
+            "isArray": false
+          }
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "config": {
+            "maxLength": 50,
+            "isArray": false
+          }
+        },
+        {
+          "name": "firstName",
+          "type": "string",
+          "config": {
+            "maxLength": 50,
+            "isArray": false
+          }
+        },
+        {
+          "name": "lastName",
+          "type": "string",
+          "config": {
+            "maxLength": 50,
+            "isArray": false
+          }
+        }
+      ]
+    },
+    {
+      "_id": "UserSession",
+      "name": "UserSession",
+      "description": "Tracks user sessions",
+      "type": "class",
+      "schema": [
+        {
+          "name": "username",
+          "type": "string",
+          "config": {
+            "maxLength": 50,
+            "isArray": false,
+            "primaryKey": true,
+            "mandatory": true
+          }
+        },
+        {
+          "name": "sessionId",
+          "type": "string",
+          "config": {
+            "maxLength": 200,
+            "isArray": false,
+            "mandatory": true
+          }
+        },
+        {
+          "name": "sessionStart",
+          "type": "string",
+          "config": {
+            "maxLength": 100,
+            "isArray": false,
+            "mandatory": true
+          }
+        },
+        {
+          "name": "sessionStatus",
+          "type": "string",
+          "config": {
+            "maxLength": 100,
+            "isArray": false,
+            "mandatory": true
+          }
+        },
+        {
+          "name": "sessionEnd",
+          "type": "string",
+          "config": {
+            "maxLength": 100,
+            "isArray": false,
+            "mandatory": false
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,17 +1,16 @@
-import NodePouchDB from "pouchdb-node";
-import getLogger from "../../../utils/logger/";
-import Class, { ClassModel } from "../Class";
-// import Domain, { DomainModel } from "../Domain";
-import { AttributeModel, AttributeTypeDecimal, 
+import PouchDB from "pouchdb";
+import logger_ from "../../../utils/logger/";
+import Class from "../../../../../shared/src/utils/docstack/class";
+import { decryptString } from "../../crypto";
+import { importJsonFile, countPatches } from "../datamodel";
+
+
+import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
     AttributeTypeForeignKey, 
     AttributeTypeInteger,
-    AttributeTypeString
-} from "../Attribute";
-// import ReferenceAttribute, { AttributeTypeReference } from "../Reference";
-import { decryptString } from "../../../utils/crypto";
-import { importJsonFile } from "../datamodel";
+    AttributeTypeString} from "../../../../../shared/src/types";
 
-const logger = getLogger().child({module: "stack"});
+const logger = logger_.child({module: "stack"});
 
 export const BASE_SCHEMA: AttributeModel[] = [
     { name: "_id", type: "string", config: { maxLength: 100 } },
@@ -50,30 +49,7 @@ const DOMAIN_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", confi
     { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
     { name: "targetClass", type: "foreign_key", config: { isArray: true } },
     ...BASE_SCHEMA
-]
-export type Document = PouchDB.Core.ExistingDocument<{
-    type: string;
-    createTimestamp?: number; // [TODO] Error prone
-    updateTimestamp?: number | null;
-    [key: string]: any
-}>
-
-// The idea is to make this patch object be processed
-// storing the version of the patch and the documents contained in it
-export interface Patch {
-    version: string;
-    docs: (PouchDB.Core.ExistingDocument<{
-        [key: string]: any
-    }> | PouchDB.Core.Document<{[key: string]: any}>)[]
-}
-
-export interface SystemDoc {
-    _id: string;
-    appVersion: string;
-    schemaVersion: string | undefined;
-    dbInfo: PouchDB.Core.DatabaseInfo;
-    startupTime: number;
-}
+];
 
 type StoreOptions = {
     plugins: PouchDB.Plugin[]
@@ -96,6 +72,8 @@ class Store {
     private cache: {
         [className: string]: CachedClass
     }
+    private patchCount!: number;
+
 
     private constructor() {
         // Private constructor to prevent direct instantiation
@@ -106,18 +84,8 @@ class Store {
         // Store the connection string and options
         this.connection = conn;
         this.options = options;
-        let PouchDB: typeof import('pouchdb-core');
-        let Find: typeof import('pouchdb-find');
+        let Find: typeof import('pouchdb-find') =( await import('pouchdb-find')).default;
 
-        if (typeof window !== 'undefined') {
-            // Running in a browser
-            PouchDB = (await import('pouchdb-browser')).default;
-            Find = (await import('pouchdb-find')).default;
-        } else {
-            // Running in Node.js
-            PouchDB = (await import('pouchdb-node')).default;
-            Find = (await import('pouchdb-find')).default;
-        }
 
         // Load default plugins
         PouchDB.plugin(Find);
@@ -159,7 +127,7 @@ class Store {
             lastDocId = doc.value;
         } catch (e: any) {
             if (e.name === 'not_found') {
-                logger.info("getLastDocId - not found", e)
+                logger.info("getLastDocId - not found. Must be first initialization.")
                 return lastDocId
             }
             logger.error("checkdb - something went wrong", {"error": e});
@@ -184,12 +152,12 @@ class Store {
     // TODO Parametrize the URL in a way that during the build procedure
     // it get substituted with the correct path for the build configuration
     private async loadPatches(): Promise<Patch[]> {
-        let __patchDir = "../datamodel/patch"
+        let __patchDir = "patch"
         if (process.env.BUILDING) __patchDir = "patch"
         // [TODO] Load patches from files located in utils/dbManager/patch
         try {
-            let patchCount = Number(process.env.PATCH_COUNT);
-            logger.info(`loadPatches - preparing to load ${patchCount} patches`)
+            let patchCount = Number(this.patchCount);
+            logger.info(`loadPatches - preparing to load ${patchCount} patches`);
             let patches = await Promise.all(
                 Array.from({ length: patchCount }).map(
                   (_, index) => {
@@ -232,6 +200,7 @@ class Store {
     private async applyPatches(schemaVersion: string | undefined): Promise<string> {
         let _schemaVersion = schemaVersion;
         try {
+            this.patchCount = countPatches();
             const allPatches = await this.loadPatches();
             // When schemaVersion is undefined uses index 0 (start from first)
             // or start from the index after the patch at which the system is at 
@@ -336,7 +305,7 @@ class Store {
             this.lastDocId = Number(lastDocId);
         } catch (e: any) {
             logger.error("initdb -  something went wrong", e)
-            throw new Error("initdb -  something went wrong"+e);
+            throw new Error(e);
         }
     }
 
@@ -514,7 +483,7 @@ class Store {
     static async clear (conn: string) {
         return new Promise ( (resolve, reject) => {
             try {
-                let db = new NodePouchDB(conn)
+                let db = new PouchDB(conn)
                 db.destroy(null, () => {
                     logger.info("clear - Destroyed db");
                     resolve(true);
@@ -903,5 +872,7 @@ class Store {
         return this.createDoc(null, domain, params);
     } */
 }
+
+
 
 export default Store

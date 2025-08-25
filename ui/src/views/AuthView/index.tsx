@@ -1,4 +1,4 @@
-import { Button, Form, TextInput } from "alenite-design"
+import { Button, Form, TextInput } from "@prismal/react"
 import { useAppDispatch, useAppSelector } from "hooks"
 import { useCallback, useMemo } from "react"
 import { login } from "features/auth"
@@ -20,8 +20,8 @@ const AuthView = () => {
         <Form name={'login-form'}
             submit={<Button type="primary">Login</Button>}
             onSubmit={doLogin}>
-            <TextInput type="text" name="username" label="Username" placeholder="a.username" />
-            <TextInput type="password" name="password" label="Password" placeholder="a.password" />
+            <TextInput htmlType="text" name="username" label="Username" placeholder="a.username" />
+            <TextInput htmlType="password" name="password" label="Password" placeholder="a.password" />
         </Form>
         <Button type="primary" onClick={doSaveState}>Save State</Button>
     </div>, []);

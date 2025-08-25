@@ -1,5 +1,5 @@
 import { createAsyncThunk, createReducer } from '@reduxjs/toolkit';
-import { saveState as saveStateLocal } from 'utils/pouchdb';
+import { saveState as saveStateLocal } from 'utils/docstack';
 const doTestRequest = async () => {
     // Include credentials in development mode (different port)
     var credentialsConfig: RequestCredentials = process.env.NODE_ENV === "development" ? 'include' : 'same-origin';

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { resolve } from 'node:path';
 import process from "node:process";
 import fs from "node:fs";
+import { KeyLike } from "node:crypto";
 
 const envPath = process.env.ENVFILE || "./.env";
 
@@ -100,7 +101,7 @@ export const encryptString = (stringToEncrypt: string) => {
   
     const encryptedData = crypto.publicEncrypt(
         {
-            key: publicKey,
+            key: publicKey as KeyLike,
             padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
             oaepHash: "sha256",
         },
@@ -143,7 +144,7 @@ export const decryptData = (encryptedData: Buffer) => {
         // The decrypted data is of the Buffer type, which we can convert to a
         // string to reveal the original data
         return decryptedData.toString();
-    } catch (error) {
+    } catch (error: any) {
         if (error.message.includes('error:0407109F:rsa routines:RSA_padding_check_PKCS1_type_2:pkcs decoding error')) {
             console.error("Decryption failed: Incorrect padding.");
         } else if (error.message.includes('error:04065072:rsa routines:RSA_EAY_PRIVATE_DECRYPT:padding check failed')) {

@@ -28,7 +28,7 @@ const testDataModel = async () => {
     // let aDocument = await testStore.createDoc(null, "TestClass", TestClass, {TestAttribute: "TestValue", TestAnotherAttrWithClass: ["TestValue1", "TestValue2"]});
     console.log("aDocument was created", aDocument)
 
-    let testclassDocs = await TestClass.getCards(null, null, 0, undefined);
+    let testclassDocs = await TestClass.getCards(undefined, undefined, 0, undefined);
     console.log("allDocs of class TestClass", testclassDocs)
 
     var UserClass = await Class.create(testStore, "User", "class", "A user class for secure login");
@@ -64,7 +64,7 @@ const testDataModel = async () => {
     //     console.log("Error", e);
     // }
 
-    let userDocs = await UserClass.getCards(null, null, 0, undefined);
+    let userDocs = await UserClass.getCards(undefined, undefined, 0, undefined);
 
     console.log("userDocs", userDocs)
 

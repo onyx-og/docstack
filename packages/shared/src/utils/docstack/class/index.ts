@@ -1,23 +1,16 @@
-import Attribute, { AttributeModel, AttributeType } from '../Attribute'
-import Store, { Document } from '../Store';
+import Attribute from '../attribute'
+import Store from '../../../../../client/src/utils/docstack/stack';
 // import DbManager from '..';
-import getLogger from "../../../utils/logger";
+import getLogger from "../../logger";
 // import ReferenceAttribute from '../Reference';
-
-const logger = getLogger().child({module: "Store"})
+import {ClassModel, AttributeModel, Document} from "../../../types";
+const logger = getLogger().child({module: "class"});
 
 const CLASS_TYPE = "class";
 const SUPERCLASS_TYPE = "superclass";
 const CLASS_TYPES = [CLASS_TYPE, SUPERCLASS_TYPE];
 
-export type ClassModel = Document & {
-    type: string,
-    name: string,
-    description?: string,
-    parentClass?: string,
-    _rev: PouchDB.Core.RevisionId | undefined;
-    schema?: AttributeModel[]
-}
+
 class Class {
     private space?: Store | null;
     /* Populated in init() */
@@ -165,7 +158,7 @@ class Class {
             description: this.getDescription(),
             type: this.getType(),
             schema: this.buildSchema(),
-            _rev: this.model ? this.model._rev : undefined,
+            _rev: this.model ? this.model._rev : "", // [TODO] Error prone
             createTimestamp: this.model ? this.model.createTimestamp : undefined,
         };
         return model;
@@ -352,10 +345,12 @@ class Class {
         if (cardId) return this.updateCard(cardId, params);
         logger.info("addOrUpdateCard - received params", {params});
         // attempt to retrieve card by primary key
-        let filter = {}
+        let filter: {[key: string]:any} = {}
         let primaryKeys = this.getPrimaryKeys();
         logger.info("addOrUpdateCard - got primary keys", {primaryKeys});
-        this.getPrimaryKeys().reduce(
+        // executes a reducer function on each element of the primaryKeys array
+        // that sets each primary key prop to the corresponding param value 
+        primaryKeys.reduce(
             (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
             filter,
         );

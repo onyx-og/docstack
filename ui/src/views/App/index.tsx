@@ -4,7 +4,7 @@ import AuthView from "views/AuthView";
 import { useEffect } from 'react';
 import Dashboard from 'views/Dashboard';
 
-require('alenite-design/lib/index.css')
+require('@prismal/react/lib/index.css')
 
 const App = () => {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);

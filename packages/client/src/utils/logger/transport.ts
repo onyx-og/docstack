@@ -1,5 +1,6 @@
 import Transport, { TransportStreamOptions } from "winston-transport";
-import NodePouchDB from "pouchdb-node"
+import PouchDB from "pouchdb"
+import 'setimmediate';
 import * as stream from 'stream';
 //
 // Inherit from `winston-transport` so you can take advantage
@@ -13,11 +14,11 @@ constructor(opts: {dbName: string} & TransportStreamOptions) {
 
     // Make sure that the database connection information is passed
     // and use that information to connect to the database
-    this.db = new NodePouchDB(opts.dbName)
+    this.db = new PouchDB(opts.dbName)
 }
 
   async log(info: Object, callback: Function) {
-    setImmediate(() => {
+    queueMicrotask(() => {
       this.emit('logged', info);
     });
 

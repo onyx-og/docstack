@@ -1,0 +1,25 @@
+{
+  "name": "@docstack/client",
+  "version": "0.0.1",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onyx-og/docstack.git"
+  },
+  "keywords": [
+    "nosql",
+    "db",
+    "storage",
+    "management"
+  ],
+  "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
+  "license": "CC-BY-SA-4.0",
+  "bugs": {
+    "url": "https://github.com/onyx-og/docstack/issues"
+  },
+  "homepage": "https://github.com/onyx-og/docstack#readme",
+  "description": ""
+}

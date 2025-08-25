@@ -1,26 +1,26 @@
 // This method is meant to be run by nodejs to calculate 
 // the number of patches in the patch folder
 import fs from 'node:fs';
-import dotenv from 'dotenv';
+// import dotenv from 'dotenv';
 import { updateEnvFile } from '../../../utils/crypto';
 import path from 'node:path';
-import { resolve } from "path";
+// import { resolve } from "path";
 
-let envPath = process.env.ENVFILE || "./.env";
-envPath = resolve(process.cwd(), envPath);
+// let envPath = process.env.ENVFILE || "./.env";
+// envPath = resolve(process.cwd(), envPath);
 
 // TODO: Consider an alternative for when running in the browser
 // like ftp
 export const countPatches = () => {
-    try {
-        const folderPath = path.resolve(__dirname, 'patch')
-        console.log("countPatches - checking directory", folderPath)
-        const count = fs.readdirSync(folderPath).length;
-        console.log(`countPatches - total number of patches: ${count}`)
-        return count;
-    } catch(e) {
-        console.log("countPatches - problem while reading patch folder", e)
-    }
+  try {
+    const folderPath = path.resolve(__dirname, 'patch')
+    console.log("countPatches - checking directory", folderPath)
+    const count = fs.readdirSync(folderPath).length;
+    console.log(`countPatches - total number of patches: ${count}`)
+    return count;
+  } catch(e: any) {
+    console.log("countPatches - problem while reading patch folder", e)
+  }
 }
 
 export const importJsonFile = async (importFilePath: string) => {
