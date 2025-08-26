@@ -1,114 +1,43 @@
 import Class from "../class";
-import { AttributeModel, AttributeType, ATTRIBUTE_TYPES } from "../../../types";
+import { AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig } from "../../../types";
 
-class Attribute {
-    name: string;
+abstract class Attribute {
+    abstract name: string;
     model!: AttributeModel;
-    class: Class | null;
+    class: Class | null = null;
     defaultValue?: any;
     
     constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], config?: AttributeType["config"] ) {
-        this.name = name;
-        this.setModel({
-            name: this.name,
-            type: this.getType(type),
-            config: this.getTypeConf(type, config) || {},
-        });
-        // if it's given a class
-        // if ( classObj ) {
-            // attempt to add attribute
-            this.class = classObj;
-        // }
+        
     }
 
-    public static async create(
+    static create: (
         classObj: Class,
         name: string,
         type: AttributeType["type"],
         config?: AttributeType["config"] 
-    ) {
-        const attribute = new Attribute(classObj, name, type, config);
-        await Attribute.build(attribute)
-        return attribute;
-    }
+    ) => Promise<Attribute | null>;
 
-    isPrimaryKey() {
-        let model = this.getModel();
-        return model.config.primaryKey;
-    }
+    abstract isPrimaryKey: () => boolean;
 
-    getModel() {
-        return this.model;
-    }
+    abstract getModel: () => AttributeModel;
 
-    getClass() {
-        if (this.class) return this.class
-        else throw Error("Missing class configuration for this attribute");
-    }
+    abstract getClass: () => Class;
 
-    static async build( attributeObj: Attribute ) {
-        let classObj = attributeObj.getClass();
-        let store = classObj.getSpace();
-        if ( store ) {
-            await classObj.addAttribute(attributeObj);
-            return attributeObj;
-        } else {
-            throw new Error("Missing db configuration");
-        }
-    }
+    static build: ( attributeObj: Attribute ) => Promise<Attribute | null>;
 
-    setModel( model: AttributeModel ) {
-        let currentModel = this.getModel();
-        model = Object.assign(currentModel || {}, model);
-        this.model = model;
-        this.defaultValue = model.config.defaultValue;
-    }
+    abstract setModel: ( model: AttributeModel ) => void;
     
     // TODO: Better define config
-    getType( type: AttributeType["type"]) {
-        if ( this.checkTypeValidity(type) ) {
-            return type
-        } else throw Error("Invalid attribute type: "+type)
-        // return this?
-    }
+    abstract getType: ( type: AttributeType["type"]) => AttributeType["type"];
 
     // getType()
 
-    getName() {
-        return this.name;
-    }
+    abstract getName: () => string;
 
-    checkTypeValidity(type: string) {
-        let validity = false;
-        if ( ATTRIBUTE_TYPES.includes(type) ) {
-            validity = true;
-        }
-        return validity;
-    }
+    abstract checkTypeValidity: (type: string) => boolean;
 
-    // TODO: change to imported const default configs for types
-    // as of now it accepts only string
-    // TODO: since config depends on attribute's type, 
-    // find a way to check if given configs are correct
-    // find a way to add default configs base on type
-    getTypeConf( type: AttributeType["type"], config: AttributeType["config"] | undefined ) {
-        switch( type ) {
-            // TODO: add missing cases and change values to imported const 
-            case "decimal":
-                config = Object.assign({ max: null, min: null, precision: null, isArray: false}, config);
-            break;
-            case "integer":
-                config = Object.assign({ max: null, min: null, isArray: false}, config);
-            break;
-            case "string":
-                config = Object.assign({ maxLength: 50, isArray: false }, config );
-            break;
-            default:
-                throw new Error("Unexpected type: "+type);
-                // return "^[a-zA-Z0-9_\\s]".concat("{0,"+config.maxLength+"}$");
-        }
-        return config
-    }
+    abstract getTypeConf: ( type: AttributeType["type"], config: AttributeType["config"] | undefined ) => AttributeTypeConfig;
 }
 
 export default Attribute;

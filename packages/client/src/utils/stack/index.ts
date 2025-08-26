@@ -1,6 +1,6 @@
 import PouchDB from "pouchdb";
 import logger_ from "../../utils/logger/";
-import Class from "../../../../shared/src/utils/stack/class";
+import Class from "./class";
 import { decryptString } from "../crypto";
 import { importJsonFile, countPatches } from "./datamodel";
 import {

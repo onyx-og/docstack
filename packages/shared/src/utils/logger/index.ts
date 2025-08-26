@@ -1,14 +1,10 @@
-import clientLogger from "../../../../client/src/utils/logger";
-// import {serverLogger} from "../../../../../server/src/utils/logger";
+import * as winston from "winston";
+import { createLogger, transports, format } from "winston";
 
-const getLogger = () => {
-  if (typeof window !== 'undefined') {
-    // Running in a browser
-    return clientLogger;
-  } else if (false) {
-    // Running in Node.js
-    return (require("../../../../../server/src/utils/logger"));
-  }
-}
+const logger = createLogger({
+    transports: [
+        new winston.transports.Console(),
+    ]
+});
 
-export default getLogger;
+export default logger;

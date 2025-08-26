@@ -1,60 +1,19 @@
-import Class from "../Class";
-// import { AttributeTypeReference } from "../Reference";
+import Class from "./class";
+import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig } from "@docstack/shared";
 
-const ATTRIBUTE_TYPES = ["string", "number", "integer", "reference", "boolean"];
-
-export type AttributeTypeConfig = {
-    isArray?: boolean,
-    primaryKey?: boolean,
-    mandatory?: boolean,
-    defaultValue?: any,
-    [key: string]: any
-}
-export type AttributeTypeDecimal = {
-    type: "decimal",
-    name: string,
-    config: {max?: number, min?: number, precision?: number} & AttributeTypeConfig
-}
-export type AttributeTypeInteger = {
-    type: "integer",
-    name: string,
-    config: {max?: number, min?: number} & AttributeTypeConfig
-}
-export type AttributeTypeString = {
-    name: string,
-    type: "string",
-    config: {maxLength?: number, encrypted?: boolean} & AttributeTypeConfig
-}
-
-export type AttributeTypeBoolean = {
-    type: "boolean",
-    name: string,
-    config: {default?: boolean} & AttributeTypeConfig
-}
-export type AttributeTypeForeignKey = {
-    type: "foreign_key",
-    name: string,
-    config: {} & AttributeTypeConfig
-}
-export type AttributeType = AttributeTypeString | AttributeTypeInteger | 
-    AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey;
-export type AttributeModel = {
-    name: string,
-    config: AttributeType["config"],
-    type: AttributeType["type"] 
-}
-class Attribute {
+class Attribute extends Attribute_ {
     name: string;
     model!: AttributeModel;
     class: Class | null;
     defaultValue?: any;
     
-    constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], config: AttributeType["config"] ) {
+    constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], config?: AttributeType["config"] ) {
+        super(classObj, name, type, config);
         this.name = name;
         this.setModel({
             name: this.name,
             type: this.getType(type),
-            config: this.getTypeConf(type, config),
+            config: this.getTypeConf(type, config) || {},
         });
         // if it's given a class
         // if ( classObj ) {
@@ -74,21 +33,21 @@ class Attribute {
         return attribute;
     }
 
-    isPrimaryKey() {
+    isPrimaryKey = () => {
         let model = this.getModel();
-        return model.config.primaryKey;
+        return !!model.config.primaryKey;
     }
 
-    getModel() {
+    getModel = () => {
         return this.model;
     }
 
-    getClass() {
+    getClass = () => {
         if (this.class) return this.class
         else throw Error("Missing class configuration for this attribute");
     }
 
-    static async build( attributeObj: Attribute ) {
+    static build = async ( attributeObj: Attribute ) => {
         let classObj = attributeObj.getClass();
         let store = classObj.getSpace();
         if ( store ) {
@@ -99,7 +58,7 @@ class Attribute {
         }
     }
 
-    setModel( model: AttributeModel ) {
+    setModel = ( model: AttributeModel ) => {
         let currentModel = this.getModel();
         model = Object.assign(currentModel || {}, model);
         this.model = model;
@@ -107,7 +66,7 @@ class Attribute {
     }
     
     // TODO: Better define config
-    getType( type: AttributeType["type"]) {
+    getType = ( type: AttributeType["type"]) => {
         if ( this.checkTypeValidity(type) ) {
             return type
         } else throw Error("Invalid attribute type: "+type)
@@ -116,11 +75,11 @@ class Attribute {
 
     // getType()
 
-    getName() {
+    getName = () => {
         return this.name;
     }
 
-    checkTypeValidity(type: string) {
+    checkTypeValidity = (type: string) => {
         let validity = false;
         if ( ATTRIBUTE_TYPES.includes(type) ) {
             validity = true;
@@ -133,17 +92,17 @@ class Attribute {
     // TODO: since config depends on attribute's type, 
     // find a way to check if given configs are correct
     // find a way to add default configs base on type
-    getTypeConf( type: AttributeType["type"], config: AttributeType["config"] | undefined ) {
+    getTypeConf = ( type: AttributeType["type"], config: AttributeType["config"] | undefined ) => {
         switch( type ) {
             // TODO: add missing cases and change values to imported const 
             case "decimal":
-                config = Object.assign({ max: null, min: null, precision: null, isArray: false}, config);
+                config = Object.assign({ max: null, min: null, precision: null, isArray: false}, config) as AttributeTypeConfig;
             break;
             case "integer":
-                config = Object.assign({ max: null, min: null, isArray: false}, config);
+                config = Object.assign({ max: null, min: null, isArray: false}, config) as AttributeTypeConfig;
             break;
             case "string":
-                config = Object.assign({ maxLength: 50, isArray: false }, config );
+                config = Object.assign({ maxLength: 50, isArray: false }, config ) as AttributeTypeConfig;
             break;
             default:
                 throw new Error("Unexpected type: "+type);

@@ -5,9 +5,9 @@ import process from "node:process";
 import fs from "node:fs";
 import { KeyLike } from "node:crypto";
 
-const envPath = process.env.ENVFILE || "./.env";
+const envPath = process.env.ENVFILE || "../shared/.env";
 
-dotenv.config({ path: envPath }); 
+dotenv.config({ path: envPath }).parsed; 
 
 const checkKeyPairPresence = (keys: string[]) => {
     let missingKeys = keys.filter(key => {

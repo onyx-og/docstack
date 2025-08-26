@@ -1,0 +1,33 @@
+{
+  "name": "@docstack/server",
+  "version": "0.0.1",
+  "main": "src/index.ts",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "jest",
+    "start": "node ./lib/index.js",
+    "build:types": "npx tsc -p ./tsconfig.json",
+    "build": "rollup --config ./rollup.config.js && npm run build:types && cp -r ./src/utils/stack/datamodel/patch lib/",
+    "develop": "ts-node -r tsconfig-paths/register ./index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onyx-og/docstack.git"
+  },
+  "keywords": [
+    "server",
+    "admin",
+    "nosql",
+    "workbench",
+    "db"
+  ],
+  "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
+  "license": "CC-BY-SA-4.0",
+  "bugs": {
+    "url": "https://github.com/onyx-og/docstack/issues"
+  },
+  "homepage": "https://github.com/onyx-og/docstack#readme",
+  "description": ""
+}

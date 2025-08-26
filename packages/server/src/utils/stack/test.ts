@@ -1,8 +1,8 @@
 import { encryptString } from "../crypto";
-import Attribute from "./Attribute";
-import Class from "./Class";
+import Attribute from "./attribute";
+import Class from "./class";
 // import Domain from "./Domain";
-import Store from "./Store";
+import Store from "./";
 
 const testDataModel = async () => {
     console.log("Starting")

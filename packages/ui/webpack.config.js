@@ -5,7 +5,7 @@ const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const WorkboxWebpackPlugin = require("workbox-webpack-plugin");
-require('dotenv').config({ path: '../../.env' }); 
+require('dotenv').config({ path: '../shared/.env' }); 
 
 const isProduction = process.env.NODE_ENV == "production";
 

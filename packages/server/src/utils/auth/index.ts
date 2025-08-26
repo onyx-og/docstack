@@ -1,5 +1,6 @@
 import { decryptString, encryptString, hashStringEpoch } from "../crypto";
-import Store, {Document} from '../dbManager/Store';
+import Store from '../stack';
+import {Document} from "@docstack/shared";
 import jwt from 'jsonwebtoken';
 import fs from "node:fs";
 import dotenv from 'dotenv';
@@ -8,7 +9,7 @@ import { resolve } from "node:path";
 
 const logger = getLogger().child({module: "auth"})
 
-let envPath = process.env.ENVFILE || "./.env";
+let envPath = process.env.ENVFILE || "../shared/.env";
 envPath = resolve(process.cwd(), envPath);
 
 dotenv.config({ path: envPath });

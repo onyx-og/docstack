@@ -1,35 +1,23 @@
-import Attribute, { AttributeModel, AttributeType } from '../Attribute'
-import Store, { Document } from '../Store';
-// import DbManager from '..';
-import getLogger from "../../../utils/logger";
+import { Class as Class_ } from "@docstack/shared";
+import logger from "../logger";
 // import ReferenceAttribute from '../Reference';
+import {Stack, ClassModel, AttributeModel, Document} from "@docstack/shared";
+import Attribute from "./attribute";
+import { Logger } from 'winston';
 
-const logger = getLogger().child({module: "Store"})
-
-const CLASS_TYPE = "class";
-const SUPERCLASS_TYPE = "superclass";
-const CLASS_TYPES = [CLASS_TYPE, SUPERCLASS_TYPE];
-
-export type ClassModel = Document & {
-    type: string,
-    name: string,
-    description?: string,
-    parentClass?: string,
-    _rev: PouchDB.Core.RevisionId | undefined;
-    schema?: AttributeModel[]
-}
-class Class {
-    private space?: Store | null;
+class Class extends Class_ {
+    space: Stack | null = null;
     /* Populated in init() */
-    private name!: string;
+    name!: string;
     /* Populated in init() */
-    private type!: string;
-    private description?: string;
-    private attributes: Attribute[] = [];
-    private schema!: AttributeModel[]
-    private id?: string;
-    // private parentClass: Class | null;
-    private model!: ClassModel;
+    type!: string;
+    description?: string;
+    attributes: Attribute[] = [];
+    schema!: AttributeModel[]
+    id?: string;
+    // parentClass: Class | null;
+    model!: ClassModel;
+    static logger: Logger = logger.child({module: "class"});
 
     getPrimaryKeys() {
         return this.attributes.filter( attr => attr.isPrimaryKey() )
@@ -37,6 +25,7 @@ class Class {
     }
 
     private constructor() {
+        super();
         // Private constructor to prevent direct instantiation
         /* Populated on async build */
         // this.id = null; 
@@ -51,29 +40,34 @@ class Class {
         }
     } */
 
-    private async build(): Promise<Class> {
+    build = (): Promise<Class> => {
         return new Promise(async (resolve, reject) => {
             let space = this.getSpace();
             if ( space ) {
                 // if (parentClassName) this.setParentClass(parentClassName);
                 let classModel = await space.addClass(this);
-                this.setModel(classModel)
-                logger.info("build - classModel", {classModel: classModel})
-                this.setId(classModel._id);
-                resolve(this);
+                if (classModel) {
+                    this.setModel(classModel)
+                    this.logger.info("build - classModel", {classModel: classModel})
+                    this.setId(classModel._id);
+                    resolve(this);
+                } else {
+                    reject("unable to get classModel. Check logs");
+                }
+                
             } else {
                 reject("Missing db configuration");
             }
         })
     }
 
-    private init(
-        space: Store | null,
+    init = (
+        space: Stack | null,
         name: string,
         type: string,
         description: string,
         // parentClass: Class | null
-    ) {
+    ) => {
         this.name = name;
         this.description = description;
         this.type = type;
@@ -89,21 +83,21 @@ class Class {
         // if (parentClass) this.inheritAttributes(parentClass);
     }
 
-    public static async create(
-        space: Store,
+    public static create = async (
+        space: Stack,
         name: string,
         type: string = "class",
         description: string,
         // parentClass: Class | null = null
-    ) {
+    ) => {
         const _class = new Class();
         _class.init(space, name, type, description);
         await _class.build()
         return _class;
     }
 
-    static async buildFromModel(space: Store, classModel: ClassModel) {
-        logger.info("buildFromModel - Instantiate from model", {classModel});
+    static buildFromModel = async (space: Stack, classModel: ClassModel) => {
+        this.logger.info("buildFromModel - Instantiate from model", {classModel});
         // let parentClassModel = (classModel.parentClass ? await space.getClassModel(classModel.parentClass) : null);
         // let parentClass = (parentClassModel ? await Class.buildFromModel(space, parentClassModel) : null);
 
@@ -114,7 +108,7 @@ class Class {
         return classObj;
     }
 
-    static async fetch( space: Store, className: string ) {
+    static fetch = async ( space: Stack, className: string ) => {
         let classModel = await space.getClassModel(className);
         if ( classModel ) {
             return Class.buildFromModel(space, classModel);
@@ -123,33 +117,33 @@ class Class {
         }
     }
 
-    // TODO Turn into private method (after factory method instantiation refactory is done)
-    setId( id: string ) {
+    // TODO Turn into method (after factory method instantiation refactory is done)
+    setId = ( id: string ) => {
         this.id = id;
     } 
 
-    getName() {
+    getName = () => {
         return this.name;
     }
 
-    getSpace() {
+    getSpace = () => {
         return this.space;
     }
 
-    getDescription() {
+    getDescription = () => {
         return this.description;
     }
 
-    getType() {
+    getType = () => {
         return this.type;
     }
 
-    getId() {
+    getId = () => {
         return this.id;
     }
 
-    buildSchema() {
-        let schema = [];
+    buildSchema = () => {
+        let schema: AttributeModel[] = [];
         for ( let attribute of this.getAttributes() ) {
             let attributeModel = attribute.getModel();
             schema.push( attributeModel );
@@ -158,22 +152,22 @@ class Class {
         return schema;
     }
 
-    getModel() {
+    getModel = () => {
         let model: ClassModel = {
             _id:this.getName(),
             name: this.getName(),
             description: this.getDescription(),
             type: this.getType(),
             schema: this.buildSchema(),
-            _rev: this.model ? this.model._rev : undefined,
+            _rev: this.model ? this.model._rev : "", // [TODO] Error prone
             createTimestamp: this.model ? this.model.createTimestamp : undefined,
         };
         return model;
     }
 
     // Set model should be called only after fetching the latest model from db
-    private setModel( model: ClassModel ) {
-        logger.info("setModel - got incoming model", {model: model});
+    setModel = ( model: ClassModel ) => {
+        this.logger.info("setModel - got incoming model", {model: model});
         // Retreive current class model
         let currentModel = this.getModel();
         // Set model arg to the overwrite of the current model with the given one 
@@ -206,10 +200,10 @@ class Class {
         // this.model = {...this.model, ...model};
         this.name = model.name;
         this.description = model.description;
-        logger.info("setModel - model after processing",{ model: model})
+        this.logger.info("setModel - model after processing",{ model: model})
     }
 
-    getAttributes( ...names: string[] ) {
+    getAttributes = ( ...names: string[] ) => {
         let attributes: Attribute[] = [ ];
         for ( let attribute of this.attributes ) {
             if ( names.length > 0 ) {
@@ -225,7 +219,7 @@ class Class {
         return attributes
     }
 
-    hasAllAttributes( ...names: string[] ) {
+    hasAllAttributes = ( ...names: string[] ) => {
         let result = false;
         let attributes = this.getAttributes(...names);
         for ( let attribute of attributes ) {
@@ -235,7 +229,7 @@ class Class {
         return result;
     }
 
-    hasAnyAttributes( ...names: string[] ) {
+    hasAnyAttributes = ( ...names: string[] ) => {
         let result = false;
         let attributes = this.getAttributes(...names);
         for ( let attribute of attributes ) {
@@ -246,97 +240,36 @@ class Class {
     }
 
     // interface of hasAnyAttributes
-    hasAttribute( name: string ) {
+    hasAttribute = ( name: string ) => {
         return this.hasAnyAttributes( name )
     }
 
-    /*
-    async addReferenceAttribute( attribute: ReferenceAttribute ) {
-        return this.addAttribute(attribute)
-    }*/
-    /*
-    async addAttribute(nameOrAttribute: string | Attribute, type?: AttributeType["type"]) {
-        try {
-            let attribute: Attribute;
-            if (typeof nameOrAttribute === 'string' && type) {
-                attribute = new Attribute(this, nameOrAttribute, type);
-            } else if (nameOrAttribute instanceof ReferenceAttribute) {
-                let _attribute = nameOrAttribute as ReferenceAttribute;
-                // check if the target domain exists
-                let targetDomain = _attribute.domain;
-                if (this.space && (await this.space.getDomain(targetDomain)) != null) {
-                    attribute = _attribute;
-                } else if (!this.space) {
-                    throw new Error("Missing db configuration");
-                } else {
-                    throw new Error("Target domain not found: " + targetDomain);
-                }
-            } else if (nameOrAttribute instanceof Attribute) {
-                attribute = nameOrAttribute;
-            } else {
-                throw new Error('Invalid arguments');
-            }
 
-            let name = attribute.getName();
-            if (!this.hasAttribute(name)) {
-                logger.info("addAttribute - adding attribute", {name: name, type: type})
-                this.attributes.push(attribute);
-                let attributeModel = attribute.getModel();
-                logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
-                this.schema.push(attributeModel); // sometimes getting schema undefined
-                // update class on db
-                logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
-                if (this.space && this.id) {
-                    logger.info("addAttribute - updating class on db")
-                    await this.space.updateClass(this);
-                    // TODO: Check if this class has subclasses
-                    // if ( this.class ) 
-                }
-                return this; // return class object
-            } else throw Error("Attribute with name " + name + " already exists within this Class")
-        } catch (e) {
-            logger.info("Falied adding attribute because: ", e)
-        }
-    } */
-
-    async addAttribute(attribute: Attribute): Promise<Class> {
+    addAttribute = async (attribute: Attribute): Promise<Class> => {
         return new Promise(async (resolve, reject) => {
             try {
-                /*
-                else if (nameOrAttribute instanceof ReferenceAttribute) {
-                    let _attribute = nameOrAttribute as ReferenceAttribute;
-                    // check if the target domain exists
-                    let targetDomain = _attribute.domain;
-                    if (this.space && (await this.space.getDomain(targetDomain)) != null) {
-                        attribute = _attribute;
-                    } else if (!this.space) {
-                        reject("Missing db configuration");
-                    } else {
-                        reject("Target domain not found: " + targetDomain);
-                    }
-                } */
                 let name = attribute.getName();
                 if (!this.hasAttribute(name)) {
-                    logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()})
+                    this.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()})
                     this.attributes.push(attribute);
                     let attributeModel = attribute.getModel();
-                    logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
+                    this.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
                     this.schema.push(attributeModel); // sometimes getting schema undefined
                     // update class on db
-                    logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
+                    this.logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
                     if (this.space && this.id) {
-                        logger.info("addAttribute - updating class on db")
+                        this.logger.info("addAttribute - updating class on db")
                         let res = await this.space.updateClass(this);
                         resolve(this)
                         // TODO: Check if this class has subclasses
                         // if ( this.class ) 
                     } else {
-                        logger.info("addAttribute - class not updated on db because of missing space or id")
+                        this.logger.info("addAttribute - class not updated on db because of missing space or id")
                         resolve(this)
                     }
                 } else reject("Attribute with name " + name + " already exists within this Class")
             } catch (e) {
-                logger.info("Falied adding attribute because: ", e)
+                this.logger.info("Falied adding attribute because: ", e)
                 reject(e)
             }
         });
@@ -344,36 +277,54 @@ class Class {
 
     // TODO: modify to pass also the current class model
     // consider first fetching/updating the local class model
-    async addCard(params: {[key:string]: any}) {
+    addCard = async (params: {[key:string]: any}) => {
         return await this.space!.createDoc(null, this.getName(), this, params);
     }
 
-    async addOrUpdateCard(params: {[key:string]: any}, cardId?: string) {
-        if (cardId) return this.updateCard(cardId, params);
-        logger.info("addOrUpdateCard - received params", {params});
-        // attempt to retrieve card by primary key
-        let filter = {}
-        let primaryKeys = this.getPrimaryKeys();
-        logger.info("addOrUpdateCard - got primary keys", {primaryKeys});
-        this.getPrimaryKeys().reduce(
-            (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
-            filter,
-        );
-        let cards = await this.getCards(filter, undefined, 0, 1);
-        if (cards.length > 0) { 
-            return this.updateCard(cards[0]._id, params);
-        } else {
-            return this.addCard(params);
-        }
+    addOrUpdateCard = async (params: {[key:string]: any}, cardId?: string) => {
+        return new Promise<Document | null>( async (resolve, reject) => {
+            if (cardId) {
+                const res = await this.updateCard(cardId, params);
+                resolve(res);
+            }
+            this.logger.info("addOrUpdateCard - received params", {params});
+            // attempt to retrieve card by primary key
+            let filter: {[key: string]:any} = {}
+            let primaryKeys = this.getPrimaryKeys();
+            this.logger.info("addOrUpdateCard - got primary keys", {primaryKeys});
+            // executes a reducer function on each element of the primaryKeys array
+            // that sets each primary key prop to the corresponding param value 
+            primaryKeys.reduce(
+                (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
+                filter,
+            );
+            let cards = await this.getCards(filter, undefined, 0, 1);
+            if (cards.length > 0) {
+                const res = await this.updateCard(cards[0]._id, params);
+                resolve(res);
+            } else {
+                const res = await this.addCard(params);
+                resolve(res);
+            }
+        });
+        
     }
 
-    async updateCard(cardId: string, params: {[key:string]: any}) {
-        return await this.space!.createDoc(cardId, this.getName(), this, params);
+    updateCard = async (cardId: string, params: {[key:string]: any}) => {
+        return new Promise<Document | null>( async (resolve, reject) => {
+            if (this.space) {
+                const res = await this.space.createDoc(cardId, this.getName(), this, params);
+                resolve(res)
+            } else {
+                this.logger.info("no stack defined");
+                resolve(null);
+            }
+        })
     }
 
-    async getCards(selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) {
+    getCards = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
         let _selector = { ...selector, type: this.name };
-        logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
+        this.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
         let docs = (await this.space!.findDocuments(_selector, fields, skip, limit)).docs
         return docs;
     }

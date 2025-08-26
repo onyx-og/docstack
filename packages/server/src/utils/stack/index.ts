@@ -6,9 +6,8 @@ import { decryptString } from "../../utils/crypto";
 import { importJsonFile } from "./datamodel";
 
 import {CachedClass, Patch, Stack, StoreOptions, SystemDoc, Document} from "@docstack/shared";
-
+import Class from "./class";
 import {
-    Class,
     ClassModel,
     AttributeModel,
     AttributeTypeDecimal,
@@ -17,6 +16,7 @@ import {
     AttributeTypeString,
     AttributeTypeBoolean
 } from "@docstack/shared";
+
 
 const logger = getLogger().child({module: "stack"});
 

@@ -11,7 +11,8 @@ import { login, JWTAuthPayload, setupAdminUser } from './utils/auth';
 // import memoryAdapter from "pouchdb-adapter-memory"
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
-import {Class, Attribute} from '@docstack/shared';
+import Class from './utils/stack/class';
+import Attribute from './utils/stack/attribute';
 import { setPatchCount } from './utils/stack/datamodel';
 import { EventEmitter } from 'node:events';
 import { resolve } from 'node:path';

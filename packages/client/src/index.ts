@@ -12,7 +12,7 @@ import ClientStack from './utils/stack';
 // import cookieParser from 'cookie-parser';
 // import jwt from 'jsonwebtoken';
 import Class from '../../shared/src//utils/stack/class';
-import Attribute from '../../shared/src//utils/stack/attribute';
+import Attribute from './utils/stack/attribute';
 import {AttributeType} from "../../shared/src/types";
 // import { EventTarget } from 'node:events';
 
