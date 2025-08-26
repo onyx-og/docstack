@@ -1,0 +1,46 @@
+@use '@prismal/react/lib/styles/utils';
+
+.view-auth {
+    display: flex;
+    height: 100%;
+
+    .view-auth-hero {
+        display: flex;
+        flex: 1;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+
+        .view-auth-hero-fill {
+            flex: 1;
+            height: 100%;
+            background-color: darkcyan;
+            background-size: cover;
+            border-radius: 1rem;
+        }
+    }
+
+    .view-auth-content {
+        display: flex;
+        flex: 1;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+        .view-auth-content-head {
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            .form-fields {
+                justify-content: center;
+            }
+        }
+    }
+
+    @include utils.mq_max(md) {
+        flex-direction: column;
+    }
+}

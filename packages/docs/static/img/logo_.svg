@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="15 15 70 70">
 
   <!-- Bottom document -->
-  <rect x="18" y="30" width="50" height="50" rx="4" ry="4" fill="#f0f0f0" stroke="#333" stroke-width="3"/>
+  <rect x="20" y="30" width="50" height="50" rx="4" ry="4" fill="#f0f0f0" stroke="#333" stroke-width="3"/>
 
   <!-- Middle document -->
-  <rect x="23" y="25" width="50" height="50" rx="4" ry="4" fill="#ffffff" stroke="#333" stroke-width="3"/>
+  <rect x="25" y="25" width="50" height="50" rx="4" ry="4" fill="#ffffff" stroke="#333" stroke-width="3"/>
 
   <!-- Top document -->
-  <rect x="28" y="20" width="50" height="50" rx="4" ry="4" fill="#e8e8e8" stroke="#333" stroke-width="3"/>
+  <rect x="30" y="20" width="50" height="50" rx="4" ry="4" fill="#e8e8e8" stroke="#333" stroke-width="3"/>
 
 </svg>

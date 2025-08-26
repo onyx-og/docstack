@@ -22,7 +22,15 @@ import {AttributeType} from "../../shared/src/types";
 
 const logger = logger_.child({module: "client"});
 
-
+// [TODO] Implement DocStack.type in "remote" | "local"
+// When is remote, open a websocket (socket.io) connection to given remote
+// implement cases in each of stack methods (queries and doc creation)
+// to actually send and receive messages
+// [TODO][HARD] Think about authentication mechanism
+// Probably support same rest authentication (jwtToken)
+// but also api tokens
+// Remote connection that require auth can be opened but
+// cannot send or receive messages until authentication
 class DocStack extends EventTarget {
     //private app: Express;
     private dbName: string;
