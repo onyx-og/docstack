@@ -1,6 +1,6 @@
 import PouchDB from 'pouchdb';
 import { Middleware } from '@reduxjs/toolkit';
-import {DocStack, Class, Attribute} from "../../../../packages/client/src";
+import {DocStack, Class, Attribute} from "@docstack/client";
 const db = new PouchDB('redux_state');
 
 export const saveState = async (state: any) => {

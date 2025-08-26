@@ -1,0 +1,32 @@
+{
+  "name": "@docstack/ui",
+  "version": "0.0.1",
+  "main": "src/index.tsx",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "jest",
+    "build": "webpack --node-env=production",
+    "develop": "webpack serve --node-env=development --progress"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onyx-og/docstack.git"
+  },
+  "keywords": [
+    "ui",
+    "admin",
+    "panel",
+    "nosql",
+    "workbench",
+    "db"
+  ],
+  "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
+  "license": "CC-BY-SA-4.0",
+  "bugs": {
+    "url": "https://github.com/onyx-og/docstack/issues"
+  },
+  "homepage": "https://github.com/onyx-og/docstack#readme",
+  "description": ""
+}

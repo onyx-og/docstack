@@ -6,13 +6,13 @@
 import logger_ from "./utils/logger"
 // import test from '../../../server/src//utils/dbManager/test';
 // import { generateJwtKeys, generatePswKeys } from '../../../server/src/utils/crypto';
-import Store from './utils/docstack/stack';
+import ClientStack from './utils/stack';
 // import { login, JWTAuthPayload, setupAdminUser } from '../../../server/src//utils/auth';
 // import memoryAdapter from "pouchdb-adapter-memory"
 // import cookieParser from 'cookie-parser';
 // import jwt from 'jsonwebtoken';
-import Class from '../../shared/src//utils/docstack/class';
-import Attribute from '../../shared/src//utils/docstack/attribute';
+import Class from '../../shared/src//utils/stack/class';
+import Attribute from '../../shared/src//utils/stack/attribute';
 import {AttributeType} from "../../shared/src/types";
 // import { EventTarget } from 'node:events';
 
@@ -27,11 +27,11 @@ class DocStack extends EventTarget {
     //private app: Express;
     private dbName: string;
     private readyState: boolean; 
-    private store!: Store;
+    private store!: ClientStack;
 
     private async initInstance(dbName: string) {
         // TODO instead of fixed "db-test" allow the configuration of "test" part
-        const store = await Store.create(`db-${dbName}`, {
+        const store = await ClientStack.create(`db-${dbName}`, {
             // defaults to leveldb
             // adapter: 'memory', 
             plugins: [
@@ -41,7 +41,7 @@ class DocStack extends EventTarget {
         });
         this.store = store;
         let window_ = window as Window & typeof globalThis & {
-            store: Store
+            store: ClientStack
         }
         window_.store = this.store;
         // await setupAdminUser();
@@ -79,7 +79,7 @@ class DocStack extends EventTarget {
             if (!conn) {
                 throw new Error("Connection name not provided");
             }
-            await Store.clear(conn);
+            await ClientStack.clear(conn);
             logger.info('Internal database cleared');
             // return res.status(200).json({ success: true, message: 'Internal database cleared' });
         } catch (e: any) {
@@ -106,7 +106,7 @@ class DocStack extends EventTarget {
                 {classModel: newClass.getModel()}
             )
         } catch (e: any) {
-            throw new Error(`Error during class '${name} creation`, e);
+            throw new Error(`Error during class '${name} creation. ${e}`);
         }
         
         fnLogger.info('Class created successfully');
@@ -129,8 +129,8 @@ class DocStack extends EventTarget {
                 {attributeModel: newAttribute.getModel()}
             );
         } catch (e: any) {
-            fnLogger.error(`Error during attribute '${name}' creation`, e);
-            throw new Error(`Error during attribute '${name}' creation`, e);
+            fnLogger.error(`Error during attribute '${name}' creation: ${e}`);
+            throw new Error(`Error during attribute '${name}' creation: ${e}`);
         }
     } 
 
@@ -261,7 +261,7 @@ class DocStack extends EventTarget {
                 if (!conn) {
                     throw new Error("Connection name not provided");
                 }
-                await Store.clear(conn);
+                await ClientStack.clear(conn);
                 return res.status(200).json({ success: true, message: 'Internal database cleared' });
             } catch (e) {
                 logger.error("Error during database clear", e);
@@ -291,7 +291,7 @@ class DocStack extends EventTarget {
                     {classModel: newClass.getModel()}
                 )
             } catch (e) {
-                logger.error(`Error during class '${name} creation`, e);
+                logger.error(`Error during class '${name} creation: ${e}`);
                 return res.status(500).json({ success: false, error: 'An error occurred' });
             }
             
@@ -314,7 +314,7 @@ class DocStack extends EventTarget {
                     {attributeModel: newAttribute.getModel()}
                 );
             } catch (e) {
-                logger.error(`Error during attribute '${name}' creation`, e)
+                logger.error(`Error during attribute '${name}' creation: ${e}`)
             }
         })
         */
@@ -338,5 +338,5 @@ class DocStack extends EventTarget {
     // }
 }
 
-export { Store, Class, Attribute }
+export { ClientStack, Class, Attribute }
 export {DocStack};

@@ -1,17 +1,20 @@
-import NodePouchDB from "pouchdb-node";
-import getLogger from "../../../utils/logger/";
-import Class, { ClassModel } from "../Class";
-// import Domain, { DomainModel } from "../Domain";
-import { AttributeModel, AttributeTypeDecimal, 
+import PouchDB from "pouchdb";
+import logger_ from "../../utils/logger/";
+import Class from "../../../../shared/src/utils/stack/class";
+import { decryptString } from "../crypto";
+import { importJsonFile, countPatches } from "./datamodel";
+import {
+    Stack,
+    StoreOptions,
+    CachedClass
+} from "@docstack/shared";
+
+import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
     AttributeTypeForeignKey, 
     AttributeTypeInteger,
-    AttributeTypeString
-} from "../Attribute";
-// import ReferenceAttribute, { AttributeTypeReference } from "../Reference";
-import { decryptString } from "../../../utils/crypto";
-import { importJsonFile } from "../datamodel";
+    AttributeTypeString} from "../../../../shared/src/types";
 
-const logger = getLogger().child({module: "stack"});
+const logger = logger_.child({module: "stack"});
 
 export const BASE_SCHEMA: AttributeModel[] = [
     { name: "_id", type: "string", config: { maxLength: 100 } },
@@ -50,54 +53,25 @@ const DOMAIN_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", confi
     { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
     { name: "targetClass", type: "foreign_key", config: { isArray: true } },
     ...BASE_SCHEMA
-]
-export type Document = PouchDB.Core.ExistingDocument<{
-    type: string;
-    createTimestamp?: number; // [TODO] Error prone
-    updateTimestamp?: number | null;
-    [key: string]: any
-}>
-
-// The idea is to make this patch object be processed
-// storing the version of the patch and the documents contained in it
-export interface Patch {
-    version: string;
-    docs: (PouchDB.Core.ExistingDocument<{
-        [key: string]: any
-    }> | PouchDB.Core.Document<{[key: string]: any}>)[]
-}
-
-export interface SystemDoc {
-    _id: string;
-    appVersion: string;
-    schemaVersion: string | undefined;
-    dbInfo: PouchDB.Core.DatabaseInfo;
-    startupTime: number;
-}
-
-type StoreOptions = {
-    plugins: PouchDB.Plugin[]
-} & PouchDB.Configuration.DatabaseConfiguration 
-
-type CachedClass = Class & {
-    ttl: number
-}
-
-class Store {
+];
+class ClientStack extends Stack {
     /* Initialized asynchronously */
-    private db!: PouchDB.Database<{}>;
+    db!: PouchDB.Database<{}>;
     /* Retrieved asynchronously */
-    private lastDocId!: number;
+    lastDocId!: number;
     /* Populated on async constructor */
-    private connection!: string;
-    private options?: StoreOptions;
-    private static appVersion: string = "0.0.1";
+    connection!: string;
+    options?: StoreOptions;
+    static appVersion: string = "0.0.1";
     /* Used to retrieve faster data */
-    private cache: {
+    cache: {
         [className: string]: CachedClass
     }
+    patchCount!: number;
+
 
     private constructor() {
+        super();
         // Private constructor to prevent direct instantiation
         this.cache = {}
     }
@@ -106,18 +80,8 @@ class Store {
         // Store the connection string and options
         this.connection = conn;
         this.options = options;
-        let PouchDB: typeof import('pouchdb-core');
-        let Find: typeof import('pouchdb-find');
+        let Find: typeof import('pouchdb-find') =( await import('pouchdb-find')).default;
 
-        if (typeof window !== 'undefined') {
-            // Running in a browser
-            PouchDB = (await import('pouchdb-browser')).default;
-            Find = (await import('pouchdb-find')).default;
-        } else {
-            // Running in Node.js
-            PouchDB = (await import('pouchdb-node')).default;
-            Find = (await import('pouchdb-find')).default;
-        }
 
         // Load default plugins
         PouchDB.plugin(Find);
@@ -145,8 +109,8 @@ class Store {
     }
 
     // asynchronous factory method
-    public static async create(conn: string, options?: StoreOptions): Promise<Store> {
-        const store = new Store();
+    public static async create(conn: string, options?: StoreOptions): Promise<ClientStack> {
+        const store = new ClientStack();
         await store.initialize(conn, options);
         await store.initdb()
         return store;
@@ -159,7 +123,7 @@ class Store {
             lastDocId = doc.value;
         } catch (e: any) {
             if (e.name === 'not_found') {
-                logger.info("getLastDocId - not found", e)
+                logger.info("getLastDocId - not found. Must be first initialization.")
                 return lastDocId
             }
             logger.error("checkdb - something went wrong", {"error": e});
@@ -184,12 +148,12 @@ class Store {
     // TODO Parametrize the URL in a way that during the build procedure
     // it get substituted with the correct path for the build configuration
     private async loadPatches(): Promise<Patch[]> {
-        let __patchDir = "../datamodel/patch"
+        let __patchDir = "patch"
         if (process.env.BUILDING) __patchDir = "patch"
         // [TODO] Load patches from files located in utils/dbManager/patch
         try {
-            let patchCount = Number(process.env.PATCH_COUNT);
-            logger.info(`loadPatches - preparing to load ${patchCount} patches`)
+            let patchCount = Number(this.patchCount);
+            logger.info(`loadPatches - preparing to load ${patchCount} patches`);
             let patches = await Promise.all(
                 Array.from({ length: patchCount }).map(
                   (_, index) => {
@@ -232,6 +196,7 @@ class Store {
     private async applyPatches(schemaVersion: string | undefined): Promise<string> {
         let _schemaVersion = schemaVersion;
         try {
+            this.patchCount = countPatches();
             const allPatches = await this.loadPatches();
             // When schemaVersion is undefined uses index 0 (start from first)
             // or start from the index after the patch at which the system is at 
@@ -265,7 +230,7 @@ class Store {
         if (!systemDoc) {
             _systemDoc = {
                 _id: "~system",
-                appVersion: Store.appVersion,
+                appVersion: ClientStack.appVersion,
                 dbInfo: dbInfo,
                 schemaVersion: undefined,
                 startupTime: (new Date()).valueOf()
@@ -278,7 +243,7 @@ class Store {
             // apply patches if needed
             let schemaVersion = await this.applyPatches(systemDoc.schemaVersion);
             _systemDoc = { ...systemDoc,
-                appVersion: Store.appVersion,
+                appVersion: ClientStack.appVersion,
                 dbInfo: dbInfo,
                 schemaVersion: schemaVersion,
                 startupTime: (new Date()).valueOf()
@@ -336,11 +301,11 @@ class Store {
             this.lastDocId = Number(lastDocId);
         } catch (e: any) {
             logger.error("initdb -  something went wrong", e)
-            throw new Error("initdb -  something went wrong"+e);
+            throw new Error(e);
         }
     }
 
-    // static async build( that: Store ) {
+    // static async build( that: ClientStack ) {
     //     let result = await that.initdb();
     //     return result;
     // }
@@ -374,10 +339,10 @@ class Store {
     }
 
     // Expects a selector like { type: { $eq: "class" } }
-    async findDocuments( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) {
+    findDocuments = async ( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
         let indexFields = Object.keys(selector);
         let result: {
-            docs: (PouchDB.Core.ExistingDocument<{}>)[],
+            docs: Document[],
             [key: string]: any
         } = {
             docs: []
@@ -398,7 +363,7 @@ class Store {
                 result: foundResult,
                 selector: selector,
             });
-            result = { docs: foundResult.docs, selector, skip, limit };
+            result = { docs: foundResult.docs as unknown as Document[], selector, skip, limit };
             return result;
         } catch (e: any) {
             logger.info("findDocument - error",e);
@@ -412,7 +377,7 @@ class Store {
     }
 
     // TODO: Understand why most classes are empty of attributes
-    async getClassModel( className: string ) {
+    getClassModel = async ( className: string ) => {
         let selector = {
             type: { $eq: "class" },
             name: { $eq: className }
@@ -514,7 +479,7 @@ class Store {
     static async clear (conn: string) {
         return new Promise ( (resolve, reject) => {
             try {
-                let db = new NodePouchDB(conn)
+                let db = new PouchDB(conn)
                 db.destroy(null, () => {
                     logger.info("clear - Destroyed db");
                     resolve(true);
@@ -526,7 +491,7 @@ class Store {
         })
     }
 
-    async addClass( classObj: Class ) {
+    addClass = async ( classObj: Class ) => {
         let classModel = classObj.getModel();
         logger.info("addClass - got class model", {classModel})
         let existingDoc = await this.getClassModel(classModel.name);
@@ -551,7 +516,7 @@ class Store {
     //     }
     // }
 
-    async updateClass(classObj: Class) {
+    updateClass = async (classObj: Class) => {
         // logger.info("updateClass - classObj", classObj)
         let result = await this.createDoc(classObj.getId()!, 'class', classObj, classObj.getModel());
         logger.info("updateClass - result", result)
@@ -740,7 +705,7 @@ class Store {
         return isValid;
     }
 
-    async validateObjectByType (obj: any, type: string, schema?: ClassModel["schema"]) {
+    validateObjectByType = async (obj: any, type: string, schema?: ClassModel["schema"]) => {
         logger.info("validateObjectByType - given args", {obj, type, schema})
         let schema_: AttributeModel[] | undefined = [];
         
@@ -775,11 +740,11 @@ class Store {
         return params;
     }
 
-    async createDoc(docId: string | null, type: string,classObj: Class, params: {}) {
+    createDoc = async (docId: string | null, type: string,classObj: Class, params: {}) => {
         let schema = classObj.buildSchema();
         logger.info("createDoc - args", {docId, type, params, schema});
         let db = this.db,
-            doc: Document | undefined,
+            doc: Document | null = null,
             isNewDoc = false;
         try {
             let validationRes = await this.validateObjectByType(params, type, schema);
@@ -787,7 +752,7 @@ class Store {
                 throw new Error("createDoc - Invalid object")
             }
             if (docId) {
-                const existingDoc = await this.getDocument(docId) as Document;
+                const existingDoc = await this.getDocument(docId) as unknown as Document;
                 logger.info("retrieved doc", {existingDoc})
                 if (existingDoc && existingDoc.type === type) {
                     logger.info("createDoc - assigning existing doc");
@@ -904,4 +869,6 @@ class Store {
     } */
 }
 
-export default Store
+
+
+export default ClientStack

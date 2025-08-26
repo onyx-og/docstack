@@ -4,16 +4,15 @@ import * as dotenv from "dotenv";
 import cors from "cors";
 dotenv.config({ path: './.env' })
 import getLogger, {logRequest} from "./utils/logger"
-import test from './utils/dbManager/test';
+import test from './utils/stack/test';
 import { generateJwtKeys, generatePswKeys } from './utils/crypto';
-import Store from './utils/dbManager/Store';
+import Stack from './utils/stack';
 import { login, JWTAuthPayload, setupAdminUser } from './utils/auth';
 // import memoryAdapter from "pouchdb-adapter-memory"
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
-import Class from './utils/dbManager/Class';
-import { setPatchCount } from './utils/dbManager/datamodel';
-import Attribute from './utils/dbManager/Attribute';
+import {Class, Attribute} from '@docstack/shared';
+import { setPatchCount } from './utils/stack/datamodel';
 import { EventEmitter } from 'node:events';
 import { resolve } from 'node:path';
 
@@ -25,11 +24,11 @@ class DocStack extends EventEmitter {
     private app: Express;
     private dbName: string;
     private readyState: boolean; 
-    private store: Store;
+    private store: Stack;
 
     private async initInstance(dbName: string) {
         // TODO instead of fixed "db-test" allow the configuration of "test" part
-        const store = await Store.create(`db-${dbName}`, {
+        const store = await Stack.create(`db-${dbName}`, {
             // defaults to leveldb
             // adapter: 'memory', 
             plugins: [
@@ -187,7 +186,7 @@ class DocStack extends EventEmitter {
                 if (!conn) {
                     throw new Error("Connection name not provided");
                 }
-                await Store.clear(conn);
+                await Stack.clear(conn);
                 return res.status(200).json({ success: true, message: 'Internal database cleared' });
             } catch (e) {
                 logger.error("Error during database clear", e);
@@ -262,5 +261,5 @@ class DocStack extends EventEmitter {
     }
 }
 
-export { Store, Class, Attribute, getLogger }
+export { Stack, Class, Attribute, getLogger }
 export {DocStack};

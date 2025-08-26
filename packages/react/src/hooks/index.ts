@@ -1,6 +1,6 @@
 // src/hooks/useFind.js
 import { useContext, useEffect, useState } from 'react';
-import { DocStackContext } from '../components/Provider';
+import { DocStackContext } from '../components/StackProvider';
 import { Document } from '../../../shared/src/types';
 import { Class } from '@docstack/client';
 
@@ -64,6 +64,10 @@ export const useFind = (query: {
 
     return { docs, loading, error };
 };
+
+export const useClassCreate = () => {
+    
+}
 
 export const useClassDocs = (className: string, query = {}) => {
     const docStack = useContext(DocStackContext);

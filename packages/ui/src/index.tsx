@@ -6,11 +6,15 @@ import App from './views/App';
 import { store } from 'store';
 import { BrowserRouter } from 'react-router-dom';
 
+import { StackProvider } from "@docstack/react";
+
 const root = createRoot(document.getElementById('root')!);
 root.render(<React.StrictMode>
-  <Provider store={store}>
-  <BrowserRouter>
-      <App />
-  </BrowserRouter>
-  </Provider>
+    <StackProvider dbName="client-test">
+        <Provider store={store}>
+            <BrowserRouter>
+                <App />
+            </BrowserRouter>
+        </Provider>
+    </StackProvider>
 </React.StrictMode>);

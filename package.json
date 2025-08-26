@@ -17,6 +17,10 @@
       "react-app/jest"
     ]
   },
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "browserslist": {
     "production": [
       ">0.2%",

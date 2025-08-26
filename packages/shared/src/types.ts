@@ -1,3 +1,4 @@
+import Class from "./utils/stack/class";
 
 
 export const ATTRIBUTE_TYPES = ["string", "number", "integer", "reference", "boolean"];
@@ -43,7 +44,7 @@ export type AttributeModel = {
     type: AttributeType["type"] 
 }
 
-export type ClassModel = Document & {
+export interface ClassModel extends Document {
     type: string,
     name: string,
     description?: string,
@@ -53,7 +54,7 @@ export type ClassModel = Document & {
 }
 
 
-export type Document = PouchDB.Core.ExistingDocument<{
+export type Document = PouchDB.Core.Document<{
     type: string;
     createTimestamp?: number; // [TODO] Error prone
     updateTimestamp?: number | null;
@@ -75,4 +76,29 @@ export interface SystemDoc {
     schemaVersion: string | undefined;
     dbInfo: PouchDB.Core.DatabaseInfo;
     startupTime: number;
+}
+
+// The idea is to make this patch object be processed
+// storing the version of the patch and the documents contained in it
+export interface Patch {
+    version: string;
+    docs: (PouchDB.Core.ExistingDocument<{
+        [key: string]: any
+    }> | PouchDB.Core.Document<{[key: string]: any}>)[]
+}
+
+export interface SystemDoc {
+    _id: string;
+    appVersion: string;
+    schemaVersion: string | undefined;
+    dbInfo: PouchDB.Core.DatabaseInfo;
+    startupTime: number;
+}
+
+export type StoreOptions = {
+    plugins: PouchDB.Plugin[]
+} & PouchDB.Configuration.DatabaseConfiguration 
+
+export type CachedClass = Class & {
+    ttl: number
 }

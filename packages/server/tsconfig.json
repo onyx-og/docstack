@@ -13,7 +13,10 @@
     "declaration": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "paths" : {
+      "@docstack/shared": ["../../shared/src"]
+    }
   },
   "include": [
     "src/**/*.ts"

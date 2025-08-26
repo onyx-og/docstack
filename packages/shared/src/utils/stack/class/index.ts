@@ -1,9 +1,10 @@
 import Attribute from '../attribute'
-import Store from '../../../../../client/src/utils/docstack/stack';
+import Store from '../../../../../client/src/utils/stack';
 // import DbManager from '..';
 import getLogger from "../../logger";
 // import ReferenceAttribute from '../Reference';
 import {ClassModel, AttributeModel, Document} from "../../../types";
+import Stack from '..';
 const logger = getLogger().child({module: "class"});
 
 const CLASS_TYPE = "class";
@@ -12,7 +13,7 @@ const CLASS_TYPES = [CLASS_TYPE, SUPERCLASS_TYPE];
 
 
 class Class {
-    private space?: Store | null;
+    private space?: Stack | null;
     /* Populated in init() */
     private name!: string;
     /* Populated in init() */
@@ -50,10 +51,15 @@ class Class {
             if ( space ) {
                 // if (parentClassName) this.setParentClass(parentClassName);
                 let classModel = await space.addClass(this);
-                this.setModel(classModel)
-                logger.info("build - classModel", {classModel: classModel})
-                this.setId(classModel._id);
-                resolve(this);
+                if (classModel) {
+                    this.setModel(classModel)
+                    logger.info("build - classModel", {classModel: classModel})
+                    this.setId(classModel._id);
+                    resolve(this);
+                } else {
+                    reject("unable to get classModel. Check logs");
+                }
+                
             } else {
                 reject("Missing db configuration");
             }
@@ -61,7 +67,7 @@ class Class {
     }
 
     private init(
-        space: Store | null,
+        space: Stack | null,
         name: string,
         type: string,
         description: string,
@@ -83,7 +89,7 @@ class Class {
     }
 
     public static async create(
-        space: Store,
+        space: Stack,
         name: string,
         type: string = "class",
         description: string,
@@ -95,7 +101,7 @@ class Class {
         return _class;
     }
 
-    static async buildFromModel(space: Store, classModel: ClassModel) {
+    static async buildFromModel(space: Stack, classModel: ClassModel) {
         logger.info("buildFromModel - Instantiate from model", {classModel});
         // let parentClassModel = (classModel.parentClass ? await space.getClassModel(classModel.parentClass) : null);
         // let parentClass = (parentClassModel ? await Class.buildFromModel(space, parentClassModel) : null);
@@ -107,7 +113,7 @@ class Class {
         return classObj;
     }
 
-    static async fetch( space: Store, className: string ) {
+    static async fetch( space: Stack, className: string ) {
         let classModel = await space.getClassModel(className);
         if ( classModel ) {
             return Class.buildFromModel(space, classModel);
@@ -142,7 +148,7 @@ class Class {
     }
 
     buildSchema() {
-        let schema = [];
+        let schema: AttributeModel[] = [];
         for ( let attribute of this.getAttributes() ) {
             let attributeModel = attribute.getModel();
             schema.push( attributeModel );

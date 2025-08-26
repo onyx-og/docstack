@@ -5,7 +5,7 @@ const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const WorkboxWebpackPlugin = require("workbox-webpack-plugin");
-require('dotenv').config({ path: './.env' }); 
+require('dotenv').config({ path: '../../.env' }); 
 
 const isProduction = process.env.NODE_ENV == "production";
 
@@ -14,9 +14,9 @@ const stylesHandler = isProduction
   : "style-loader";
 
 const config = {
-  entry: "./ui/src/index.tsx",
+  entry: "./src/index.tsx",
   output: {
-    path: path.resolve(__dirname, "ui/lib"),
+    path: path.resolve(__dirname, "lib"),
     filename: '[name].[contenthash].js',
     clean: true,
   },
@@ -27,7 +27,7 @@ const config = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: "./ui/src/index.html",
+      template: "./src/index.html",
     }),
     new webpack.ProvidePlugin({
       process: 'process/browser',
@@ -101,14 +101,17 @@ const config = {
     ],
     alias: {
       'pouchdb-promise$': "pouchdb-promise/lib/index.js",
-      'styles': path.resolve(__dirname, "ui/src/styles"),
-      'components': path.resolve(__dirname, "ui/src/components"),
-      'hooks': path.resolve(__dirname, "ui/src/hooks"),
-      'views': path.resolve(__dirname, "ui/src/views"),
-      'assets': path.resolve(__dirname, "ui/src/assets"),
-      'features': path.resolve(__dirname, "ui/src/features"),
-      'store': path.resolve(__dirname, "ui/src/store"),
-      'utils': path.resolve(__dirname, "ui/src/utils"),
+      'styles': path.resolve(__dirname, "src/styles"),
+      'components': path.resolve(__dirname, "src/components"),
+      'hooks': path.resolve(__dirname, "src/hooks"),
+      'views': path.resolve(__dirname, "src/views"),
+      'assets': path.resolve(__dirname, "src/assets"),
+      'features': path.resolve(__dirname, "src/features"),
+      'store': path.resolve(__dirname, "src/store"),
+      'utils': path.resolve(__dirname, "src/utils"),
+      '@docstack/client': path.resolve(__dirname, "../client/src"),
+      '@docstack/react': path.resolve(__dirname, "../react/src"),
+      '@docstack/shared': path.resolve(__dirname, "../shared/src"),
     }
   },
 };
