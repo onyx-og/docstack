@@ -22,7 +22,9 @@ abstract class Stack {
     } = {}
     public patchCount!: number;
 
-    abstract addClass: (classObj: Class) => Promise<ClassModel | null>;
+    abstract getClass: (className: string) => Promise<Class | null>;
+
+    abstract addClass: (classObj: Class) => Promise<ClassModel>;
 
     abstract updateClass: (classObj: Class) => Promise<Document | null>;
 

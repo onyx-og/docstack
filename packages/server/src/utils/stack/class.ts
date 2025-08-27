@@ -46,6 +46,7 @@ class Class extends Class_ {
             if ( space ) {
                 // if (parentClassName) this.setParentClass(parentClassName);
                 let classModel = await space.addClass(this);
+                // Hydrate model
                 if (classModel) {
                     this.setModel(classModel)
                     this.logger.info("build - classModel", {classModel: classModel})
@@ -66,6 +67,7 @@ class Class extends Class_ {
         name: string,
         type: string,
         description: string,
+        schema: ClassModel["schema"]
         // parentClass: Class | null
     ) => {
         this.name = name;
@@ -74,7 +76,9 @@ class Class extends Class_ {
         this.attributes = [];
         this.space = null;
         // this.id = null;
-        this.schema = [];
+        if (schema) {
+            this.schema = schema;
+        }
         // this.parentClass = parentClass;
         if (space) {
             this.space = space;
@@ -83,17 +87,30 @@ class Class extends Class_ {
         // if (parentClass) this.inheritAttributes(parentClass);
     }
 
+    
+    public static get = (
+        space: Stack,
+        name: string,
+        type: string = "class",
+        description: string,
+        schema: ClassModel["schema"],
+    ) => {
+        const class_ = new Class();
+        class_.init(space, name, type, description, schema);
+        return class_;
+    }
+
     public static create = async (
         space: Stack,
         name: string,
         type: string = "class",
         description: string,
+        schema: ClassModel["schema"],
         // parentClass: Class | null = null
     ) => {
-        const _class = new Class();
-        _class.init(space, name, type, description);
-        await _class.build()
-        return _class;
+        const class_ = Class.get(space, name, type, description, schema);
+        await class_.build();
+        return class_;
     }
 
     static buildFromModel = async (space: Stack, classModel: ClassModel) => {
@@ -102,10 +119,17 @@ class Class extends Class_ {
         // let parentClass = (parentClassModel ? await Class.buildFromModel(space, parentClassModel) : null);
 
         // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
-        let classObj: Class = await Class.create(space, classModel.name, classModel.type, classModel.type);
-        // [TODO] Redundancy: classObj.setModel updates the model again from the one provided
-        classObj.setModel(classModel);
-        return classObj;
+        if (classModel._rev) {
+            let classObj: Class = Class.get(
+                space, classModel.name, 
+                classModel.type, classModel.type, // [TODO] Change into desc
+                classModel.schema
+            )
+            return classObj;
+        } else {
+            let classObj: Class = await Class.create(space, classModel.name, classModel.type, classModel.type, classModel.schema);
+            return classObj;
+        }
     }
 
     static fetch = async ( space: Stack, className: string ) => {

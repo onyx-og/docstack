@@ -269,7 +269,7 @@ class ServerStack extends Stack {
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
-    async getClass(className: string) {
+    getClass = async (className: string) => {
         // Check if class is in cache and not expired
         if (this.cache[className] && Date.now() < this.cache[className].ttl) {
             logger.info("getClass -  retrieving class from cache", {ttl: this.cache[className].ttl})

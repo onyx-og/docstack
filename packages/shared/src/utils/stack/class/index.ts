@@ -22,7 +22,7 @@ abstract class Class {
     // parentClass: Class | null;
     model!: ClassModel;
 
-    logger: Logger = logger.child({module: "class"});
+    static logger: Logger;
 
     getPrimaryKeys() {
         return this.attributes.filter( attr => attr.isPrimaryKey() )
@@ -40,14 +40,25 @@ abstract class Class {
         name: string,
         type: string,
         description: string,
+        schema: ClassModel["schema"],
         // parentClass: Class | null
     ) => void;
+
+    static get: (
+        space: Stack,
+        name: string,
+        type: string,
+        description: string,
+        schema: ClassModel["schema"],
+        // parentClass: Class | null = null
+    ) => Class;
 
     static create: (
         space: Stack,
         name: string,
         type: string,
         description: string,
+        schema: ClassModel["schema"],
         // parentClass: Class | null = null
     ) => Promise<Class>;
 

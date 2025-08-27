@@ -270,7 +270,7 @@ class ClientStack extends Stack {
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
-    async getClass(className: string) {
+    getClass = async (className: string) => {
         // Check if class is in cache and not expired
         if (this.cache[className] && Date.now() < this.cache[className].ttl) {
             logger.info("getClass -  retrieving class from cache", {ttl: this.cache[className].ttl})
@@ -340,7 +340,10 @@ class ClientStack extends Stack {
 
     // Expects a selector like { type: { $eq: "class" } }
     findDocuments = async ( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
+        const fnLogger = logger.child({"method": "findDocuments"});
+        fnLogger.info("Executing with args", {selector, fields, skip, limit});
         let indexFields = Object.keys(selector);
+        fnLogger.info("Produced indexFields from selector", {selector, indexFields});
         let result: {
             docs: Document[],
             [key: string]: any
@@ -348,9 +351,10 @@ class ClientStack extends Stack {
             docs: []
         }
         try {
-            let indexResult = await this.db.createIndex({
-                index: { fields: indexFields }
-            });
+            // let indexResult = await this.db.createIndex({
+            //     index: { fields: indexFields }
+            // });
+            // fnLogger.info("Index result", indexResult);
     
             let foundResult = await this.db.find({
                 selector: selector,
@@ -359,14 +363,14 @@ class ClientStack extends Stack {
                 limit: limit
             });
     
-            logger.info("findDocument - found", {
+            fnLogger.info("findDocument - found", {
                 result: foundResult,
                 selector: selector,
             });
             result = { docs: foundResult.docs as unknown as Document[], selector, skip, limit };
             return result;
         } catch (e: any) {
-            logger.info("findDocument - error",e);
+            fnLogger.error("findDocument - error",e);
             return {docs: [], error: e.toString(),selector, skip, limit};
         }
     }
@@ -407,6 +411,22 @@ class ClientStack extends Stack {
         logger.info("getDomainModel - result", {result})
         return result;
     } */
+
+    // [TODO] Implement abstract
+    getAllClasses = async () => {
+        const fnLogger = logger.child({"method": "getAllClasses"});
+        fnLogger.info("Requesting");
+        let classModels =  await this.getAllClassModels();
+        fnLogger.info("Received classes models", {classModels});
+        let classList: Class[] = [];
+        for (const classModel of classModels) {
+            fnLogger.info(`Building class "${classModel.name}" from model`, {classModel});
+            const classObj = await Class.buildFromModel(this, classModel);
+            classList.push(classObj);
+        }
+        fnLogger.info("Completed classes build");
+        return classList;
+    }
 
     async getAllClassModels() {
         let selector = {

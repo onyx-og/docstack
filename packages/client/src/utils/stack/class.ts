@@ -46,9 +46,10 @@ class Class extends Class_ {
             if ( space ) {
                 // if (parentClassName) this.setParentClass(parentClassName);
                 let classModel = await space.addClass(this);
+                // Hydrate model
                 if (classModel) {
                     this.setModel(classModel)
-                    this.logger.info("build - classModel", {classModel: classModel})
+                    Class.logger.info("build - classModel", {classModel: classModel})
                     this.setId(classModel._id);
                     resolve(this);
                 } else {
@@ -66,6 +67,7 @@ class Class extends Class_ {
         name: string,
         type: string,
         description: string,
+        schema: ClassModel["schema"]
         // parentClass: Class | null
     ) => {
         this.name = name;
@@ -74,7 +76,9 @@ class Class extends Class_ {
         this.attributes = [];
         this.space = null;
         // this.id = null;
-        this.schema = [];
+        if (schema) {
+            this.schema = schema;
+        }
         // this.parentClass = parentClass;
         if (space) {
             this.space = space;
@@ -83,29 +87,49 @@ class Class extends Class_ {
         // if (parentClass) this.inheritAttributes(parentClass);
     }
 
+    
+    public static get = (
+        space: Stack,
+        name: string,
+        type: string = "class",
+        description: string,
+        schema: ClassModel["schema"],
+    ) => {
+        const class_ = new Class();
+        class_.init(space, name, type, description, schema);
+        return class_;
+    }
+
     public static create = async (
         space: Stack,
         name: string,
         type: string = "class",
         description: string,
+        schema: ClassModel["schema"],
         // parentClass: Class | null = null
     ) => {
-        const _class = new Class();
-        _class.init(space, name, type, description);
-        await _class.build()
-        return _class;
+        const class_ = Class.get(space, name, type, description, schema);
+        await class_.build();
+        return class_;
     }
 
     static buildFromModel = async (space: Stack, classModel: ClassModel) => {
-        this.logger.info("buildFromModel - Instantiate from model", {classModel});
+        Class.logger.info("buildFromModel - Instantiate from model", {classModel});
         // let parentClassModel = (classModel.parentClass ? await space.getClassModel(classModel.parentClass) : null);
         // let parentClass = (parentClassModel ? await Class.buildFromModel(space, parentClassModel) : null);
 
         // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
-        let classObj: Class = await Class.create(space, classModel.name, classModel.type, classModel.type);
-        // [TODO] Redundancy: classObj.setModel updates the model again from the one provided
-        classObj.setModel(classModel);
-        return classObj;
+        if (classModel._rev) {
+            let classObj: Class = Class.get(
+                space, classModel.name, 
+                classModel.type, classModel.type, // [TODO] Change into desc
+                classModel.schema
+            )
+            return classObj;
+        } else {
+            let classObj: Class = await Class.create(space, classModel.name, classModel.type, classModel.type, classModel.schema);
+            return classObj;
+        }
     }
 
     static fetch = async ( space: Stack, className: string ) => {
@@ -167,7 +191,7 @@ class Class extends Class_ {
 
     // Set model should be called only after fetching the latest model from db
     setModel = ( model: ClassModel ) => {
-        this.logger.info("setModel - got incoming model", {model: model});
+        Class.logger.info("setModel - got incoming model", {model: model});
         // Retreive current class model
         let currentModel = this.getModel();
         // Set model arg to the overwrite of the current model with the given one 
@@ -200,7 +224,7 @@ class Class extends Class_ {
         // this.model = {...this.model, ...model};
         this.name = model.name;
         this.description = model.description;
-        this.logger.info("setModel - model after processing",{ model: model})
+        Class.logger.info("setModel - model after processing",{ model: model})
     }
 
     getAttributes = ( ...names: string[] ) => {
@@ -250,26 +274,26 @@ class Class extends Class_ {
             try {
                 let name = attribute.getName();
                 if (!this.hasAttribute(name)) {
-                    this.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()})
+                    Class.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()})
                     this.attributes.push(attribute);
                     let attributeModel = attribute.getModel();
-                    this.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
+                    Class.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
                     this.schema.push(attributeModel); // sometimes getting schema undefined
                     // update class on db
-                    this.logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
+                    Class.logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
                     if (this.space && this.id) {
-                        this.logger.info("addAttribute - updating class on db")
+                        Class.logger.info("addAttribute - updating class on db")
                         let res = await this.space.updateClass(this);
                         resolve(this)
                         // TODO: Check if this class has subclasses
                         // if ( this.class ) 
                     } else {
-                        this.logger.info("addAttribute - class not updated on db because of missing space or id")
+                        Class.logger.info("addAttribute - class not updated on db because of missing space or id")
                         resolve(this)
                     }
                 } else reject("Attribute with name " + name + " already exists within this Class")
             } catch (e) {
-                this.logger.info("Falied adding attribute because: ", e)
+                Class.logger.info("Falied adding attribute because: ", e)
                 reject(e)
             }
         });
@@ -287,11 +311,11 @@ class Class extends Class_ {
                 const res = await this.updateCard(cardId, params);
                 resolve(res);
             }
-            this.logger.info("addOrUpdateCard - received params", {params});
+            Class.logger.info("addOrUpdateCard - received params", {params});
             // attempt to retrieve card by primary key
             let filter: {[key: string]:any} = {}
             let primaryKeys = this.getPrimaryKeys();
-            this.logger.info("addOrUpdateCard - got primary keys", {primaryKeys});
+            Class.logger.info("addOrUpdateCard - got primary keys", {primaryKeys});
             // executes a reducer function on each element of the primaryKeys array
             // that sets each primary key prop to the corresponding param value 
             primaryKeys.reduce(
@@ -316,7 +340,7 @@ class Class extends Class_ {
                 const res = await this.space.createDoc(cardId, this.getName(), this, params);
                 resolve(res)
             } else {
-                this.logger.info("no stack defined");
+                Class.logger.info("no stack defined");
                 resolve(null);
             }
         })
@@ -324,7 +348,7 @@ class Class extends Class_ {
 
     getCards = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
         let _selector = { ...selector, type: this.name };
-        this.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
+        Class.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
         let docs = (await this.space!.findDocuments(_selector, fields, skip, limit)).docs
         return docs;
     }

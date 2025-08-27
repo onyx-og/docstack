@@ -209,7 +209,8 @@ class DocStack extends EventEmitter {
 
             try {
                 const newClass = await Class.create(
-                    this.store, name, type as string, description as string
+                    this.store, name, type as string, description as string,
+                    [] // no schema yet
                 );
                 logger.info("create-class", `class '${name}' created successfully.`,
                     {classModel: newClass.getModel()}
