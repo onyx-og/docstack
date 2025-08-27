@@ -10,14 +10,15 @@ import "./index.scss";
 
 const App = () => {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+    const isAnonymous = useAppSelector((state) => state.auth.isAnonymous);
     const navigate = useNavigate();
 
     useEffect(() => {
-        console.log("App - isAuthenticated", {isAuthenticated})
-        if (!isAuthenticated) {
+        console.log("App - isAuthenticated or isAnonymous", {isAuthenticated, isAnonymous})
+        if (!isAuthenticated && !isAnonymous) {
             navigate('/login');
         } else navigate('/');
-    }, [isAuthenticated]);
+    }, [isAuthenticated, isAnonymous]);
 
     return (
         <Routes>

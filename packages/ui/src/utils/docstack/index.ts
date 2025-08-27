@@ -7,7 +7,7 @@ export const saveState = async (state: any) => {
   try {
     const docStack = new DocStack({dbName: "client-test"});
     docStack.addEventListener("ready", async () => {
-      const testClass = await Class.create(docStack.getStore(), "Test", "class", "A test");
+      const testClass = await Class.create(docStack.getStore(), "Test", "class", "A test", []);
       // await docStack.getStore().addClass();
 
       // const testClass = await docStack.getStore().getClass("Test");

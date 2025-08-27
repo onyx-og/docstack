@@ -1,12 +1,14 @@
-import { createSlice, createAsyncThunk, createReducer, nanoid } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, createReducer, nanoid, createAction } from '@reduxjs/toolkit';
 import { encryptStringWithPublicKey, importPublicKey  } from 'utils/crypto';
 
 export interface AuthState {
   isAuthenticated: boolean;
+  isAnonymous: boolean;
 }
 
 const initialState: AuthState = {
   isAuthenticated: false,
+  isAnonymous: false,
 };
 
 const encryptString = async (string: string) => {
@@ -29,10 +31,11 @@ const encryptString = async (string: string) => {
 const doLogin = async (data: {
   username: string;
   password: string;
+  serverURL: string;
 }) => {
   const encryptedStringBase64 = await encryptString(data.password);
 
-  const response = await fetch("http://localhost:5000/login", {
+  const response = await fetch(`${data.serverURL}/login`, {
     method: "POST",
     body: JSON.stringify({
       username: data.username,
@@ -45,6 +48,8 @@ const doLogin = async (data: {
   });
   return response.json();
 }
+
+export const skipLogin = createAction("skipLogin");
 
 export const login = createAsyncThunk('login', 
   async ( data: any, thunkApi) => {
@@ -73,10 +78,14 @@ const auth = createReducer(initialState, builder => { builder
   })
   .addCase(logout.fulfilled, (state, action) => {
       state.isAuthenticated = false;
+      state.isAnonymous = false;
   })
   .addCase(logout.rejected, (state, action) => {
       // TODO
       console.error(action.error);
+  })
+  .addCase(skipLogin, (state, action) => {
+    state.isAnonymous = true;
   })
 });
 
