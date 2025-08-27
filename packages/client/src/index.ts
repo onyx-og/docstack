@@ -133,10 +133,15 @@ class DocStack extends EventTarget {
         try {
             // Loads the class object
             let classObj = await this.store.getClass(className);
-            let newAttribute = await Attribute.create(classObj, name, type, config);
-            fnLogger.info(`Attribute '${name}' added to class '${className}'`, 
-                {attributeModel: newAttribute.getModel()}
-            );
+            if (classObj) {
+                let newAttribute = await Attribute.create(classObj, name, type, config);
+                fnLogger.info(`Attribute '${name}' added to class '${className}'`, 
+                    {attributeModel: newAttribute.getModel()}
+                );
+            } else {
+                throw new Error(`Failed to retrieve Class '${className}'`);
+            }
+            
         } catch (e: any) {
             fnLogger.error(`Error during attribute '${name}' creation: ${e}`);
             throw new Error(`Error during attribute '${name}' creation: ${e}`);

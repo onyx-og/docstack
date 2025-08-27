@@ -270,15 +270,17 @@ class ClientStack extends Stack {
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
-    getClass = async (className: string) => {
+    getClass = async (className: string): Promise<Class | null> => {
         // Check if class is in cache and not expired
         if (this.cache[className] && Date.now() < this.cache[className].ttl) {
             logger.info("getClass -  retrieving class from cache", {ttl: this.cache[className].ttl})
             return this.cache[className];
         }
         const classObj = await Class.fetch(this, className);
-        (classObj as CachedClass).ttl = Date.now() + 60000 // 1 minute expiration
-        this.cache[className]
+        if (classObj) {
+            (classObj as CachedClass).ttl = Date.now() + 60000 // 1 minute expiration
+            this.cache[className]
+        }
         return classObj;
     }
 
@@ -432,7 +434,7 @@ class ClientStack extends Stack {
         let selector = {
             type: { $eq: "class" }
         };
-        let fields = ['_id', 'name', 'description'];
+        let fields = ['_id', 'name', 'description', 'schema'];
 
         let response = await this.findDocuments(selector, fields);
         let result: ClassModel[] = response.docs as ClassModel[];

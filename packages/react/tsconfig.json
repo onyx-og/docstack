@@ -14,7 +14,8 @@
       "components": ["components/*"],
       "hooks": ["hooks/*"],
       "utils": ["utils/*"],
-      "@docstack/client": ["../../client/src/index.ts"]
+      "@docstack/client": ["../../client/src/index.ts"],
+      "@docstack/shared": ["../../shared/src"]
     }
   },
   "include": [

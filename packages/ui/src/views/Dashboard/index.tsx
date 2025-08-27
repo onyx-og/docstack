@@ -1,12 +1,14 @@
 
-import { ActionBar, List, Button, Header, Card, Table } from "@prismal/react";
+import { ActionBar, List, Button, Header, Card, Table, useModal } from "@prismal/react";
 import { useAppDispatch } from "hooks";
 import React, { useCallback } from "react";
 import { logout } from "features/auth";
 import { saveState } from "features/store";
 import { useClassList } from "@docstack/react";
+import DebugPanel from "components/DebugPanel";
 
 import "./index.scss";
+import ClassCard from "components/ClassCard";
 
 const Dashboard = () => {
     const dispatch = useAppDispatch()
@@ -20,27 +22,21 @@ const Dashboard = () => {
     },[dispatch]);
 
     const { loading, error, classList } = useClassList();
-    console.log({classList});
 
     const classList_ = React.useMemo(() => {
         if (classList.length) {
             return <List
-                view="grid"
+                view="list"
                 pageSize={5}
-                cols={3}
                 showPageCtrl={true}
                 type="raw"
             >
                 {
                     classList.map((classObj) => {
-                        return <Card
-                            header={<div className="dashboard-class-header">
-                                <h3>{classObj.name}</h3>
-                                <span>{classObj.description}</span>
-                            </div>}
-                        >
-                            {/* <Table data={classObj.getAttributes().} /> */}
-                        </Card>
+                        return <ClassCard 
+                            name={classObj.name} description={classObj.description}
+                            attributes={classObj.getAttributes()}
+                        />
                     })
                 }
             </List>
@@ -53,18 +49,12 @@ const Dashboard = () => {
     //     dispatch(testRequest(true));
     // }, [dispatch])
 
-    return <div className="view-dashboard">
-        <Header style={{
-            borderBottom: "var(--color-primary) solid .1rem"
-        }} >
-            <ActionBar items={[
-                { item: <h1>Dashboard</h1>, key: "dashboard-title", position: "left" },
-                { item: <Button type="text" iconName="bug" />, key: "btn-bug", position: "right" },
-                { item: <Button type="primary" onClick={doLogout}>Logout</Button>, key: "btn-logout", position: "right" }
-            ]} />
-        </Header>
+    const { Modal, state: debugPanelState, open: openDebugPanel } = useModal({areaId: "root"});
 
-        <main>
+    return <main className="view-dashboard">
+        
+
+
             <ActionBar items={[
                 { item: <h2>Classes</h2>, key: "body-title", position: "left" },
                 // { item: <Button type="text" iconName="bug" />, key: "btn-bug", position: "right" },
@@ -72,12 +62,11 @@ const Dashboard = () => {
             <div className="view-dash-classes-container">
                 {classList_}
             </div>
-        </main>
         
         {/* <Button type="default" onClick={doRequest}>Test request</Button> */}
         
-        <Button type="primary" onClick={doSaveState}>Save State</Button>
-    </div>
+        {/* <Button type="primary" onClick={doSaveState}>Save State</Button> */}
+    </main>
 }
 
 export default Dashboard

@@ -39,8 +39,8 @@ abstract class Class {
         space: Stack | null,
         name: string,
         type: string,
-        description: string,
-        schema: ClassModel["schema"],
+        description?: string,
+        schema?: ClassModel["schema"],
         // parentClass: Class | null
     ) => void;
 
@@ -48,8 +48,8 @@ abstract class Class {
         space: Stack,
         name: string,
         type: string,
-        description: string,
-        schema: ClassModel["schema"],
+        description?: string,
+        schema?: ClassModel["schema"],
         // parentClass: Class | null = null
     ) => Class;
 
@@ -57,14 +57,14 @@ abstract class Class {
         space: Stack,
         name: string,
         type: string,
-        description: string,
-        schema: ClassModel["schema"],
+        description?: string,
+        schema?: ClassModel["schema"],
         // parentClass: Class | null = null
     ) => Promise<Class>;
 
     static buildFromModel: (space: Stack, classModel: ClassModel) => Promise<Class>;
 
-    static fetch: ( space: Stack, className: string ) => Promise<Class>;
+    static fetch: ( space: Stack, className: string ) => Promise<Class | null>;
 
     // TODO Turn into method (after factory method instantiation refactory is done)
     abstract setId: ( id: string ) => void;
