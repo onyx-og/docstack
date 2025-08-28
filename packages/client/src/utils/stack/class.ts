@@ -99,7 +99,6 @@ class Class extends Class_ {
         schema: ClassModel["schema"] = [],
     ) => {
         const class_ = new Class();
-        debugger;
         Class.logger.info("Received schema", {schema})
         class_.init(space, name, type, description, schema);
         return class_;
@@ -127,7 +126,7 @@ class Class extends Class_ {
         if (classModel._rev) {
             let classObj: Class = Class.get(
                 space, classModel.name, 
-                classModel.type, classModel.description, // [TODO] Change into desc
+                classModel.type, classModel.description,
                 classModel.schema
             )
             return classObj;

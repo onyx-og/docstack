@@ -25,12 +25,12 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
         return null;
     }, [schema]);
 
-    return <div className="panel-class-model">
+    return <section className="panel-class-model">
         <h2>{name}</h2>
         <span>{description}</span>
         <span>{type}</span>
         {attributePanels}
-    </div>
+    </section>
 }
 
 export default ClassModelPanel;

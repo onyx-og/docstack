@@ -55,7 +55,8 @@ const AuthView = () => {
     return <div className="view-auth">
         <div className="view-auth-hero">
             <div className="view-auth-hero-fill" style={{
-                backgroundImage: `url("${require('assets/shubham-dhage-unsplash.jpg')}")`
+                backgroundImage: `url("${require('assets/hero-cubes.gif')}")`
+                // backgroundImage: `url("${require('assets/shubham-dhage-unsplash.jpg')}")`
             }}>
 
             </div>

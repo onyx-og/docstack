@@ -66,19 +66,22 @@ class Class extends Class_ {
         space: Stack | null,
         name: string,
         type: string,
-        description: string,
-        schema: ClassModel["schema"]
+        description?: string,
+        schema: ClassModel["schema"] = []
         // parentClass: Class | null
     ) => {
         this.name = name;
         this.description = description;
         this.type = type;
-        this.attributes = [];
+        // this.attributes = [];
         this.space = null;
         // this.id = null;
-        if (schema) {
-            this.schema = schema;
-        }
+        // if (schema) {
+        //     this.schema = schema;
+        // }
+        this.setModel({
+            name, description, schema, type, _id: name
+        })
         // this.parentClass = parentClass;
         if (space) {
             this.space = space;
@@ -96,6 +99,7 @@ class Class extends Class_ {
         schema: ClassModel["schema"],
     ) => {
         const class_ = new Class();
+        Class.logger.info("Received schema", {schema})
         class_.init(space, name, type, description, schema);
         return class_;
     }
@@ -104,8 +108,8 @@ class Class extends Class_ {
         space: Stack,
         name: string,
         type: string = "class",
-        description: string,
-        schema: ClassModel["schema"],
+        description?: string,
+        schema: ClassModel["schema"] = [],
         // parentClass: Class | null = null
     ) => {
         const class_ = Class.get(space, name, type, description, schema);
@@ -122,7 +126,7 @@ class Class extends Class_ {
         if (classModel._rev) {
             let classObj: Class = Class.get(
                 space, classModel.name, 
-                classModel.type, classModel.type, // [TODO] Change into desc
+                classModel.type, classModel.description,
                 classModel.schema
             )
             return classObj;
@@ -137,6 +141,7 @@ class Class extends Class_ {
         if ( classModel ) {
             return Class.buildFromModel(space, classModel);
         } else {
+            return null;
             throw new Error("Class not found: "+className);
         }
     }
@@ -182,14 +187,14 @@ class Class extends Class_ {
             name: this.getName(),
             description: this.getDescription(),
             type: this.getType(),
-            schema: this.schema,
+            schema: this.buildSchema(),
             _rev: this.model ? this.model._rev : "", // [TODO] Error prone
             createTimestamp: this.model ? this.model.createTimestamp : undefined,
         };
         return model;
     }
 
-    // Set model should be called only after fetching the latest model from db
+    /* Mainly sets schema and attributes, also name and description */
     setModel = ( model: ClassModel ) => {
         Class.logger.info("setModel - got incoming model", {model: model});
         // Retreive current class model
