@@ -1,0 +1,30 @@
+td.doc-cell {
+    position: relative;
+
+    &.mode-edit:hover::after {
+        content: "✎";
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(var(--color-primary-light_), 0.7);
+        top: 0;
+        left: 0;
+        cursor: pointer;
+    }
+    &.mode-view:hover::after {
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(var(--color-primary-light_), 0.25);
+        top: 0;
+        left: 0;
+        cursor: pointer;
+    }
+}

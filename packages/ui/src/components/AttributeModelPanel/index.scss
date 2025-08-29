@@ -1,0 +1,18 @@
+.panel-attribute-model {
+
+    .btn-edit-attr,
+    .btn-del-attr {
+        opacity: 0;
+        pointer-events: none;
+        transition: all 1s ease-in-out;
+    }
+
+    &:hover, &:focus, &:focus-within {
+
+        .btn-edit-attr,
+        .btn-del-attr {
+            pointer-events:initial;
+            opacity: 1;
+        }
+    }
+}

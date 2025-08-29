@@ -1,5 +1,6 @@
 import { AttributeModel, ClassModel, Document } from "@docstack/shared";
 import { Button, Form, TextInput, Toggle, InputRefType } from "@prismal/react";
+import { useClass } from "@docstack/react";
 import React from "react";
 
 interface AttributeFieldProps extends AttributeModel {
@@ -45,26 +46,36 @@ const AttributeField = React.forwardRef((props: AttributeFieldProps, ref: React.
 });
 
 interface DocumentFormProps {
-    schema: AttributeModel[];
+    model: ClassModel;
     doc?: Document;
     mode?: "read" | "write" | "read/write";
+    onSubmission?: (arg?: any) => void;
 }
 const DocumentForm: React.FC<DocumentFormProps> = (props) => {
     const {
-        schema,
+        model,
         mode,
-        doc
+        doc,
+        onSubmission
     } = props;
 
+    const { schema = [], name } = model;
+
+    console.log("DocumentForm", {doc});
+
+    // [TODO] Add loading indicator on submit button
+    const { loading, error, classObj } = useClass(name);
+    
     const submitDoc = React.useCallback((formData: {}) => {
-        console.log("Form data", {data: formData});
-        if (doc) {
-
+        if (classObj) {
+            // Perform create/update
+            console.log(`submitDoc - id: ${doc?._id}`);
+            classObj.addOrUpdateCard(formData, doc?._id);
         } else {
-            // New document
-
+            // disabled submit button on loading/error
         }
-    }, [doc]);
+        if (onSubmission) onSubmission(formData);
+    }, [doc, classObj, onSubmission]);
 
 
     const attributeFields = React.useMemo(() => {
@@ -73,11 +84,12 @@ const DocumentForm: React.FC<DocumentFormProps> = (props) => {
             fields.push(<AttributeField 
                 defaultMode={mode != "read/write" ? mode : "write"} 
                 allowToggleMode={mode=="read/write"} {...attrModel} 
+                value={doc?.[attrModel.name]}
                 key={attrModel.name}
             />);
         }
         return fields;
-    }, [schema, mode]);
+    }, [schema, doc, mode]);
 
     return <Form className="form-class-doc"
         // submit={}

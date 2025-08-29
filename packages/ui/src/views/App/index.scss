@@ -1,4 +1,11 @@
-html, body, #root {
+html,
+body,
+#root {
     margin: 0;
     height: 100%
+}
+
+.prismal-header .prismal-header-nav.prismal-header-nav-flyout {
+    backdrop-filter: blur(10px);
+    background-color: rgba(var(--color-primary-light_), 0.25);
 }
