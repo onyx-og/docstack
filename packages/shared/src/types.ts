@@ -29,7 +29,7 @@ export type AttributeTypeString = {
 export type AttributeTypeBoolean = {
     type: "boolean",
     name: string,
-    config: {default?: boolean} & AttributeTypeConfig
+    config: {} & AttributeTypeConfig
 }
 export type AttributeTypeForeignKey = {
     type: "foreign_key",

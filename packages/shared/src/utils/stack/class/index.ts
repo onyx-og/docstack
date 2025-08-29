@@ -107,6 +107,8 @@ abstract class Class extends EventTarget {
     abstract updateCard: (cardId: string, params: {[key:string]: any}) => Promise<Document | null>;
 
     abstract getCards: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
+
+    abstract deleteCard: (cardId: string) => Promise<boolean>;
 }
 
 export default Class;

@@ -157,9 +157,10 @@ export const useClassDocs = (className: string, query = {}) => {
 
             const changeListener = (change: any) => {
                 const doc = change.detail.doc;
-                if (doc._deleted) {
+                console.log("useClassDocs - detail", {detail: change.detail});
+                if (!doc.active) {
                     // A doc was deleted
-                    // console.log("useClassDocs - a doc was deleted", {doc});
+                    console.log("useClassDocs - a doc was deleted", {doc});
                     const docIndex = docsRef.current.findIndex((d) => d._id == doc._id)
                     if (docIndex != -1) {
                         docsRef.current = [

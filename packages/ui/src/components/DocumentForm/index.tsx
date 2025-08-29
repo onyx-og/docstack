@@ -1,5 +1,5 @@
 import { AttributeModel, ClassModel, Document } from "@docstack/shared";
-import { Button, Form, TextInput, Toggle, InputRefType } from "@prismal/react";
+import { Button, Form, TextInput, Toggle, InputRefType, ActionBar, ActionBarItemConfig, Select, useModal } from "@prismal/react";
 import { useClass } from "@docstack/react";
 import React from "react";
 
@@ -54,14 +54,21 @@ interface DocumentFormProps {
 const DocumentForm: React.FC<DocumentFormProps> = (props) => {
     const {
         model,
-        mode,
+        mode: initMode = "read",
         doc,
         onSubmission
     } = props;
 
     const { schema = [], name } = model;
+    const [mode, setMode] = React.useState(initMode);
 
-    console.log("DocumentForm", {doc});
+    const toggleMode = React.useCallback((value: string) => {
+        if (["read", "read/write"].includes(value)) {
+            setMode(value as "read" | "read/write");
+        }
+    }, []);
+
+    const { Modal, open: openConfirmDel, close: closeConfirmDel } = useModal({areaId: "root"});
 
     // [TODO] Add loading indicator on submit button
     const { loading, error, classObj } = useClass(name);
@@ -91,11 +98,44 @@ const DocumentForm: React.FC<DocumentFormProps> = (props) => {
         return fields;
     }, [schema, doc, mode]);
 
-    return <Form className="form-class-doc"
-        // submit={}
-        onSubmit={submitDoc}>
-        {attributeFields}
-    </Form>
+    const deleteDoc = React.useCallback(() => {
+        if (classObj && doc) {
+            classObj.deleteCard(doc._id).then((res) => {
+                if (res && onSubmission) onSubmission({deleted: true})
+            });
+        } else if (!classObj) {
+            throw new Error("Missing class instance. Check logs");
+        } else {
+            throw new Error("Missing document to delete");
+        }
+    }, [doc, classObj, onSubmission]);
+
+    const actionBarItems = React.useMemo(() => {
+        const items: ActionBarItemConfig[] = [];
+        if (doc) {
+            items.push({position: "left", key: "btn-doc-del", item: <Button iconName="trash" type="primary" onClick={openConfirmDel}/>});
+        }
+        items.push({ item: <Select placeholder={"Mode"} options={[
+            {value: "read", element: "View", selected: mode == "read"},
+            {value: "read/write", element: "Edit", selected: mode != "read"}
+        ]} onChange={(v) => toggleMode(v as string)}  />, position: "left", key: "mode-selector" })
+        return items;
+    }, [doc, mode, openConfirmDel]);
+
+    return <div>
+        <Modal footer={<ActionBar items={[
+            { position: "right", key: 'btn-cancel-del', item: <Button onClick={closeConfirmDel} type="primary" iconName="close">Cancel</Button> },
+            { position: "right", key: 'btn-confirm-del', item: <Button onClick={deleteDoc} iconName="check">Confirm</Button> },
+        ]}/>}>
+
+        </Modal>
+        <Form className="form-class-doc"
+            // submit={}
+            onSubmit={submitDoc}>
+            {attributeFields}
+        </Form>
+        <ActionBar items={actionBarItems}/>
+    </div>
 }
 
 export default DocumentForm;

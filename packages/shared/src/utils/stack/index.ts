@@ -39,6 +39,8 @@ abstract class Stack extends EventTarget {
 
     abstract getClassModel: (className: string) => Promise<ClassModel | null>;
 
+    abstract deleteDocument: (_id: string) => Promise<boolean>;
+
 }
 
 export default Stack;

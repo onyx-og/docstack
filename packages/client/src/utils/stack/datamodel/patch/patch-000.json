@@ -3,6 +3,7 @@
   "docs": [
     {
       "_id": "User",
+      "active": true,
       "name": "User",
       "description": "A user class for secure login",
       "type": "class",
@@ -11,7 +12,9 @@
           "name": "username",
           "type": "string",
           "config": {
+            "primaryKey": true,
             "maxLength": 50,
+            "mandatory": true,
             "isArray": false
           }
         },
@@ -20,6 +23,7 @@
           "type": "string",
           "config": {
             "maxLength": 50,
+            "mandatory": true,
             "isArray": false
           }
         },
@@ -52,6 +56,7 @@
     {
       "_id": "UserSession",
       "name": "UserSession",
+      "active": true,
       "description": "Tracks user sessions",
       "type": "class",
       "schema": [

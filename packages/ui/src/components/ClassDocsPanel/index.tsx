@@ -61,11 +61,14 @@ const ClassDocsPanel: React.FC<ClassDocsPanelProps> = (props) => {
         const {data, coords, mode} = props;
         const key = `${coords ? coords.concat() : null}`;
         const className = `doc-cell mode-${tableMode}`;
-        // console.log('editableCellRenderer',{coords});
+
         return <td onClick={() => {
             if (tableMode == "edit") doOpenDocForm(Number(coords![0]));
-        }} className={className} key={key}>{data}</td>
-    }, [tableMode]);
+        }} className={className} onDoubleClick={() => {
+            if (tableMode == "view") doOpenDocForm(Number(coords![0]))
+        }}
+        key={key}>{data?.toString( )}</td>
+    }, [tableMode, doOpenDocForm]);
 
     const table = React.useMemo(() => {
         
@@ -86,14 +89,14 @@ const ClassDocsPanel: React.FC<ClassDocsPanelProps> = (props) => {
                 <Select placeholder={"Mode"} options={[
                     {value: "view", element: "View", selected: tableMode == "view"},
                     {value: "edit", element: "Edit", selected: tableMode == "edit"}
-                ]} onChange={(v) => toggleTableMode(v as string)} multiple={false} />
+                ]} onChange={(v) => toggleTableMode(v as string)} />
             },
             { position: "right", key: "btn-add-doc", item: <Button type="primary" onClick={doOpenEmptyDocForm} iconName="plus-square" /> }
         ]}
         />
         <Modal title="Document">
             {model?.schema
-                ? <DocumentForm doc={doc} mode="write" model={model} onSubmission={closeDocForm} /> 
+                ? <DocumentForm doc={doc} mode={tableMode == "edit" ? "read/write" : "read"} model={model} onSubmission={closeDocForm} /> 
                 : <span>Check logs</span>
             }
         </Modal>

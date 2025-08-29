@@ -12,16 +12,17 @@ import {
 import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
     AttributeTypeForeignKey, 
     AttributeTypeInteger,
-    AttributeTypeString} from "../../../../shared/src/types";
+    AttributeTypeString} from "@docstack/shared";
 
 const logger = logger_.child({module: "stack"});
 
 export const BASE_SCHEMA: AttributeModel[] = [
-    { name: "_id", type: "string", config: { maxLength: 100 } },
+    { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
     { name: "type", type: "string", config: { maxLength: 100 } },
     { name: "createTimestamp", type: "integer", config: { min: 0 } },
     { name: "updateTimestamp", type: "integer", config: { min: 0 } },
-    { name: "description", type: "string", config: { maxLength: 1000 } }
+    { name: "description", type: "string", config: { maxLength: 1000 } },
+    { name: "active", type: "boolean", config: { defaultValue: true , primaryKey: true } }
 ]
 export const CLASS_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", config: {}})[] = [
     ...BASE_SCHEMA,
@@ -289,8 +290,8 @@ class ClientStack extends Stack {
         }
         const classObj = await Class.fetch(this, className);
         if (classObj) {
-            (classObj as CachedClass).ttl = Date.now() + 60000 // 1 minute expiration
-            this.cache[className]
+            (classObj as CachedClass).ttl = Date.now() + 60000 * 15; // 15 minutes expiration
+            this.cache[className] = classObj as CachedClass;
         }
         return classObj;
     }
@@ -353,17 +354,25 @@ class ClientStack extends Stack {
 
     // Expects a selector like { type: { $eq: "class" } }
     findDocuments = async ( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
-        const fnLogger = logger.child({"method": "findDocuments"});
-        fnLogger.info("Executing with args", {selector, fields, skip, limit});
+        const fnLogger = logger.child({method: "findDocuments", args: {selector, fields, skip, limit}});
+
+        // By default request for only active documents
+        if (!selector.hasOwnProperty("active")) {
+            selector["active"] = true;
+        }
+
         let indexFields = Object.keys(selector);
-        fnLogger.info("Produced indexFields from selector", {selector, indexFields});
+        fnLogger.info("Produced index fields from selector", {indexFields});
+
         let result: {
             docs: Document[],
             [key: string]: any
         } = {
             docs: []
         }
+
         try {
+            // [TODO] This breaks find method and even db!!
             // let indexResult = await this.db.createIndex({
             //     index: { fields: indexFields }
             // });
@@ -493,17 +502,16 @@ class ClientStack extends Stack {
     }
 
     async destroyDb() {
-        return new Promise ( (resolve, reject) => {
-            try {
-                this.db.destroy(null, () => {
-                    logger.info("reset - Destroyed db");
-                    resolve(true);
-                });
-            } catch (e: any) {
-                logger.error("reset - Error while destroying db"+e)
-                reject(false)
-            }
-        })
+        const fnLogger = logger.child({method: "destroyDb"});
+        try {
+            this.db.destroy(null, () => {
+                fnLogger.info("Destroyed db");
+                return true;
+            });
+        } catch (e: any) {
+            fnLogger.error(`Error while destroying db: ${e}`);
+            return false;
+        }
     }
 
     // This method is similar to destroyDb, but intended to be called from the client (not to destroy the main db)
@@ -773,17 +781,19 @@ class ClientStack extends Stack {
         if (schema_) return await this.validateObject(obj, type, schema_);
     }
 
-    prepareDoc (_id: string, type: string, params: {[key: string] : string | number}) {
+    prepareDoc (_id: string, type: string, params: {[key: string] : string | number | boolean}) {
         logger.info("prepareDoc - given args", {_id: _id, type: type, params: params});
         params["_id"] = _id;
         params["type"] = type;
         params["createTimestamp"] = new Date().getTime();
+        params["active"] = true;
         logger.info("prepareDoc - after elaborations", {params} );
         return params;
     }
 
     createDoc = async (docId: string | null, type: string,classObj: Class, params: {}) => {
         let schema = classObj.buildSchema();
+        // [TODO] Custom triggers goes here
         logger.info("createDoc - args", {docId, type, params, schema});
         let db = this.db,
             doc: Document | null = null,
@@ -864,6 +874,28 @@ class ClientStack extends Stack {
         // Note that doc don't contain the _rev field. This approach enforce the use of 
         // retreiving the document from the database to get the _rev field
         return doc;
+    }
+
+    /**
+     * Sets the active param of a document to false
+     * @param _id 
+     * @returns Promise<boolean>
+     */
+    deleteDocument = async (_id: string): Promise<boolean> => {
+        const fnLogger = logger.child({method: "deleteDocument", args: {_id}});
+        const doc = await this.db.get(_id);
+        if (doc) {
+            try {
+                await this.db.put({...doc, active: false});
+                return true;
+            } catch (e: any) {
+                fnLogger.error(`Error while deleting document: ${e}`,{document: doc});
+                return false;
+            }
+        } else {
+            fnLogger.error("Found no document with given id");
+            return false;
+        }
     }
 
     /*
