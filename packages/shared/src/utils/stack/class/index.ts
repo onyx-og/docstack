@@ -9,7 +9,7 @@ const CLASS_TYPE = "class";
 const SUPERCLASS_TYPE = "superclass";
 const CLASS_TYPES = [CLASS_TYPE, SUPERCLASS_TYPE];
 
-abstract class Class {
+abstract class Class extends EventTarget {
     space: Stack | null = null;
     /* Populated in init() */
     name!: string;
@@ -30,7 +30,7 @@ abstract class Class {
     }
 
     constructor() {
-        
+        super();
     }
     
     abstract build: () => Promise<Class>;

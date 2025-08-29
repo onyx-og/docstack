@@ -96,6 +96,17 @@ class ServerStack extends Stack {
         }
     }
 
+    public onClassDoc = (className: string) => {
+        return this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == className;
+            }
+        })
+    }
+
     public getDb() {
         return this.db
     }

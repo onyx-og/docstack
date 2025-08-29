@@ -96,6 +96,17 @@ class ClientStack extends Stack {
         }
     }
 
+    public onClassDoc = (className: string) => {
+        return this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == className;
+            }
+        })
+    }
+
     public getDb() {
         return this.db
     }
@@ -519,7 +530,16 @@ class ClientStack extends Stack {
         let existingDoc = await this.getClassModel(classModel.name);
         if ( existingDoc == null ) {
             let resultDoc = await this.createDoc(classModel.name, 'class', classObj, classModel);
-            logger.info("addClass - result", {result: resultDoc})
+            logger.info("addClass - result", {result: resultDoc});
+            // [TODO] Consider creating a design doc for easier filtering
+            // this.db.put({
+            //     _id: `_design/${classModel.name}`,
+            //     filters: {
+            //         classDocs: function (doc) {
+            //         return doc.type == `${classModel.name}`;
+            //         }.toString()
+            //     }
+            // });
             return resultDoc as ClassModel;
         } else {
             return existingDoc;

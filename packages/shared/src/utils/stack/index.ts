@@ -7,7 +7,7 @@ import {
 
 import Class from "./class";
 
-abstract class Stack {
+abstract class Stack extends EventTarget {
     /* Initialized asynchronously */
     public db!: PouchDB.Database<{}>;
     /* Retrieved asynchronously */
@@ -34,6 +34,8 @@ abstract class Stack {
         [key: string]: any;
         docs: Document[];
     }>;
+
+    abstract onClassDoc: (className: string) => PouchDB.Core.Changes<{}>;
 
     abstract getClassModel: (className: string) => Promise<ClassModel | null>;
 

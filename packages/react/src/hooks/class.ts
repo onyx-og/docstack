@@ -103,9 +103,11 @@ export const useClassDocs = (className: string, query = {}) => {
 
     const [classObj, setClass] = React.useState<Class>();
     const [docs, setDocs] = React.useState<Document[]>([]);
+    const docsRef = React.useRef<Document[]>([]);
 
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
+    
 
     React.useEffect(() => {
         // Only run if the docStack is available and a className is provided
@@ -145,24 +147,52 @@ export const useClassDocs = (className: string, query = {}) => {
             setLoading(true);
             try {
                 const initialDocs = await classObj.getCards(query) as Document[];
-                setDocs(initialDocs);
+                docsRef.current = initialDocs;
+                setDocs(docsRef.current);
             } catch (err: any) {
                 setError(err);
             } finally {
                 setLoading(false);
             }
 
-            /*  // [TODO]
-            const changeListener = (change) => {
-                //
+            const changeListener = (change: any) => {
+                const doc = change.detail.doc;
+                if (doc._deleted) {
+                    // A doc was deleted
+                    // console.log("useClassDocs - a doc was deleted", {doc});
+                    const docIndex = docsRef.current.findIndex((d) => d._id == doc._id)
+                    if (docIndex != -1) {
+                        docsRef.current = [
+                            ...docsRef.current.slice(0, docIndex),
+                            ...docsRef.current.slice(docIndex+1, docsRef.current.length)
+                        ];
+                    }
+                } else {
+                    // A doc was changed or added
+                    console.log("useClassDocs - a doc was changed or added", {doc});
+                    const docIndex = docsRef.current.findIndex((d) => d._id == doc._id)
+                    if (docIndex != -1) {
+                        // A doc was changed
+                        console.log("useClassDocs - a doc was changed", {doc});
+                        docsRef.current = [
+                            ...docsRef.current.slice(0, docIndex),
+                            doc,
+                            ...docsRef.current.slice(docIndex+1, docsRef.current.length)
+                        ];
+                    } else {
+                        // A doc was added
+                        console.log("useClassDocs - a doc was added", {doc});
+                        docsRef.current.push(doc);
+                    }
+                }
+                setDocs([...docsRef.current])
             };
 
-            classObj.on('change', changeListener);
+            classObj.addEventListener('doc', changeListener);
 
             return () => {
-                classObj.off('change', changeListener);
+                classObj.removeEventListener('doc', changeListener);
             };
-            */
         };
 
         runQueryAndListen();

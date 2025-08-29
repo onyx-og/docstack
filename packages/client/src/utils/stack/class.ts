@@ -101,6 +101,14 @@ class Class extends Class_ {
         const class_ = new Class();
         Class.logger.info("Received schema", {schema})
         class_.init(space, name, type, description, schema);
+        // Add listener for new documents of this class type
+        class_.space!.onClassDoc(name)
+            .on("change", (change) => {
+                const evt = new CustomEvent("doc", {
+                    detail: change
+                })
+                class_.dispatchEvent(evt);
+            })
         return class_;
     }
 
@@ -311,29 +319,39 @@ class Class extends Class_ {
     }
 
     addOrUpdateCard = async (params: {[key:string]: any}, cardId?: string) => {
+        const fnLogger = Class.logger.child({method: "addOrUpdateCard", args: {params, cardId}});
         return new Promise<Document | null>( async (resolve, reject) => {
             if (cardId) {
+                fnLogger.info("Provided document's id, performing an update");
                 const res = await this.updateCard(cardId, params);
                 resolve(res);
-            }
-            Class.logger.info("addOrUpdateCard - received params", {params});
-            // attempt to retrieve card by primary key
-            let filter: {[key: string]:any} = {}
-            let primaryKeys = this.getPrimaryKeys();
-            Class.logger.info("addOrUpdateCard - got primary keys", {primaryKeys});
-            // executes a reducer function on each element of the primaryKeys array
-            // that sets each primary key prop to the corresponding param value 
-            primaryKeys.reduce(
-                (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
-                filter,
-            );
-            let cards = await this.getCards(filter, undefined, 0, 1);
-            if (cards.length > 0) {
-                const res = await this.updateCard(cards[0]._id, params);
-                resolve(res);
             } else {
-                const res = await this.addCard(params);
-                resolve(res);
+                fnLogger.info("No document id provided, checking for PKs");
+                // attempt to retrieve card by primary key
+                let filter: {[key: string]:any} = {}
+                let primaryKeys = this.getPrimaryKeys();
+                fnLogger.info("Got primary keys", {primaryKeys});
+                if (primaryKeys.length) {
+                    // executes a reducer function on each element of the primaryKeys array
+                    // that sets each primary key prop to the corresponding param value 
+                    primaryKeys.reduce(
+                        (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
+                        filter,
+                    );
+                    fnLogger.info("Defined filter", {filter});
+                    let cards = await this.getCards(filter, undefined, 0, 1);
+                    if (cards.length > 0) {
+                        const res = await this.updateCard(cards[0]._id, params);
+                        resolve(res);
+                    } else {
+                        const res = await this.addCard(params);
+                        resolve(res);
+                    }
+                } else {
+                    // No primary keys defined => always adds new document
+                    const res = await this.addCard(params);
+                    resolve(res);
+                }
             }
         });
         
