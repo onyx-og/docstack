@@ -1,5 +1,5 @@
 import { ClassModel } from "@docstack/shared";
-import { List } from "@prismal/react";
+import { ActionBar, Button, List, useModal } from "@prismal/react";
 import AttributeModelPanel from "components/AttributeModelPanel";
 import React from "react";
 
@@ -27,13 +27,26 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
         return [];
     }, [schema]);
 
+    const {
+        Modal: AttributeCreationModal,
+        open: openAttrCreationModal,
+        close: closeAttrCreationModal
+    } = useModal({areaId: "root"});
+
     return <section style={{
         padding: "2rem 1rem"
     }} className="panel-class-model">
         <h2>{name}</h2>
         <span>{description}</span>
         <span>{type}</span>
-        <List type="raw" view="list">
+        <AttributeCreationModal title="New attribute" footer={<ActionBar items={[
+            { position: "right", key: "btn-attr-creation-close", item: <Button type="default" onClick={closeAttrCreationModal} iconName="close">Cancel</Button> },
+        ]} />}>
+
+        </AttributeCreationModal>
+        <List header={<ActionBar items={[
+            { position: "right", key: "btn-add-attr", item: <Button type="primary" onClick={openAttrCreationModal} iconName="plus">New attribute</Button>}
+        ]} />} type="raw" view="list">
             {attributePanels}
         </List>
         

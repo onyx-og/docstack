@@ -23,9 +23,14 @@ const Dashboard = () => {
 
     const { loading, error, classList } = useClassList();
 
+    const { Modal: ClassCreationModal, open: openClassCreationModal, close: closeClassCreationModal } = useModal({areaId: "root"});
+
     const classList_ = React.useMemo(() => {
         if (classList.length) {
             return <List
+                header={<ActionBar items={[
+                    { position: "right", key: "btn-class-creation-open", item: <Button onClick={openClassCreationModal} type="primary" iconName="plus">New class</Button>}
+                ]}/>}
                 view="list"
                 pageSize={5}
                 showPageCtrl={true}
@@ -43,18 +48,15 @@ const Dashboard = () => {
         } 
         return <span>Loading</span>
         
-    }, [loading, classList, error]);
+    }, [loading, classList, error, openClassCreationModal]);
 
-    // const doRequest = useCallback( () => {
-    //     dispatch(testRequest(true));
-    // }, [dispatch])
-
-    const { Modal, state: debugPanelState, open: openDebugPanel } = useModal({areaId: "root"});
 
     return <main className="view-dashboard">
-        
-
-
+        <ClassCreationModal footer={<ActionBar items={[
+            { position: "right", key: "btn-class-creation-close", item: <Button type="default" onClick={closeClassCreationModal} iconName="close">Cancel</Button> },
+        ]} />}>
+            <span>Creating class</span>
+        </ClassCreationModal>
             <ActionBar items={[
                 { item: <h2>Classes</h2>, key: "body-title", position: "left" },
                 // { item: <Button type="text" iconName="bug" />, key: "btn-bug", position: "right" },
@@ -62,10 +64,6 @@ const Dashboard = () => {
             <div className="view-dash-classes-container">
                 {classList_}
             </div>
-        
-        {/* <Button type="default" onClick={doRequest}>Test request</Button> */}
-        
-        {/* <Button type="primary" onClick={doSaveState}>Save State</Button> */}
     </main>
 }
 

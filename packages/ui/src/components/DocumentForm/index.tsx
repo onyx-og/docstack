@@ -123,11 +123,11 @@ const DocumentForm: React.FC<DocumentFormProps> = (props) => {
     }, [doc, mode, openConfirmDel]);
 
     return <div>
-        <Modal footer={<ActionBar items={[
+        <Modal title="Confirmation" footer={<ActionBar items={[
             { position: "right", key: 'btn-cancel-del', item: <Button onClick={closeConfirmDel} type="primary" iconName="close">Cancel</Button> },
             { position: "right", key: 'btn-confirm-del', item: <Button onClick={deleteDoc} iconName="check">Confirm</Button> },
         ]}/>}>
-
+            Do you wish to delete this document?
         </Modal>
         <Form className="form-class-doc"
             // submit={}
