@@ -132,6 +132,7 @@
     "express": "^4.18.3",
     "express-winston": "^4.2.0",
     "fs": "0.0.1-security",
+    "jsondiffpatch": "^0.7.3",
     "jsonwebtoken": "^9.0.2",
     "pouchdb": "^7.3.0",
     "pouchdb-adapter-memory": "^8.0.1",

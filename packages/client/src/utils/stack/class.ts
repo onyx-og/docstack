@@ -17,9 +17,10 @@ class Class extends Class_ {
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
+    state: "busy" | "idle" = "idle"; 
     static logger: Logger = logger.child({module: "class"});
 
-    getPrimaryKeys() {
+    getPrimaryKeys = () => {
         return this.attributes.filter( attr => attr.isPrimaryKey() )
             .map( attr => attr.getName() );
     }
@@ -80,7 +81,7 @@ class Class extends Class_ {
         //     this.schema = schema;
         // }
         this.setModel({
-            name, description, schema, type, _id: name
+            name, description, schema, type, _id: name, active: true
         })
         // this.parentClass = parentClass;
         if (space) {
@@ -104,6 +105,7 @@ class Class extends Class_ {
         // Add listener for new documents of this class type
         class_.space!.onClassDoc(name)
             .on("change", (change) => {
+                console.log("onClassDoc", {change})
                 const evt = new CustomEvent("doc", {
                     detail: change
                 })
@@ -196,6 +198,7 @@ class Class extends Class_ {
             description: this.getDescription(),
             type: this.getType(),
             schema: this.buildSchema(),
+            active: true,
             _rev: this.model ? this.model._rev : "", // [TODO] Error prone
             createTimestamp: this.model ? this.model.createTimestamp : undefined,
         };

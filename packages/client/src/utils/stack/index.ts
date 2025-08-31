@@ -6,8 +6,11 @@ import { importJsonFile, countPatches } from "./datamodel";
 import {
     Stack,
     StoreOptions,
-    CachedClass
+    CachedClass,
+    ClassModelPropagationStart,
+    ClassModelPropagationComplete
 } from "@docstack/shared";
+
 
 import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
     AttributeTypeForeignKey, 
@@ -70,6 +73,9 @@ class ClientStack extends Stack {
     }
     patchCount!: number;
 
+    listeners: PouchDB.Core.Changes<{}>[] = [];
+
+    modelWorker: Worker | null = null;
 
     private constructor() {
         super();
@@ -95,17 +101,6 @@ class ClientStack extends Stack {
         this.cache = {
             // empty at init
         }
-    }
-
-    public onClassDoc = (className: string) => {
-        return this.db.changes({
-            since: 'now',
-            live: true,
-            include_docs: true,
-            filter: (doc) => {
-                return doc.type == className;
-            }
-        })
     }
 
     public getDb() {
@@ -272,13 +267,216 @@ class ClientStack extends Stack {
         logger.info("checkSystem - updated system", {system: _systemDoc})
     }
 
+    setListeners = () => {
+        const fnLogger = logger.child({method: "setListeners"});
+
+        // Listening for class model propagation
+        this.addEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
+        this.addEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
+
+        fnLogger.info("Setting up class model worker");
+        this.modelWorker = new Worker(require("@docstack/shared/workers/dataModel"), { type: 'module' });
+        
+        fnLogger.info("Setting up class model changes listener");
+        const classModelChanges = this.onClassModelChanges();
+
+        this.modelWorker.onmessage = (event) => {
+            const { status, className, message } = event.data;
+            
+            this.dispatchEvent(new CustomEvent('class-model-propagation-complete', {
+                detail: { className: className, success: status === 'success', message }
+            }));
+
+            if (status === 'error') {
+                fnLogger.error(`Model worker error for class '${className}': ${message}`);
+            }
+        };
+
+        // Store listener for later
+        this.listeners.push(classModelChanges);
+    }
+
+    /**
+     * @description Clears all listeners from the Stack
+     */
+    removeAllListeners = () => {
+        this.removeEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
+        this.removeEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
+        this.listeners = [];
+    }
+
+    /**
+     * @description When a class model propagation starts write the ~lock document to the database.
+     * It prevents any further modifications on the class data model
+     * @param event
+     */
+    onClassModelPropagationStart = (event: CustomEvent<ClassModelPropagationStart>) => {
+        const fnLogger = logger.child({method: "onClassModelPropagationStart", args: {event}});
+        const className = event.detail.className;
+        this.addClassLock(className).then(() => {
+            fnLogger.info(`Lock created successfully for class: '${className}'`);
+        }).catch(error => {
+            fnLogger.error(`Error creating lock for '${className}': ${error}`);
+        });
+    }
+
+    /**
+     * @description When a class model propagation comes to completion remove the corresponding 
+     * ~lock from the database
+     * @param event 
+     */
+    onClassModelPropagationComplete = (event: CustomEvent<ClassModelPropagationComplete>) => {
+        const fnLogger = logger.child({method: "onClassModelPropagationComplete", args: {event}});
+        const className = event.detail.className;
+        this.clearClassLock(className).then(() => {
+            fnLogger.info(`Lock removed successfully for class: '${className}'`);
+        }).catch(error => {
+            fnLogger.error(`Error removing lock for '${className}': ${error}`);
+        });;
+    }
+
+    /**
+     * Listener that fires when a document that refers to a class is edited or created,
+     * marks its execution while handling the propagation of schema modifications to children documents: 
+     * by dispatching a webworker message containing the @var className and the previous revision id.
+     * In the main case, the worker sends a message with the result of its task.
+     * @fires class-model-propagation-complete
+     * @fires class-model-propagation-pending
+     * @returns void
+     */
+    onClassModelChanges = () => {
+        const fnLogger = logger.child({listener: "classModelChanges"});
+
+        const classModelChanges = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == "class";
+            }
+        }).on("change", async (change) => {
+            const doc = change.doc! as unknown as Document;
+            const className = doc.type;
+            if (doc.active) {
+                // Dispatch class-propagate-start [TODO] Move it outside the doc.active
+                this.dispatchEvent(new CustomEvent<ClassModelPropagationStart>('class-model-propagation-pending', {
+                    detail: { className }
+                }));
+                try {
+                    // Invalidate cached version if present
+                    fnLogger.info(`Class model was updated. Clearing '${className}' from cache.`);
+                    delete this.cache[className];
+                    fnLogger.info(`Successfully cleared '${className}' from cache.`);
+                    const docWithRevs = await this.db.get(className, {revs: true});
+                    const revisionIDList = docWithRevs._revisions!.ids;
+                    if (revisionIDList.length == 1) {
+                        fnLogger.info(`Class '${className}' was just created. Nothing to propagate.`);
+
+                        this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
+                            detail: { className, success: true }
+                        }));
+                    } else {
+                        fnLogger.info(`Class '${className}' was updated. Dispatching task to webworker.`);
+                        const secondLastRevID = revisionIDList[1];
+                        const secondLastPrefix = docWithRevs._revisions!.start-1;
+                        const previousRevId = `${secondLastPrefix}-${secondLastRevID}`;
+                        this.modelWorker!.postMessage({
+                            command: 'propagateSchema',
+                            payload: {
+                                dbName: this.getDbName(),
+                                className,
+                                previousRevId,
+                            }
+                        });
+                    }
+                } catch (e: any) {
+                    fnLogger.error(`Error while propagating data model changes for class '${className}': ${e}`);
+                    this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
+                        detail: { className, success: false, message: e }
+                    }));
+                }
+            } else {
+                // Class was deleted
+                // [TODO]
+                fnLogger.info("Class was deleted. [TODO] deletion of documents belonging to its class");
+                this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
+                    detail: { className, success: true }
+                }));
+            }
+        });
+
+        // Avoid adding it to this.listeners
+
+        return classModelChanges;
+    }
+
+    onClassLock = (className: string) => {
+        const classLockListener = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == "~lock" && doc._id == `~lock-propagation-${className}`;
+            }
+        });
+        this.listeners.push(classLockListener);
+        return classLockListener;
+    }
+
+    addClassLock = async (className: string) => {
+        const fnLogger = logger.child({method: "addClassLock", args: {className}});
+        try {
+            const response = await this.db.put({
+                _id: `~lock-propagation-${className}`,
+                type: `~lock`
+            });
+            fnLogger.info(`Adding class lock response`, {response});
+            return response.ok;
+        } catch (e: any) {
+            fnLogger.error(`Error while adding class lock: ${e}`);
+            return false;
+        }
+    }
+
+    clearClassLock = async (className: string) => {
+        const fnLogger = logger.child({method: "clearClassLock", args: {className}});
+        try {
+            const doc = await this.db.get(`~lock-propagation-${className}`);
+            fnLogger.info(`Fetched class lock`, {document: doc});
+            const response = await this.db.remove(doc);
+            fnLogger.info(`Removing class lock response`, {response});
+            return response.ok;
+        } catch (e: any) {
+            fnLogger.error(`Error while adding class lock: ${e}`);
+            return false;
+        }
+    }
+
+    onClassDoc = (className: string) => {
+        const onClassDocListener = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == className;
+            }
+        });
+        this.listeners.push(onClassDocListener);
+        return onClassDocListener;
+    }
+
     // Database initialization should be about making sure that all the documents
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
     async initdb () {
         await this.initIndex();
         await this.checkSystem();
+        this.setListeners();
         return this;
+    }
+
+    close = () => {
+        this.removeAllListeners();
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache

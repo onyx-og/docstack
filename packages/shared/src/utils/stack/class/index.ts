@@ -21,13 +21,11 @@ abstract class Class extends EventTarget {
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
+    state: "busy" | "idle" = 'idle';
 
     static logger: Logger;
 
-    getPrimaryKeys() {
-        return this.attributes.filter( attr => attr.isPrimaryKey() )
-            .map( attr => attr.getName() );
-    }
+    abstract getPrimaryKeys: () => string[];
 
     constructor() {
         super();

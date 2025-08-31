@@ -155,7 +155,7 @@ export const useClassDocs = (className: string, query = {}) => {
                 setLoading(false);
             }
 
-            const changeListener = (change: any) => {
+            const changeListener = (change: CustomEvent) => {
                 const doc = change.detail.doc;
                 console.log("useClassDocs - detail", {detail: change.detail});
                 if (!doc.active) {
@@ -189,10 +189,10 @@ export const useClassDocs = (className: string, query = {}) => {
                 setDocs([...docsRef.current])
             };
 
-            classObj.addEventListener('doc', changeListener);
+            classObj.addEventListener('doc', changeListener as EventListener);
 
             return () => {
-                classObj.removeEventListener('doc', changeListener);
+                classObj.removeEventListener('doc', changeListener as EventListener);
             };
         };
 

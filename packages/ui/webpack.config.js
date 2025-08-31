@@ -5,7 +5,7 @@ const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const WorkboxWebpackPlugin = require("workbox-webpack-plugin");
-require('dotenv').config({ path: '../shared/.env' }); 
+require('dotenv').config({ path: '../shared/.env' });
 
 const isProduction = process.env.NODE_ENV == "production";
 
@@ -25,7 +25,7 @@ const config = {
     open: true,
     hot: true,
   },
-  stats: {warnings:false},
+  stats: { warnings: false },
   plugins: [
     new HtmlWebpackPlugin({
       favicon: "./src/assets/favicon.ico",
@@ -118,15 +118,26 @@ const config = {
   },
 };
 
+// Re-build for online website
+const docsConfig = { ...config };
+docsConfig.output = {
+  path: path.resolve(__dirname, "../docs/static/app"),
+  filename: '[name].[contenthash].js',
+  clean: true,
+}
+
 module.exports = () => {
+  // TODO Handle these configs also for docsConfig
   if (isProduction) {
     config.mode = "production";
 
     config.plugins.push(new MiniCssExtractPlugin());
 
     config.plugins.push(new WorkboxWebpackPlugin.GenerateSW());
+    return [config, docsConfig];
   } else {
     config.mode = "development";
+    return config;
+
   }
-  return config;
 };

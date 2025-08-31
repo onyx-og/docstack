@@ -50,7 +50,7 @@ export interface ClassModel extends Document {
     description?: string,
     parentClass?: string,
     _rev?: PouchDB.Core.RevisionId | undefined;
-    schema?: AttributeModel[]
+    schema?: AttributeModel[];
 }
 
 
@@ -58,6 +58,7 @@ export type Document = PouchDB.Core.Document<{
     type: string;
     createTimestamp?: number; // [TODO] Error prone
     updateTimestamp?: number | null;
+    active: boolean;
     [key: string]: any
 }>
 
@@ -101,4 +102,14 @@ export type StoreOptions = {
 
 export type CachedClass = Class & {
     ttl: number
+}
+
+export interface ClassModelPropagationStart {
+    className: string;
+}
+
+export interface ClassModelPropagationComplete {
+    className: string;
+    success: boolean;
+    message?: string;
 }

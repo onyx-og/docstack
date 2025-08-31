@@ -351,6 +351,17 @@ class Class extends Class_ {
         })
     }
 
+    deleteCard = async (cardId: string) => {
+        const fnLogger = Class.logger.child({method: "deleteCard", args: {cardId}});
+        if (this.space) {
+            const res = await this.space.deleteDocument(cardId);
+            return res;
+        } else {
+            fnLogger.error("Stack is not defined");
+            return false;
+        }
+    }
+
     getCards = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
         let _selector = { ...selector, type: this.name };
         Class.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})

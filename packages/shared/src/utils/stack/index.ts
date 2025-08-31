@@ -22,11 +22,31 @@ abstract class Stack extends EventTarget {
     } = {}
     public patchCount!: number;
 
+    listeners: PouchDB.Core.Changes<{}>[] = [];
+
+    modelWorker: Worker | null = null;
+
+    abstract setListeners: () => void;
+
+    abstract close: () => void;
+
+    abstract removeAllListeners: () => void;
+
     abstract getClass: (className: string) => Promise<Class | null>;
 
     abstract addClass: (classObj: Class) => Promise<ClassModel>;
 
     abstract updateClass: (classObj: Class) => Promise<Document | null>;
+
+    abstract addClassLock: (className: string) => Promise<boolean>;
+
+    abstract clearClassLock: (className: string) => Promise<boolean>;
+
+    abstract onClassModelPropagationStart: (event: CustomEvent<any>) => void;
+
+    abstract onClassLock: (className: string) => PouchDB.Core.Changes<{}>;
+
+    abstract onClassDoc: (className: string) => PouchDB.Core.Changes<{}>;
 
     abstract createDoc: (docId: string | null, type: string,classObj: Class, params: {}) => Promise<Document | null> ;
 
@@ -35,7 +55,6 @@ abstract class Stack extends EventTarget {
         docs: Document[];
     }>;
 
-    abstract onClassDoc: (className: string) => PouchDB.Core.Changes<{}>;
 
     abstract getClassModel: (className: string) => Promise<ClassModel | null>;
 
