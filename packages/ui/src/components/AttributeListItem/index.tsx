@@ -1,5 +1,5 @@
 import { AttributeModel } from "@docstack/shared";
-import { Card, Accordion, ActionBar, Button, Form, Toggle, useModal } from "@prismal/react";
+import { Card, Accordion, ActionBar, Button, Form, Toggle, useModal, NumberInput } from "@prismal/react";
 import React from "react";
 
 import "./index.scss";
@@ -23,13 +23,13 @@ const ExistingAttrConfigForm: React.FC<ExistingAttrConfigFormProps> = (props) =>
                 case "primaryKey":
                     return <Toggle disabled={mode == "view"} name="primaryKey" checked={e[1]} label="Primary key" />;
                 case "maxLength":
-                    return <input readOnly={mode == "view"} type="number" name="maxLength" value={e[1]} />;
+                    return <NumberInput disabled={mode == "view"} name="maxLength" value={e[1]} label="Max length" />;
                 case "max":
-                    return <input readOnly={mode == "view"} type="number" name="max" value={e[1]} />;
+                    return <NumberInput disabled={mode == "view"} name="max" value={e[1]} label="Max" />;
                 case "min":
-                    return <input readOnly={mode == "view"} type="number" name="min" value={e[1]} />;
+                    return <NumberInput disabled={mode == "view"} name="min" value={e[1]} label="Min" />;
                 case "precision":
-                    return <input readOnly={mode == "view"} type="number" name="min" value={e[1]} />;
+                    return <NumberInput disabled={mode == "view"} name="min" value={e[1]} label="Precision" />;
             }
         })
     }, [config, mode]);
@@ -43,10 +43,10 @@ const ExistingAttrConfigForm: React.FC<ExistingAttrConfigFormProps> = (props) =>
     </Form>
 }
 
-interface AttributeModelPanelProps extends AttributeModel {
+interface AttributeListItemProps extends AttributeModel {
 
 }
-const AttributeModelPanel = (props: AttributeModelPanelProps) => {
+const AttributeListItem = (props: AttributeListItemProps) => {
     const {
         name,
         type,
@@ -54,7 +54,7 @@ const AttributeModelPanel = (props: AttributeModelPanelProps) => {
     } = props;
 
 
-    const { Modal: EditModal, open: openEditModal, close: closeEditModal } = useModal({areaId: "root"});
+    const { Modal: ViewModal, open: openViewModal, close: closeViewModal } = useModal({areaId: "root"});
     const { Modal: DeleteModal, open: openDelModal, close: closeDelModal } = useModal({areaId: "root"});
 
     const confirmDeleteAttr = React.useCallback(() => {
@@ -62,13 +62,13 @@ const AttributeModelPanel = (props: AttributeModelPanelProps) => {
         closeDelModal();
     }, [name]);
 
-    return <Card className="panel-attribute-model">
-        <EditModal footer={<ActionBar items={[
-            { position: "right", key: "btn-del-attr", item: <Button type="default" onClick={closeEditModal} iconName="close">Cancel</Button> },
+    return <Card className="list-item-attribute">
+        <ViewModal title={`Attribute: ${name}`} footer={<ActionBar items={[
+            { position: "right", key: "btn-del-attr", item: <Button type="default" onClick={closeViewModal} iconName="close">Cancel</Button> },
             { position: "left", key: "btn-cancel-edit-attr", item: <Button type="primary" onClick={openDelModal} accent="#f5474c" iconName="trash">Delete</Button> }
         ]}/>}>
-            <ExistingAttrConfigForm name={name} type={type} config={config} mode="edit" />
-        </EditModal>
+            <ExistingAttrConfigForm name={name} type={type} config={config} />
+        </ViewModal>
         <DeleteModal title="Confirmation" footer={<ActionBar items={[
             { position: "right", key: 'btn-cancel-del', item: <Button onClick={closeDelModal} type="primary" iconName="close">Cancel</Button> },
             { position: "right", key: 'btn-confirm-del', item: <Button onClick={confirmDeleteAttr} iconName="check">Confirm</Button> },
@@ -78,7 +78,7 @@ const AttributeModelPanel = (props: AttributeModelPanelProps) => {
         <Accordion header={<ActionBar
             items={[
                 { position: 'left', key: 'label-attr', item: <span>{name}</span> },
-                { position: "right", key: "btn-edit-attr", item: <Button onClick={openEditModal} className="btn-edit-attr" iconName="pencil" type="primary" /> },
+                { position: "right", key: "btn-edit-attr", item: <Button onClick={openViewModal} className="btn-edit-attr" iconName="external-link" type="primary" /> },
                 { position: "right", key: "btn-del-attr", item: <Button onClick={openDelModal} accent="#f5474c" className="btn-del-attr" iconName="trash" type="text" /> },
             ]}
         />}>
@@ -88,4 +88,4 @@ const AttributeModelPanel = (props: AttributeModelPanelProps) => {
     </Card>
 }
 
-export default AttributeModelPanel;
+export default AttributeListItem;

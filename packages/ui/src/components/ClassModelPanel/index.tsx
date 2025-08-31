@@ -1,6 +1,6 @@
 import { ClassModel } from "@docstack/shared";
 import { ActionBar, Button, List, useModal } from "@prismal/react";
-import AttributeModelPanel from "components/AttributeModelPanel";
+import AttributeListItem from "components/AttributeListItem";
 import React from "react";
 
 import "./index.scss";
@@ -20,7 +20,7 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
         if (schema) {
             let panels = schema.map((attrModel, i) => {
                 console.log("attribute",attrModel);
-                return <AttributeModelPanel key={i} {...attrModel} />
+                return <AttributeListItem key={i} {...attrModel} />
             });
             return panels;
         }
