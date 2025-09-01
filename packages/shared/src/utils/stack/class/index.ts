@@ -1,16 +1,17 @@
 import Attribute from '../attribute'
 import logger from "../../logger";
 // import ReferenceAttribute from '../Reference';
-import {ClassModel, AttributeModel, Document} from "../../../types";
+import {ClassModel, AttributeModel, Document, TriggerModel} from "../../../types";
 import Stack from '..';
 import { Logger } from 'winston';
+import Trigger from '../trigger';
 
 const CLASS_TYPE = "class";
 const SUPERCLASS_TYPE = "superclass";
 const CLASS_TYPES = [CLASS_TYPE, SUPERCLASS_TYPE];
 
 abstract class Class extends EventTarget {
-    space: Stack | null = null;
+    space: Stack | undefined;
     /* Populated in init() */
     name!: string;
     /* Populated in init() */
@@ -22,8 +23,10 @@ abstract class Class extends EventTarget {
     // parentClass: Class | null;
     model!: ClassModel;
     state: "busy" | "idle" = 'idle';
+    triggers: {[name: string]: Trigger} = {};
 
     static logger: Logger;
+    abstract logger: Logger;
 
     abstract getPrimaryKeys: () => string[];
 
@@ -69,7 +72,7 @@ abstract class Class extends EventTarget {
 
     abstract getName: () => string;
 
-    abstract getSpace: () => Stack | null;
+    abstract getSpace: () => Stack | undefined;
 
     abstract getDescription: () => string | undefined;
 
@@ -82,7 +85,7 @@ abstract class Class extends EventTarget {
     abstract getModel: () => ClassModel;
 
     // Set model should be called only after fetching the latest model from db
-    abstract setModel: ( model: ClassModel ) => void;
+    abstract setModel: ( model?: ClassModel ) => void;
 
     abstract getAttributes: ( ...names: string[] ) => Attribute[];
 
@@ -107,6 +110,10 @@ abstract class Class extends EventTarget {
     abstract getCards: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
 
     abstract deleteCard: (cardId: string) => Promise<boolean>;
+
+    abstract addTrigger: (name: string, model: TriggerModel) => Promise<Class>;
+
+    abstract removeTrigger: (name: string) => Promise<Class>;
 }
 
 export default Class;

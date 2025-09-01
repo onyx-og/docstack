@@ -1,12 +1,13 @@
-import { Class as Class_ } from "@docstack/shared";
+import { Class as Class_, TriggerModel } from "@docstack/shared";
 import logger from "../logger";
 // import ReferenceAttribute from '../Reference';
 import {Stack, ClassModel, AttributeModel, Document} from "@docstack/shared";
 import Attribute from "./attribute";
 import { Logger } from 'winston';
+import { Trigger } from "./trigger";
 
 class Class extends Class_ {
-    space: Stack | null = null;
+    space: Stack | undefined;
     /* Populated in init() */
     name!: string;
     /* Populated in init() */
@@ -19,6 +20,8 @@ class Class extends Class_ {
     model!: ClassModel;
     state: "busy" | "idle" = "idle"; 
     static logger: Logger = logger.child({module: "class"});
+    logger: Logger = logger.child({module: "class", className: this.name});
+    triggers: { [name: string]: Trigger; } = {};
 
     getPrimaryKeys = () => {
         return this.attributes.filter( attr => attr.isPrimaryKey() )
@@ -75,13 +78,15 @@ class Class extends Class_ {
         this.description = description;
         this.type = type;
         // this.attributes = [];
-        this.space = null;
+        // this.space = null;
         // this.id = null;
         // if (schema) {
         //     this.schema = schema;
         // }
         this.setModel({
-            name, description, schema, type, _id: name, active: true
+            type, _id: name, active: true,
+            name, description,
+            schema, triggers: {},
         })
         // this.parentClass = parentClass;
         if (space) {
@@ -146,6 +151,7 @@ class Class extends Class_ {
         }
     }
 
+    // TODO: Decide return method
     static fetch = async ( space: Stack, className: string ) => {
         let classModel = await space.getClassModel(className);
         if ( classModel ) {
@@ -192,12 +198,17 @@ class Class extends Class_ {
     }
 
     getModel = () => {
+        let triggers: {[name: string]: TriggerModel} = {};
+        Object.entries(this.triggers).forEach(t => {
+            triggers[t[0]] = t[1].model
+        });
         let model: ClassModel = {
             _id:this.getName(),
             name: this.getName(),
             description: this.getDescription(),
             type: this.getType(),
             schema: this.buildSchema(),
+            triggers: triggers,
             active: true,
             _rev: this.model ? this.model._rev : "", // [TODO] Error prone
             createTimestamp: this.model ? this.model.createTimestamp : undefined,
@@ -205,8 +216,12 @@ class Class extends Class_ {
         return model;
     }
 
-    /* Mainly sets schema and attributes, also name and description */
-    setModel = ( model: ClassModel ) => {
+    // [TODO] Change into buildFromModel
+    /**
+     * It hydrates attributes and triggers from given model
+     * @param model 
+     */
+    setModel = ( model?: ClassModel ) => {
         Class.logger.info("setModel - got incoming model", {model: model});
         // Retreive current class model
         let currentModel = this.getModel();
@@ -233,6 +248,8 @@ class Class extends Class_ {
                 this.attributes.push(_attribute);
             }
         }
+
+        model.triggers
         
         
         //     this.addAttribute(attribute.name, attribute.type);
@@ -240,6 +257,7 @@ class Class extends Class_ {
         // this.model = {...this.model, ...model};
         this.name = model.name;
         this.description = model.description;
+        this.model = model;
         Class.logger.info("setModel - model after processing",{ model: model})
     }
 
@@ -290,7 +308,7 @@ class Class extends Class_ {
             try {
                 let name = attribute.getName();
                 if (!this.hasAttribute(name)) {
-                    Class.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()})
+                    Class.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()});
                     this.attributes.push(attribute);
                     let attributeModel = attribute.getModel();
                     Class.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
@@ -388,6 +406,29 @@ class Class extends Class_ {
         Class.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
         let docs = (await this.space!.findDocuments(_selector, fields, skip, limit)).docs
         return docs;
+    }
+
+    addTrigger = async (name: string, model: TriggerModel) => {
+        const fnLogger = logger.child({method: "addTrigger"});
+        try {
+            this.triggers[name] = new Trigger(model, this);
+            if (this.space) {
+                this.setModel(); // [TODO] Change to buildFromModel();
+                let res = await this.space.updateClass(this);
+            } else {
+                throw new Error(`Stack is not defined. Can't update class`);
+            }
+        } catch (e) {
+            fnLogger.error(e);
+        }
+        return this;
+    }
+
+    removeTrigger = async (name: string) => {
+        if (this.triggers[name]) {
+            delete this.triggers[name];
+        }
+        return this;
     }
 }
 

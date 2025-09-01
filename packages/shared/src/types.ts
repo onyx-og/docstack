@@ -1,4 +1,6 @@
+import Stack from "./utils/stack";
 import Class from "./utils/stack/class";
+import Trigger from "./utils/stack/trigger";
 
 
 export const ATTRIBUTE_TYPES = ["string", "number", "integer", "reference", "boolean"];
@@ -13,23 +15,23 @@ export type AttributeTypeConfig = {
 export type AttributeTypeDecimal = {
     type: "decimal",
     name: string,
-    config: {max?: number, min?: number, precision?: number} & AttributeTypeConfig
+    config: {max?: number, min?: number, precision?: number, defaultValue?: number} & AttributeTypeConfig
 }
 export type AttributeTypeInteger = {
     type: "integer",
     name: string,
-    config: {max?: number, min?: number} & AttributeTypeConfig
+    config: {max?: number, min?: number, defaultValue?: number} & AttributeTypeConfig
 }
 export type AttributeTypeString = {
     name: string,
     type: "string",
-    config: {maxLength?: number, encrypted?: boolean} & AttributeTypeConfig
+    config: {maxLength?: number, encrypted?: boolean, defaultValue?: string} & AttributeTypeConfig
 }
 
 export type AttributeTypeBoolean = {
     type: "boolean",
     name: string,
-    config: {} & AttributeTypeConfig
+    config: {defaultValue?: boolean} & AttributeTypeConfig
 }
 export type AttributeTypeForeignKey = {
     type: "foreign_key",
@@ -51,6 +53,7 @@ export interface ClassModel extends Document {
     parentClass?: string,
     _rev?: PouchDB.Core.RevisionId | undefined;
     schema?: AttributeModel[];
+    triggers: {[name: string]: TriggerModel};
 }
 
 
@@ -112,4 +115,37 @@ export interface ClassModelPropagationComplete {
     className: string;
     success: boolean;
     message?: string;
+}
+
+// Interfaces for the Trigger's data model and hydrated function signature.
+export interface TriggerModel {
+    name: string;
+    order: "before" | "after";
+    run: string;
+}
+
+/**
+ * The signature of the dynamically generated 'run' function.
+ * It takes a document and returns the updated document.
+ * It is now asynchronous by default.
+ */
+export type TriggerRunFunction = (document: Document, classObj?: Class, stack?: Stack) => Document | Promise<Document>;
+
+export type DocstackReady = CustomEvent<{
+    stack: Stack
+}>
+
+export const isDocument = (object: object): object is Document => {
+    if (object.hasOwnProperty("type")) {
+        return true;
+    }
+    return false;
+}
+
+export type StackPluginType = (stackInstance: Stack) => {
+    bulkDocs<Model>(
+        docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
+        options: PouchDB.Core.BulkDocsOptions | null,
+        callback: PouchDB.Core.Callback<Array<PouchDB.Core.Response | PouchDB.Core.Error>>,
+    ): void;
 }

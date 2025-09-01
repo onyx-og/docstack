@@ -16,6 +16,7 @@ import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDec
     AttributeTypeForeignKey, 
     AttributeTypeInteger,
     AttributeTypeString} from "@docstack/shared";
+import { StackPlugin } from "../../plugins/pouchdb";
 
 const logger = logger_.child({module: "stack"});
 
@@ -92,6 +93,8 @@ class ClientStack extends Stack {
 
         // Load default plugins
         PouchDB.plugin(Find);
+        PouchDB.plugin(StackPlugin(this));
+        // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
                 PouchDB.plugin(plugin);
@@ -954,7 +957,7 @@ class ClientStack extends Stack {
     }
 
     validateObjectByType = async (obj: any, type: string, schema?: ClassModel["schema"]) => {
-        logger.info("validateObjectByType - given args", {obj, type, schema})
+        const fnLogger = logger.child({method: "validateObjectByType", args: {obj, type, schema}});
         let schema_: AttributeModel[] | undefined = [];
         
         switch (type) {
@@ -971,12 +974,13 @@ class ClientStack extends Stack {
                     schema_ = classDoc.schema;
                 } catch (e: any) {
                     // if 404 validation failed because of missing class
-                    logger.info("validateObjectByType - failed because of error",e)
+                    fnLogger.error(`Failed because of error: ${e}`)
                     return false;
                 }
             }
         }
         if (schema_) return await this.validateObject(obj, type, schema_);
+        else throw new Error(`Unable to retrieve schema to validate object against`);
     }
 
     prepareDoc (_id: string, type: string, params: {[key: string] : string | number | boolean}) {
@@ -997,10 +1001,10 @@ class ClientStack extends Stack {
             doc: Document | null = null,
             isNewDoc = false;
         try {
-            let validationRes = await this.validateObjectByType(params, type, schema);
-            if  (!validationRes) {
-                throw new Error("createDoc - Invalid object")
-            }
+            // let validationRes = await this.validateObjectByType(params, type, schema);
+            // if  (!validationRes) {
+            //     throw new Error("createDoc - Invalid object")
+            // }
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 logger.info("retrieved doc", {existingDoc})

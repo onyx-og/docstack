@@ -3,8 +3,8 @@
 // Import the PouchDB library.
 // We must use `importScripts` since this is a web worker.
 // importScripts('https://cdn.jsdelivr.net/npm/pouchdb@8.0.1/dist/pouchdb.min.js');
-import PouchDB from "pouchdb";
-import { AttributeModel, ClassModel, Document } from "../types";
+import {ClientStack, DocStack} from "../../../client/";
+import { AttributeModel, ClassModel, DocstackReady, Document } from "../types";
 import * as jsondiffpatch from 'jsondiffpatch';
 import logger_ from "../utils/logger";
 // PouchDB requires a valid database name.
@@ -14,15 +14,31 @@ import logger_ from "../utils/logger";
 const logger = logger_.child({module: "dataModel"});
 
 // Listen for messages from the main application thread.
+
+type PropagateModel = {
+    dbName: string;
+    className: string;
+    previousRevId: string;
+}
+type EnvisionModel = {
+    dbName: string;
+    className: string;
+    schema: AttributeModel[]
+}
 interface StackMessage {
     command: string;
-    payload: {
-        dbName: string;
-        className: string;
-        previousRevId: string;
-    }
+    payload: PropagateModel | EnvisionModel
 }
 
+const isEnvisionModel = (payload: {}): payload is EnvisionModel => {
+    if (payload.hasOwnProperty("schema")) return true;
+    return false;
+}
+
+const isPropagateModel = (payload: {}): payload is PropagateModel => {
+    if (payload.hasOwnProperty("previousRevId")) return true;
+    return false;
+}
 // PouchDB requires a valid database name.
 // The worker will use its own instance of the database.
 // The database is backed by the same storage, so they can see the same data.
@@ -43,7 +59,7 @@ const processQueue = async () => {
         const { command, payload } = nextMessage;
 
         try {
-            if (command === 'propagateSchema') {
+            if (command === 'propagateSchema' && isPropagateModel(payload)) {
                 const { dbName,className, previousRevId } = payload;
                 const db = new PouchDB(dbName);
 
@@ -110,6 +126,76 @@ const processQueue = async () => {
                     className: currentClassDoc.type,
                     // message: `${result.length} documents updated for class '${currentClassDoc.type}'.`
                 });
+            } else if (command === 'envisionSchema' && isEnvisionModel(payload)) {
+                // Query all data (all docs)
+                const { dbName, className, schema } = payload;
+                const onStackReady = async (evt: CustomEventInit) => {
+                    const stack = evt.detail.stack as ClientStack;
+                    const classObj = await stack.getClass(className);
+
+                    if (!classObj) {
+                        throw new Error("Class object could not be retrieved. Check logs");
+                    }
+
+                    const classModel = classObj?.model;
+                    logger.info("Retrieved class model", {classModel});
+
+                    // Use jsondiffpatch to find the differences in the 'schema' property.
+                    const schemaDelta = jsondiffpatch.diff(classModel.schema, schema);
+
+                    // If there are no changes to the schema, we can return early.
+                    if (!schemaDelta) {
+                        self.postMessage({
+                            status: 'success',
+                            className: classModel.type,
+                            message: `Schema for '${classModel.type}' has no changes.`
+                        });
+                        return;
+                    }
+
+                    // Step 1: Query for all documents of the specified class.
+                   
+
+                    const documents = await classObj.getCards() as Document[];
+
+                    // If no documents are found, we can send a success message immediately.
+                    if (documents.length === 0) {
+                        self.postMessage({
+                            status: 'success',
+                            task: command,
+                            className: classModel.type,
+                            message: `No documents found for class '${classModel.type}'.`
+                        });
+                        return;
+                    }
+
+                    // Modify all documents based on schema
+                    // Iterate over the documents and apply the schema changes based on the delta.
+                    const updates = documents.map( async doc => {
+                        // Avoid altering the original doc, to allow comparison
+                        let updatedDoc = {...doc};
+                        const triggers = Object.values(classObj.triggers);
+                        for (const trigger of triggers.filter(t => t.order === "before")) {
+                            updatedDoc = await trigger.executeLimited(updatedDoc);
+                        }
+
+                        // TODO: updatedDoc = applySchemaChangesToDoc(updatedDoc, schemaDelta, classModel.schema);
+
+                        for (const trigger of triggers.filter(t => t.order === "after")) {
+                            updatedDoc = await trigger.executeLimited(updatedDoc);
+                        }
+
+                        // PouchDB requires the `_rev` property for updates.
+                        return updatedDoc;
+                    });
+
+                    // Validate all documents
+
+                    // if validation error
+
+                    // if validation successful
+                }
+                const docStack = new DocStack({dbName}).addEventListener("ready", onStackReady);
             }
         } catch (error: any) {
             // If anything goes wrong, send an error message back.

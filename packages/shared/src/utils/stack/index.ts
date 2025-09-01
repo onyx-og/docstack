@@ -48,6 +48,8 @@ abstract class Stack extends EventTarget {
 
     abstract onClassDoc: (className: string) => PouchDB.Core.Changes<{}>;
 
+    abstract validateObjectByType: (obj: any, type: string, schema?: ClassModel["schema"]) => Promise<boolean>;
+
     abstract createDoc: (docId: string | null, type: string,classObj: Class, params: {}) => Promise<Document | null> ;
 
     abstract findDocuments: (selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => Promise<{

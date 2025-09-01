@@ -13,7 +13,7 @@ import ClientStack from './utils/stack';
 // import jwt from 'jsonwebtoken';
 import Class from '../../shared/src//utils/stack/class';
 import Attribute from './utils/stack/attribute';
-import {AttributeType} from "../../shared/src/types";
+import {AttributeType, DocstackReady} from "../../shared/src/types";
 // import { EventTarget } from 'node:events';
 
 // let envPath = process.env.ENVFILE || "./.env";
@@ -54,7 +54,11 @@ class DocStack extends EventTarget {
         window_.store = this.store;
         // await setupAdminUser();
         this.readyState = true;
-        this.dispatchEvent(new CustomEvent('ready')) // TODO: consider wether to provide args
+        this.dispatchEvent(new CustomEvent('ready', {
+            detail: {
+                stack: this.store
+            }
+        }));
     }
 
     async resetDb() {

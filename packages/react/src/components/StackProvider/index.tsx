@@ -14,23 +14,26 @@ const StackProvider = (props: DocStackProviderProps) => {
     const docStackRef = React.useRef<DocStack | null>(null);
     const [docStack, setDocStack] = useState<DocStack | null>(null);
 
+    const setsDocStackWhenReady = React.useCallback(() => {
+        setDocStack(docStackRef.current)
+    },[]);
+
     useEffect(() => {
         if (docStackRef.current === null) {
             console.log("DocStack provider - init instance");
             const instance = new DocStack({ dbName });
             docStackRef.current = instance;
-            // You might need to handle initialization or loading states
-            // before setting the docStack.
-            setDocStack(instance);
+            docStackRef.current.addEventListener("ready", setsDocStackWhenReady);
         }
 
-        // Optional: Cleanup function to close the database when the component unmounts
-        // return () => {
-        //   if (instance && instance.close) {
-        //     instance.close();
-        //   }
-        // };
-    }, [dbName]);
+        // Optional: Cleanup function to remove listeners
+        return () => {
+            if (docStackRef.current) {
+                // docStackRef.current.removeEventListener("ready", setsDocStackWhenReady);
+                // docStackRef.current.getStore().removeAllListeners();
+            }
+        };
+    }, [dbName, setsDocStackWhenReady]);
 
     return (
         <DocStackContext.Provider value={docStack}>
