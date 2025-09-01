@@ -129,8 +129,8 @@ const processQueue = async () => {
             } else if (command === 'envisionSchema' && isEnvisionModel(payload)) {
                 // Query all data (all docs)
                 const { dbName, className, schema } = payload;
-                const onStackReady = async (evt: CustomEventInit) => {
-                    const stack = evt.detail.stack as ClientStack;
+                const onStackReady = async (evt: DocstackReady) => {
+                    const stack = evt.detail!.stack;
                     const classObj = await stack.getClass(className);
 
                     if (!classObj) {

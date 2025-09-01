@@ -131,7 +131,7 @@ export interface TriggerModel {
  */
 export type TriggerRunFunction = (document: Document, classObj?: Class, stack?: Stack) => Document | Promise<Document>;
 
-export type DocstackReady = CustomEvent<{
+export type DocstackReady = CustomEventInit<{
     stack: Stack
 }>
 

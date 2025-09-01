@@ -3,6 +3,8 @@ import { ActionBar, Button, Card, Table } from "@prismal/react";
 import { Attribute } from "@docstack/client";
 import { Link } from "react-router-dom";
 
+import "./index.scss";
+
 interface ClassCardProps {
     name: string;
     description?: string;
@@ -21,7 +23,7 @@ const ClassCard = (props: ClassCardProps) => {
         return attrSet;
     }, [attributes]);
 
-    return <Card
+    return <Card className="class-card"
         header={<ActionBar className="dashboard-class-header"
             items={[
                 { position: 'left', key: "class-title", item: <h3>{name}</h3> },

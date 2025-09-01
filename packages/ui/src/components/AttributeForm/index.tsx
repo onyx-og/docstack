@@ -62,7 +62,7 @@ const AttributeForm: React.FC<AttributeFormProps> = (props) => {
         gridTemplate={{cols: "1fr 1fr 1fr"}}
         onSubmit={createAttribute}
     >
-        <Select required name="type" id="attrType" options={[
+        <Select gridPlacement={{column: "1 / span 2"}} required name="type" id="attrType" options={[
             { value: "string", element: "String" },
             { value: "boolean", element: "Boolean" },
             { value: "integer", element: "Integer" },

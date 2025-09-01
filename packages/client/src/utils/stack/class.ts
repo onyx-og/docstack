@@ -4,7 +4,7 @@ import logger from "../logger";
 import {Stack, ClassModel, AttributeModel, Document} from "@docstack/shared";
 import Attribute from "./attribute";
 import { Logger } from 'winston';
-import { Trigger } from "./trigger";
+import { Trigger } from "./trigger/";
 
 class Class extends Class_ {
     space: Stack | undefined;

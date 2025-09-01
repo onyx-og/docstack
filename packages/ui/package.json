@@ -28,5 +28,8 @@
     "url": "https://github.com/onyx-og/docstack/issues"
   },
   "homepage": "https://github.com/onyx-og/docstack#readme",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "monaco-editor": "^0.52.2"
+  }
 }
