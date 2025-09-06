@@ -20,21 +20,21 @@ import { StackPlugin } from "../../plugins/pouchdb";
 
 const logger = logger_.child({module: "stack"});
 
-export const BASE_SCHEMA: AttributeModel[] = [
-    { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
-    { name: "type", type: "string", config: { maxLength: 100 } },
-    { name: "createTimestamp", type: "integer", config: { min: 0 } },
-    { name: "updateTimestamp", type: "integer", config: { min: 0 } },
-    { name: "description", type: "string", config: { maxLength: 1000 } },
-    { name: "active", type: "boolean", config: { defaultValue: true , primaryKey: true } }
-]
-export const CLASS_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", config: {}})[] = [
+export const BASE_SCHEMA: ClassModel["schema"] = {
+    "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
+    "type": { name: "type", type: "string", config: { maxLength: 100 } },
+    "createTimestamp": { name: "createTimestamp", type: "integer", config: { min: 0 } },
+    "updateTimestamp": { name: "updateTimestamp", type: "integer", config: { min: 0 } },
+    "description": { name: "description", type: "string", config: { maxLength: 1000 } },
+    "active": { name: "active", type: "boolean", config: { defaultValue: true , primaryKey: true } }
+}
+export const CLASS_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    { name: "schema", type: "attribute", config: { maxLength: 1000, isArray: true }},
-    { name: "parentClass", type: "foreign_key", config: { isArray: false } },
-]
-const DOMAIN_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", config: {}})[] = [
-    { name: "schema", type: "attribute", config: { 
+    "schema": { name: "schema", type: "json", config: { maxLength: 1000, isArray: true }},
+    "parentClass": { name: "parentClass", type: "foreign_key", config: { isArray: false } },
+}
+const DOMAIN_SCHEMA: ClassModel["schema"] = {
+    "schema": { name: "schema", type: "json", config: { 
         isArray: true,
         defaultValue: [
             {
@@ -53,12 +53,12 @@ const DOMAIN_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", confi
             }
         ]
     }},
-    { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
-    { name: "relation", type: "string", config: { maxLength: 100 , isArray: false } },
-    { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
-    { name: "targetClass", type: "foreign_key", config: { isArray: true } },
+    "parentDomain": { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
+    "relation": { name: "relation", type: "string", config: { maxLength: 100 , isArray: false } },
+    "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
+    "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: true } },
     ...BASE_SCHEMA
-];
+};
 class ClientStack extends Stack {
     /* Initialized asynchronously */
     db!: PouchDB.Database<{}>;
@@ -586,7 +586,7 @@ class ClientStack extends Stack {
                 limit: limit
             });
     
-            fnLogger.info("findDocument - found", {
+            fnLogger.info("Found", {
                 result: foundResult,
                 selector: selector,
             });
@@ -786,12 +786,12 @@ class ClientStack extends Stack {
 
     // [TODO] Implement also for attributes of type different from string
     // [TODO] Implement primary key check for combination of attributes and not just one
-    async validateObject(obj: any, type: string, attributeModels: AttributeModel[]): Promise<boolean> {
-        logger.info("validateObject - given args", {obj: obj, attributeModels: attributeModels})
+    async validateObject(obj: any, type: string, schema: ClassModel["schema"]): Promise<boolean> {
+        logger.info("validateObject - given args", {obj, schema})
         let isValid = true;
         try {
-            // attributeModels.forEach(async model => {
-            for (let model of attributeModels) {
+            // schema.forEach(async model => {
+            for (let model of Object.values(schema)) {
                 let value = obj[model.name];
                 logger.info("validateObject - model", {model, value})
                 // Check if the property exists
@@ -943,8 +943,11 @@ class ClientStack extends Stack {
     
                     break;
                     */
+                    case "json":
+                        logger.info("Missing json validation. Skipping for now.");
+                    break;
                     default:
-                        logger.info("Probably an attribute? Huh", model)
+                        throw new Error("Unexpected type received")
                 }
             }
         } catch (e: any) {
@@ -958,14 +961,14 @@ class ClientStack extends Stack {
 
     validateObjectByType = async (obj: any, type: string, schema?: ClassModel["schema"]) => {
         const fnLogger = logger.child({method: "validateObjectByType", args: {obj, type, schema}});
-        let schema_: AttributeModel[] | undefined = [];
+        let schema_: ClassModel["schema"] = {}
         
         switch (type) {
         case "class":
-            schema_ = CLASS_SCHEMA as AttributeModel[];
+            schema_ = CLASS_SCHEMA;
             break;
         case "domain":
-            schema_ = DOMAIN_SCHEMA as AttributeModel[]
+            schema_ = DOMAIN_SCHEMA;
             break;
         default:
             if (!schema) {

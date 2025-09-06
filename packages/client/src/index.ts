@@ -113,7 +113,7 @@ class DocStack extends EventTarget {
         try {
             const newClass = await Class.create(
                 this.store, name, type as string, description as string,
-                []
+                {}
             );
             fnLogger.info(`class '${name}' created successfully.`,
                 {classModel: newClass.getModel()}

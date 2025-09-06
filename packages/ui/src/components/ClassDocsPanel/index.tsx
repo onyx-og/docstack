@@ -37,7 +37,7 @@ const ClassDocsPanel: React.FC<ClassDocsPanelProps> = (props) => {
             data_.push(...docs);
         } else {
             if (model) {
-                model.schema?.forEach((attrModel) => {
+                Object.values(model.schema).forEach((attrModel) => {
                     placeholder[attrModel.name] = undefined;
                 });
                 data_.push(placeholder);

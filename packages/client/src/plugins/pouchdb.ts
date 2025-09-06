@@ -19,10 +19,11 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
         bulkDocs: async function (docs, options, callback) {
 
             // Check if there are any documents to process.
-            if (typeof options == 'function') {
-                callback = options
-                options = {}
-            }
+            // if (typeof options == 'function') {
+            //     callback = options
+            //     options = {}
+            // }
+            debugger;
 
             let documentsToProcess: typeof docs;
             if (Array.isArray(docs)) {
@@ -43,9 +44,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // You can now access the schema and triggers from the model.
                             const { schema, triggers: triggerModels } = classObj.model;
 
-                            const beforeTriggers = Object.values(triggerModels)
-                                .filter(t => t.order === "before")
-                                .map(t => new Trigger(t, classObj));
+                            const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
 
                             for (const trigger of beforeTriggers) {
                                 const updatedDoc = await trigger.execute(doc);

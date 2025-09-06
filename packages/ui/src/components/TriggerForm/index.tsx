@@ -40,7 +40,7 @@ const TriggerForm: React.FC<TriggerFormProps> = (props) => {
         const reg = new RegExp(/^[A-Za-z]*$/gm);
         if (!reg.test(value)) {
             return "Must be without spaces, no special characters and cannot start with a number."
-        } else return false
+        } else return true
     }, []);
 
     React.useEffect(() => {

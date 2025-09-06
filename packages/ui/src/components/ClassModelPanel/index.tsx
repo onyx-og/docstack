@@ -20,7 +20,7 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
 
     const attributePanels = React.useMemo(() => {
         if (schema) {
-            let panels = schema.map((attrModel, i) => {
+            let panels = Object.values(schema).map((attrModel, i) => {
                 return <AttributeListItem key={i} {...attrModel} />
             });
             return panels;

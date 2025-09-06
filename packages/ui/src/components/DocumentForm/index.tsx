@@ -87,7 +87,7 @@ const DocumentForm: React.FC<DocumentFormProps> = (props) => {
 
     const attributeFields = React.useMemo(() => {
         let fields = [];
-        for (const attrModel of schema) {
+        for (const attrModel of Object.values(schema)) {
             fields.push(<AttributeField 
                 defaultMode={mode != "read/write" ? mode : "write"} 
                 allowToggleMode={mode=="read/write"} {...attrModel} 

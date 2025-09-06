@@ -13,20 +13,15 @@ class Class extends Class_ {
     /* Populated in init() */
     type!: string;
     description?: string;
-    attributes: Attribute[] = [];
-    schema!: AttributeModel[]
+    attributes: {[name: string]: Attribute} = {};
+    schema: ClassModel["schema"] = {};
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
     state: "busy" | "idle" = "idle"; 
     static logger: Logger = logger.child({module: "class"});
     logger: Logger = logger.child({module: "class", className: this.name});
-    triggers: { [name: string]: Trigger; } = {};
-
-    getPrimaryKeys = () => {
-        return this.attributes.filter( attr => attr.isPrimaryKey() )
-            .map( attr => attr.getName() );
-    }
+    triggers: Trigger[] = [];
 
     private constructor() {
         super();
@@ -71,7 +66,7 @@ class Class extends Class_ {
         name: string,
         type: string,
         description?: string,
-        schema: ClassModel["schema"] = []
+        schema: ClassModel["schema"] = {}
         // parentClass: Class | null
     ) => {
         this.name = name;
@@ -86,7 +81,7 @@ class Class extends Class_ {
         this.setModel({
             type, _id: name, active: true,
             name, description,
-            schema, triggers: {},
+            schema, triggers: [],
         })
         // this.parentClass = parentClass;
         if (space) {
@@ -102,7 +97,7 @@ class Class extends Class_ {
         name: string,
         type: string = "class",
         description?: string,
-        schema: ClassModel["schema"] = [],
+        schema: ClassModel["schema"] = {},
     ) => {
         const class_ = new Class();
         Class.logger.info("Received schema", {schema})
@@ -124,7 +119,7 @@ class Class extends Class_ {
         name: string,
         type: string = "class",
         description?: string,
-        schema: ClassModel["schema"] = [],
+        schema: ClassModel["schema"] = {},
         // parentClass: Class | null = null
     ) => {
         const class_ = Class.get(space, name, type, description, schema);
@@ -188,20 +183,19 @@ class Class extends Class_ {
     }
 
     buildSchema = () => {
-        let schema: AttributeModel[] = [];
-        for ( let attribute of this.getAttributes() ) {
-            let attributeModel = attribute.getModel();
-            schema.push( attributeModel );
-        }
+        let schema: typeof this.schema= {};
+        Object.entries(this.attributes).forEach(t => {
+            schema[t[0]] = t[1].model
+        });
         this.schema = schema;
         return schema;
     }
 
     getModel = () => {
-        let triggers: {[name: string]: TriggerModel} = {};
-        Object.entries(this.triggers).forEach(t => {
-            triggers[t[0]] = t[1].model
-        });
+        let triggers: ClassModel["triggers"] = [];
+        for (const trigger of this.triggers) {
+            triggers.push(trigger.model);
+        }
         let model: ClassModel = {
             _id:this.getName(),
             name: this.getName(),
@@ -227,52 +221,51 @@ class Class extends Class_ {
         let currentModel = this.getModel();
         // Set model arg to the overwrite of the current model with the given one 
         model = Object.assign(currentModel, model);
+        debugger;
         if (model.schema) {
-            this.schema = this.schema || []
-            // model.schema = [ ...model.schema, ...(this.schema)]
-            // Create a Map from the current (this.schema) for efficient lookup
-            const schemaMap = new Map(this.schema.map(item => [item.name, item]));
-            // Iterate over the provided (model.schema) array and add/update items in the Map
-            model.schema.forEach(item => {
-                schemaMap.set(item.name, item); // This will overwrite existing keys
-            });
-
-            // Convert the Map values back to the model schema
-            model.schema = Array.from(schemaMap.values());
-            // let _model = Object.assign(currentModel, {...model, schema: this.schema});
-            this.attributes = []
-            for (let attribute of model.schema) {
-                let _attribute = new Attribute(
-                    this, attribute.name, attribute.type, attribute.config
+            // model.schema = {...this.model.schema, ...model.schema};
+            this.attributes = {};
+            for (const [attributeName, attributeModel] of Object.entries(model.schema)) {
+                let attribute = new Attribute(
+                    this, attributeName, attributeModel.type, attributeModel.config
                 );
-                this.attributes.push(_attribute);
+                this.attributes[attributeName] = attribute;
             }
         }
 
-        model.triggers
-        
-        
-        //     this.addAttribute(attribute.name, attribute.type);
-        // }
-        // this.model = {...this.model, ...model};
+        if (model.triggers) {
+            for (const trigger of model.triggers) {
+                let trigger_ = new Trigger(trigger, this);
+                this.triggers.push(trigger_);
+            }
+        }
+
         this.name = model.name;
         this.description = model.description;
         this.model = model;
         Class.logger.info("setModel - model after processing",{ model: model})
     }
 
+    getPrimaryKeys = () => {
+        return Object.values(this.attributes).filter( attr => attr.isPrimaryKey() )
+            .map( attr => attr.getName() );
+    }
+
     getAttributes = ( ...names: string[] ) => {
-        let attributes: Attribute[] = [ ];
-        for ( let attribute of this.attributes ) {
+        let attributes: typeof this.attributes = {};
+        for ( const attribute of Object.values(this.attributes) ) {
             if ( names.length > 0 ) {
                 // filter with given names
                 for ( let name of names ) {
                     // match?
                     if ( name != null && attribute.getName() == name ) {
-                        return [ attribute ];
+                        attributes[attribute.name] = attribute;
                     } 
                 }
-            } else attributes.push(attribute); // no filter, add all
+            } else {
+                // no filter provided add all
+                attributes[attribute.name] = attribute;
+            }
         }
         return attributes
     }
@@ -280,7 +273,7 @@ class Class extends Class_ {
     hasAllAttributes = ( ...names: string[] ) => {
         let result = false;
         let attributes = this.getAttributes(...names);
-        for ( let attribute of attributes ) {
+        for ( let attribute of Object.values(attributes) ) {
             result = names.includes(attribute.getName())
             if ( !result ) break;
         }
@@ -290,7 +283,7 @@ class Class extends Class_ {
     hasAnyAttributes = ( ...names: string[] ) => {
         let result = false;
         let attributes = this.getAttributes(...names);
-        for ( let attribute of attributes ) {
+        for ( let attribute of Object.values(attributes) ) {
             result = names.includes(attribute.getName())
             if ( result ) break;
         }
@@ -304,33 +297,33 @@ class Class extends Class_ {
 
 
     addAttribute = async (attribute: Attribute): Promise<Class> => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                let name = attribute.getName();
-                if (!this.hasAttribute(name)) {
-                    Class.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()});
-                    this.attributes.push(attribute);
-                    let attributeModel = attribute.getModel();
-                    Class.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
-                    this.schema.push(attributeModel); // sometimes getting schema undefined
-                    // update class on db
-                    Class.logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
-                    if (this.space && this.id) {
-                        Class.logger.info("addAttribute - updating class on db")
-                        let res = await this.space.updateClass(this);
-                        resolve(this)
-                        // TODO: Check if this class has subclasses
-                        // if ( this.class ) 
-                    } else {
-                        Class.logger.info("addAttribute - class not updated on db because of missing space or id")
-                        resolve(this)
-                    }
-                } else reject("Attribute with name " + name + " already exists within this Class")
-            } catch (e) {
-                Class.logger.info("Falied adding attribute because: ", e)
-                reject(e)
+        try {
+            let name = attribute.getName();
+            if (!this.hasAttribute(name)) {
+                Class.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()});
+                this.attributes[name] = attribute;
+                let attributeModel = attribute.getModel();
+                Class.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
+                this.schema[name] = attributeModel; // sometimes getting schema undefined
+                // update class on db
+                Class.logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
+                if (this.space && this.id) {
+                    Class.logger.info("addAttribute - updating class on db")
+                    let res = await this.space.updateClass(this);
+                    return this;
+                    // TODO: Check if this class has subclasses
+                } else {
+                    Class.logger.error("addAttribute - class not updated on db because of missing space or id")
+                    return this;
+                }
+            } else { 
+                Class.logger.error("Attribute with name " + name + " already exists within this Class");
+                return this;
             }
-        });
+        } catch (e) {
+            Class.logger.error("Falied adding attribute because: ", e)
+            return this;
+        }
     }
 
     // TODO: modify to pass also the current class model
@@ -411,7 +404,8 @@ class Class extends Class_ {
     addTrigger = async (name: string, model: TriggerModel) => {
         const fnLogger = logger.child({method: "addTrigger"});
         try {
-            this.triggers[name] = new Trigger(model, this);
+            const trigger = new Trigger(model, this);
+            this.triggers.push(trigger);
             if (this.space) {
                 this.setModel(); // [TODO] Change to buildFromModel();
                 let res = await this.space.updateClass(this);
@@ -425,9 +419,7 @@ class Class extends Class_ {
     }
 
     removeTrigger = async (name: string) => {
-        if (this.triggers[name]) {
-            delete this.triggers[name];
-        }
+        this.triggers = this.triggers.filter(t => t.name != name)
         return this;
     }
 }

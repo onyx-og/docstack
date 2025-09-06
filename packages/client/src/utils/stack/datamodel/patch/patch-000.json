@@ -7,8 +7,8 @@
       "name": "User",
       "description": "A user class for secure login",
       "type": "class",
-      "schema": [
-        {
+      "schema": {
+        "username": {
           "name": "username",
           "type": "string",
           "config": {
@@ -18,7 +18,7 @@
             "isArray": false
           }
         },
-        {
+        "password": {
           "name": "password",
           "type": "string",
           "config": {
@@ -27,7 +27,7 @@
             "isArray": false
           }
         },
-        {
+        "email": {
           "name": "email",
           "type": "string",
           "config": {
@@ -35,7 +35,7 @@
             "isArray": false
           }
         },
-        {
+        "firstName": {
           "name": "firstName",
           "type": "string",
           "config": {
@@ -43,7 +43,7 @@
             "isArray": false
           }
         },
-        {
+        "lastName": {
           "name": "lastName",
           "type": "string",
           "config": {
@@ -51,7 +51,7 @@
             "isArray": false
           }
         }
-      ]
+      }
     },
     {
       "_id": "UserSession",
@@ -59,8 +59,8 @@
       "active": true,
       "description": "Tracks user sessions",
       "type": "class",
-      "schema": [
-        {
+      "schema": {
+        "username": {
           "name": "username",
           "type": "string",
           "config": {
@@ -70,7 +70,7 @@
             "mandatory": true
           }
         },
-        {
+        "sessionId": {
           "name": "sessionId",
           "type": "string",
           "config": {
@@ -79,7 +79,7 @@
             "mandatory": true
           }
         },
-        {
+        "sessionStart": {
           "name": "sessionStart",
           "type": "string",
           "config": {
@@ -88,7 +88,7 @@
             "mandatory": true
           }
         },
-        {
+        "sessionStatus": {
           "name": "sessionStatus",
           "type": "string",
           "config": {
@@ -97,7 +97,7 @@
             "mandatory": true
           }
         },
-        {
+        "sessionEnd": {
           "name": "sessionEnd",
           "type": "string",
           "config": {
@@ -106,7 +106,7 @@
             "mandatory": false
           }
         }
-      ]
+      }
     }
   ]
 }
