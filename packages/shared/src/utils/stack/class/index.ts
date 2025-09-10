@@ -1,5 +1,5 @@
 import Attribute from '../attribute'
-import logger from "../../logger";
+import {z} from "zod";
 // import ReferenceAttribute from '../Reference';
 import {ClassModel, AttributeModel, Document, TriggerModel} from "../../../types";
 import Stack from '..';
@@ -17,13 +17,14 @@ abstract class Class extends EventTarget {
     /* Populated in init() */
     type!: string;
     description?: string;
-    attributes: Attribute[] = [];
-    schema!: AttributeModel[]
+    attributes: {[name: string]: Attribute} = {};
+    schema: ClassModel["schema"] = {};
+    schemaZOD: z.ZodObject = z.object({});
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
     state: "busy" | "idle" = 'idle';
-    triggers: {[name: string]: Trigger} = {};
+    triggers: Trigger[] = [];
 
     static logger: Logger;
     abstract logger: Logger;
@@ -80,14 +81,16 @@ abstract class Class extends EventTarget {
 
     abstract getId: () => string | undefined;
 
-    abstract buildSchema: () => AttributeModel[];
+    abstract hydrateSchema: (rawSchema: ClassModel["schema"]) => void;
+
+    abstract buildSchema: () => ClassModel["schema"];
 
     abstract getModel: () => ClassModel;
 
     // Set model should be called only after fetching the latest model from db
     abstract setModel: ( model?: ClassModel ) => void;
 
-    abstract getAttributes: ( ...names: string[] ) => Attribute[];
+    abstract getAttributes: ( ...names: string[] ) => {[name: string]: Attribute};
 
     abstract hasAllAttributes: ( ...names: string[] ) => boolean;
 

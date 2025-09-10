@@ -5,7 +5,18 @@ import {Stack, ClassModel, AttributeModel, Document} from "@docstack/shared";
 import Attribute from "./attribute";
 import { Logger } from 'winston';
 import { Trigger } from "./trigger/";
+import * as z from "zod";
 
+/**
+ * Refinement to check for a specific number of decimal places.
+ * @param places The number of decimal places to validate.
+ */
+const hasDecimalPrecision = (places: number) => {
+  return (value: number) => {
+    const multiplier = Math.pow(10, places);
+    return Math.abs(value * multiplier) % 1 === 0;
+  };
+}
 class Class extends Class_ {
     space: Stack | undefined;
     /* Populated in init() */
@@ -15,6 +26,7 @@ class Class extends Class_ {
     description?: string;
     attributes: {[name: string]: Attribute} = {};
     schema: ClassModel["schema"] = {};
+    schemaZOD: z.ZodObject = z.object({});
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
@@ -157,6 +169,106 @@ class Class extends Class_ {
         }
     }
 
+    // Inside your Class class
+    hydrateSchema = (rawSchema: { [name: string]: AttributeModel }):void => {
+        const zodFields: Record<string, z.ZodTypeAny> = {};
+
+        for (const fieldName in rawSchema) {
+            const attributeModel = rawSchema[fieldName];
+            const { type, config } = attributeModel;
+            let zodField: z.ZodTypeAny;
+
+            switch (type) {
+                // ... existing cases for 'string', 'number', 'boolean', 'date' ...
+                case 'string':
+                    zodField = z.string();
+                    if (config.maxLength !== undefined) {
+                        zodField = (zodField as z.ZodString).max(config.maxLength);
+                    }
+                    break;
+
+                case 'integer':
+                    zodField = z.number();
+                    break;
+
+                case 'boolean':
+                    zodField = z.boolean();
+                    break;
+
+                // case 'date':
+                //     zodField = z.coerce.date();
+                //     break;
+
+                // New case for 'foreign_key'
+                case 'foreign_key':
+                    if (!config.foreignKeyClass) {
+                        throw new Error(
+                            `Attribute '${fieldName}' of type 'foreign_key' is missing a 'foreignKeyClass' in its config.`
+                        );
+                    }
+
+                    const foreignClass = config.foreignKeyClass;
+
+                    // The base schema for a foreign key is always a string
+                    const baseSchema = z.string();
+
+                    // We apply the refine to the base schema
+                    zodField = baseSchema.refine(
+                        // The input is either a string or a string[] depending on 'isArray'
+                        async (documentIdOrIds) => {
+                            // Normalize the input into an array for easy processing
+                            const idsToValidate = Array.isArray(documentIdOrIds) ? documentIdOrIds : [documentIdOrIds];
+
+                            // Return true if the array is empty (no ids to validate)
+                            if (idsToValidate.length === 0) {
+                                return true;
+                            }
+
+                            try {
+                                const stack = this.getSpace();
+                                if (stack) {
+                                    // Create an array of promises for each database lookup
+                                    const promises = idsToValidate.map(id => stack.db.get!(id));
+
+                                    // Await all promises. Promise.all rejects on the first error.
+                                    await Promise.all(promises);
+
+                                    // If we reach here, all documents were found
+                                    return true;
+                                } else throw new Error("Missing stack connection");
+                            } catch (error: any) {
+                                // Catching a 404 error means a document was not found
+                                if (error.status === 404) {
+                                    return false;
+                                }
+                                // For other errors, let them be thrown
+                                throw error;
+                            }
+                        },
+                        {
+                            message: `One or more documents not found in class '${foreignClass}'.`,
+                        }
+                    );
+                    break;
+
+                default:
+                    throw new Error(`Unsupported schema type: '${type}' for field '${fieldName}'`);
+            }
+
+            // These rules are applied regardless of the type, and in the correct order
+            if (config.mandatory !== true) {
+                zodField = zodField.optional();
+            }
+            if (config.isArray === true) {
+                zodField = z.array(zodField);
+            }
+
+            zodFields[fieldName] = zodField;
+        }
+
+        this.schemaZOD = z.object(zodFields);
+    }
+
     // TODO Turn into method (after factory method instantiation refactory is done)
     setId = ( id: string ) => {
         this.id = id;
@@ -183,11 +295,10 @@ class Class extends Class_ {
     }
 
     buildSchema = () => {
-        let schema: typeof this.schema= {};
+        let schema: ClassModel["schema"] = {};
         Object.entries(this.attributes).forEach(t => {
             schema[t[0]] = t[1].model
         });
-        this.schema = schema;
         return schema;
     }
 
@@ -221,7 +332,6 @@ class Class extends Class_ {
         let currentModel = this.getModel();
         // Set model arg to the overwrite of the current model with the given one 
         model = Object.assign(currentModel, model);
-        debugger;
         if (model.schema) {
             // model.schema = {...this.model.schema, ...model.schema};
             this.attributes = {};
@@ -303,8 +413,9 @@ class Class extends Class_ {
                 Class.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()});
                 this.attributes[name] = attribute;
                 let attributeModel = attribute.getModel();
-                Class.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel})
-                this.schema[name] = attributeModel; // sometimes getting schema undefined
+                Class.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel});
+                // TODO: 
+                // this.schema[name] = attributeModel; // sometimes getting schema undefined
                 // update class on db
                 Class.logger.info("addAttribute - checking for requirements before updating class on db", {space: (this.space != null), id: this.id})
                 if (this.space && this.id) {
@@ -344,6 +455,7 @@ class Class extends Class_ {
                 // attempt to retrieve card by primary key
                 let filter: {[key: string]:any} = {}
                 let primaryKeys = this.getPrimaryKeys();
+                // debugger;
                 fnLogger.info("Got primary keys", {primaryKeys});
                 if (primaryKeys.length) {
                     // executes a reducer function on each element of the primaryKeys array
@@ -355,8 +467,7 @@ class Class extends Class_ {
                     fnLogger.info("Defined filter", {filter});
                     let cards = await this.getCards(filter, undefined, 0, 1);
                     if (cards.length > 0) {
-                        const res = await this.updateCard(cards[0]._id, params);
-                        resolve(res);
+                        reject("Other card with same PK found");
                     } else {
                         const res = await this.addCard(params);
                         resolve(res);

@@ -38,8 +38,13 @@ export type AttributeTypeForeignKey = {
     name: string,
     config: {} & AttributeTypeConfig
 }
+export type AttributeTypeObject = {
+    type: "object",
+    name: string,
+    config: {} & AttributeTypeConfig
+}
 export type AttributeType = AttributeTypeString | AttributeTypeInteger | 
-    AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey;
+    AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey | AttributeTypeObject;
 export type AttributeModel = {
     name: string,
     config: AttributeType["config"],
@@ -52,8 +57,8 @@ export interface ClassModel extends Document {
     description?: string,
     parentClass?: string,
     _rev?: PouchDB.Core.RevisionId | undefined;
-    schema?: AttributeModel[];
-    triggers: {[name: string]: TriggerModel};
+    schema: {[name: string]: AttributeModel};
+    triggers: TriggerModel[];
 }
 
 

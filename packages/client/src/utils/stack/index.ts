@@ -30,11 +30,11 @@ export const BASE_SCHEMA: ClassModel["schema"] = {
 }
 export const CLASS_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    "schema": { name: "schema", type: "json", config: { maxLength: 1000, isArray: true }},
+    "schema": { name: "schema", type: "object", config: { maxLength: 1000, isArray: true }},
     "parentClass": { name: "parentClass", type: "foreign_key", config: { isArray: false } },
 }
 const DOMAIN_SCHEMA: ClassModel["schema"] = {
-    "schema": { name: "schema", type: "json", config: { 
+    "schema": { name: "schema", type: "object", config: { 
         isArray: true,
         defaultValue: [
             {
@@ -93,7 +93,7 @@ class ClientStack extends Stack {
 
         // Load default plugins
         PouchDB.plugin(Find);
-        PouchDB.plugin(StackPlugin(this));
+        // PouchDB.plugin(StackPlugin(this));
         // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
@@ -943,7 +943,7 @@ class ClientStack extends Stack {
     
                     break;
                     */
-                    case "json":
+                    case "object":
                         logger.info("Missing json validation. Skipping for now.");
                     break;
                     default:

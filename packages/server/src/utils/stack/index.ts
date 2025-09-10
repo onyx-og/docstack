@@ -5,36 +5,39 @@ import getLogger from "../../utils/logger/";
 import { decryptString } from "../../utils/crypto";
 import { importJsonFile } from "./datamodel";
 
-import {CachedClass, Patch, Stack, StoreOptions, SystemDoc, Document} from "@docstack/shared";
 import Class from "./class";
 import {
-    ClassModel,
-    AttributeModel,
-    AttributeTypeDecimal,
-    AttributeTypeForeignKey,
-    AttributeTypeInteger,
-    AttributeTypeString,
-    AttributeTypeBoolean
+    Stack,
+    StoreOptions,
+    CachedClass,
+    ClassModelPropagationStart,
+    ClassModelPropagationComplete
 } from "@docstack/shared";
 
 
+import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
+    AttributeTypeForeignKey,
+    AttributeTypeInteger,
+    AttributeTypeString} from "@docstack/shared";
+import { StackPlugin } from "../../plugins/pouchdb";
+
 const logger = getLogger().child({module: "stack"});
 
-export const BASE_SCHEMA: AttributeModel[] = [
-    { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
-    { name: "type", type: "string", config: { maxLength: 100 } },
-    { name: "createTimestamp", type: "integer", config: { min: 0 } },
-    { name: "updateTimestamp", type: "integer", config: { min: 0 } },
-    { name: "description", type: "string", config: { maxLength: 1000 } },
-    { name: "active", type: "boolean", config: { defaultValue: true , primaryKey: true } }
-]
-export const CLASS_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", config: {}})[] = [
+export const BASE_SCHEMA: ClassModel["schema"] = {
+    "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
+    "type": { name: "type", type: "string", config: { maxLength: 100 } },
+    "createTimestamp": { name: "createTimestamp", type: "integer", config: { min: 0 } },
+    "updateTimestamp": { name: "updateTimestamp", type: "integer", config: { min: 0 } },
+    "description": { name: "description", type: "string", config: { maxLength: 1000 } },
+    "active": { name: "active", type: "boolean", config: { defaultValue: true , primaryKey: true } }
+}
+export const CLASS_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    { name: "schema", type: "attribute", config: { maxLength: 1000, isArray: true }},
-    { name: "parentClass", type: "foreign_key", config: { isArray: false } },
-]
-const DOMAIN_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", config: {}})[] = [
-    { name: "schema", type: "attribute", config: { 
+    "schema": { name: "schema", type: "object", config: { maxLength: 1000, isArray: true }},
+    "parentClass": { name: "parentClass", type: "foreign_key", config: { isArray: false } },
+}
+const DOMAIN_SCHEMA: ClassModel["schema"] = {
+    "schema": { name: "schema", type: "object", config: { 
         isArray: true,
         defaultValue: [
             {
@@ -53,13 +56,12 @@ const DOMAIN_SCHEMA: (AttributeModel | {name: "schema", type: "attribute", confi
             }
         ]
     }},
-    { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
-    { name: "relation", type: "string", config: { maxLength: 100 , isArray: false } },
-    { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
-    { name: "targetClass", type: "foreign_key", config: { isArray: true } },
+    "parentDomain": { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
+    "relation": { name: "relation", type: "string", config: { maxLength: 100 , isArray: false } },
+    "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
+    "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: true } },
     ...BASE_SCHEMA
-]
-
+};
 class ServerStack extends Stack {
     private constructor() {
         super();
@@ -86,6 +88,8 @@ class ServerStack extends Stack {
 
         // Load default plugins
         PouchDB.plugin(Find);
+        PouchDB.plugin(StackPlugin(this));
+        // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
                 PouchDB.plugin(plugin);
@@ -95,17 +99,6 @@ class ServerStack extends Stack {
         this.cache = {
             // empty at init
         }
-    }
-
-    public onClassDoc = (className: string) => {
-        return this.db.changes({
-            since: 'now',
-            live: true,
-            include_docs: true,
-            filter: (doc) => {
-                return doc.type == className;
-            }
-        })
     }
 
     public getDb() {
@@ -271,13 +264,216 @@ class ServerStack extends Stack {
         logger.info("checkSystem - updated system", {system: _systemDoc})
     }
 
+    setListeners = () => {
+        const fnLogger = logger.child({method: "setListeners"});
+
+        // Listening for class model propagation
+        this.addEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
+        this.addEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
+
+        fnLogger.info("Setting up class model worker");
+        this.modelWorker = new Worker(require("@docstack/shared/workers/dataModel"), { type: 'module' });
+        
+        fnLogger.info("Setting up class model changes listener");
+        const classModelChanges = this.onClassModelChanges();
+
+        this.modelWorker.onmessage = (event) => {
+            const { status, className, message } = event.data;
+            
+            this.dispatchEvent(new CustomEvent('class-model-propagation-complete', {
+                detail: { className: className, success: status === 'success', message }
+            }));
+
+            if (status === 'error') {
+                fnLogger.error(`Model worker error for class '${className}': ${message}`);
+            }
+        };
+
+        // Store listener for later
+        this.listeners.push(classModelChanges);
+    }
+
+    /**
+     * @description Clears all listeners from the Stack
+     */
+    removeAllListeners = () => {
+        this.removeEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
+        this.removeEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
+        this.listeners = [];
+    }
+
+    /**
+     * @description When a class model propagation starts write the ~lock document to the database.
+     * It prevents any further modifications on the class data model
+     * @param event
+     */
+    onClassModelPropagationStart = (event: CustomEvent<ClassModelPropagationStart>) => {
+        const fnLogger = logger.child({method: "onClassModelPropagationStart", args: {event}});
+        const className = event.detail.className;
+        this.addClassLock(className).then(() => {
+            fnLogger.info(`Lock created successfully for class: '${className}'`);
+        }).catch(error => {
+            fnLogger.error(`Error creating lock for '${className}': ${error}`);
+        });
+    }
+
+    /**
+     * @description When a class model propagation comes to completion remove the corresponding 
+     * ~lock from the database
+     * @param event 
+     */
+    onClassModelPropagationComplete = (event: CustomEvent<ClassModelPropagationComplete>) => {
+        const fnLogger = logger.child({method: "onClassModelPropagationComplete", args: {event}});
+        const className = event.detail.className;
+        this.clearClassLock(className).then(() => {
+            fnLogger.info(`Lock removed successfully for class: '${className}'`);
+        }).catch(error => {
+            fnLogger.error(`Error removing lock for '${className}': ${error}`);
+        });;
+    }
+
+    /**
+     * Listener that fires when a document that refers to a class is edited or created,
+     * marks its execution while handling the propagation of schema modifications to children documents: 
+     * by dispatching a webworker message containing the @var className and the previous revision id.
+     * In the main case, the worker sends a message with the result of its task.
+     * @fires class-model-propagation-complete
+     * @fires class-model-propagation-pending
+     * @returns void
+     */
+    onClassModelChanges = () => {
+        const fnLogger = logger.child({listener: "classModelChanges"});
+
+        const classModelChanges = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == "class";
+            }
+        }).on("change", async (change) => {
+            const doc = change.doc! as unknown as Document;
+            const className = doc.type;
+            if (doc.active) {
+                // Dispatch class-propagate-start [TODO] Move it outside the doc.active
+                this.dispatchEvent(new CustomEvent<ClassModelPropagationStart>('class-model-propagation-pending', {
+                    detail: { className }
+                }));
+                try {
+                    // Invalidate cached version if present
+                    fnLogger.info(`Class model was updated. Clearing '${className}' from cache.`);
+                    delete this.cache[className];
+                    fnLogger.info(`Successfully cleared '${className}' from cache.`);
+                    const docWithRevs = await this.db.get(className, {revs: true});
+                    const revisionIDList = docWithRevs._revisions!.ids;
+                    if (revisionIDList.length == 1) {
+                        fnLogger.info(`Class '${className}' was just created. Nothing to propagate.`);
+
+                        this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
+                            detail: { className, success: true }
+                        }));
+                    } else {
+                        fnLogger.info(`Class '${className}' was updated. Dispatching task to webworker.`);
+                        const secondLastRevID = revisionIDList[1];
+                        const secondLastPrefix = docWithRevs._revisions!.start-1;
+                        const previousRevId = `${secondLastPrefix}-${secondLastRevID}`;
+                        this.modelWorker!.postMessage({
+                            command: 'propagateSchema',
+                            payload: {
+                                dbName: this.getDbName(),
+                                className,
+                                previousRevId,
+                            }
+                        });
+                    }
+                } catch (e: any) {
+                    fnLogger.error(`Error while propagating data model changes for class '${className}': ${e}`);
+                    this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
+                        detail: { className, success: false, message: e }
+                    }));
+                }
+            } else {
+                // Class was deleted
+                // [TODO]
+                fnLogger.info("Class was deleted. [TODO] deletion of documents belonging to its class");
+                this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
+                    detail: { className, success: true }
+                }));
+            }
+        });
+
+        // Avoid adding it to this.listeners
+
+        return classModelChanges;
+    }
+
+    onClassLock = (className: string) => {
+        const classLockListener = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == "~lock" && doc._id == `~lock-propagation-${className}`;
+            }
+        });
+        this.listeners.push(classLockListener);
+        return classLockListener;
+    }
+
+    addClassLock = async (className: string) => {
+        const fnLogger = logger.child({method: "addClassLock", args: {className}});
+        try {
+            const response = await this.db.put({
+                _id: `~lock-propagation-${className}`,
+                type: `~lock`
+            });
+            fnLogger.info(`Adding class lock response`, {response});
+            return response.ok;
+        } catch (e: any) {
+            fnLogger.error(`Error while adding class lock: ${e}`);
+            return false;
+        }
+    }
+
+    clearClassLock = async (className: string) => {
+        const fnLogger = logger.child({method: "clearClassLock", args: {className}});
+        try {
+            const doc = await this.db.get(`~lock-propagation-${className}`);
+            fnLogger.info(`Fetched class lock`, {document: doc});
+            const response = await this.db.remove(doc);
+            fnLogger.info(`Removing class lock response`, {response});
+            return response.ok;
+        } catch (e: any) {
+            fnLogger.error(`Error while adding class lock: ${e}`);
+            return false;
+        }
+    }
+
+    onClassDoc = (className: string) => {
+        const onClassDocListener = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            filter: (doc) => {
+                return doc.type == className;
+            }
+        });
+        this.listeners.push(onClassDocListener);
+        return onClassDocListener;
+    }
+
     // Database initialization should be about making sure that all the documents
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
     async initdb () {
         await this.initIndex();
         await this.checkSystem();
+        this.setListeners();
         return this;
+    }
+
+    close = () => {
+        this.removeAllListeners();
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
@@ -381,7 +577,7 @@ class ServerStack extends Stack {
                 limit: limit
             });
     
-            fnLogger.info("findDocument - found", {
+            fnLogger.info("Found", {
                 result: foundResult,
                 selector: selector,
             });
@@ -572,12 +768,12 @@ class ServerStack extends Stack {
 
     // [TODO] Implement also for attributes of type different from string
     // [TODO] Implement primary key check for combination of attributes and not just one
-    async validateObject(obj: any, type: string, attributeModels: AttributeModel[]): Promise<boolean> {
-        logger.info("validateObject - given args", {obj: obj, attributeModels: attributeModels})
+    async validateObject(obj: any, type: string, schema: ClassModel["schema"]): Promise<boolean> {
+        logger.info("validateObject - given args", {obj, schema})
         let isValid = true;
         try {
-            // attributeModels.forEach(async model => {
-            for (let model of attributeModels) {
+            // schema.forEach(async model => {
+            for (let model of Object.values(schema)) {
                 let value = obj[model.name];
                 logger.info("validateObject - model", {model, value})
                 // Check if the property exists
@@ -743,15 +939,15 @@ class ServerStack extends Stack {
     }
 
     validateObjectByType = async (obj: any, type: string, schema?: ClassModel["schema"]) => {
-        logger.info("validateObjectByType - given args", {obj, type, schema})
-        let schema_: AttributeModel[] | undefined = [];
+        const fnLogger = logger.child({method: "validateObjectByType", args: {obj, type, schema}});
+        let schema_: ClassModel["schema"] = {}
         
         switch (type) {
         case "class":
-            schema_ = CLASS_SCHEMA as AttributeModel[];
+            schema_ = CLASS_SCHEMA;
             break;
         case "domain":
-            schema_ = DOMAIN_SCHEMA as AttributeModel[]
+            schema_ = DOMAIN_SCHEMA;
             break;
         default:
             if (!schema) {
@@ -760,12 +956,13 @@ class ServerStack extends Stack {
                     schema_ = classDoc.schema;
                 } catch (e: any) {
                     // if 404 validation failed because of missing class
-                    logger.info("validateObjectByType - failed because of error",e)
+                    fnLogger.error(`Failed because of error: ${e}`)
                     return false;
                 }
             }
         }
         if (schema_) return await this.validateObject(obj, type, schema_);
+        else throw new Error(`Unable to retrieve schema to validate object against`);
     }
 
     prepareDoc (_id: string, type: string, params: {[key: string] : string | number | boolean}) {
@@ -786,10 +983,10 @@ class ServerStack extends Stack {
             doc: Document | null = null,
             isNewDoc = false;
         try {
-            let validationRes = await this.validateObjectByType(params, type, schema);
-            if  (!validationRes) {
-                throw new Error("createDoc - Invalid object")
-            }
+            // let validationRes = await this.validateObjectByType(params, type, schema);
+            // if  (!validationRes) {
+            //     throw new Error("createDoc - Invalid object")
+            // }
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 logger.info("retrieved doc", {existingDoc})
@@ -867,7 +1064,7 @@ class ServerStack extends Stack {
      * Sets the active param of a document to false
      * @async
      * @param _id 
-     * @returns boolean
+     * @returns Promise<boolean>
      */
     deleteDocument = async (_id: string): Promise<boolean> => {
         const fnLogger = logger.child({method: "deleteDocument", args: {_id}});
