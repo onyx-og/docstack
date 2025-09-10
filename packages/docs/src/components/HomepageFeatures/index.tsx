@@ -11,32 +11,32 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    title: 'Tame the Chaos',
+    Svg: require('@site/static/img/bytedance_confusion.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Stop debugging inconsistent data. Unstructured NoSQL leads to chaos and frustrating bugs. 
+        DocStack’s schemas enforce order, ensuring your data is always reliable and predictable.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: 'Secure by Design',
+    Svg: require('@site/static/img/bytedance_security.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Fortify your application with built-in security. DocStack uses server-side 
+        cryptography and client-side encryption to safeguard your data.
       </>
     ),
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    title: 'Streamlined Development',
+    Svg: require('@site/static/img/bytedance_tasks.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Accelerate your development. Our framework automates common tasks and the foundational API, 
+        so you can dedicate your time to building core features and custom logic.
       </>
     ),
   },

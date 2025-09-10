@@ -37,6 +37,7 @@ const config = {
     new webpack.EnvironmentPlugin({
       PSW_PUBLIC_KEY: JSON.stringify(process.env.PSW_PUBLIC_KEY),
       NODE_ENV: JSON.stringify(process.env.NODE_ENV),
+      // BASE_URL: isProduction ? "/" : "/"
     })
   ],
   module: {

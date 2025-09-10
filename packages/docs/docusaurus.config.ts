@@ -7,7 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'DocStack',
   tagline: 'One does not simply stack documents',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/logo.png',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -31,11 +31,29 @@ const config: Config = {
     [
       'docusaurus-plugin-typedoc',
       {
+        id: 'server',
         // TypeDoc options are passed directly here
         entryPoints: ['../server/src/index.ts'],
         tsconfig: '../server/tsconfig.json',
-        out: 'docs/api', // This is where the docs will be generated
-        // Additional options for typedoc-plugin-markdown can go here
+        out: 'docs/server',
+      }
+    ],
+    [
+      'docusaurus-plugin-typedoc',
+      {
+        id: 'client',
+        entryPoints: ['../client/src/index.ts'],
+        tsconfig: '../client/tsconfig.json',
+        out: 'docs/client',
+      }
+    ],
+    [
+      'docusaurus-plugin-typedoc',
+      {
+        id: 'react',
+        entryPoints: ['../react/src/index.ts'],
+        tsconfig: '../react/tsconfig.json',
+        out: 'docs/react',
       },
     ],
   ],
@@ -45,6 +63,10 @@ const config: Config = {
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
+  },
+
+  markdown: {
+    format: 'md',
   },
 
   presets: [
@@ -58,21 +80,21 @@ const config: Config = {
           editUrl:
             'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
-        blog: {
-          showReadingTime: true,
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-          // Useful options to enforce blogging best practices
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
-        },
+        // blog: {
+        //   showReadingTime: true,
+        //   feedOptions: {
+        //     type: ['rss', 'atom'],
+        //     xslt: true,
+        //   },
+        //   // Please change this to your repo.
+        //   // Remove this to remove the "edit this page" links.
+        //   editUrl:
+        //     'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+        //   // Useful options to enforce blogging best practices
+        //   onInlineTags: 'warn',
+        //   onInlineAuthors: 'warn',
+        //   onUntruncatedBlogPosts: 'warn',
+        // },
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -82,7 +104,7 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/banner-social.jpg',
     navbar: {
       title: 'DocStack',
       logo: {
@@ -97,12 +119,27 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          type: 'docSidebar',
-          sidebarId: 'api',
+          type: 'dropdown',
+          label: 'API',
           position: 'left',
-          label: 'API'
+          items: [
+            {
+              type: 'docSidebar',
+              sidebarId: 'client',
+              label: 'Client',
+            },
+            {
+              type: 'docSidebar',
+              sidebarId: 'server',
+              label: 'Server',
+            },
+            // {
+            //   type: 'docSidebar',
+            //   sidebarId: 'react',
+            //   label: 'React',
+            // },
+          ],
         },
-        {to: '/blog', label: 'Blog', position: 'left'},
         {href: 'pathname:///app/index.html', label: 'Live', position: 'right'},
         {
           href: 'https://github.com/onyx-og/docstack',
@@ -118,8 +155,8 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Tutorial',
-              to: '/docs/intro',
+              label: 'Architecture',
+              to: '/docs/architecture/core-concepts',
             },
           ],
         },
@@ -135,10 +172,6 @@ const config: Config = {
         {
           title: 'More',
           items: [
-            {
-              label: 'Blog',
-              to: '/blog',
-            },
             {
               label: 'GitHub',
               href: 'https://github.com/onyx-og/docstack',
