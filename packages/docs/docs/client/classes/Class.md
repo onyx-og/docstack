@@ -1,6 +1,6 @@
 # Abstract Class: Class
 
-Defined in: [shared/src/utils/stack/class/index.ts:13](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L13)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:13](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L13)
 
 ## Extends
 
@@ -12,7 +12,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:13](https://github.com/onyx-o
 
 > **new Class**(): `Class`
 
-Defined in: [shared/src/utils/stack/class/index.ts:34](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L34)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:34](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L34)
 
 #### Returns
 
@@ -28,7 +28,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:34](https://github.com/onyx-o
 
 > `abstract` **addAttribute**: (`attribute`) => `Promise`\<`Class`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:103](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L103)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:103](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L103)
 
 #### Parameters
 
@@ -46,7 +46,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:103](https://github.com/onyx-
 
 > `abstract` **addCard**: (`params`) => `Promise`\<`null` \| `Document`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:107](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L107)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:107](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L107)
 
 #### Parameters
 
@@ -62,7 +62,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:107](https://github.com/onyx-
 
 > `abstract` **addOrUpdateCard**: (`params`, `cardId?`) => `Promise`\<`null` \| `Document`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:109](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L109)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:109](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L109)
 
 #### Parameters
 
@@ -82,7 +82,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:109](https://github.com/onyx-
 
 > `abstract` **addTrigger**: (`name`, `model`) => `Promise`\<`Class`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:117](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L117)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:117](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L117)
 
 #### Parameters
 
@@ -104,7 +104,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:117](https://github.com/onyx-
 
 > **attributes**: `object` = `{}`
 
-Defined in: [shared/src/utils/stack/class/index.ts:20](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L20)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:20](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L20)
 
 #### Index Signature
 
@@ -116,7 +116,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:20](https://github.com/onyx-o
 
 > `abstract` **build**: () => `Promise`\<`Class`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:38](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L38)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:38](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L38)
 
 #### Returns
 
@@ -128,7 +128,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:38](https://github.com/onyx-o
 
 > `abstract` **buildSchema**: () => `object`
 
-Defined in: [shared/src/utils/stack/class/index.ts:86](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L86)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:86](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L86)
 
 #### Returns
 
@@ -140,7 +140,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:86](https://github.com/onyx-o
 
 > `abstract` **deleteCard**: (`cardId`) => `Promise`\<`boolean`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:115](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L115)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:115](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L115)
 
 #### Parameters
 
@@ -158,7 +158,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:115](https://github.com/onyx-
 
 > `optional` **description**: `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:19](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L19)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:19](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L19)
 
 ***
 
@@ -166,7 +166,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:19](https://github.com/onyx-o
 
 > `abstract` **getAttributes**: (...`names`) => `object`
 
-Defined in: [shared/src/utils/stack/class/index.ts:93](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L93)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:93](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L93)
 
 #### Parameters
 
@@ -184,7 +184,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:93](https://github.com/onyx-o
 
 > `abstract` **getCards**: (`selector?`, `fields?`, `skip?`, `limit?`) => `Promise`\<`Document`[]\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:113](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L113)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:113](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L113)
 
 #### Parameters
 
@@ -212,7 +212,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:113](https://github.com/onyx-
 
 > `abstract` **getDescription**: () => `undefined` \| `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:78](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L78)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:78](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L78)
 
 #### Returns
 
@@ -224,7 +224,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:78](https://github.com/onyx-o
 
 > `abstract` **getId**: () => `undefined` \| `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:82](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L82)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:82](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L82)
 
 #### Returns
 
@@ -236,7 +236,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:82](https://github.com/onyx-o
 
 > `abstract` **getModel**: () => `ClassModel`
 
-Defined in: [shared/src/utils/stack/class/index.ts:88](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L88)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:88](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L88)
 
 #### Returns
 
@@ -248,7 +248,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:88](https://github.com/onyx-o
 
 > `abstract` **getName**: () => `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:74](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L74)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:74](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L74)
 
 #### Returns
 
@@ -260,7 +260,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:74](https://github.com/onyx-o
 
 > `abstract` **getPrimaryKeys**: () => `string`[]
 
-Defined in: [shared/src/utils/stack/class/index.ts:32](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L32)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:32](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L32)
 
 #### Returns
 
@@ -272,7 +272,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:32](https://github.com/onyx-o
 
 > `abstract` **getSpace**: () => `undefined` \| `Stack`
 
-Defined in: [shared/src/utils/stack/class/index.ts:76](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L76)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:76](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L76)
 
 #### Returns
 
@@ -284,7 +284,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:76](https://github.com/onyx-o
 
 > `abstract` **getType**: () => `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:80](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L80)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:80](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L80)
 
 #### Returns
 
@@ -296,7 +296,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:80](https://github.com/onyx-o
 
 > `abstract` **hasAllAttributes**: (...`names`) => `boolean`
 
-Defined in: [shared/src/utils/stack/class/index.ts:95](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L95)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:95](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L95)
 
 #### Parameters
 
@@ -314,7 +314,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:95](https://github.com/onyx-o
 
 > `abstract` **hasAnyAttributes**: (...`names`) => `boolean`
 
-Defined in: [shared/src/utils/stack/class/index.ts:97](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L97)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:97](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L97)
 
 #### Parameters
 
@@ -332,7 +332,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:97](https://github.com/onyx-o
 
 > `abstract` **hasAttribute**: (`name`) => `boolean`
 
-Defined in: [shared/src/utils/stack/class/index.ts:100](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L100)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:100](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L100)
 
 #### Parameters
 
@@ -350,7 +350,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:100](https://github.com/onyx-
 
 > `abstract` **hydrateSchema**: (`rawSchema`) => `void`
 
-Defined in: [shared/src/utils/stack/class/index.ts:84](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L84)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:84](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L84)
 
 #### Parameters
 
@@ -366,7 +366,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:84](https://github.com/onyx-o
 
 > `optional` **id**: `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:23](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L23)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:23](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L23)
 
 ***
 
@@ -374,7 +374,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:23](https://github.com/onyx-o
 
 > `abstract` **init**: (`space`, `name`, `type`, `description?`, `schema?`) => `void`
 
-Defined in: [shared/src/utils/stack/class/index.ts:40](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L40)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:40](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L40)
 
 #### Parameters
 
@@ -406,7 +406,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:40](https://github.com/onyx-o
 
 > `abstract` **logger**: `Logger`
 
-Defined in: [shared/src/utils/stack/class/index.ts:30](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L30)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:30](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L30)
 
 ***
 
@@ -414,7 +414,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:30](https://github.com/onyx-o
 
 > **model**: `ClassModel`
 
-Defined in: [shared/src/utils/stack/class/index.ts:25](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L25)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:25](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L25)
 
 ***
 
@@ -422,7 +422,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:25](https://github.com/onyx-o
 
 > **name**: `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:16](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L16)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:16](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L16)
 
 ***
 
@@ -430,7 +430,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:16](https://github.com/onyx-o
 
 > `abstract` **removeTrigger**: (`name`) => `Promise`\<`Class`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:119](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L119)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:119](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L119)
 
 #### Parameters
 
@@ -448,7 +448,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:119](https://github.com/onyx-
 
 > **schema**: `object` = `{}`
 
-Defined in: [shared/src/utils/stack/class/index.ts:21](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L21)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:21](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L21)
 
 #### Index Signature
 
@@ -460,7 +460,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:21](https://github.com/onyx-o
 
 > **schemaZOD**: `ZodObject`
 
-Defined in: [shared/src/utils/stack/class/index.ts:22](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L22)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:22](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L22)
 
 ***
 
@@ -468,7 +468,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:22](https://github.com/onyx-o
 
 > `abstract` **setId**: (`id`) => `void`
 
-Defined in: [shared/src/utils/stack/class/index.ts:72](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L72)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:72](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L72)
 
 #### Parameters
 
@@ -486,7 +486,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:72](https://github.com/onyx-o
 
 > `abstract` **setModel**: (`model?`) => `void`
 
-Defined in: [shared/src/utils/stack/class/index.ts:91](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L91)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:91](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L91)
 
 #### Parameters
 
@@ -504,7 +504,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:91](https://github.com/onyx-o
 
 > **space**: `undefined` \| `Stack`
 
-Defined in: [shared/src/utils/stack/class/index.ts:14](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L14)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:14](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L14)
 
 ***
 
@@ -512,7 +512,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:14](https://github.com/onyx-o
 
 > **state**: `"busy"` \| `"idle"` = `'idle'`
 
-Defined in: [shared/src/utils/stack/class/index.ts:26](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L26)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:26](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L26)
 
 ***
 
@@ -520,7 +520,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:26](https://github.com/onyx-o
 
 > **triggers**: `Trigger`[] = `[]`
 
-Defined in: [shared/src/utils/stack/class/index.ts:27](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L27)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:27](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L27)
 
 ***
 
@@ -528,7 +528,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:27](https://github.com/onyx-o
 
 > **type**: `string`
 
-Defined in: [shared/src/utils/stack/class/index.ts:18](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L18)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:18](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L18)
 
 ***
 
@@ -536,7 +536,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:18](https://github.com/onyx-o
 
 > `abstract` **updateCard**: (`cardId`, `params`) => `Promise`\<`null` \| `Document`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:111](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L111)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:111](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L111)
 
 #### Parameters
 
@@ -556,7 +556,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:111](https://github.com/onyx-
 
 > `static` **buildFromModel**: (`space`, `classModel`) => `Promise`\<`Class`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:67](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L67)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:67](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L67)
 
 #### Parameters
 
@@ -578,7 +578,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:67](https://github.com/onyx-o
 
 > `static` **create**: (`space`, `name`, `type`, `description?`, `schema?`) => `Promise`\<`Class`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:58](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L58)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:58](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L58)
 
 #### Parameters
 
@@ -610,7 +610,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:58](https://github.com/onyx-o
 
 > `static` **fetch**: (`space`, `className`) => `Promise`\<`null` \| `Class`\>
 
-Defined in: [shared/src/utils/stack/class/index.ts:69](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L69)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:69](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L69)
 
 #### Parameters
 
@@ -632,7 +632,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:69](https://github.com/onyx-o
 
 > `static` **get**: (`space`, `name`, `type`, `description?`, `schema?`) => `Class`
 
-Defined in: [shared/src/utils/stack/class/index.ts:49](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L49)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:49](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L49)
 
 #### Parameters
 
@@ -664,7 +664,7 @@ Defined in: [shared/src/utils/stack/class/index.ts:49](https://github.com/onyx-o
 
 > `static` **logger**: `Logger`
 
-Defined in: [shared/src/utils/stack/class/index.ts:29](https://github.com/onyx-og/docstack/blob/e1811111621ad0131f194807e782fe7339ab2ab7/packages/shared/src/utils/stack/class/index.ts#L29)
+Defined in: [packages/shared/src/utils/stack/class/index.ts:29](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/shared/src/utils/stack/class/index.ts#L29)
 
 ## Methods
 
@@ -672,21 +672,9 @@ Defined in: [shared/src/utils/stack/class/index.ts:29](https://github.com/onyx-o
 
 > **addEventListener**(`type`, `callback`, `options?`): `void`
 
-Defined in: docs/node\_modules/typescript/lib/lib.dom.d.ts:8303
+Defined in: node\_modules/typescript/lib/lib.dom.d.ts:11569
 
-Appends an event listener for events whose type attribute value is type. The callback argument sets the callback that will be invoked when the event is dispatched.
-
-The options argument sets listener-specific options. For compatibility this can be a boolean, in which case the method behaves exactly as if the value was specified as options's capture.
-
-When set to true, options's capture prevents callback from being invoked when the event's eventPhase attribute value is BUBBLING_PHASE. When false (or not present), callback will not be invoked when event's eventPhase attribute value is CAPTURING_PHASE. Either way, callback will be invoked if event's eventPhase attribute value is AT_TARGET.
-
-When set to true, options's passive indicates that the callback will not cancel the event by invoking preventDefault(). This is used to enable performance optimizations described in § 2.8 Observing event listeners.
-
-When set to true, options's once indicates that the callback will only be invoked once after which the event listener will be removed.
-
-If an AbortSignal is passed for options's signal, then the event listener will be removed when signal is aborted.
-
-The event listener is appended to target's event listener list and is not appended if it has the same type, callback, and capture.
+The **`addEventListener()`** method of the EventTarget interface sets up a function that will be called whenever the specified event is delivered to the target.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/addEventListener)
 
@@ -718,9 +706,9 @@ The event listener is appended to target's event listener list and is not append
 
 > **dispatchEvent**(`event`): `boolean`
 
-Defined in: docs/node\_modules/typescript/lib/lib.dom.d.ts:8309
+Defined in: node\_modules/typescript/lib/lib.dom.d.ts:11575
 
-Dispatches a synthetic event event to target and returns true if either event's cancelable attribute value is false or its preventDefault() method was not invoked, and false otherwise.
+The **`dispatchEvent()`** method of the EventTarget sends an Event to the object, (synchronously) invoking the affected event listeners in the appropriate order.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/dispatchEvent)
 
@@ -744,9 +732,9 @@ Dispatches a synthetic event event to target and returns true if either event's 
 
 > **removeEventListener**(`type`, `callback`, `options?`): `void`
 
-Defined in: docs/node\_modules/typescript/lib/lib.dom.d.ts:8315
+Defined in: node\_modules/typescript/lib/lib.dom.d.ts:11581
 
-Removes the event listener in target's event listener list with the same type, callback, and options.
+The **`removeEventListener()`** method of the EventTarget interface removes an event listener previously registered with EventTarget.addEventListener() from the target.
 
 [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/removeEventListener)
 

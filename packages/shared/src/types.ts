@@ -47,6 +47,7 @@ export type AttributeType = AttributeTypeString | AttributeTypeInteger |
     AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey | AttributeTypeObject;
 export type AttributeModel = {
     name: string,
+    description?: string,
     config: AttributeType["config"],
     type: AttributeType["type"] 
 }

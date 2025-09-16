@@ -3,6 +3,7 @@ import { AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig } f
 
 abstract class Attribute {
     abstract name: string;
+    abstract description?: string;
     model!: AttributeModel;
     class: Class | null = null;
     defaultValue?: any;
@@ -15,6 +16,7 @@ abstract class Attribute {
         classObj: Class,
         name: string,
         type: AttributeType["type"],
+        description?: string,
         config?: AttributeType["config"] 
     ) => Promise<Attribute | null>;
 

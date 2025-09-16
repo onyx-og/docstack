@@ -16,14 +16,21 @@ const stylesHandler = isProduction
 const config = {
   entry: "./src/index.tsx",
   output: {
+    publicPath: '/docstack/app',
     path: path.resolve(__dirname, "lib"),
     filename: '[name].[contenthash].js',
     clean: true,
   },
   devServer: {
     host: "localhost",
-    open: true,
+    open: ['/docstack/app'],
     hot: true,
+    client: {
+      overlay: false,
+    },
+    devMiddleware: {
+      publicPath: '/docstack/app',
+    },
   },
   stats: { warnings: false },
   plugins: [
@@ -35,7 +42,7 @@ const config = {
       process: 'process/browser',
     }),
     new webpack.EnvironmentPlugin({
-      PSW_PUBLIC_KEY: JSON.stringify(process.env.PSW_PUBLIC_KEY),
+      PSW_PUBLIC_KEY: JSON.stringify(process.env.PSW_PUBLIC_KEY || ""),
       NODE_ENV: JSON.stringify(process.env.NODE_ENV),
       // BASE_URL: isProduction ? "/" : "/"
     })
