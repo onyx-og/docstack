@@ -1,9 +1,9 @@
-import React from "react";
+import React, { ReactElement, ReactNode } from "react";
 import { AttributeType } from "@docstack/shared";
 import { Form, NumberInput, Select, TextInput, Toggle } from "@prismal/react";
 
 const getConfigFields = (type?: AttributeType["type"]) => {
-    const fields = [];
+    const fields: JSX.Element[] = [];
 
     fields.push(<Toggle gridPlacement={"2"} key="mandatory" id="mandatory" name="mandatory" checked={false} label="Mandatory" />);
     fields.push(<Toggle gridPlacement={"2"} key="primaryKey" id="primaryKey" name="primaryKey" checked={false} label="Primary key" />);
@@ -28,7 +28,7 @@ const getConfigFields = (type?: AttributeType["type"]) => {
             fields.push(<NumberInput gridPlacement={"3"} key="min" name="min" id="maxLength" label="Min value" />);
             fields.push(<NumberInput gridPlacement={"3"} key="defaultValue" name="defaultValue" id="defaultValue" label="Default value" />);
         break;
-        default:
+        default: <></>
         break;
     }
     return fields;
@@ -69,7 +69,7 @@ const AttributeForm: React.FC<AttributeFormProps> = (props) => {
             { value: "decimal", element: "Decimal" },
             { value: "foreign_key", element: "Foreign key"}
         ]} placeholder={"Choose"} label="Attribute type" onChange={onTypeChange}/>
-        {fields}
+        <>{...fields}</>
     </Form>
 }
 

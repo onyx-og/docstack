@@ -12,7 +12,7 @@ const root = createRoot(document.getElementById('root')!);
 root.render(<React.StrictMode>
     <StackProvider dbName="client-test">
         <Provider store={store}>
-            <BrowserRouter>
+            <BrowserRouter basename='/docstack/app'>
                 <App />
             </BrowserRouter>
         </Provider>

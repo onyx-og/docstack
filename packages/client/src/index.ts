@@ -126,10 +126,10 @@ class DocStack extends EventTarget {
     }
 
     public createAttribute = async (className: string, params: {
-        name: string, type: AttributeType["type"], config: {}
+        name: string, type: AttributeType["type"], description?: string, config?: {}
     }) => {
         const fnLogger = logger.child({method: 'createAttribute'}); 
-        const { name, type, config } = params;
+        const { name, type, description, config } = params;
         fnLogger.info(`Creating attribute for class '${className}'`, {
             name, type, config
         });
@@ -138,7 +138,7 @@ class DocStack extends EventTarget {
             // Loads the class object
             let classObj = await this.store.getClass(className);
             if (classObj) {
-                let newAttribute = await Attribute.create(classObj, name, type, config);
+                let newAttribute = await Attribute.create(classObj, name, type, description, config);
                 fnLogger.info(`Attribute '${name}' added to class '${className}'`, 
                     {attributeModel: newAttribute.getModel()}
                 );

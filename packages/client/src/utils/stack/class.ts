@@ -335,11 +335,11 @@ class Class extends Class_ {
         if (model.schema) {
             // model.schema = {...this.model.schema, ...model.schema};
             this.attributes = {};
-            for (const [attributeName, attributeModel] of Object.entries(model.schema)) {
+            for (const [key, attrModel] of Object.entries(model.schema)) {
                 let attribute = new Attribute(
-                    this, attributeName, attributeModel.type, attributeModel.config
+                    this, attrModel.name, attrModel.type, attrModel.description, attrModel.config
                 );
-                this.attributes[attributeName] = attribute;
+                this.attributes[attrModel.name] = attribute;
             }
         }
 

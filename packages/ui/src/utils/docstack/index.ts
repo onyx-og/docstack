@@ -16,7 +16,7 @@ export const saveState = async (state: any) => {
       // console.log("saveState - provided state", {state});
       // await db.put({ ...doc, state });
       // [TODO] Add attribute
-      var textAttribute = new Attribute(testClass, "text", "string", { maxLength: 50, primaryKey: true, mandatory: true });
+      var textAttribute = new Attribute(testClass, "text", "string", "A test attribute", { maxLength: 50, primaryKey: true, mandatory: true });
       await Attribute.build(textAttribute);
       await testClass.addCard({text: 'Hello'});
     })

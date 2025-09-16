@@ -30,15 +30,17 @@ const ExistingAttrConfigForm: React.FC<ExistingAttrConfigFormProps> = (props) =>
                     return <NumberInput disabled={mode == "view"} name="min" value={e[1]} label="Min" />;
                 case "precision":
                     return <NumberInput disabled={mode == "view"} name="min" value={e[1]} label="Precision" />;
+                default:
+                    return <></>
             }
-        })
+        });
     }, [config, mode]);
 
     const updateAttr = React.useCallback((formData: {}) => {
         console.log("updateAttr", formData);
     }, [mode]);
 
-    return <Form onSubmit={mode == "view" ? null : updateAttr}>
+    return <Form onSubmit={mode == "view" ? undefined : updateAttr}>
         {fields}
     </Form>
 }

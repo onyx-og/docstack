@@ -67,7 +67,7 @@ const AuthView = () => {
                 height: "fit-content"
             }} orientation="vertical" 
                 padding="m"
-                borderRadius="medium"
+                borderRadius="md"
                 headerClass="view-auth-content-head"
                 header={<h1>Login</h1>}
                 footer={<ActionBar

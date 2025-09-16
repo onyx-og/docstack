@@ -3,15 +3,18 @@ import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES
 
 class Attribute extends Attribute_ {
     name: string;
+    description?: string;
     model!: AttributeModel;
     class: Class | null;
     defaultValue?: any;
     
-    constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], config?: AttributeType["config"] ) {
+    constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], description?: string, config?: AttributeType["config"] ) {
         super(classObj, name, type, config);
         this.name = name;
+        this.description = description;
         this.setModel({
             name: this.name,
+            description: this.description,
             type: this.getType(type),
             config: this.getTypeConf(type, config) || {},
         });
@@ -26,9 +29,10 @@ class Attribute extends Attribute_ {
         classObj: Class,
         name: string,
         type: AttributeType["type"],
+        description?: string,
         config?: AttributeType["config"] 
     ) {
-        const attribute = new Attribute(classObj, name, type, config);
+        const attribute = new Attribute(classObj, name, type, description, config);
         await Attribute.build(attribute)
         return attribute;
     }

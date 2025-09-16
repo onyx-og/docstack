@@ -4,6 +4,7 @@ import { Attribute } from "@docstack/client";
 import { Link } from "react-router-dom";
 
 import "./index.scss";
+import { AttributeModel } from "@docstack/shared";
 
 interface ClassCardProps {
     name: string;
@@ -14,9 +15,10 @@ const ClassCard = (props: ClassCardProps) => {
     const {name, description, attributes} = props;
 
     const attributes_ = React.useMemo(() => {
-        let attrSet: {[key: string]: string} = {};
+        let attrSet: {[key: string]: {}} = {};
         attributes?.forEach((attr) => {
-            let modelProc: any = attr.model;
+            console.log("attribute model", {model: attr.model});
+            let modelProc: {[key: string]: string | AttributeModel["config"]} = attr.model;
             modelProc["config"] = JSON.stringify(modelProc.config);
             attrSet[attr.name] = modelProc;
         })

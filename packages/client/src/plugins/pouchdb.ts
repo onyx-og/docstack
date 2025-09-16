@@ -18,7 +18,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
         // You're overriding the default bulkDocs method.
         bulkDocs: async function (docs, options, callback) {
 
-            // Check if there are any documents to process.
             if (typeof options == 'function') {
                 callback = options
                 options = {}

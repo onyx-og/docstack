@@ -93,7 +93,7 @@ class ClientStack extends Stack {
 
         // Load default plugins
         PouchDB.plugin(Find);
-        // PouchDB.plugin(StackPlugin(this));
+        PouchDB.plugin(StackPlugin(this));
         // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {

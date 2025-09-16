@@ -11,6 +11,9 @@
   "contributors": [
     "Onyx <hello@onyx.ac> (https://onyx.ac)"
   ],
+  "workspaces": [
+    "packages/*"
+  ],
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -31,17 +34,16 @@
   },
   "scripts": {
     "start": "npm run build && npm run start:server",
+    "develop:ui": "npm run -w packages/ui develop",
+    "build:ui": "npm run -w packages/ui build",
     "start:server": "node ./server/lib/index.js",
-    "develop:ui": "webpack serve --node-env=development --progress",
     "develop:server": "ts-node ./server/index.ts",
     "test": "jest --config jest.config.ts",
     "build:types": "npx tsc -p server/tsconfig.json",
     "build:server": "rollup --config server/rollup.config.js && npm run build:types && cp -r server/src/utils/dbManager/datamodel/patch lib/",
-    "build:ui": "webpack --node-env=production",
     "build": "npm run build:server && npm run build:ui",
-    "build-docs:server": "npx typedoc --tsconfig ./server/tsconfig.json --options ./server/typedoc.json",
-    "build-docs:ui": "npx typedoc --options ./ui/typedoc.json",
-    "build-docs": "npm run build-docs:server && npm run build-docs:ui"
+    "start:docs": "npm run -w packages/docs start",
+    "build:docs": "npm run -w packages/docs build"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

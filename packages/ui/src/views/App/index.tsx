@@ -8,7 +8,7 @@ require('@prismal/react/lib/index.css');
 
 import "./index.scss";
 import ClassView from 'views/Class';
-import { ActionBar, ActionBarItemConfig, Button, Header, useModal } from '@prismal/react';
+import { ActionBar, ActionBarItemConfig, Button, Header, Text, useModal } from '@prismal/react';
 import { logout } from 'features/auth';
 import DebugPanel from 'components/DebugPanel';
 
@@ -46,7 +46,7 @@ const AppHeader = () => {
             })
         }
         items.push(
-            { item: <h1>Dashboard</h1>, key: "dashboard-title", position: "left" },
+            { item: <Text type="heading" level={1}>Dashboard</Text>, key: "dashboard-title", position: "left" },
             { item: <Button type="text" iconName="bug" onClick={openDebugPanel} />, key: "btn-bug", position: "right" },
             { item: <Button type="primary" onClick={doLogout}>Logout</Button>, key: "btn-logout", position: "right" }
         )
