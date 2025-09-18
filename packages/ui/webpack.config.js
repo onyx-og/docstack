@@ -17,7 +17,7 @@ const config = {
   entry: "./src/index.tsx",
   output: {
     publicPath: '/docstack/app',
-    path: path.resolve(__dirname, "lib"),
+    path: path.resolve(__dirname, "build"),
     filename: '[name].[contenthash].js',
     clean: true,
   },
@@ -27,6 +27,9 @@ const config = {
     hot: true,
     client: {
       overlay: false,
+    },
+    historyApiFallback: {
+      index: '/docstack/app'
     },
     devMiddleware: {
       publicPath: '/docstack/app',
