@@ -10,7 +10,7 @@ import { StackProvider } from "@docstack/react";
 
 const root = createRoot(document.getElementById('root')!);
 root.render(<React.StrictMode>
-    <StackProvider dbName="client-test">
+    <StackProvider config={["client-test"]}>
         <Provider store={store}>
             <BrowserRouter basename='/docstack/app'>
                 <App />

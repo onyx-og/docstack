@@ -5,6 +5,7 @@ import DocumentForm from "components/DocumentForm";
 import React from "react";
 
 import "./index.scss";
+import { useAppSelector } from "hooks";
 
 interface ClassDocsPanelProps {
     className: string;
@@ -16,7 +17,9 @@ const ClassDocsPanel: React.FC<ClassDocsPanelProps> = (props) => {
         model,
     } = props;
 
-    const { loading, error, docs } = useClassDocs(className);
+    const stackName = useAppSelector(s => s.stack.name);
+
+    const { loading, error, docs } = useClassDocs(stackName, className);
 
     const [tableMode, setTableMode] = React.useState<"view" | "edit">("view");
 

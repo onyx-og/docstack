@@ -1,11 +1,11 @@
 import PouchDB from "pouchdb";
-import logger_ from "../../utils/logger/";
+import createLogger from "../../utils/logger/";
 import Class from "./class";
 import { decryptString } from "../crypto";
 import { importJsonFile, countPatches } from "./datamodel";
 import {
     Stack,
-    StoreOptions,
+    StackOptions,
     CachedClass,
     ClassModelPropagationStart,
     ClassModelPropagationComplete
@@ -18,7 +18,7 @@ import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDec
     AttributeTypeString} from "@docstack/shared";
 import { StackPlugin } from "../../plugins/pouchdb";
 
-const logger = logger_.child({module: "stack"});
+const logger = createLogger().child({module: "stack"});
 
 export const BASE_SCHEMA: ClassModel["schema"] = {
     "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
@@ -62,11 +62,12 @@ const DOMAIN_SCHEMA: ClassModel["schema"] = {
 class ClientStack extends Stack {
     /* Initialized asynchronously */
     db!: PouchDB.Database<{}>;
+    name!: string;
     /* Retrieved asynchronously */
     lastDocId!: number;
     /* Populated on async constructor */
     connection!: string;
-    options?: StoreOptions;
+    options?: StackOptions;
     static appVersion: string = "0.0.1";
     /* Used to retrieve faster data */
     cache: {
@@ -84,10 +85,21 @@ class ClientStack extends Stack {
         this.cache = {}
     }
 
-    private async initialize(conn: string, options?: StoreOptions) {
+    private async initialize(conn: string, options?: StackOptions) {
         // Store the connection string and options
         this.connection = conn;
         this.options = options;
+        if (options?.name) {
+            this.name = options?.name
+        }
+        const connRegExp = /(?<=db-).*/
+        const match = conn.match(connRegExp);
+        if (match) {
+            this.name = match[0];
+        } else {
+            this.name = conn;
+        }
+        
         let Find: typeof import('pouchdb-find') =( await import('pouchdb-find')).default;
 
 
@@ -119,7 +131,7 @@ class ClientStack extends Stack {
     }
 
     // asynchronous factory method
-    public static async create(conn: string, options?: StoreOptions): Promise<ClientStack> {
+    public static async create(conn: string, options?: StackOptions): Promise<ClientStack> {
         const store = new ClientStack();
         await store.initialize(conn, options);
         await store.initdb()
@@ -278,8 +290,8 @@ class ClientStack extends Stack {
         this.addEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
 
         fnLogger.info("Setting up class model worker");
-        this.modelWorker = new Worker(require("@docstack/shared/workers/dataModel"), { type: 'module' });
-        
+        this.modelWorker = new Worker(require("@docstack/shared/workers/dataModel"), {type: "module"});
+
         fnLogger.info("Setting up class model changes listener");
         const classModelChanges = this.onClassModelChanges();
 
@@ -314,8 +326,8 @@ class ClientStack extends Stack {
      * @param event
      */
     onClassModelPropagationStart = (event: CustomEvent<ClassModelPropagationStart>) => {
-        const fnLogger = logger.child({method: "onClassModelPropagationStart", args: {event}});
         const className = event.detail.className;
+        const fnLogger = logger.child({method: "onClassModelPropagationStart", className});
         this.addClassLock(className).then(() => {
             fnLogger.info(`Lock created successfully for class: '${className}'`);
         }).catch(error => {
@@ -359,7 +371,7 @@ class ClientStack extends Stack {
             }
         }).on("change", async (change) => {
             const doc = change.doc! as unknown as Document;
-            const className = doc.type;
+            const className = doc.name;
             if (doc.active) {
                 // Dispatch class-propagate-start [TODO] Move it outside the doc.active
                 this.dispatchEvent(new CustomEvent<ClassModelPropagationStart>('class-model-propagation-pending', {
@@ -379,18 +391,20 @@ class ClientStack extends Stack {
                             detail: { className, success: true }
                         }));
                     } else {
-                        fnLogger.info(`Class '${className}' was updated. Dispatching task to webworker.`);
+                        fnLogger.info(`Class '${className}' was updated. Preparing to dispach message to webworker.`);
                         const secondLastRevID = revisionIDList[1];
                         const secondLastPrefix = docWithRevs._revisions!.start-1;
                         const previousRevId = `${secondLastPrefix}-${secondLastRevID}`;
-                        this.modelWorker!.postMessage({
+                        const message = {
                             command: 'propagateSchema',
                             payload: {
-                                dbName: this.getDbName(),
+                                conn: this.connection,
                                 className,
                                 previousRevId,
                             }
-                        });
+                        }
+                        fnLogger.info(`Class '${className}' was updated. Dispatching message to webworker.`, {msg: message});
+                        self.postMessage(message);
                     }
                 } catch (e: any) {
                     fnLogger.error(`Error while propagating data model changes for class '${className}': ${e}`);
@@ -429,9 +443,15 @@ class ClientStack extends Stack {
     addClassLock = async (className: string) => {
         const fnLogger = logger.child({method: "addClassLock", args: {className}});
         try {
+            const existing = await this.db.get(`~lock-propagation-${className}`);
+            let _rev: string | undefined = undefined;
+            if (existing) {
+                _rev = existing._rev;
+            }
             const response = await this.db.put({
                 _id: `~lock-propagation-${className}`,
-                type: `~lock`
+                type: `~Lock`,
+                _rev
             });
             fnLogger.info(`Adding class lock response`, {response});
             return response.ok;
@@ -480,6 +500,7 @@ class ClientStack extends Stack {
 
     close = () => {
         this.removeAllListeners();
+        if (this.modelWorker) this.modelWorker.terminate();
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
@@ -1012,7 +1033,7 @@ class ClientStack extends Stack {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 logger.info("retrieved doc", {existingDoc})
                 if (existingDoc && existingDoc.type === type) {
-                    logger.info("createDoc - assigning existing doc");
+                    logger.info("createDoc - assigning existing doc", {doc: existingDoc});
                     doc = {...existingDoc};
                 } else if (existingDoc && existingDoc.type !== type) {
                     throw new Error("createDoc - Existing document type differs");
@@ -1027,7 +1048,7 @@ class ClientStack extends Stack {
                 logger.info("createDoc - generated docId", docId);
             }
             logger.info("createDoc - doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _id: docId, updateTimestamp: new Date().getTime()};
+            const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, updateTimestamp: new Date().getTime()};
             logger.info("createDoc - doc AFTER elaboration (i.e. merge)", {doc_})
             let response = await db.put(doc_);
             logger.info("createDoc - Response after put",{"response": response});

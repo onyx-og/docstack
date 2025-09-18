@@ -1,4 +1,4 @@
-import { ClassModel } from "@docstack/shared";
+import { Class, ClassModel } from "@docstack/shared";
 import { ActionBar, Button, List, Text, useModal } from "@prismal/react";
 import AttributeListItem from "components/AttributeListItem";
 import AttributeForm from "components/AttributeForm";
@@ -6,20 +6,24 @@ import TriggerForm from "components/TriggerForm";
 import React from "react";
 
 import "./index.scss";
-interface ClassModelPanelProps extends ClassModel {
-
+interface ClassModelPanelProps {
+    classObj: Class;
 }
 const ClassModelPanel = (props: ClassModelPanelProps) => {
+    const {classObj} = props;
     const {
         name,
         description,
-        schema,
         type,
-        _id
-    } = props;
+    } = classObj;
+
+    const schema = React.useMemo(() => {
+        return classObj.buildSchema();
+    },[classObj]);
 
     const attributePanels = React.useMemo(() => {
         if (schema) {
+            console.log("attributePanels", {schema})
             let panels = Object.values(schema).map((attrModel, i) => {
                 return <AttributeListItem key={i} {...attrModel} />
             });
@@ -53,7 +57,7 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
         <AttributeCreationModal title="New attribute" footer={<ActionBar items={[
             { position: "left", key: "btn-attr-creation-close", item: <Button type="default" onClick={closeAttrCreationModal} iconName="close">Cancel</Button> },
         ]} />}>
-            <AttributeForm closeModal={closeAttrCreationModal}/>
+            <AttributeForm classObj={classObj} closeModal={closeAttrCreationModal}/>
         </AttributeCreationModal>
         <TriggerCreationModal title="New trigger"
          footer={<ActionBar items={[

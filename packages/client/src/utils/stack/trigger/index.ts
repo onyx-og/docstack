@@ -52,7 +52,7 @@ export class Trigger extends Trigger_ {
      * @returns The updated document returned by the trigger logic as a Promise.
      */
     public execute = async (document: Document): Promise<Document> => {
-        const stack = this.classObj ? this.classObj.getSpace() : undefined;
+        const stack = this.classObj ? this.classObj.getStack() : undefined;
         
         // Call the dynamically created function with the required arguments.
         // It's crucial to pass the `document` argument and await the result.

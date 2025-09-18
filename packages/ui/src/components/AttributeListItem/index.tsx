@@ -17,19 +17,19 @@ const ExistingAttrConfigForm: React.FC<ExistingAttrConfigFormProps> = (props) =>
         return Object.entries(config).map((e, i) => {
             switch (e[0]) {
                 case "encrypted":
-                    return <Toggle disabled={mode == "view"} name="encrypted" checked={e[1]} label="Encrypted" />;
+                    return <Toggle key={"encrypted"} disabled={mode == "view"} name="encrypted" checked={e[1]} label="Encrypted" />;
                 case "mandatory":
-                    return <Toggle disabled={mode == "view"} name="mandatory" checked={e[1]} label="Mandatory" />;
+                    return <Toggle key={"mandatory"} disabled={mode == "view"} name="mandatory" checked={e[1]} label="Mandatory" />;
                 case "primaryKey":
-                    return <Toggle disabled={mode == "view"} name="primaryKey" checked={e[1]} label="Primary key" />;
+                    return <Toggle key={"primaryKey"} disabled={mode == "view"} name="primaryKey" checked={e[1]} label="Primary key" />;
                 case "maxLength":
-                    return <NumberInput disabled={mode == "view"} name="maxLength" value={e[1]} label="Max length" />;
+                    return <NumberInput key={"maxLength"} disabled={mode == "view"} name="maxLength" value={e[1]} label="Max length" />;
                 case "max":
-                    return <NumberInput disabled={mode == "view"} name="max" value={e[1]} label="Max" />;
+                    return <NumberInput key={"max"} disabled={mode == "view"} name="max" value={e[1]} label="Max" />;
                 case "min":
-                    return <NumberInput disabled={mode == "view"} name="min" value={e[1]} label="Min" />;
+                    return <NumberInput key={"min"} disabled={mode == "view"} name="min" value={e[1]} label="Min" />;
                 case "precision":
-                    return <NumberInput disabled={mode == "view"} name="min" value={e[1]} label="Precision" />;
+                    return <NumberInput key={"precision"} disabled={mode == "view"} name="min" value={e[1]} label="Precision" />;
                 default:
                     return <></>
             }

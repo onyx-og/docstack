@@ -5,6 +5,7 @@ import { login, skipLogin } from "features/auth";
 import { saveState } from "features/store"
 
 import "./index.scss";
+import { setStackName } from "features/stack";
 
 const AuthView = () => {
     const dispatch = useAppDispatch();
@@ -13,6 +14,7 @@ const AuthView = () => {
     const doLogin = useCallback( (formData: {}) => {
         if (target == "server") {
             dispatch(login(formData));
+            dispatch(setStackName("client-test"));
         } else {
             throw new Error("Unexpected form data for anonymous login");
         }
@@ -20,7 +22,8 @@ const AuthView = () => {
 
     const doSkipLogin = React.useCallback( () => {
         if (target == "browser") {
-            dispatch(skipLogin())
+            dispatch(skipLogin());
+            dispatch(setStackName("client-test"));
         } else {
             throw new Error("should have run credentials form submit");
         }

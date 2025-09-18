@@ -1,6 +1,6 @@
 
 import { ActionBar, List, Button, Header, Card, Table, useModal } from "@prismal/react";
-import { useAppDispatch } from "hooks";
+import { useAppDispatch, useAppSelector } from "hooks";
 import React, { useCallback } from "react";
 import { logout } from "features/auth";
 import { saveState } from "features/store";
@@ -13,6 +13,8 @@ import ClassCard from "components/ClassCard";
 const Dashboard = () => {
     const dispatch = useAppDispatch()
 
+    const stackName = useAppSelector(s => s.stack.name);
+
     const doLogout = useCallback( () => {
         dispatch(logout(true));
     }, [dispatch]);
@@ -21,7 +23,7 @@ const Dashboard = () => {
         dispatch(saveState(true));
     },[dispatch]);
 
-    const { loading, error, classList } = useClassList();
+    const { loading, error, classList } = useClassList(stackName);
 
     const { Modal: ClassCreationModal, open: openClassCreationModal, close: closeClassCreationModal } = useModal({areaId: "root"});
 

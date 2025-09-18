@@ -39,8 +39,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         // Accessing methods from the Stack instance you passed in.
                         const classObj = await stack.getClass(className);
                         if (classObj) {
-                            // You can now access the schema and triggers from the model.
-                            const { schema } = classObj.model;
                             const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
 
                             for (const trigger of beforeTriggers) {
@@ -49,7 +47,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             }
 
                             // Perform validation using the schema.
-                            const validationResult = await stack.validateObjectByType(doc, className, schema);
+                            const validationResult = await classObj.validate(doc);
                             if (!validationResult) {
                                 throw new Error("Discarded object because object not valid for its Class schema");
                             }

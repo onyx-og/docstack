@@ -2,6 +2,7 @@ import { AttributeModel, ClassModel, Document } from "@docstack/shared";
 import { Button, Form, TextInput, Toggle, InputRefType, ActionBar, ActionBarItemConfig, Select, useModal } from "@prismal/react";
 import { useClass } from "@docstack/react";
 import React from "react";
+import { useAppSelector } from "hooks";
 
 interface AttributeFieldProps extends AttributeModel {
     value?: any;
@@ -61,6 +62,7 @@ const DocumentForm: React.FC<DocumentFormProps> = (props) => {
 
     const { schema = [], name } = model;
     const [mode, setMode] = React.useState(initMode);
+    const stackName = useAppSelector(s => s.stack.name);
 
     const toggleMode = React.useCallback((value: string) => {
         if (["read", "read/write"].includes(value)) {
@@ -71,7 +73,7 @@ const DocumentForm: React.FC<DocumentFormProps> = (props) => {
     const { Modal, open: openConfirmDel, close: closeConfirmDel } = useModal({areaId: "root"});
 
     // [TODO] Add loading indicator on submit button
-    const { loading, error, classObj } = useClass(name);
+    const { loading, error, classObj } = useClass(stackName, model.name);
     
     const submitDoc = React.useCallback((formData: {}) => {
         if (classObj) {

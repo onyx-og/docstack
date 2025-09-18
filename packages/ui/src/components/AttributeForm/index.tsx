@@ -1,9 +1,22 @@
 import React, { ReactElement, ReactNode } from "react";
-import { AttributeType } from "@docstack/shared";
+import { AttributeType, Class } from "@docstack/shared";
 import { Form, NumberInput, Select, TextInput, Toggle } from "@prismal/react";
+import { Attribute } from "@docstack/client";
 
 const getConfigFields = (type?: AttributeType["type"]) => {
     const fields: JSX.Element[] = [];
+
+    fields.push(
+        <TextInput gridPlacement={"1"} key="name" id="name" name="name" 
+            label="Name" required placeholder="Attribute name"
+        />
+    );
+
+    fields.push(
+        <TextInput gridPlacement={"1"} key="description" id="description" name="description" 
+            label="Description" required placeholder="Explain what it represent"
+        />
+    );
 
     fields.push(<Toggle gridPlacement={"2"} key="mandatory" id="mandatory" name="mandatory" checked={false} label="Mandatory" />);
     fields.push(<Toggle gridPlacement={"2"} key="primaryKey" id="primaryKey" name="primaryKey" checked={false} label="Primary key" />);
@@ -34,14 +47,7 @@ const getConfigFields = (type?: AttributeType["type"]) => {
     return fields;
 }
 
-interface AttributeFormProps {
-    closeModal?: () => void;
-}
-const AttributeForm: React.FC<AttributeFormProps> = (props) => {
-    const {
-        closeModal
-    } = props;
-
+const useFields = () => {
     const [attrType, setAttrType] = React.useState<AttributeType["type"] | undefined>();
 
     const onTypeChange = React.useCallback((value: string | string[]) => {
@@ -49,27 +55,66 @@ const AttributeForm: React.FC<AttributeFormProps> = (props) => {
         if (value_) setAttrType(value_);
         else setAttrType(undefined);
     }, []);
-
+    
     const fields = React.useMemo( () => getConfigFields(attrType), [attrType]);
 
-    const createAttribute = React.useCallback((data: {}) => {
-        console.log("Create attribute from data", {data});
-        if (closeModal) closeModal();
-    }, [closeModal]);
+    return [
+        <Select gridPlacement={"1"} required name="type" id="type" options={[
+            { value: "string", element: "String" },
+            { value: "boolean", element: "Boolean" },
+            { value: "integer", element: "Integer" },
+            { value: "decimal", element: "Decimal" },
+            { value: "foreign_key", element: "Foreign key"}
+        ]} placeholder={"Choose"} label="Attribute type" onChange={onTypeChange}/>,
+        ...fields
+    ]
+    
+}
+
+interface AttributeFormProps {
+    classObj: Class;
+    closeModal?: () => void;
+}
+const AttributeForm: React.FC<AttributeFormProps> = (props) => {
+    const {
+        classObj,
+        closeModal
+    } = props;
+
+    const [isLoading, markLoading] = React.useState(false);
+    
+    const fields = useFields();
+
+    const createAttribute = React.useCallback((data: {[key: string]: any}) => {
+        const config: AttributeType["config"] = {};
+        if (data.mandatory) config.mandatory = data.mandatory;
+        if (data.primaryKey) config.primaryKey = data.primaryKey;
+        if (data.isArray) config.isArray = data.isArray;
+        if (data.defaultValue) config.defaultValue = data.defaultValue;
+        if (data.encrypted) config.encrypted = data.encrypted;
+        if (data.format) config.format = data.format;
+        if (data.maxLength) config.maxLength = data.maxLength;
+        if (data.max) config.max = data.max;
+        if (data.min) config.min = data.min;
+        if (data.precision) config.precision = data.precision;
+        if (data.targetClass) config.targetClass = data.targetClass;
+        const attribute = new Attribute(classObj, data.name, data.type, data.description, config);
+        classObj.addAttribute(attribute).then((result) => {
+            console.log("createAttribute - Result", {result})
+        }).finally(() => {
+            markLoading(false);
+            if (closeModal) closeModal();
+        });
+        // set loading state
+        markLoading(true);
+    }, [closeModal, classObj]);
 
     return <Form
         gridGap={"1rem 0.5rem"}
         gridTemplate={{cols: "1fr 1fr 1fr"}}
         onSubmit={createAttribute}
     >
-        <Select gridPlacement={{column: "1 / span 2"}} required name="type" id="attrType" options={[
-            { value: "string", element: "String" },
-            { value: "boolean", element: "Boolean" },
-            { value: "integer", element: "Integer" },
-            { value: "decimal", element: "Decimal" },
-            { value: "foreign_key", element: "Foreign key"}
-        ]} placeholder={"Choose"} label="Attribute type" onChange={onTypeChange}/>
-        <>{...fields}</>
+        {fields}
     </Form>
 }
 

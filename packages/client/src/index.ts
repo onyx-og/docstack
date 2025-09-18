@@ -3,7 +3,7 @@
 // import * as dotenv from "dotenv";
 // import cors from "cors";
 // dotenv.config({ path: './.env' })
-import logger_ from "./utils/logger"
+import createlogger from "./utils/logger"
 // import test from '../../../server/src//utils/dbManager/test';
 // import { generateJwtKeys, generatePswKeys } from '../../../server/src/utils/crypto';
 import ClientStack from './utils/stack';
@@ -13,14 +13,14 @@ import ClientStack from './utils/stack';
 // import jwt from 'jsonwebtoken';
 import Class from '../../shared/src//utils/stack/class';
 import Attribute from './utils/stack/attribute';
-import {AttributeType, DocstackReady} from "../../shared/src/types";
+import {AttributeType, DocstackReady, StackConfig, StackOptions} from "../../shared/src/types";
+import { createLogger, Logger } from "winston";
 // import { EventTarget } from 'node:events';
 
 // let envPath = process.env.ENVFILE || "./.env";
 // envPath = resolve(process.cwd(), envPath);
 // dotenv.config({ path: envPath });
 
-const logger = logger_.child({module: "client"});
 
 // [TODO] Implement DocStack.type in "remote" | "local"
 // When is remote, open a websocket (socket.io) connection to given remote
@@ -33,32 +33,59 @@ const logger = logger_.child({module: "client"});
 // cannot send or receive messages until authentication
 class DocStack extends EventTarget {
     //private app: Express;
-    private dbName: string;
+    // private dbName: string;
+    private config: StackConfig[] = [];
     private readyState: boolean; 
     private store!: ClientStack;
+    private stacks: ClientStack[] = [];
+    private logger: Logger = createlogger().child({module: "client"});
 
-    private async initInstance(dbName: string) {
-        // TODO instead of fixed "db-test" allow the configuration of "test" part
-        const store = await ClientStack.create(`db-${dbName}`, {
-            // defaults to leveldb
-            // adapter: 'memory', 
-            plugins: [
-            // https://www.npmjs.com/package/pouchdb-adapter-memory
-            // memoryAdapter
-            ]
-        });
-        this.store = store;
-        let window_ = window as Window & typeof globalThis & {
-            store: ClientStack
+    private async addStack(config: StackConfig) {
+        let stack: ClientStack | undefined; 
+        if (typeof config == "object" && config.name) {
+            stack = await ClientStack.create(`db-${config.name}`, {
+                // defaults to leveldb
+                // adapter: 'memory', 
+                plugins: [
+                // https://www.npmjs.com/package/pouchdb-adapter-memory
+                // memoryAdapter
+                ]
+            });
+        } else if (typeof config === "string") {
+            stack = await ClientStack.create(`db-${config}`, {
+                // defaults to leveldb
+                // adapter: 'memory', 
+                plugins: [
+                // https://www.npmjs.com/package/pouchdb-adapter-memory
+                // memoryAdapter
+                ]
+            });
         }
-        window_.store = this.store;
-        // await setupAdminUser();
-        this.readyState = true;
-        this.dispatchEvent(new CustomEvent('ready', {
-            detail: {
-                stack: this.store
+        if (stack) {
+            debugger;
+            this.stacks.push(stack);
+            let window_ = window as Window & typeof globalThis & {
+                stacks: ClientStack[]
             }
-        }));
+            if (window_.stacks) {
+                window_.stacks.push(stack)
+            } 
+            return stack;
+        }
+        // await setupAdminUser();
+    }
+
+    private initStacks = async (configs: StackConfig[]) => {
+        for (const config of configs) {
+            const stack = await this.addStack(config);
+        }
+        
+        this.readyState = true;
+        this.dispatchEvent(new CustomEvent("ready", {
+            detail: {
+                stacks: this.stacks
+            }
+        }))
     }
 
     async resetDb() {
@@ -69,8 +96,13 @@ class DocStack extends EventTarget {
         }
     }
 
-    public getStore() {
-        return this.store;
+    public getStacks() {
+        return this.stacks;
+    }
+
+    public getStack = (name: string) => {
+        debugger;
+        return this.stacks.find(s => s.name == name || s.connection == name );
     }
 
     public getReadyState() {
@@ -79,20 +111,21 @@ class DocStack extends EventTarget {
     async reset() {
         try {
             await this.resetDb();
-            await this.initInstance(this.dbName);
+            await this.initStacks(this.config);
         } catch (e: any) {
             throw new Error(e);
         }
     }
 
     public clearConnection = async (conn: string) => {
+        const fnLogger = this.logger.child({method: 'clearConnection'});
         try {
             // const conn = req.params.conn;
             if (!conn) {
                 throw new Error("Connection name not provided");
             }
             await ClientStack.clear(conn);
-            logger.info('Internal database cleared');
+            fnLogger.info('Internal database cleared');
             // return res.status(200).json({ success: true, message: 'Internal database cleared' });
         } catch (e: any) {
             throw new Error(e);
@@ -104,7 +137,7 @@ class DocStack extends EventTarget {
         type: string,
         description: string
     }) => {
-        const fnLogger = logger.child({method: 'createClass'});
+        const fnLogger = this.logger.child({method: 'createClass'});
         const { type, description } = config;
         fnLogger.info("Args", {
             name, config
@@ -128,7 +161,7 @@ class DocStack extends EventTarget {
     public createAttribute = async (className: string, params: {
         name: string, type: AttributeType["type"], description?: string, config?: {}
     }) => {
-        const fnLogger = logger.child({method: 'createAttribute'}); 
+        const fnLogger = this.logger.child({method: 'createAttribute'}); 
         const { name, type, description, config } = params;
         fnLogger.info(`Creating attribute for class '${className}'`, {
             name, type, config
@@ -152,13 +185,12 @@ class DocStack extends EventTarget {
         }
     } 
 
-    constructor(config?: {
-        dbName: string;
-    }) {
+    constructor(...config: StackConfig[]) {
         super();
-        this.dbName = (config && config.dbName) ? config.dbName : "docstack";
+        //this.dbName = (config && config.dbName) ? config.dbName : "docstack";
         // this.app = express();
         this.readyState = false;
+        const fnLogger = this.logger.child({method: "constructor"});
 
         /*
         this.app.use(logRequest)
@@ -347,8 +379,8 @@ class DocStack extends EventTarget {
 
         // Server "startup procedures"
         // setTimeout(test, 1000)
-        this.initInstance(this.dbName)
-        this.addEventListener("ready", () => logger.info("DocStack client successfully initialized"));
+        this.initStacks(config);
+        this.addEventListener("ready", () => fnLogger.info("DocStack client successfully initialized"));
     }
 
     // public getApp() {

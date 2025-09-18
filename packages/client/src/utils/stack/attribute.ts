@@ -53,7 +53,7 @@ class Attribute extends Attribute_ {
 
     static build = async ( attributeObj: Attribute ) => {
         let classObj = attributeObj.getClass();
-        let store = classObj.getSpace();
+        let store = classObj.getStack();
         if ( store ) {
             await classObj.addAttribute(attributeObj);
             return attributeObj;
