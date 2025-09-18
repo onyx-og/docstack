@@ -11,7 +11,7 @@ const SUPERCLASS_TYPE = "superclass";
 const CLASS_TYPES = [CLASS_TYPE, SUPERCLASS_TYPE];
 
 abstract class Class extends EventTarget {
-    space: Stack | undefined;
+    stack: Stack | undefined;
     /* Populated in init() */
     name!: string;
     /* Populated in init() */
@@ -38,7 +38,7 @@ abstract class Class extends EventTarget {
     abstract build: () => Promise<Class>;
 
     abstract init: (
-        space: Stack | null,
+        stack: Stack | null,
         name: string,
         type: string,
         description?: string,
@@ -47,7 +47,7 @@ abstract class Class extends EventTarget {
     ) => void;
 
     static get: (
-        space: Stack,
+        stack: Stack,
         name: string,
         type: string,
         description?: string,
@@ -56,7 +56,7 @@ abstract class Class extends EventTarget {
     ) => Class;
 
     static create: (
-        space: Stack,
+        stack: Stack,
         name: string,
         type: string,
         description?: string,
@@ -64,16 +64,16 @@ abstract class Class extends EventTarget {
         // parentClass: Class | null = null
     ) => Promise<Class>;
 
-    static buildFromModel: (space: Stack, classModel: ClassModel) => Promise<Class>;
+    static buildFromModel: (stack: Stack, classModel: ClassModel) => Promise<Class>;
 
-    static fetch: ( space: Stack, className: string ) => Promise<Class | null>;
+    static fetch: ( stack: Stack, className: string ) => Promise<Class | null>;
 
     // TODO Turn into method (after factory method instantiation refactory is done)
     abstract setId: ( id: string ) => void;
 
     abstract getName: () => string;
 
-    abstract getSpace: () => Stack | undefined;
+    abstract getStack: () => Stack | undefined;
 
     abstract getDescription: () => string | undefined;
 
@@ -82,6 +82,8 @@ abstract class Class extends EventTarget {
     abstract getId: () => string | undefined;
 
     abstract hydrateSchema: (rawSchema: ClassModel["schema"]) => void;
+
+    abstract validate: (data: {[key: string]: any}) => Promise<boolean>;
 
     abstract buildSchema: () => ClassModel["schema"];
 

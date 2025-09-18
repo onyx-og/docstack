@@ -1,7 +1,7 @@
 import {
     CachedClass,
     Document,
-    StoreOptions,
+    StackOptions,
     ClassModel,
 } from "../../types";
 
@@ -14,7 +14,8 @@ abstract class Stack extends EventTarget {
     public lastDocId!: number;
     /* Populated on async constructor */
     public connection!: string;
-    public options?: StoreOptions;
+    public options?: StackOptions;
+    abstract name: string;
     public static appVersion: string = "0.0.1";
     /* Used to retrieve faster data */
     public cache: {

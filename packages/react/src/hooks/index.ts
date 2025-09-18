@@ -4,7 +4,7 @@ import { DocStackContext } from '../components/StackProvider';
 import { Document } from '../../../shared/src/types';
 import { Class } from '@docstack/client';
 
-export const useFind = (query: {
+export const useFind = (stack: string, query: {
     selector: { [key: string]: string | number },
     fields?: string[]
 }, sort?: any, limit: number = 50) => {
@@ -27,12 +27,16 @@ export const useFind = (query: {
 
         const runQuery = async () => {
             try {
-                // Run the initial query
-                const initialDocs = await docStack.getStore().findDocuments(query.selector, query.fields);
-                if (initialDocs.docs.length) {
-                    let docs = initialDocs.docs as Document[]; // [TODO] Check types
-                    setDocs(docs);
+                const stackInstance = docStack.getStack(stack);
+                if (stackInstance) {
+                    // Run the initial query
+                    const initialDocs = await stackInstance.findDocuments(query.selector, query.fields);
+                    if (initialDocs.docs.length) {
+                        let docs = initialDocs.docs as Document[]; // [TODO] Check types
+                        setDocs(docs);
+                    }
                 }
+                
             } catch (err: any) {
                 setError(err);
             } finally {

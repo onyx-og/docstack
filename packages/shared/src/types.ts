@@ -23,9 +23,15 @@ export type AttributeTypeInteger = {
     config: {max?: number, min?: number, defaultValue?: number} & AttributeTypeConfig
 }
 export type AttributeTypeString = {
-    name: string,
     type: "string",
+    name: string,
     config: {maxLength?: number, encrypted?: boolean, defaultValue?: string} & AttributeTypeConfig
+}
+
+export type AttribruteTypeDate = {
+    type: "date",
+    name: string,
+    config: {format?: string, defaultValue?: string | number, max?: string|number, min?: string | number} & AttributeTypeConfig
 }
 
 export type AttributeTypeBoolean = {
@@ -36,15 +42,17 @@ export type AttributeTypeBoolean = {
 export type AttributeTypeForeignKey = {
     type: "foreign_key",
     name: string,
-    config: {} & AttributeTypeConfig
+    config: {targetClass?: string} & AttributeTypeConfig
 }
 export type AttributeTypeObject = {
     type: "object",
     name: string,
     config: {} & AttributeTypeConfig
 }
-export type AttributeType = AttributeTypeString | AttributeTypeInteger | 
-    AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey | AttributeTypeObject;
+export type AttributeType = 
+    AttributeTypeString | AttributeTypeInteger | AttribruteTypeDate |
+    AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey |
+    AttributeTypeObject;
 export type AttributeModel = {
     name: string,
     description?: string,
@@ -105,9 +113,14 @@ export interface SystemDoc {
     startupTime: number;
 }
 
-export type StoreOptions = {
-    plugins: PouchDB.Plugin[]
-} & PouchDB.Configuration.DatabaseConfiguration 
+export type StackOptions = {
+    name?: string,
+    plugins?: PouchDB.Plugin[]
+} & PouchDB.Configuration.DatabaseConfiguration
+
+export type StackConfig = ({
+    connection?: string;
+} & StackOptions) | string | `db-${string}`;
 
 export type CachedClass = Class & {
     ttl: number

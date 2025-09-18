@@ -3,7 +3,7 @@ import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
 import {Document} from "@docstack/shared";
 
-export const useClassList = () => {
+export const useClassList = (stack: string) => {
     const docStack = React.useContext(DocStackContext);
     const [loading, setLoading] = React.useState<boolean>(false);
     const [error, setError] = React.useState();
@@ -24,10 +24,15 @@ export const useClassList = () => {
         const fetchClasses = async () => {
             try {
                 // Run the initial query
-                const classList = await docStack.getStore().getAllClasses();
-                if (classList.length) {
-                    setClassList(classList);
+                const stackInstance = docStack.getStack(stack);
+                debugger;
+                if (stackInstance) {
+                    const classList = await stackInstance.getAllClasses();
+                    if (classList.length) {
+                        setClassList(classList);
+                    }
                 }
+                
             } catch (err: any) {
                 setError(err);
             } finally {
@@ -48,12 +53,12 @@ export const useClassList = () => {
             // queryRef.current = false;
         }
 
-    }, [docStack]);
+    }, [docStack, stack]);
 
     return { loading, classList, error };
 }
 
-export const useClass = (className: string) => {
+export const useClass = (stack: string, className: string) => {
     const docStack = React.useContext(DocStackContext);
     const [loading, setLoading] = React.useState<boolean>(false);
     const [error, setError] = React.useState();
@@ -71,10 +76,14 @@ export const useClass = (className: string) => {
 
         const fetchClass = async () => {
             try {
-                const res = await docStack.getStore().getClass(className);
-                if (res) {
-                    setClass(res);
+                const stackInstance = docStack.getStack(stack);
+                if (stackInstance) {
+                    const res = await stackInstance.getClass(className);
+                    if (res) {
+                        setClass(res);
+                    }
                 }
+                
             } catch (e: any) {
                 setError(e);
             } finally {
@@ -92,13 +101,13 @@ export const useClass = (className: string) => {
             // reqRef.current = false;
         }
 
-    }, [docStack, className]);
+    }, [docStack, stack, className]);
 
     return {loading, error, classObj}
 }
 
 
-export const useClassDocs = (className: string, query = {}) => {
+export const useClassDocs = (stack: string, className: string, query = {}) => {
     const docStack = React.useContext(DocStackContext);
 
     const [classObj, setClass] = React.useState<Class>();
@@ -120,11 +129,14 @@ export const useClassDocs = (className: string, query = {}) => {
             setLoading(true);
             setError(null);
             try {
-                const stackInstance = docStack.getStore();
-                const retrievedClass = await stackInstance.getClass(className);
-                if (retrievedClass) {
-                    setClass(retrievedClass);
+                const stackInstance = docStack.getStack(stack);
+                if (stackInstance) {
+                    const retrievedClass = await stackInstance.getClass(className);
+                    if (retrievedClass) {
+                        setClass(retrievedClass);
+                    }
                 }
+                
             } catch (err: any) {
                 setError(err);
                 setLoading(false);
@@ -136,7 +148,7 @@ export const useClassDocs = (className: string, query = {}) => {
         return () => {
             // clean what?
         };
-    }, [docStack, className]); // Dependency on docStack and className
+    }, [docStack, stack, className]); // Dependency on docStack and className
 
     React.useEffect(() => {
         if (!classObj) {
