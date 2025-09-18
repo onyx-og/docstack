@@ -1,15 +1,16 @@
 import React, { createContext, useEffect, useState } from 'react';
 import {DocStack} from '@docstack/client'; // Import your DocStack class
+import { StackConfig } from '@docstack/shared';
 
 // You can give it a default value, e.g., null, which can be checked later.
 export const DocStackContext = createContext<DocStack | null>(null);
 
 export interface DocStackProviderProps {
-    dbName: string;
+    config: StackConfig[];
     children?: React.ReactNode;
 }
 const StackProvider = (props: DocStackProviderProps) => {
-    const { dbName, children } = props;
+    const { config, children } = props;
     // Use a ref to store the DocStack instance
     const docStackRef = React.useRef<DocStack | null>(null);
     const [docStack, setDocStack] = useState<DocStack | null>(null);
@@ -21,7 +22,7 @@ const StackProvider = (props: DocStackProviderProps) => {
     useEffect(() => {
         if (docStackRef.current === null) {
             console.log("DocStack provider - init instance");
-            const instance = new DocStack({ dbName });
+            const instance = new DocStack(...config);
             docStackRef.current = instance;
             docStackRef.current.addEventListener("ready", setsDocStackWhenReady);
         }
@@ -33,7 +34,7 @@ const StackProvider = (props: DocStackProviderProps) => {
                 // docStackRef.current.getStore().removeAllListeners();
             }
         };
-    }, [dbName, setsDocStackWhenReady]);
+    }, [config, setsDocStackWhenReady]);
 
     return (
         <DocStackContext.Provider value={docStack}>
