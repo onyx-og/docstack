@@ -25,7 +25,6 @@ export const useClassList = (stack: string) => {
             try {
                 // Run the initial query
                 const stackInstance = docStack.getStack(stack);
-                debugger;
                 if (stackInstance) {
                     const classList = await stackInstance.getAllClasses();
                     if (classList.length) {

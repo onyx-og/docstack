@@ -33,7 +33,7 @@ abstract class Stack extends EventTarget {
 
     abstract removeAllListeners: () => void;
 
-    abstract getClass: (className: string) => Promise<Class | null>;
+    abstract getClass: (className: string, fresh?: boolean) => Promise<Class | null>;
 
     abstract addClass: (classObj: Class) => Promise<ClassModel>;
 
@@ -63,6 +63,7 @@ abstract class Stack extends EventTarget {
 
     abstract deleteDocument: (_id: string) => Promise<boolean>;
 
+    abstract addDesignDocumentPKs: (className: string, pKs: string[], temp?: boolean) => Promise<string>;
 }
 
 export default Stack;

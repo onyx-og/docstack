@@ -81,9 +81,13 @@ abstract class Class extends EventTarget {
 
     abstract getId: () => string | undefined;
 
-    abstract hydrateSchema: (rawSchema: ClassModel["schema"]) => void;
+    abstract getByPrimaryKeys: (params: {[key: string]: any}) => Promise<Document | null>;
 
     abstract validate: (data: {[key: string]: any}) => Promise<boolean>;
+
+    abstract uniqueCheck: (doc: Document) => Promise<boolean>;
+
+    abstract bulkUniqueCheck: (pks: string[]) => Promise<boolean>;
 
     abstract buildSchema: () => ClassModel["schema"];
 

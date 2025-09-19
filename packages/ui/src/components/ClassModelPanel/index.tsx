@@ -18,6 +18,7 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
     } = classObj;
 
     const schema = React.useMemo(() => {
+        console.log("Got classObj", {classObj, fields: classObj.schemaZOD})
         return classObj.buildSchema();
     },[classObj]);
 

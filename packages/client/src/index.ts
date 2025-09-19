@@ -6,13 +6,13 @@
 import createlogger from "./utils/logger"
 // import test from '../../../server/src//utils/dbManager/test';
 // import { generateJwtKeys, generatePswKeys } from '../../../server/src/utils/crypto';
-import ClientStack from './utils/stack';
+import ClientStack from './core';
 // import { login, JWTAuthPayload, setupAdminUser } from '../../../server/src//utils/auth';
 // import memoryAdapter from "pouchdb-adapter-memory"
 // import cookieParser from 'cookie-parser';
 // import jwt from 'jsonwebtoken';
 import Class from '../../shared/src//utils/stack/class';
-import Attribute from './utils/stack/attribute';
+import Attribute from './core/attribute';
 import {AttributeType, DocstackReady, StackConfig, StackOptions} from "../../shared/src/types";
 import { createLogger, Logger } from "winston";
 // import { EventTarget } from 'node:events';
@@ -62,7 +62,6 @@ class DocStack extends EventTarget {
             });
         }
         if (stack) {
-            debugger;
             this.stacks.push(stack);
             let window_ = window as Window & typeof globalThis & {
                 stacks: ClientStack[]
@@ -88,9 +87,11 @@ class DocStack extends EventTarget {
         }))
     }
 
-    async resetDb() {
+    async resetAll() {
         try {
-            await this.store.reset();
+            for (const stack of this.stacks) {
+                await stack.reset();
+            }
         } catch (e: any) {
             throw new Error(e);
         }
@@ -101,7 +102,6 @@ class DocStack extends EventTarget {
     }
 
     public getStack = (name: string) => {
-        debugger;
         return this.stacks.find(s => s.name == name || s.connection == name );
     }
 
@@ -110,7 +110,7 @@ class DocStack extends EventTarget {
     }
     async reset() {
         try {
-            await this.resetDb();
+            await this.resetAll();
             await this.initStacks(this.config);
         } catch (e: any) {
             throw new Error(e);

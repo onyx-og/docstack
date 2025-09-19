@@ -11,7 +11,6 @@ const initState: StackState = {
 
 const stack = createReducer(initState, builder => builder
     .addCase(setStackName, (state, action) => {
-        debugger;
         state.name = action.payload;
     })
 );

@@ -1,10 +1,10 @@
-import { Class as Class_, TriggerModel } from "@docstack/shared";
-import createLogger from "../logger";
+import { Class as Class_, DesignDocument, TriggerModel } from "@docstack/shared";
+import createLogger from "../utils/logger";
 // import ReferenceAttribute from '../Reference';
 import {Stack, ClassModel, AttributeModel, Document} from "@docstack/shared";
 import Attribute from "./attribute";
 import { Logger } from 'winston';
-import { Trigger } from "./trigger/";
+import { Trigger } from "./trigger";
 import {z} from "zod";
 
 /**
@@ -96,7 +96,6 @@ class Class extends Class_ {
             name, description,
             schema, triggers: [],
         });
-        this.hydrateSchema(schema);
         // this.parentClass = parentClass;
         if (stack) {
             this.stack = stack;
@@ -171,128 +170,60 @@ class Class extends Class_ {
         }
     }
 
-    // Inside your Class class
-    hydrateSchema = (rawSchema: { [name: string]: AttributeModel }):void => {
-        const fnLogger = this.logger.child({method: "hydrateSchema", args: {rawSchema}});
-        const zodFields: Record<string, z.ZodTypeAny> = {};
-
-        for (const index in rawSchema) {
-            const attributeModel = rawSchema[index];
-            const { name, type, config } = attributeModel;
-            let zodField: z.ZodTypeAny;
-
-            switch (type) {
-                // ... existing cases for 'string', 'number', 'boolean', 'date' ...
-                case 'string':
-                    zodField = z.string();
-                    if (config.maxLength !== undefined) {
-                        zodField = (zodField as z.ZodString).max(config.maxLength);
-                    }
-                    break;
-
-                case 'integer':
-                    zodField = z.number();
-                    if (typeof config.min === 'number') {
-                        zodField = (zodField as z.ZodNumber).min(config.min);
-                    }
-
-                    if (typeof config.max === 'number') {
-                        zodField = (zodField as z.ZodNumber).max(config.max);
-                    }
-                    break;
-
-                // case 'date':
-                //     zodField = z.date();
-
-
-                //     break;
-                
-                case 'decimal': 
-                    zodField = z.number();
-
-                    // min and max validation
-                    if (typeof config.min === 'number') {
-                        zodField = (zodField as z.ZodNumber).min(config.min);
-                    }
-                    if (typeof config.max === 'number') {
-                        zodField = (zodField as z.ZodNumber).max(config.max);
-                    }
-
-                    // decimal precision validation (with refinement)
-                    if (typeof config.precision === 'number' && config.precision >= 0) {
-                        const isPrecise = (value: any) => {
-                        if (typeof value !== 'number') 
-                            return true;
-                            const valueAsString = value.toString();
-                            const decimalPart = valueAsString.split('.')[1];
-                            const decimalPlaces = decimalPart ? decimalPart.length : 0;
-                            return decimalPlaces <= config.precision;
-                        };
-
-                        zodField = zodField.refine(
-                            isPrecise,
-                            `Number cannot have more than ${config.precision} decimals.`
-                        );
-                    }
-                    break;
-
-                case 'boolean':
-                    zodField = z.boolean();
-                    break;
-
-                case 'foreign_key':
-                    if (!config.targetClass) {
-                        throw new Error(
-                            `Attribute '${name}' of type 'foreign_key' is missing a 'targetClass' in its config.`
-                        );
-                    }
-
-                    const foreignClass = config.targetClass;
-                    const baseSchema = z.string();
-
-                    zodField = baseSchema.refine(
-                        async (documentIdOrIds: string | string[]) => {
-                            const idsToValidate = Array.isArray(documentIdOrIds) ? documentIdOrIds : [documentIdOrIds];
-                            if (idsToValidate.length === 0) {
-                                return true;
-                            }
-
-                            try {
-                                const stack = this.getStack();
-                                if (stack) {
-                                    const promises = idsToValidate.map(id => stack.db.get!(id));
-                                    await Promise.all(promises);
-                                    return true;
-                                } else throw new Error("Missing stack connection");
-                            } catch (error: any) {
-                                if (error.status === 404) {
-                                    return false;
-                                }
-                                throw error;
-                            }
-                        },
-                        {
-                            message: `One or more documents not found in class '${foreignClass}'.`,
-                        }
-                    );
-                    break;
-
-                default:
-                    throw new Error(`Unsupported schema type: '${type}' for field '${name}'`);
-            }
-
-            // These rules are applied regardless of the type, and in the correct order
-            if (config.mandatory !== true) {
-                zodField = zodField.optional();
-            }
-            if (config.isArray === true) {
-                zodField = z.array(zodField);
-            }
-
-            zodFields[name] = zodField;
+    uniqueCheck = async (doc: Document): Promise<boolean> => {
+        const fnLogger = this.logger.child({method: "uniqueCheck", args: {doc}});
+        const duplicate = await this.getByPrimaryKeys(doc);
+        if (duplicate == null || duplicate._id == doc._id) {
+            fnLogger.info("No duplicate found for doc");
+            return true;
+        } else {
+            fnLogger.info("Duplicate found for doc", {duplicate});
+            return false;
         }
-        this.schemaZOD = z.object(zodFields);
-        fnLogger.debug("Schema generated", {schema: z.toJSONSchema(this.schemaZOD)});
+    };
+
+    bulkUniqueCheck = async (pKs: string[]): Promise<boolean> => {
+        const fnLogger = this.logger.child({method: "bulkUniqueCheck", args: {pKs}});
+        const ddocId = await this.stack?.addDesignDocumentPKs(this.name, pKs, true);
+        fnLogger.info(`Created temporary design document '${ddocId}'`);
+        if (this.stack && ddocId) {
+            try {
+                const result = await this.stack.db.query(`${ddocId}/by_pKeys`, {
+                    group: true,
+                    reduce: '_count'
+                });
+
+                const hasDuplicates = result.rows.some(row => row.value > 1);
+
+                if (hasDuplicates) {
+                    // 3a. Rollback: new schema is invalid
+                    fnLogger.error('Schema change invalid: new duplicates found.');
+                    const finalTempDoc = await this.stack.db.get(ddocId);
+                    await this.stack.db.remove(finalTempDoc);
+                    return false; // Indicate failure
+                } else {
+                    // 3b. Execute: new schema is valid. Replace the live document.
+                    fnLogger.info('Bulk unique check completed: no new duplicates found');
+                    const finalTempDoc = await this.stack.db.get(ddocId) as DesignDocument;
+
+                    // Clean up the temporary document
+                    await this.stack.db.remove(finalTempDoc);
+                    return true; // Indicate success
+                }
+            } catch (err) {
+                console.error('Error during schema validation:', err);
+                // Ensure the temporary document is removed on error
+                try {
+                    const finalTempDoc = await this.stack.db.get(ddocId);
+                    await this.stack.db.remove(finalTempDoc);
+                } catch(e: any) { /* ignore */ }
+                return false;
+            }
+        } else {
+            fnLogger.error(`Was unable to create temporary design document to group by`);
+            return false;
+        }
+        
     }
 
     validate = async (data: {[key: string]: any}): Promise<boolean> => {
@@ -372,11 +303,15 @@ class Class extends Class_ {
         if (model.schema) {
             // model.schema = {...this.model.schema, ...model.schema};
             this.attributes = {};
+            this.schemaZOD = z.object({});
             for (const [key, attrModel] of Object.entries(model.schema)) {
                 let attribute = new Attribute(
                     this, attrModel.name, attrModel.type, attrModel.description, attrModel.config
                 );
                 this.attributes[attrModel.name] = attribute;
+                this.schemaZOD = this.schemaZOD.extend({
+                    [attrModel.name]: attribute.field
+                });
             }
         }
 
@@ -444,32 +379,33 @@ class Class extends Class_ {
 
 
     addAttribute = async (attribute: Attribute): Promise<Class> => {
+        const fnLogger = this.logger.child({method: "addAttribute"});
         try {
             let name = attribute.getName();
             if (!this.hasAttribute(name)) {
-                this.logger.info("addAttribute - adding attribute", {name: name, type: attribute.getModel()});
+                fnLogger.info("Adding attribute", {name: name, type: attribute.getModel()});
                 this.attributes[name] = attribute;
                 let attributeModel = attribute.getModel();
-                this.logger.info("addAttribute - adding attribute to schema", {attributeModel: attributeModel});
+                fnLogger.info("Adding attribute to schema", {attributeModel: attributeModel});
                 // TODO: 
                 // this.schema[name] = attributeModel; // sometimes getting schema undefined
                 // update class on db
-                this.logger.info("addAttribute - checking for requirements before updating class on db", {stack: (this.stack != null), id: this.id})
+                fnLogger.info("Checking for requirements before updating class on db", {stack: (this.stack != null), id: this.id})
                 if (this.stack && this.id) {
-                    this.logger.info("addAttribute - updating class on db")
+                    fnLogger.info("Updating class on db")
                     let res = await this.stack.updateClass(this);
                     return this;
                     // TODO: Check if this class has subclasses
                 } else {
-                    this.logger.error("addAttribute - class not updated on db because of missing stack or id")
+                    fnLogger.error("Class not updated on db because of missing stack or id")
                     return this;
                 }
             } else { 
-                this.logger.error("Attribute with name " + name + " already exists within this Class");
+                fnLogger.error("Attribute with name " + name + " already exists within this Class");
                 return this;
             }
         } catch (e) {
-            this.logger.error("Falied adding attribute because: ", e)
+            fnLogger.error("Falied adding attribute because: ", e)
             return this;
         }
     }
@@ -478,6 +414,33 @@ class Class extends Class_ {
     // consider first fetching/updating the local class model
     addCard = async (params: {[key:string]: any}) => {
         return await this.stack!.createDoc(null, this.getName(), this, params);
+    }
+    
+    getByPrimaryKeys = async (params: {[key: string]: any}): Promise<Document | null> => {
+        const fnLogger = this.logger.child({method: "getByPrimaryKeys"});
+        // attempt to retrieve card by primary key
+        let filter: {[key: string]:any} = {}
+        let primaryKeys = this.getPrimaryKeys();
+        fnLogger.info("Got primary keys", {primaryKeys});
+        if (primaryKeys.length) {
+            // executes a reducer function on each element of the primaryKeys array
+            // that sets each primary key prop to the corresponding param value 
+            primaryKeys.reduce(
+                (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
+                filter,
+            );
+            fnLogger.info("Defined filter", {filter});
+            let cards = await this.getCards(filter, undefined, 0, 1);
+            if (cards.length > 0) {
+                return cards[0];
+            } else {
+                fnLogger.info("Did not find any documents with given primary key", {filter});
+                return null;
+            }
+        } else {
+            fnLogger.info("Class has no field specified as primary key");
+            return null;
+        }
     }
 
     addOrUpdateCard = async (params: {[key:string]: any}, cardId?: string) => {
@@ -489,30 +452,13 @@ class Class extends Class_ {
                 resolve(res);
             } else {
                 fnLogger.info("No document id provided, checking for PKs");
-                // attempt to retrieve card by primary key
-                let filter: {[key: string]:any} = {}
-                let primaryKeys = this.getPrimaryKeys();
-                // debugger;
-                fnLogger.info("Got primary keys", {primaryKeys});
-                if (primaryKeys.length) {
-                    // executes a reducer function on each element of the primaryKeys array
-                    // that sets each primary key prop to the corresponding param value 
-                    primaryKeys.reduce(
-                        (accumulator, currentValue) => accumulator[currentValue] = params[currentValue],
-                        filter,
-                    );
-                    fnLogger.info("Defined filter", {filter});
-                    let cards = await this.getCards(filter, undefined, 0, 1);
-                    if (cards.length > 0) {
-                        reject("Other card with same PK found");
-                    } else {
-                        const res = await this.addCard(params);
-                        resolve(res);
-                    }
-                } else {
-                    // No primary keys defined => always adds new document
+                const card = await this.getByPrimaryKeys(params);
+                if (card == null) {
                     const res = await this.addCard(params);
                     resolve(res);
+                } else {
+                    fnLogger.error("Duplicate card by keys");
+                    reject("Duplicate card by keys");
                 }
             }
         });

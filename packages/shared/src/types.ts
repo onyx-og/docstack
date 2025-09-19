@@ -1,5 +1,5 @@
 import Stack from "./utils/stack";
-import Class from "./utils/stack/class";
+import type Class from "./utils/stack/class";
 import Trigger from "./utils/stack/trigger";
 
 
@@ -161,6 +161,13 @@ export const isDocument = (object: object): object is Document => {
     return false;
 }
 
+export const isClassModel = (object: {[key: string]: any}): object is ClassModel => {
+    if (object.hasOwnProperty("type") && object.type === "class") {
+        return true;
+    }
+    return false;
+}
+
 export type StackPluginType = (stackInstance: Stack) => {
     bulkDocs<Model>(
         docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
@@ -168,3 +175,16 @@ export type StackPluginType = (stackInstance: Stack) => {
         callback: PouchDB.Core.Callback<Array<PouchDB.Core.Response | PouchDB.Core.Error>>,
     ): void;
 }
+
+export interface DesignDocument extends PouchDB.Core.Document<any> {
+  _id: `_design/${string}`;
+  _rev: string;
+  views: {
+    [viewName: string]: {
+      map: string;
+      reduce?: string;
+    };
+  };
+}
+
+export {Class};

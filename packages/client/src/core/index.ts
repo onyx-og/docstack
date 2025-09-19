@@ -1,14 +1,15 @@
 import PouchDB from "pouchdb";
-import createLogger from "../../utils/logger/";
+import createLogger from "../utils/logger";
 import Class from "./class";
-import { decryptString } from "../crypto";
+import { decryptString } from "../utils/crypto";
 import { importJsonFile, countPatches } from "./datamodel";
 import {
     Stack,
     StackOptions,
     CachedClass,
     ClassModelPropagationStart,
-    ClassModelPropagationComplete
+    ClassModelPropagationComplete,
+    isClassModel
 } from "@docstack/shared";
 
 
@@ -16,7 +17,7 @@ import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDec
     AttributeTypeForeignKey, 
     AttributeTypeInteger,
     AttributeTypeString} from "@docstack/shared";
-import { StackPlugin } from "../../plugins/pouchdb";
+import { StackPlugin } from "../plugins/pouchdb";
 
 const logger = createLogger().child({module: "stack"});
 
@@ -290,7 +291,7 @@ class ClientStack extends Stack {
         this.addEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
 
         fnLogger.info("Setting up class model worker");
-        this.modelWorker = new Worker(require("@docstack/shared/workers/dataModel"), {type: "module"});
+        this.modelWorker = new Worker(require("../workers/dataModel"), {type: "module"});
 
         fnLogger.info("Setting up class model changes listener");
         const classModelChanges = this.onClassModelChanges();
@@ -351,13 +352,7 @@ class ClientStack extends Stack {
     }
 
     /**
-     * Listener that fires when a document that refers to a class is edited or created,
-     * marks its execution while handling the propagation of schema modifications to children documents: 
-     * by dispatching a webworker message containing the @var className and the previous revision id.
-     * In the main case, the worker sends a message with the result of its task.
-     * @fires class-model-propagation-complete
-     * @fires class-model-propagation-pending
-     * @returns void
+     * @returns PouchDB.Core.Changes<{}>
      */
     onClassModelChanges = () => {
         const fnLogger = logger.child({listener: "classModelChanges"});
@@ -370,59 +365,18 @@ class ClientStack extends Stack {
                 return doc.type == "class";
             }
         }).on("change", async (change) => {
-            const doc = change.doc! as unknown as Document;
-            const className = doc.name;
-            if (doc.active) {
-                // Dispatch class-propagate-start [TODO] Move it outside the doc.active
-                this.dispatchEvent(new CustomEvent<ClassModelPropagationStart>('class-model-propagation-pending', {
-                    detail: { className }
-                }));
-                try {
-                    // Invalidate cached version if present
-                    fnLogger.info(`Class model was updated. Clearing '${className}' from cache.`);
-                    delete this.cache[className];
-                    fnLogger.info(`Successfully cleared '${className}' from cache.`);
-                    const docWithRevs = await this.db.get(className, {revs: true});
-                    const revisionIDList = docWithRevs._revisions!.ids;
-                    if (revisionIDList.length == 1) {
-                        fnLogger.info(`Class '${className}' was just created. Nothing to propagate.`);
-
-                        this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
-                            detail: { className, success: true }
-                        }));
-                    } else {
-                        fnLogger.info(`Class '${className}' was updated. Preparing to dispach message to webworker.`);
-                        const secondLastRevID = revisionIDList[1];
-                        const secondLastPrefix = docWithRevs._revisions!.start-1;
-                        const previousRevId = `${secondLastPrefix}-${secondLastRevID}`;
-                        const message = {
-                            command: 'propagateSchema',
-                            payload: {
-                                conn: this.connection,
-                                className,
-                                previousRevId,
-                            }
-                        }
-                        fnLogger.info(`Class '${className}' was updated. Dispatching message to webworker.`, {msg: message});
-                        self.postMessage(message);
-                    }
-                } catch (e: any) {
-                    fnLogger.error(`Error while propagating data model changes for class '${className}': ${e}`);
-                    this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
-                        detail: { className, success: false, message: e }
-                    }));
-                }
-            } else {
-                // Class was deleted
-                // [TODO]
-                fnLogger.info("Class was deleted. [TODO] deletion of documents belonging to its class");
-                this.dispatchEvent(new CustomEvent<ClassModelPropagationComplete> ('class-model-propagation-complete', {
-                    detail: { className, success: true }
-                }));
-            }
+            const doc = change.doc;
+            if (doc && isClassModel(doc) && doc.active) {
+                const className = doc.name;
+                // Invalidate cached version if present
+                fnLogger.info(`Class model was updated. Clearing '${className}' from cache.`);
+                delete this.cache[className];
+                fnLogger.info(`Successfully cleared '${className}' from cache.`);
+            } else if (doc && isClassModel(doc) && !doc.active) {
+                const className = doc.name;
+                fnLogger.info(`Class was deleted. Removing from '${className} from cache.'`);
+            } // else
         });
-
-        // Avoid adding it to this.listeners
 
         return classModelChanges;
     }
@@ -504,12 +458,15 @@ class ClientStack extends Stack {
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
-    getClass = async (className: string): Promise<Class | null> => {
-        // Check if class is in cache and not expired
-        if (this.cache[className] && Date.now() < this.cache[className].ttl) {
-            logger.info("getClass -  retrieving class from cache", {ttl: this.cache[className].ttl})
-            return this.cache[className];
+    getClass = async (className: string, fresh =  false): Promise<Class | null> => {
+        if (!fresh) {
+            // Check if class is in cache and not expired
+            if (this.cache[className] && Date.now() < this.cache[className].ttl) {
+                logger.info("getClass -  retrieving class from cache", {ttl: this.cache[className].ttl})
+                return this.cache[className];
+            }
         }
+        
         const classObj = await Class.fetch(this, className);
         if (classObj) {
             (classObj as CachedClass).ttl = Date.now() + 60000 * 15; // 15 minutes expiration
@@ -795,6 +752,56 @@ class ClientStack extends Stack {
         return result
     }
 
+    addDesignDocumentPKs = async (className: string, pKs: string[], temp = false) => {
+        const fnLogger = logger.child({method: 'addDesignDocumentPKs', args: {className, pKs}});
+         // Construct the compound key string dynamically
+        const keyString = pKs.map(key => `doc.${key}`).join(', ');
+
+        // The 'map' function as a string
+        const mapCode = `function (doc) {
+            const hasAllKeys = ${pKs.map(key => `doc.${key}`).join(' && ')};
+            if (hasAllKeys && doc.type === '${className}') {
+            emit([${keyString}], doc._id);
+            }
+        }`;
+        fnLogger.info("Generated map code", {code: mapCode});
+
+        let designDocId = `_design/${className}-group`;
+        if (temp) designDocId = `_design/${className}-group-temp`;
+        const ddoc: {
+            _id: string;
+            views: {};
+            _rev: undefined | string;
+        } = {
+            _id: designDocId,
+            views: {
+                'by_pKeys': {
+                    map: mapCode
+                }
+            },
+            _rev: undefined,
+        };
+        fnLogger.info("Prepared design document", {ddoc});
+
+        try {
+            // Use 'get' to check if the design doc already exists
+            const existingDoc = await this.db.get(designDocId);
+            ddoc._rev = existingDoc._rev; // Add _rev to update the existing doc
+            await this.db.put(ddoc);
+            fnLogger.info('Design document updated successfully.');
+        } catch (err: any) {
+            if (err.name === 'not_found') {
+                // Doc doesn't exist, create it
+                await this.db.put(ddoc);
+                fnLogger.info('Design document created successfully.');
+            } else {
+                fnLogger.error('Error saving design document:', err);
+                throw err;
+            }
+        }
+        return designDocId;
+    }
+
     // async updateDomain(domainObj: Domain) {
     //     return this.createDoc(domainObj.getId(), domainObj, domainObj.getModel());
     // }
@@ -866,7 +873,7 @@ class ClientStack extends Stack {
                                 let duplicates = await this.findDocuments({
                                     "type": { $eq: type },
                                     [model.name]: { $eq: value }
-                                })
+                                });
                                 if (duplicates.docs.length > 0) {
                                     logger.info(`A card with property ${model.name} already exists.`, duplicates);
                                     throw new Error(`A card with property ${model.name} already exists.`);
