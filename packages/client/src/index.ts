@@ -11,7 +11,8 @@ import ClientStack from './core';
 // import memoryAdapter from "pouchdb-adapter-memory"
 // import cookieParser from 'cookie-parser';
 // import jwt from 'jsonwebtoken';
-import Class from '../../shared/src//utils/stack/class';
+import Class from "./core/class";
+import AbstractClass from '../../shared/src//utils/stack/class';
 import Attribute from './core/attribute';
 import {AttributeType, DocstackReady, StackConfig, StackOptions} from "../../shared/src/types";
 import { createLogger, Logger } from "winston";

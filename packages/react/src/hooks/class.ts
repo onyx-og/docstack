@@ -3,6 +3,37 @@ import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
 import {Document} from "@docstack/shared";
 
+export const useClassCreate = (stack: string) => {
+    const docStack = React.useContext(DocStackContext);
+
+    return React.useCallback(
+        async ( className: string, classDesc?: string) => {
+            try {
+                if (!docStack) {
+                    // Handle the case where the provider is not yet initialized or missing
+                    // You could throw an error or return an empty state.
+                    console.error('useClassCreate must be used within a DocStackProvider.');
+                    // setLoading(false);
+                    return Promise.resolve(null);
+                }
+                // Run the initial query
+                const stackInstance = docStack.getStack(stack);
+                if (stackInstance) {
+                    const classObj_ = await Class.create(stackInstance, className, "class", classDesc);
+                    await stackInstance.addClass(classObj_);
+                    return classObj_;
+                }
+                return null;
+                
+            } catch (err: any) {
+                // setError(err);
+                console.error(err);
+                return null;
+            }
+        }, [docStack, stack]
+    );
+}
+
 export const useClassList = (stack: string) => {
     const docStack = React.useContext(DocStackContext);
     const [loading, setLoading] = React.useState<boolean>(false);

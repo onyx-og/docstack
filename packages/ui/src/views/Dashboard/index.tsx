@@ -9,6 +9,7 @@ import DebugPanel from "components/DebugPanel";
 
 import "./index.scss";
 import ClassCard from "components/ClassCard";
+import ClassForm from "components/ClassForm";
 
 const Dashboard = () => {
     const dispatch = useAppDispatch()
@@ -54,10 +55,10 @@ const Dashboard = () => {
 
 
     return <main className="view-dashboard">
-        <ClassCreationModal footer={<ActionBar items={[
+        <ClassCreationModal title="Create new class" footer={<ActionBar items={[
             { position: "right", key: "btn-class-creation-close", item: <Button type="default" onClick={closeClassCreationModal} iconName="close">Cancel</Button> },
         ]} />}>
-            <span>Creating class</span>
+            <ClassForm onComplete={closeClassCreationModal}/>
         </ClassCreationModal>
             <ActionBar items={[
                 { item: <h2>Classes</h2>, key: "body-title", position: "left" },
