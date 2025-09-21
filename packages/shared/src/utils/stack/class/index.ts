@@ -108,6 +108,8 @@ abstract class Class extends EventTarget {
 
     abstract addAttribute: (attribute: Attribute) => Promise<Class>;
 
+    abstract removeAttribute: (name: string) => Promise<Class>;
+
     // TODO: modify to pass also the current class model
     // consider first fetching/updating the local class model
     abstract addCard: (params: {[key:string]: any}) => Promise<Document | null>;

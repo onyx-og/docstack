@@ -17,8 +17,8 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
         type,
     } = classObj;
 
+    // TODO: remove since classObj should have schema already updated
     const schema = React.useMemo(() => {
-        console.log("Got classObj", {classObj, fields: classObj.schemaZOD})
         return classObj.buildSchema();
     },[classObj]);
 
@@ -26,12 +26,12 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
         if (schema) {
             console.log("attributePanels", {schema})
             let panels = Object.values(schema).map((attrModel, i) => {
-                return <AttributeListItem key={i} {...attrModel} />
+                return <AttributeListItem key={i} classObj={classObj} model={attrModel} />
             });
             return panels;
         }
         return [];
-    }, [schema]);
+    }, [classObj, schema]);
 
     const {
         Modal: AttributeCreationModal,

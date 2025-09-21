@@ -64,7 +64,7 @@ export const applySchemaDelta = async (
             // it's a removal when it has 3 elements
             if (e[1].length === 3) {
                 const attrModel = e[1][0] as AttributeModel;
-                updatedDoc = await attributeEffect("change", attrModel, classObj, updatedDoc);
+                updatedDoc = await attributeEffect("delete", attrModel, classObj, updatedDoc);
             }
             return updatedDoc;
         } else {

@@ -1,4 +1,4 @@
-import { AttributeModel } from "@docstack/shared";
+import { AttributeModel, Class } from "@docstack/shared";
 import { Card, Accordion, ActionBar, Button, Form, Toggle, useModal, NumberInput } from "@prismal/react";
 import React from "react";
 
@@ -45,15 +45,17 @@ const ExistingAttrConfigForm: React.FC<ExistingAttrConfigFormProps> = (props) =>
     </Form>
 }
 
-interface AttributeListItemProps extends AttributeModel {
-
+interface AttributeListItemProps {
+    model: AttributeModel;
+    classObj: Class;
 }
 const AttributeListItem = (props: AttributeListItemProps) => {
+    const {classObj, model} = props; 
     const {
         name,
         type,
         config
-    } = props;
+    } = React.useMemo( () => model, [model]);
 
 
     const { Modal: ViewModal, open: openViewModal, close: closeViewModal } = useModal({areaId: "root"});
@@ -61,8 +63,12 @@ const AttributeListItem = (props: AttributeListItemProps) => {
 
     const confirmDeleteAttr = React.useCallback(() => {
         console.log(`Deleting attribute '${name}'`);
-        closeDelModal();
-    }, [name]);
+        classObj.removeAttribute(name).then(res => {
+            console.log("delete attribute result in new classObj", {classObj})
+            closeDelModal();
+        });
+        
+    }, [classObj, name]);
 
     return <Card className="list-item-attribute">
         <ViewModal title={`Attribute: ${name}`} footer={<ActionBar items={[

@@ -410,6 +410,27 @@ class Class extends Class_ {
         }
     }
 
+    removeAttribute = async (name: string): Promise<Class> => {
+        const fnLogger = this.logger.child({method: "removeAttribute", args: {name}});
+        const originSchema = {...this.model.schema[name]},
+            originAttr = this.attributes[name];
+        try {
+            fnLogger.info(`Attempting to remove attribute from class.`);
+            delete this.model.schema[name];
+            delete this.attributes[name];
+            this.schemaZOD = this.schemaZOD.omit({[name]: true});
+            if (this.stack) {
+                this.stack.updateClass(this);
+            } else throw new Error("Missing stack, cannot perform updates.");
+        } catch (e: any) {
+            // Revert
+            this.model.schema[name] = originSchema;
+            this.attributes[name] = originAttr;
+            fnLogger.error(`Failed at removing attribute from class.'`);
+        }
+        return this;
+    };
+
     // TODO: modify to pass also the current class model
     // consider first fetching/updating the local class model
     addCard = async (params: {[key:string]: any}) => {

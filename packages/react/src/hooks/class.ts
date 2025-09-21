@@ -27,6 +27,7 @@ export const useClassList = (stack: string) => {
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
                     const classList = await stackInstance.getAllClasses();
+                    // TODO: setup listener for class add/delete
                     if (classList.length) {
                         setClassList(classList);
                     }
@@ -78,6 +79,7 @@ export const useClass = (stack: string, className: string) => {
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
                     const res = await stackInstance.getClass(className);
+                    // TODO: manage class model (schema!) updates
                     if (res) {
                         setClass(res);
                     }
