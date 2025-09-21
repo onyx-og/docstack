@@ -1,49 +1,8 @@
 import { AttributeModel, Class } from "@docstack/shared";
-import { Card, Accordion, ActionBar, Button, Form, Toggle, useModal, NumberInput } from "@prismal/react";
+import { Card, Accordion, ActionBar, Button, Form, Toggle, useModal, NumberInput, Select } from "@prismal/react";
 import React from "react";
-
+import { ExistingAttrConfigForm } from "../AttributeForm";
 import "./index.scss";
-
-interface ExistingAttrConfigFormProps extends AttributeModel {
-    mode?: "view" | "edit";
-}
-const ExistingAttrConfigForm: React.FC<ExistingAttrConfigFormProps> = (props) => {
-    const {
-        config,
-        mode = "view"
-    } = props;
-
-    const fields = React.useMemo(() => {
-        return Object.entries(config).map((e, i) => {
-            switch (e[0]) {
-                case "encrypted":
-                    return <Toggle key={"encrypted"} disabled={mode == "view"} name="encrypted" checked={e[1]} label="Encrypted" />;
-                case "mandatory":
-                    return <Toggle key={"mandatory"} disabled={mode == "view"} name="mandatory" checked={e[1]} label="Mandatory" />;
-                case "primaryKey":
-                    return <Toggle key={"primaryKey"} disabled={mode == "view"} name="primaryKey" checked={e[1]} label="Primary key" />;
-                case "maxLength":
-                    return <NumberInput key={"maxLength"} disabled={mode == "view"} name="maxLength" value={e[1]} label="Max length" />;
-                case "max":
-                    return <NumberInput key={"max"} disabled={mode == "view"} name="max" value={e[1]} label="Max" />;
-                case "min":
-                    return <NumberInput key={"min"} disabled={mode == "view"} name="min" value={e[1]} label="Min" />;
-                case "precision":
-                    return <NumberInput key={"precision"} disabled={mode == "view"} name="min" value={e[1]} label="Precision" />;
-                default:
-                    return <></>
-            }
-        });
-    }, [config, mode]);
-
-    const updateAttr = React.useCallback((formData: {}) => {
-        console.log("updateAttr", formData);
-    }, [mode]);
-
-    return <Form onSubmit={mode == "view" ? undefined : updateAttr}>
-        {fields}
-    </Form>
-}
 
 interface AttributeListItemProps {
     model: AttributeModel;
@@ -57,8 +16,15 @@ const AttributeListItem = (props: AttributeListItemProps) => {
         config
     } = React.useMemo( () => model, [model]);
 
+    const [mode, setMode] = React.useState<"read" | "write">("read");
 
-    const { Modal: ViewModal, open: openViewModal, close: closeViewModal } = useModal({areaId: "root"});
+    const toggleMode = React.useCallback((value: string) => {
+        if (["read", "write"].includes(value)) {
+            setMode(value as ("read"| "write"));
+        }
+    },[setMode]);
+
+    const { Modal: EditModal, open: openEditModal, close: closeEditModal } = useModal({areaId: "root"});
     const { Modal: DeleteModal, open: openDelModal, close: closeDelModal } = useModal({areaId: "root"});
 
     const confirmDeleteAttr = React.useCallback(() => {
@@ -71,12 +37,16 @@ const AttributeListItem = (props: AttributeListItemProps) => {
     }, [classObj, name]);
 
     return <Card className="list-item-attribute">
-        <ViewModal title={`Attribute: ${name}`} footer={<ActionBar items={[
-            { position: "right", key: "btn-del-attr", item: <Button type="default" onClick={closeViewModal} iconName="close">Cancel</Button> },
+        <EditModal title={`Attribute: ${name}`} footer={<ActionBar items={[
+            { position: "right", key: "btn-del-attr", item: <Button type="default" onClick={closeEditModal} iconName="close">Cancel</Button> },
+            { item: <Select placeholder={"Mode"} options={[
+                {value: "read", element: "View", selected: mode == "read"},
+                {value: "write", element: "Edit", selected: mode != "read"}
+            ]} onChange={(v) => toggleMode(v as string)}  />, position: "left", key: "mode-selector" },
             { position: "left", key: "btn-cancel-edit-attr", item: <Button type="primary" onClick={openDelModal} accent="#f5474c" iconName="trash">Delete</Button> }
         ]}/>}>
-            <ExistingAttrConfigForm name={name} type={type} config={config} />
-        </ViewModal>
+            <ExistingAttrConfigForm classObj={classObj} closeModal={closeEditModal} mode={mode} model={model} />
+        </EditModal>
         <DeleteModal title="Confirmation" footer={<ActionBar items={[
             { position: "right", key: 'btn-cancel-del', item: <Button onClick={closeDelModal} type="primary" iconName="close">Cancel</Button> },
             { position: "right", key: 'btn-confirm-del', item: <Button onClick={confirmDeleteAttr} iconName="check">Confirm</Button> },
@@ -86,12 +56,12 @@ const AttributeListItem = (props: AttributeListItemProps) => {
         <Accordion header={<ActionBar
             items={[
                 { position: 'left', key: 'label-attr', item: <span>{name}</span> },
-                { position: "right", key: "btn-edit-attr", item: <Button onClick={openViewModal} className="btn-edit-attr" iconName="external-link" type="primary" /> },
+                { position: "right", key: "btn-edit-attr", item: <Button onClick={openEditModal} className="btn-edit-attr" iconName="external-link" type="primary" /> },
                 { position: "right", key: "btn-del-attr", item: <Button onClick={openDelModal} accent="#f5474c" className="btn-del-attr" iconName="trash" type="text" /> },
             ]}
         />}>
             <span>{type}</span>
-            <ExistingAttrConfigForm name={name} type={type} config={config} />
+            <ExistingAttrConfigForm model={model} />
         </Accordion>
     </Card>
 }

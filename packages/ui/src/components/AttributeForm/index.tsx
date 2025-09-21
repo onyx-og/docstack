@@ -1,7 +1,71 @@
 import React, { ReactElement, ReactNode } from "react";
-import { AttributeType, Class } from "@docstack/shared";
+import { AttributeModel, AttributeType, Class } from "@docstack/shared";
 import { Form, NumberInput, Select, TextInput, Toggle } from "@prismal/react";
 import { Attribute } from "@docstack/client";
+
+
+export interface ExistingAttrConfigFormProps {
+    classObj?: Class;
+    closeModal?: () => void;
+    model: AttributeModel,
+    mode?: "read" | "write";
+}
+export const ExistingAttrConfigForm: React.FC<ExistingAttrConfigFormProps> = (props) => {
+    const {
+        classObj,
+        closeModal,
+        model,
+        mode = "read"
+    } = props;
+
+    const {name, type, description, config} = model;
+
+    const fields = React.useMemo(() => {
+        const fields_: JSX.Element[] = [
+            <TextInput key="description" disabled={mode === "read"} value={description} name="description" label="Description" />
+        ];
+        const spec = Object.entries(config).map((e, i) => {
+            switch (e[0]) {
+                case "encrypted":
+                    return <Toggle key={"encrypted"} disabled={mode == "read"} name="encrypted" checked={e[1]} label="Encrypted" />;
+                case "mandatory":
+                    return <Toggle key={"mandatory"} disabled={mode == "read"} name="mandatory" checked={e[1]} label="Mandatory" />;
+                case "primaryKey":
+                    return <Toggle key={"primaryKey"} disabled={mode == "read"} name="primaryKey" checked={e[1]} label="Primary key" />;
+                case "maxLength":
+                    return <NumberInput key={"maxLength"} disabled={mode == "read"} name="maxLength" value={e[1]} label="Max length" />;
+                case "max":
+                    return <NumberInput key={"max"} disabled={mode == "read"} name="max" value={e[1]} label="Max" />;
+                case "min":
+                    return <NumberInput key={"min"} disabled={mode == "read"} name="min" value={e[1]} label="Min" />;
+                case "precision":
+                    return <NumberInput key={"precision"} disabled={mode == "read"} name="min" value={e[1]} label="Precision" />;
+                default:
+                    return <></>
+            }
+        });
+        fields_.push(...spec);
+        return fields_;
+    }, [config, mode]);
+
+    const updateAttr = React.useCallback((data: {[key: string]: any}) => {
+        if (classObj) {
+            console.log("updateAttr", data);
+            const description = data.description;
+            delete data.description;
+            const newAttribute = new Attribute(classObj, name, type, description, {...data});
+            classObj.modifyAttribute(name, newAttribute).then(res => {
+
+            }).finally(() => {
+                if (closeModal) closeModal();
+            });
+        }
+    }, [closeModal,mode, name, type, classObj]);
+
+    return <Form style={{flex: 1}} onSubmit={mode === "write" ? updateAttr : undefined}>
+        {fields}
+    </Form>
+}
 
 const getConfigFields = (type?: AttributeType["type"]) => {
     const fields: JSX.Element[] = [];

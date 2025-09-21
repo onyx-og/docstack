@@ -378,14 +378,19 @@ class Class extends Class_ {
     }
 
 
-    addAttribute = async (attribute: Attribute): Promise<Class> => {
-        const fnLogger = this.logger.child({method: "addAttribute"});
+    addAttribute = async (attribute: Attribute | AttributeModel): Promise<Class> => {
+        const fnLogger = this.logger.child({method: "addAttribute", args: {attribute: attribute.name}});
+        const attribute_ = attribute instanceof Attribute 
+            ? attribute : new Attribute(
+                this, attribute.name, attribute.type, 
+                attribute.description, attribute.config
+            );
         try {
-            let name = attribute.getName();
+            let name = attribute_.getName();
             if (!this.hasAttribute(name)) {
-                fnLogger.info("Adding attribute", {name: name, type: attribute.getModel()});
-                this.attributes[name] = attribute;
-                let attributeModel = attribute.getModel();
+                fnLogger.info("Adding attribute", {name: name, type: attribute_.getModel()});
+                this.attributes[name] = attribute_;
+                let attributeModel = attribute_.getModel();
                 fnLogger.info("Adding attribute to schema", {attributeModel: attributeModel});
                 // TODO: 
                 // this.schema[name] = attributeModel; // sometimes getting schema undefined
@@ -408,6 +413,30 @@ class Class extends Class_ {
             fnLogger.error("Falied adding attribute because: ", e)
             return this;
         }
+    }
+
+    modifyAttribute = async (name: string, attribute: Attribute | AttributeModel): Promise<Class> => {
+        const fnLogger = this.logger.child({method: "modifyAttribute", args: {name}});
+        const originSchema = {...this.model.schema[name]},
+            originAttr = this.attributes[name];
+        const attribute_ = attribute instanceof Attribute 
+            ? attribute : new Attribute(
+                this, attribute.name, attribute.type, 
+                attribute.description, attribute.config
+            );
+        try {
+            fnLogger.info(`Attempting to change attribute definition.`);
+            delete this.model.schema[name];
+            delete this.attributes[name];
+            this.schemaZOD = this.schemaZOD.omit({[name]: true});
+            return this.addAttribute(attribute_);
+        } catch (e: any) {
+            // Revert
+            this.model.schema[name] = originSchema;
+            this.attributes[name] = originAttr;
+            fnLogger.error(`Failed at removing attribute from class.'`);
+        }
+        return this;
     }
 
     removeAttribute = async (name: string): Promise<Class> => {

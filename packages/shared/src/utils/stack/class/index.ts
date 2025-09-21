@@ -106,7 +106,9 @@ abstract class Class extends EventTarget {
     abstract hasAttribute: ( name: string ) => boolean;
 
 
-    abstract addAttribute: (attribute: Attribute) => Promise<Class>;
+    abstract addAttribute: (attribute: Attribute | AttributeModel) => Promise<Class>;
+
+    abstract modifyAttribute: (name: string, attribute: Attribute | AttributeModel) => Promise<Class>;
 
     abstract removeAttribute: (name: string) => Promise<Class>;
 
