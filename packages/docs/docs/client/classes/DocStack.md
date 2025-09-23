@@ -1,6 +1,6 @@
 # Class: DocStack
 
-Defined in: [packages/client/src/index.ts:34](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L34)
+Defined in: [packages/client/src/index.ts:35](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L35)
 
 ## Extends
 
@@ -10,17 +10,15 @@ Defined in: [packages/client/src/index.ts:34](https://github.com/onyx-og/docstac
 
 ### Constructor
 
-> **new DocStack**(`config?`): `DocStack`
+> **new DocStack**(...`config`): `DocStack`
 
-Defined in: [packages/client/src/index.ts:155](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L155)
+Defined in: [packages/client/src/index.ts:189](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L189)
 
 #### Parameters
 
-##### config?
+##### config
 
-###### dbName
-
-`string`
+...`StackConfig`[]
 
 #### Returns
 
@@ -70,7 +68,7 @@ The **`addEventListener()`** method of the EventTarget interface sets up a funct
 
 > **clearConnection**(`conn`): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:88](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L88)
+Defined in: [packages/client/src/index.ts:121](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L121)
 
 #### Parameters
 
@@ -88,7 +86,7 @@ Defined in: [packages/client/src/index.ts:88](https://github.com/onyx-og/docstac
 
 > **createAttribute**(`className`, `params`): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:128](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L128)
+Defined in: [packages/client/src/index.ts:162](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L162)
 
 #### Parameters
 
@@ -112,7 +110,7 @@ Defined in: [packages/client/src/index.ts:128](https://github.com/onyx-og/docsta
 
 ###### type
 
-`"string"` \| `"boolean"` \| `"object"` \| `"integer"` \| `"decimal"` \| `"foreign_key"`
+`"string"` \| `"boolean"` \| `"object"` \| `"integer"` \| `"decimal"` \| `"date"` \| `"foreign_key"`
 
 #### Returns
 
@@ -124,7 +122,7 @@ Defined in: [packages/client/src/index.ts:128](https://github.com/onyx-og/docsta
 
 > **createClass**(`name`, `config`): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:103](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L103)
+Defined in: [packages/client/src/index.ts:137](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L137)
 
 #### Parameters
 
@@ -178,7 +176,7 @@ The **`dispatchEvent()`** method of the EventTarget sends an Event to the object
 
 > **getReadyState**(): `boolean`
 
-Defined in: [packages/client/src/index.ts:76](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L76)
+Defined in: [packages/client/src/index.ts:109](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L109)
 
 #### Returns
 
@@ -186,15 +184,33 @@ Defined in: [packages/client/src/index.ts:76](https://github.com/onyx-og/docstac
 
 ***
 
-### getStore()
+### getStack()
 
-> **getStore**(): [`ClientStack`](ClientStack.md)
+> **getStack**(`name`): `undefined` \| [`ClientStack`](ClientStack.md)
 
-Defined in: [packages/client/src/index.ts:72](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L72)
+Defined in: [packages/client/src/index.ts:105](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L105)
+
+#### Parameters
+
+##### name
+
+`string`
 
 #### Returns
 
-[`ClientStack`](ClientStack.md)
+`undefined` \| [`ClientStack`](ClientStack.md)
+
+***
+
+### getStacks()
+
+> **getStacks**(): [`ClientStack`](ClientStack.md)[]
+
+Defined in: [packages/client/src/index.ts:101](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L101)
+
+#### Returns
+
+[`ClientStack`](ClientStack.md)[]
 
 ***
 
@@ -236,7 +252,7 @@ The **`removeEventListener()`** method of the EventTarget interface removes an e
 
 > **reset**(): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:79](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L79)
+Defined in: [packages/client/src/index.ts:112](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L112)
 
 #### Returns
 
@@ -244,11 +260,11 @@ Defined in: [packages/client/src/index.ts:79](https://github.com/onyx-og/docstac
 
 ***
 
-### resetDb()
+### resetAll()
 
-> **resetDb**(): `Promise`\<`void`\>
+> **resetAll**(): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:64](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/index.ts#L64)
+Defined in: [packages/client/src/index.ts:91](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L91)
 
 #### Returns
 

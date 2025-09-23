@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "docs": [
     {
-      "_id": "User",
+      "_id": "~User",
       "active": true,
       "name": "User",
       "description": "A user class for secure login",
@@ -54,7 +54,7 @@
       }
     },
     {
-      "_id": "UserSession",
+      "_id": "~UserSession",
       "name": "UserSession",
       "active": true,
       "description": "Tracks user sessions",
@@ -75,6 +75,7 @@
           "type": "string",
           "config": {
             "maxLength": 200,
+            "primaryKey": true,
             "isArray": false,
             "mandatory": true
           }

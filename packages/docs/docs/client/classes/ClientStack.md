@@ -1,6 +1,6 @@
 # Class: ClientStack
 
-Defined in: [packages/client/src/utils/stack/index.ts:62](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L62)
+Defined in: [packages/client/src/core/index.ts:63](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L63)
 
 ## Extends
 
@@ -12,7 +12,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:62](https://github.com/ony
 
 > **cache**: `object`
 
-Defined in: [packages/client/src/utils/stack/index.ts:72](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L72)
+Defined in: [packages/client/src/core/index.ts:74](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L74)
 
 #### Index Signature
 
@@ -28,7 +28,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:72](https://github.com/ony
 
 > **connection**: `string`
 
-Defined in: [packages/client/src/utils/stack/index.ts:68](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L68)
+Defined in: [packages/client/src/core/index.ts:70](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L70)
 
 #### Overrides
 
@@ -40,7 +40,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:68](https://github.com/ony
 
 > **db**: `Database`\<\{ \}\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:64](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L64)
+Defined in: [packages/client/src/core/index.ts:65](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L65)
 
 #### Overrides
 
@@ -52,7 +52,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:64](https://github.com/ony
 
 > **lastDocId**: `number`
 
-Defined in: [packages/client/src/utils/stack/index.ts:66](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L66)
+Defined in: [packages/client/src/core/index.ts:68](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L68)
 
 #### Overrides
 
@@ -64,7 +64,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:66](https://github.com/ony
 
 > **listeners**: `Changes`\<\{ \}\>[] = `[]`
 
-Defined in: [packages/client/src/utils/stack/index.ts:77](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L77)
+Defined in: [packages/client/src/core/index.ts:79](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L79)
 
 #### Overrides
 
@@ -76,7 +76,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:77](https://github.com/ony
 
 > **modelWorker**: `null` \| `Worker` = `null`
 
-Defined in: [packages/client/src/utils/stack/index.ts:79](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L79)
+Defined in: [packages/client/src/core/index.ts:81](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L81)
 
 #### Overrides
 
@@ -84,11 +84,23 @@ Defined in: [packages/client/src/utils/stack/index.ts:79](https://github.com/ony
 
 ***
 
+### name
+
+> **name**: `string`
+
+Defined in: [packages/client/src/core/index.ts:66](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L66)
+
+#### Overrides
+
+`Stack.name`
+
+***
+
 ### options?
 
-> `optional` **options**: `StoreOptions`
+> `optional` **options**: `StackOptions`
 
-Defined in: [packages/client/src/utils/stack/index.ts:69](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L69)
+Defined in: [packages/client/src/core/index.ts:71](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L71)
 
 #### Overrides
 
@@ -100,7 +112,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:69](https://github.com/ony
 
 > **patchCount**: `number`
 
-Defined in: [packages/client/src/utils/stack/index.ts:75](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L75)
+Defined in: [packages/client/src/core/index.ts:77](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L77)
 
 #### Overrides
 
@@ -112,7 +124,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:75](https://github.com/ony
 
 > `static` **appVersion**: `string` = `"0.0.1"`
 
-Defined in: [packages/client/src/utils/stack/index.ts:70](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L70)
+Defined in: [packages/client/src/core/index.ts:72](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L72)
 
 #### Overrides
 
@@ -124,13 +136,13 @@ Defined in: [packages/client/src/utils/stack/index.ts:70](https://github.com/ony
 
 > **addClass**(`classObj`): `Promise`\<`ClassModel`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:736](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L736)
+Defined in: [packages/client/src/core/index.ts:714](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L714)
 
 #### Parameters
 
 ##### classObj
 
-`Class`
+[`Class`](Class.md)
 
 #### Returns
 
@@ -146,7 +158,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:736](https://github.com/on
 
 > **addClassLock**(`className`): `Promise`\<`boolean`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:429](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L429)
+Defined in: [packages/client/src/core/index.ts:397](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L397)
 
 #### Parameters
 
@@ -161,6 +173,36 @@ Defined in: [packages/client/src/utils/stack/index.ts:429](https://github.com/on
 #### Overrides
 
 `Stack.addClassLock`
+
+***
+
+### addDesignDocumentPKs()
+
+> **addDesignDocumentPKs**(`className`, `pKs`, `temp`): `Promise`\<`string`\>
+
+Defined in: [packages/client/src/core/index.ts:755](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L755)
+
+#### Parameters
+
+##### className
+
+`string`
+
+##### pKs
+
+`string`[]
+
+##### temp
+
+`boolean` = `false`
+
+#### Returns
+
+`Promise`\<`string`\>
+
+#### Overrides
+
+`Stack.addDesignDocumentPKs`
 
 ***
 
@@ -202,7 +244,7 @@ The **`addEventListener()`** method of the EventTarget interface sets up a funct
 
 > **checkSystem**(): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:235](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L235)
+Defined in: [packages/client/src/core/index.ts:248](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L248)
 
 #### Returns
 
@@ -214,7 +256,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:235](https://github.com/on
 
 > **clearClassLock**(`className`): `Promise`\<`boolean`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:444](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L444)
+Defined in: [packages/client/src/core/index.ts:418](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L418)
 
 #### Parameters
 
@@ -236,7 +278,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:444](https://github.com/on
 
 > **close**(): `void`
 
-Defined in: [packages/client/src/utils/stack/index.ts:481](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L481)
+Defined in: [packages/client/src/core/index.ts:455](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L455)
 
 #### Returns
 
@@ -252,7 +294,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:481](https://github.com/on
 
 > **createDoc**(`docId`, `type`, `classObj`, `params`): `Promise`\<`null` \| `Document`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:999](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L999)
+Defined in: [packages/client/src/core/index.ts:1027](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L1027)
 
 #### Parameters
 
@@ -266,7 +308,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:999](https://github.com/on
 
 ##### classObj
 
-`Class`
+[`Class`](Class.md)
 
 ##### params
 
@@ -284,7 +326,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:999](https://github.com/on
 
 > **deleteDocument**(`_id`): `Promise`\<`boolean`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:1089](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L1089)
+Defined in: [packages/client/src/core/index.ts:1117](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L1117)
 
 Sets the active param of a document to false
 
@@ -310,7 +352,7 @@ Promise<boolean>
 
 > **destroyDb**(): `Promise`\<`undefined` \| `false`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:705](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L705)
+Defined in: [packages/client/src/core/index.ts:683](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L683)
 
 #### Returns
 
@@ -348,7 +390,7 @@ The **`dispatchEvent()`** method of the EventTarget sends an Event to the object
 
 > **findDocument**(`selector`, `fields`, `skip`, `limit`): `Promise`\<`null` \| `Document`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:601](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L601)
+Defined in: [packages/client/src/core/index.ts:579](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L579)
 
 #### Parameters
 
@@ -378,7 +420,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:601](https://github.com/on
 
 > **findDocuments**(`selector`, `fields?`, `skip?`, `limit?`): `Promise`\<\{\[`key`: `string`\]: `any`; `docs`: `Document`[]; \}\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:557](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L557)
+Defined in: [packages/client/src/core/index.ts:535](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L535)
 
 #### Parameters
 
@@ -408,13 +450,13 @@ Defined in: [packages/client/src/utils/stack/index.ts:557](https://github.com/on
 
 ### getAllClasses()
 
-> **getAllClasses**(): `Promise`\<`Class`[]\>
+> **getAllClasses**(): `Promise`\<[`Class`](Class.md)[]\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:639](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L639)
+Defined in: [packages/client/src/core/index.ts:617](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L617)
 
 #### Returns
 
-`Promise`\<`Class`[]\>
+`Promise`\<[`Class`](Class.md)[]\>
 
 ***
 
@@ -422,7 +464,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:639](https://github.com/on
 
 > **getAllClassModels**(): `Promise`\<`ClassModel`[]\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:654](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L654)
+Defined in: [packages/client/src/core/index.ts:632](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L632)
 
 #### Returns
 
@@ -432,9 +474,9 @@ Defined in: [packages/client/src/utils/stack/index.ts:654](https://github.com/on
 
 ### getClass()
 
-> **getClass**(`className`): `Promise`\<`null` \| `Class`\>
+> **getClass**(`className`, `fresh`): `Promise`\<`null` \| [`Class`](Class.md)\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:486](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L486)
+Defined in: [packages/client/src/core/index.ts:461](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L461)
 
 #### Parameters
 
@@ -442,9 +484,13 @@ Defined in: [packages/client/src/utils/stack/index.ts:486](https://github.com/on
 
 `string`
 
+##### fresh
+
+`boolean` = `false`
+
 #### Returns
 
-`Promise`\<`null` \| `Class`\>
+`Promise`\<`null` \| [`Class`](Class.md)\>
 
 #### Overrides
 
@@ -456,7 +502,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:486](https://github.com/on
 
 > **getClassModel**(`className`): `Promise`\<`null` \| `ClassModel`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:607](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L607)
+Defined in: [packages/client/src/core/index.ts:585](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L585)
 
 #### Parameters
 
@@ -478,7 +524,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:607](https://github.com/on
 
 > **getClassModels**(`classNames`): `Promise`\<`ClassModel`[]\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:665](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L665)
+Defined in: [packages/client/src/core/index.ts:643](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L643)
 
 #### Parameters
 
@@ -496,7 +542,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:665](https://github.com/on
 
 > **getDb**(): `Database`\<\{ \}\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:109](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L109)
+Defined in: [packages/client/src/core/index.ts:122](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L122)
 
 #### Returns
 
@@ -508,7 +554,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:109](https://github.com/on
 
 > **getDbInfo**(): `Promise`\<`DatabaseInfo`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:113](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L113)
+Defined in: [packages/client/src/core/index.ts:126](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L126)
 
 #### Returns
 
@@ -520,7 +566,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:113](https://github.com/on
 
 > **getDbName**(): `string`
 
-Defined in: [packages/client/src/utils/stack/index.ts:117](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L117)
+Defined in: [packages/client/src/core/index.ts:130](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L130)
 
 #### Returns
 
@@ -532,7 +578,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:117](https://github.com/on
 
 > **getDocRevision**(`docId`): `Promise`\<`null` \| `string`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:544](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L544)
+Defined in: [packages/client/src/core/index.ts:522](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L522)
 
 #### Parameters
 
@@ -550,7 +596,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:544](https://github.com/on
 
 > **getDocument**(`docId`): `Promise`\<`null` \| `ExistingDocument`\<\{ \}\>\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:529](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L529)
+Defined in: [packages/client/src/core/index.ts:507](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L507)
 
 #### Parameters
 
@@ -568,7 +614,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:529](https://github.com/on
 
 > **getLastDocId**(): `Promise`\<`number`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:129](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L129)
+Defined in: [packages/client/src/core/index.ts:142](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L142)
 
 #### Returns
 
@@ -580,7 +626,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:129](https://github.com/on
 
 > **getSystem**(): `Promise`\<`null` \| `SystemDoc`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:144](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L144)
+Defined in: [packages/client/src/core/index.ts:157](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L157)
 
 #### Returns
 
@@ -592,7 +638,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:144](https://github.com/on
 
 > **incrementLastDocId**(): `Promise`\<`undefined` \| `number`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:676](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L676)
+Defined in: [packages/client/src/core/index.ts:654](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L654)
 
 #### Returns
 
@@ -604,7 +650,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:676](https://github.com/on
 
 > **initdb**(): `Promise`\<`ClientStack`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:474](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L474)
+Defined in: [packages/client/src/core/index.ts:448](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L448)
 
 #### Returns
 
@@ -616,7 +662,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:474](https://github.com/on
 
 > **initIndex**(): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:500](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L500)
+Defined in: [packages/client/src/core/index.ts:478](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L478)
 
 #### Returns
 
@@ -628,7 +674,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:500](https://github.com/on
 
 > **onClassDoc**(`className`): `Changes`\<\{ \}\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:458](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L458)
+Defined in: [packages/client/src/core/index.ts:432](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L432)
 
 #### Parameters
 
@@ -650,7 +696,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:458](https://github.com/on
 
 > **onClassLock**(`className`): `Changes`\<\{ \}\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:416](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L416)
+Defined in: [packages/client/src/core/index.ts:384](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L384)
 
 #### Parameters
 
@@ -672,30 +718,13 @@ Defined in: [packages/client/src/utils/stack/index.ts:416](https://github.com/on
 
 > **onClassModelChanges**(): `Changes`\<\{ \}\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:350](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L350)
-
-Listener that fires when a document that refers to a class is edited or created,
-marks its execution while handling the propagation of schema modifications to children documents: 
-by dispatching a webworker message containing the
+Defined in: [packages/client/src/core/index.ts:357](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L357)
 
 #### Returns
 
 `Changes`\<\{ \}\>
 
-void
-
-#### Var
-
-className and the previous revision id.
-In the main case, the worker sends a message with the result of its task.
-
-#### Fires
-
-class-model-propagation-complete
-
-#### Fires
-
-class-model-propagation-pending
+PouchDB.Core.Changes<{}>
 
 ***
 
@@ -703,7 +732,7 @@ class-model-propagation-pending
 
 > **onClassModelPropagationComplete**(`event`): `void`
 
-Defined in: [packages/client/src/utils/stack/index.ts:331](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L331)
+Defined in: [packages/client/src/core/index.ts:344](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L344)
 
 #### Parameters
 
@@ -726,7 +755,7 @@ When a class model propagation comes to completion remove the corresponding
 
 > **onClassModelPropagationStart**(`event`): `void`
 
-Defined in: [packages/client/src/utils/stack/index.ts:316](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L316)
+Defined in: [packages/client/src/core/index.ts:329](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L329)
 
 #### Parameters
 
@@ -753,7 +782,7 @@ It prevents any further modifications on the class data model
 
 > **prepareDoc**(`_id`, `type`, `params`): `object`
 
-Defined in: [packages/client/src/utils/stack/index.ts:989](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L989)
+Defined in: [packages/client/src/core/index.ts:1017](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L1017)
 
 #### Parameters
 
@@ -777,7 +806,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:989](https://github.com/on
 
 > **removeAllListeners**(): `void`
 
-Defined in: [packages/client/src/utils/stack/index.ts:305](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L305)
+Defined in: [packages/client/src/core/index.ts:318](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L318)
 
 #### Returns
 
@@ -831,7 +860,7 @@ The **`removeEventListener()`** method of the EventTarget interface removes an e
 
 > **reset**(): `Promise`\<`ClientStack`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:694](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L694)
+Defined in: [packages/client/src/core/index.ts:672](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L672)
 
 #### Returns
 
@@ -843,7 +872,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:694](https://github.com/on
 
 > **setListeners**(): `void`
 
-Defined in: [packages/client/src/utils/stack/index.ts:273](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L273)
+Defined in: [packages/client/src/core/index.ts:286](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L286)
 
 #### Returns
 
@@ -859,13 +888,13 @@ Defined in: [packages/client/src/utils/stack/index.ts:273](https://github.com/on
 
 > **updateClass**(`classObj`): `Promise`\<`null` \| `Document`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:770](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L770)
+Defined in: [packages/client/src/core/index.ts:748](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L748)
 
 #### Parameters
 
 ##### classObj
 
-`Class`
+[`Class`](Class.md)
 
 #### Returns
 
@@ -881,7 +910,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:770](https://github.com/on
 
 > **validateObject**(`obj`, `type`, `schema`): `Promise`\<`boolean`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:789](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L789)
+Defined in: [packages/client/src/core/index.ts:817](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L817)
 
 #### Parameters
 
@@ -905,7 +934,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:789](https://github.com/on
 
 > **validateObjectByType**(`obj`, `type`, `schema?`): `Promise`\<`boolean`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:962](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L962)
+Defined in: [packages/client/src/core/index.ts:990](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L990)
 
 #### Parameters
 
@@ -933,7 +962,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:962](https://github.com/on
 
 > `static` **clear**(`conn`): `Promise`\<`unknown`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:721](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L721)
+Defined in: [packages/client/src/core/index.ts:699](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L699)
 
 #### Parameters
 
@@ -951,7 +980,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:721](https://github.com/on
 
 > `static` **create**(`conn`, `options?`): `Promise`\<`ClientStack`\>
 
-Defined in: [packages/client/src/utils/stack/index.ts:122](https://github.com/onyx-og/docstack/blob/b2170f8fde219e53e469f3acacbad3f9b1b531a7/packages/client/src/utils/stack/index.ts#L122)
+Defined in: [packages/client/src/core/index.ts:135](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/index.ts#L135)
 
 #### Parameters
 
@@ -961,7 +990,7 @@ Defined in: [packages/client/src/utils/stack/index.ts:122](https://github.com/on
 
 ##### options?
 
-`StoreOptions`
+`StackOptions`
 
 #### Returns
 
