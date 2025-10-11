@@ -134,6 +134,16 @@ class DocStack extends EventTarget {
         }
     }
 
+    public export = async (stackName: string) => {
+        const stack = this.getStack(stackName);
+        if (stack) {
+            const dump = await stack.dump();
+            return dump;
+        } else {
+            throw new Error(`Did not find any stack for name '${stackName}'`);
+        }
+    }
+
     public createClass = async (name: string, config: {
         type: string,
         description: string

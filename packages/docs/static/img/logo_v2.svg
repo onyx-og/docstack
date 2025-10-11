@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <!-- Background -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#2a1322"/>
+      <stop offset="60%" stop-color="#1b0b14"/>
+      <stop offset="100%" stop-color="#0f0710"/>
+    </radialGradient>
+
+    <!-- neon gradient for strokes -->
+      <linearGradient id="neon" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#6200EE"/>
+      <stop offset="50%" stop-color="#00674F"/>
+      <stop offset="100%" stop-color="#88E788"/>
+    </linearGradient>
+
+    <!-- Glow filter using colored flood -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#6200EE" flood-opacity="0.6"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#00674F" flood-opacity="0.5"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#88E788" flood-opacity="0.4"/>
+    </filter>
+
+
+    <!-- subtle grain/dots texture (small dotted grid) -->
+    <pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="0.9" fill="rgba(255,255,255,0.03)"/>
+    </pattern>
+  </defs>
+
+  <!-- container for rects centered at 300,300 -->
+  <g transform="translate(300,300)">
+    <!-- Glow pass: thicker blurred strokes underneath -->
+    <g filter="url(#glow)" opacity="0.55">
+      <!-- Nine concentric rounded rectangles, decreasing size, increasing rotation -->
+      <rect x="-210" y="-210" width="420" height="420" rx="36" ry="36"
+            fill="none" stroke="url(#neon)" stroke-width="14" stroke-linejoin="round"/>
+      <rect x="-190" y="-190" width="380" height="380" rx="32" ry="32"
+            fill="none" stroke="url(#neon)" stroke-width="12" stroke-linejoin="round" transform="rotate(6)"/>
+      <rect x="-170" y="-170" width="340" height="340" rx="28" ry="28"
+            fill="none" stroke="url(#neon)" stroke-width="10" stroke-linejoin="round" transform="rotate(12)"/>
+      <rect x="-150" y="-150" width="300" height="300" rx="24" ry="24"
+            fill="none" stroke="url(#neon)" stroke-width="9" stroke-linejoin="round" transform="rotate(18)"/>
+      <rect x="-130" y="-130" width="260" height="260" rx="20" ry="20"
+            fill="none" stroke="url(#neon)" stroke-width="8" stroke-linejoin="round" transform="rotate(24)"/>
+      <rect x="-110" y="-110" width="220" height="220" rx="18" ry="18"
+            fill="none" stroke="url(#neon)" stroke-width="7" stroke-linejoin="round" transform="rotate(30)"/>
+      <rect x="-90" y="-90" width="180" height="180" rx="14" ry="14"
+            fill="none" stroke="url(#neon)" stroke-width="6" stroke-linejoin="round" transform="rotate(36)"/>
+      <rect x="-70" y="-70" width="140" height="140" rx="12" ry="12"
+            fill="none" stroke="url(#neon)" stroke-width="5.5" stroke-linejoin="round" transform="rotate(42)"/>
+      <rect x="-50" y="-50" width="100" height="100" rx="10" ry="10"
+            fill="none" stroke="url(#neon)" stroke-width="5" stroke-linejoin="round" transform="rotate(48)"/>
+    </g>
+
+    <!-- Crisp strokes on top -->
+    <g>
+      <rect x="-210" y="-210" width="420" height="420" rx="36" ry="36"
+            fill="none" stroke="url(#neon)" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="-190" y="-190" width="380" height="380" rx="32" ry="32"
+            fill="none" stroke="url(#neon)" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" transform="rotate(6)"/>
+      <rect x="-170" y="-170" width="340" height="340" rx="28" ry="28"
+            fill="none" stroke="url(#neon)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" transform="rotate(12)"/>
+      <rect x="-150" y="-150" width="300" height="300" rx="24" ry="24"
+            fill="none" stroke="url(#neon)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" transform="rotate(18)"/>
+      <rect x="-130" y="-130" width="260" height="260" rx="20" ry="20"
+            fill="none" stroke="url(#neon)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" transform="rotate(24)"/>
+      <rect x="-110" y="-110" width="220" height="220" rx="18" ry="18"
+            fill="none" stroke="url(#neon)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" transform="rotate(30)"/>
+      <rect x="-90" y="-90" width="180" height="180" rx="14" ry="14"
+            fill="none" stroke="url(#neon)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" transform="rotate(36)"/>
+      <rect x="-70" y="-70" width="140" height="140" rx="12" ry="12"
+            fill="none" stroke="url(#neon)" stroke-width="2.0" stroke-linejoin="round" stroke-linecap="round" transform="rotate(42)"/>
+      <rect x="-50" y="-50" width="100" height="100" rx="10" ry="10"
+            fill="none" stroke="url(#neon)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" transform="rotate(48)"/>
+    </g>
+  </g>
+</svg>

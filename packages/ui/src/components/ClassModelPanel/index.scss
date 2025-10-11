@@ -1,5 +1,19 @@
-
 .panel-class-model {
+    display: flex;
+    div[class^='panel-class-model'] {
+        flex: 2;
+
+        &.panel-class-model-info {
+            flex: 1
+        }
+
+        &.panel-class-model-list {
+            height: 70vh;
+            overflow: auto;
+            padding: 0 0.5rem;
+        }
+    }
+
     .prismal-list.prismal-list-type-list .prismal-list-wrapper>.prismal-page-container {
         justify-content: space-evenly;
         align-items: baseline;

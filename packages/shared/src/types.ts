@@ -83,6 +83,7 @@ export type Document = PouchDB.Core.Document<{
 // storing the version of the patch and the documents contained in it
 export interface Patch {
     version: string;
+    changelog: string;
     docs: (PouchDB.Core.ExistingDocument<{
         [key: string]: any
     }> | PouchDB.Core.Document<{[key: string]: any}>)[]

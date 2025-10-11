@@ -1,0 +1,85 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  user-select: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+
+  &-icon {
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+  }
+
+  /* Variants */
+  &-default {
+    background: #f3f3f3;
+    color: #333;
+    border-color: #ddd;
+
+    &:hover {
+      background: #e6e6e6;
+    }
+  }
+
+  &-outlined {
+    background: transparent;
+    border: 1px solid #aaa;
+    color: #333;
+
+    &:hover {
+      border-color: #555;
+    }
+  }
+
+  &-selected {
+    background: #4a90e2;
+    color: #fff;
+    border-color: #357ab8;
+  }
+
+  &-success {
+    background: #e0f7e9;
+    color: #2e7d32;
+    border-color: #81c784;
+  }
+
+  &-danger {
+    background: #fdecea;
+    color: #c62828;
+    border-color: #ef9a9a;
+  }
+}
+
+/* Border radius map */
+.chip-radius-none {
+  border-radius: 0;
+}
+
+.chip-radius-xs {
+  border-radius: 2px;
+}
+
+.chip-radius-sm {
+  border-radius: 4px;
+}
+
+.chip-radius-md {
+  border-radius: 6px;
+}
+
+.chip-radius-lg {
+  border-radius: 10px;
+}
+
+.chip-radius-xl {
+  border-radius: 16px;
+}
+
+.chip-radius-full {
+  border-radius: 9999px;
+}

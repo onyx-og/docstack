@@ -1,0 +1,21 @@
+/* SCSS styles */
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: repeat(3, auto) 1fr repeat(2, auto); 
+    height: 32px;
+    background-color: var(--color-primary-dark);
+    border-top: 1px solid #444;
+    align-items: center;
+    font-family: monospace;
+    font-size: 12px;
+    color: #ddd;
+
+    // Pause all marquee animations when hovering over status bar
+    &:hover .marquee-content {
+        animation-play-state: paused;
+    }
+}

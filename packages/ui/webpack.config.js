@@ -105,7 +105,8 @@ const config = {
       "http": require.resolve("stream-http"),
       "zlib": require.resolve("browserify-zlib"),
       "timers": require.resolve("setimmediate"),
-      "fs": false
+      "fs": false,
+      "process/browser": require.resolve("process/browser"),
     },
     extensions: [
       '.js',

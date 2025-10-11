@@ -3,6 +3,7 @@ import {
     Document,
     StackOptions,
     ClassModel,
+    Patch,
 } from "../../types";
 
 import Class from "./class";
@@ -16,7 +17,9 @@ abstract class Stack extends EventTarget {
     public connection!: string;
     public options?: StackOptions;
     abstract name: string;
-    public static appVersion: string = "0.0.1";
+    public appVersion: string = "0.0.1";
+    abstract schemaVersion: string | undefined;
+    abstract patches: Patch[];
     /* Used to retrieve faster data */
     public cache: {
         [className: string]: CachedClass
@@ -26,6 +29,8 @@ abstract class Stack extends EventTarget {
     listeners: PouchDB.Core.Changes<{}>[] = [];
 
     modelWorker: Worker | null = null;
+
+    abstract dump: () => Promise<PouchDB.Core.AllDocsResponse<{}>>;
 
     abstract setListeners: () => void;
 

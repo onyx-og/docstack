@@ -1,16 +1,19 @@
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AuthView from "views/AuthView";
-import React from 'react';
+import React, { useContext } from 'react';
 import Dashboard from 'views/Dashboard';
 
+import { StackProvider } from "@docstack/react";
 require('@prismal/react/lib/index.css');
 
 import "./index.scss";
 import ClassView from 'views/Class';
-import { ActionBar, ActionBarItemConfig, Button, Header, Text, useModal } from '@prismal/react';
+import { ActionBar, ActionBarItemConfig, Button, Header, Marquee, useModal } from '@prismal/react';
 import { logout } from 'features/auth';
 import DebugPanel from 'components/DebugPanel';
+import StatusBar from 'components/StatusBar';
+import { DocStackContext } from '@docstack/react';
 
 const AppHeader = () => {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -46,14 +49,20 @@ const AppHeader = () => {
             })
         }
         items.push(
-            { item: <Text type="heading" level={1}>Dashboard</Text>, key: "dashboard-title", position: "left" },
+            { item: <div className='app-title' style={{
+                    height: '40px', width: '150px',
+                    background: `url("${require('assets/type.svg')}")`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: 'center',
+                }}></div>, key: "dashboard-title", position: "left" },
             { item: <Button type="text" iconName="bug" onClick={openDebugPanel} />, key: "btn-bug", position: "right" },
-            { item: <Button type="primary" onClick={doLogout}>Logout</Button>, key: "btn-logout", position: "right" }
+            { item: <Button type="primary" iconName='sign-out' onClick={doLogout}/>, key: "btn-logout", position: "right" }
         )
         return items;
     }, [openDebugPanel, doLogout, location]);
 
-    return <Header style={{
+    return <Header className='app-header' style={{
             borderBottom: "var(--color-primary) solid .1rem",
         }}>
             
@@ -65,10 +74,29 @@ const AppHeader = () => {
     </Header>
 }
 
+const AppStatusBar = () => {
+    const docStack = useContext(DocStackContext);
+    const dbName = useAppSelector((state) => state.stack.name);
+
+    const { Modal: ChangelogModal, open: openPatchChangelog } = useModal({ areaId: "root" });
+
+    return <StatusBar>
+        <ChangelogModal title="Changelog">
+            <p>{docStack?.getStack(dbName)?.patches.map(patch => patch.changelog)}</p>
+        </ChangelogModal>
+        <Marquee>{`Stack: ${dbName}`}</Marquee>
+        <Marquee>{`Version: ${docStack?.getStack(dbName)?.appVersion}`}</Marquee>
+        <Marquee onClick={openPatchChangelog}>{`Schema version: ${docStack?.getStack(dbName)?.schemaVersion}`}</Marquee>
+        <Marquee speed={0.7}>Trigger definition and storing is currently in development...         Class deletion is next step in the roadmap...               
+        </Marquee>
+    </StatusBar>
+}
+
 const App = () => {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
     const isAnonymous = useAppSelector((state) => state.auth.isAnonymous);
     const navigate = useNavigate();
+    const dbName = useAppSelector((state) => state.stack.name);
 
     const location = useLocation();
 
@@ -85,7 +113,14 @@ const App = () => {
         return <AppHeader />
     }, [isAuthenticated, isAnonymous, location]);
 
-    return <>
+    const statusbar = React.useMemo(() => {
+        if (!isAuthenticated && !isAnonymous) {
+            return null;
+        }
+        return <AppStatusBar />
+    },[isAuthenticated, isAnonymous, location]);
+
+    return <StackProvider config={ dbName ? [dbName] : []}>
         {header}
         
         <Routes>
@@ -93,7 +128,8 @@ const App = () => {
             <Route path="/login" element={<AuthView />} />
             <Route path="/class/:className" element={<ClassView />} />
         </Routes>
-    </>;
+        {statusbar}
+    </StackProvider>;
 }
 
 export default App;

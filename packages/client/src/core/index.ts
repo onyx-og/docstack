@@ -69,7 +69,7 @@ class ClientStack extends Stack {
     /* Populated on async constructor */
     connection!: string;
     options?: StackOptions;
-    static appVersion: string = "0.0.1";
+    appVersion: string = "0.0.1";
     /* Used to retrieve faster data */
     cache: {
         [className: string]: CachedClass
@@ -79,6 +79,8 @@ class ClientStack extends Stack {
     listeners: PouchDB.Core.Changes<{}>[] = [];
 
     modelWorker: Worker | null = null;
+    schemaVersion: string | undefined;
+    patches: Patch[] = [];
 
     private constructor() {
         super();
@@ -129,6 +131,11 @@ class ClientStack extends Stack {
 
     public getDbName() {
         return this.db.name;
+    }
+
+    public dump = async () => {
+        const all = await this.db.allDocs({include_docs: true});
+        return all;
     }
 
     // asynchronous factory method
@@ -221,6 +228,7 @@ class ClientStack extends Stack {
         try {
             this.patchCount = countPatches();
             const allPatches = await this.loadPatches();
+            this.patches = allPatches;
             // When schemaVersion is undefined uses index 0 (start from first)
             // or start from the index after the patch at which the system is at 
             const startingIndex = schemaVersion ? (allPatches.findIndex(patch => patch.version === schemaVersion)+1)
@@ -228,6 +236,7 @@ class ClientStack extends Stack {
             logger.info(`applyPatches - Starting to apply patches from index ${startingIndex}`)
             if (startingIndex === -1 || startingIndex === allPatches.length) {
                 logger.info("applyPatches - No patches to apply");
+                this.schemaVersion = schemaVersion;
                 return schemaVersion!; // [TODO] Error prone
             }
             let patches = allPatches.slice(startingIndex);
@@ -235,6 +244,7 @@ class ClientStack extends Stack {
                 _schemaVersion = await this.applyPatch(patch);
             }
             logger.info("applyPatches - Successfully applied patches till version", {version: _schemaVersion});
+            this.schemaVersion = _schemaVersion;
             return _schemaVersion!; // [TODO] Error prone
         } catch (e: any) {
             logger.error("applyPatches - something went wrong", e);
@@ -253,7 +263,7 @@ class ClientStack extends Stack {
         if (!systemDoc) {
             _systemDoc = {
                 _id: "~system",
-                appVersion: ClientStack.appVersion,
+                appVersion: this.appVersion,
                 dbInfo: dbInfo,
                 schemaVersion: undefined,
                 startupTime: (new Date()).valueOf()
@@ -266,7 +276,7 @@ class ClientStack extends Stack {
             // apply patches if needed
             let schemaVersion = await this.applyPatches(systemDoc.schemaVersion);
             _systemDoc = { ...systemDoc,
-                appVersion: ClientStack.appVersion,
+                appVersion: this.appVersion,
                 dbInfo: dbInfo,
                 schemaVersion: schemaVersion,
                 startupTime: (new Date()).valueOf()

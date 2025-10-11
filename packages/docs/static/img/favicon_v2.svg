@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" width="50" height="50">
+  <defs>
+    <!-- background -->
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+
+    <!-- New gradient -->
+    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6200EE"/>
+      <stop offset="50%" stop-color="#00674F"/>
+      <stop offset="100%" stop-color="#88E788"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.5" flood-color="#6200EE" flood-opacity="0.6"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#00674F" flood-opacity="0.5"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="#88E788" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- centered rects -->
+  <g filter="url(#glow)" transform="translate(25,25)">
+    <rect x="-22" y="-22" width="44" height="44" rx="6" ry="6" fill="none" stroke="url(#neon)" stroke-width="3"/>
+    <rect x="-18" y="-18" width="36" height="36" rx="5" ry="5" fill="none" stroke="url(#neon)" stroke-width="3" transform="rotate(10)"/>
+    <rect x="-14" y="-14" width="28" height="28" rx="4" ry="4" fill="none" stroke="url(#neon)" stroke-width="3" transform="rotate(20)"/>
+    <rect x="-10" y="-10" width="20" height="20" rx="3" ry="3" fill="none" stroke="url(#neon)" stroke-width="3" transform="rotate(30)"/>
+  </g>
+</svg>

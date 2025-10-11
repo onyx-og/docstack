@@ -20,8 +20,8 @@ const StackProvider = (props: DocStackProviderProps) => {
     },[]);
 
     useEffect(() => {
-        if (docStackRef.current === null) {
-            console.log("DocStack provider - init instance");
+        if (docStackRef.current === null && config.length) {
+            console.log("DocStack provider - init instance", {config});
             const instance = new DocStack(...config);
             docStackRef.current = instance;
             docStackRef.current.addEventListener("ready", setsDocStackWhenReady);

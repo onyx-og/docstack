@@ -1,3 +1,10 @@
 .class-card.prismal-card {
     width: 100%;
 }
+
+.attr-conf-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    justify-content: center;
+}
