@@ -1,6 +1,6 @@
 # Class: DocStack
 
-Defined in: [packages/client/src/index.ts:35](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L35)
+Defined in: [packages/client/src/index.ts:35](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L35)
 
 ## Extends
 
@@ -12,7 +12,7 @@ Defined in: [packages/client/src/index.ts:35](https://github.com/onyx-og/docstac
 
 > **new DocStack**(...`config`): `DocStack`
 
-Defined in: [packages/client/src/index.ts:189](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L189)
+Defined in: [packages/client/src/index.ts:199](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L199)
 
 #### Parameters
 
@@ -68,7 +68,7 @@ The **`addEventListener()`** method of the EventTarget interface sets up a funct
 
 > **clearConnection**(`conn`): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:121](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L121)
+Defined in: [packages/client/src/index.ts:121](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L121)
 
 #### Parameters
 
@@ -86,7 +86,7 @@ Defined in: [packages/client/src/index.ts:121](https://github.com/onyx-og/docsta
 
 > **createAttribute**(`className`, `params`): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:162](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L162)
+Defined in: [packages/client/src/index.ts:172](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L172)
 
 #### Parameters
 
@@ -122,7 +122,7 @@ Defined in: [packages/client/src/index.ts:162](https://github.com/onyx-og/docsta
 
 > **createClass**(`name`, `config`): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:137](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L137)
+Defined in: [packages/client/src/index.ts:147](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L147)
 
 #### Parameters
 
@@ -172,11 +172,29 @@ The **`dispatchEvent()`** method of the EventTarget sends an Event to the object
 
 ***
 
+### export()
+
+> **export**(`stackName`): `Promise`\<`AllDocsResponse`\<\{ \}\>\>
+
+Defined in: [packages/client/src/index.ts:137](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L137)
+
+#### Parameters
+
+##### stackName
+
+`string`
+
+#### Returns
+
+`Promise`\<`AllDocsResponse`\<\{ \}\>\>
+
+***
+
 ### getReadyState()
 
 > **getReadyState**(): `boolean`
 
-Defined in: [packages/client/src/index.ts:109](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L109)
+Defined in: [packages/client/src/index.ts:109](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L109)
 
 #### Returns
 
@@ -188,7 +206,7 @@ Defined in: [packages/client/src/index.ts:109](https://github.com/onyx-og/docsta
 
 > **getStack**(`name`): `undefined` \| [`ClientStack`](ClientStack.md)
 
-Defined in: [packages/client/src/index.ts:105](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L105)
+Defined in: [packages/client/src/index.ts:105](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L105)
 
 #### Parameters
 
@@ -206,7 +224,7 @@ Defined in: [packages/client/src/index.ts:105](https://github.com/onyx-og/docsta
 
 > **getStacks**(): [`ClientStack`](ClientStack.md)[]
 
-Defined in: [packages/client/src/index.ts:101](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L101)
+Defined in: [packages/client/src/index.ts:101](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L101)
 
 #### Returns
 
@@ -252,7 +270,7 @@ The **`removeEventListener()`** method of the EventTarget interface removes an e
 
 > **reset**(): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:112](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L112)
+Defined in: [packages/client/src/index.ts:112](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L112)
 
 #### Returns
 
@@ -264,7 +282,7 @@ Defined in: [packages/client/src/index.ts:112](https://github.com/onyx-og/docsta
 
 > **resetAll**(): `Promise`\<`void`\>
 
-Defined in: [packages/client/src/index.ts:91](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/index.ts#L91)
+Defined in: [packages/client/src/index.ts:91](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/index.ts#L91)
 
 #### Returns
 

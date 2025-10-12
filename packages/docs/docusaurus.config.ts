@@ -7,7 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'DocStack',
   tagline: 'One does not simply stack documents',
-  favicon: 'img/logo.png',
+  favicon: 'img/favicon.ico',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -109,7 +109,7 @@ const config: Config = {
       title: 'DocStack',
       logo: {
         alt: 'DocStack Logo',
-        src: 'img/logo_.svg',
+        src: 'img/logo.svg',
       },
       items: [
         {

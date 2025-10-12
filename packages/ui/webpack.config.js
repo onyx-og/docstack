@@ -17,7 +17,7 @@ const config = {
   entry: "./src/index.tsx",
   output: {
     publicPath: '/docstack/app',
-    path: path.resolve(__dirname, "build"),
+    path: path.resolve(__dirname, "../docs/static/app"),
     filename: '[name].[contenthash].js',
     clean: true,
   },

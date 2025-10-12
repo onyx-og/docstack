@@ -1,6 +1,6 @@
 # Class: Attribute
 
-Defined in: [packages/client/src/core/attribute.ts:5](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L5)
+Defined in: [packages/client/src/core/attribute.ts:5](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L5)
 
 ## Extends
 
@@ -12,7 +12,7 @@ Defined in: [packages/client/src/core/attribute.ts:5](https://github.com/onyx-og
 
 > **new Attribute**(`classObj`, `name`, `type`, `description?`, `config?`): `Attribute`
 
-Defined in: [packages/client/src/core/attribute.ts:13](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L13)
+Defined in: [packages/client/src/core/attribute.ts:13](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L13)
 
 #### Parameters
 
@@ -50,7 +50,7 @@ Defined in: [packages/client/src/core/attribute.ts:13](https://github.com/onyx-o
 
 > **class**: `null` \| [`Class`](Class.md)
 
-Defined in: [packages/client/src/core/attribute.ts:10](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L10)
+Defined in: [packages/client/src/core/attribute.ts:10](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L10)
 
 #### Overrides
 
@@ -62,7 +62,7 @@ Defined in: [packages/client/src/core/attribute.ts:10](https://github.com/onyx-o
 
 > `optional` **defaultValue**: `any`
 
-Defined in: [packages/client/src/core/attribute.ts:11](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L11)
+Defined in: [packages/client/src/core/attribute.ts:11](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L11)
 
 #### Overrides
 
@@ -74,7 +74,7 @@ Defined in: [packages/client/src/core/attribute.ts:11](https://github.com/onyx-o
 
 > `optional` **description**: `string`
 
-Defined in: [packages/client/src/core/attribute.ts:7](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L7)
+Defined in: [packages/client/src/core/attribute.ts:7](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L7)
 
 #### Overrides
 
@@ -86,7 +86,7 @@ Defined in: [packages/client/src/core/attribute.ts:7](https://github.com/onyx-og
 
 > **field**: `ZodType`
 
-Defined in: [packages/client/src/core/attribute.ts:9](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L9)
+Defined in: [packages/client/src/core/attribute.ts:9](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L9)
 
 #### Overrides
 
@@ -98,7 +98,7 @@ Defined in: [packages/client/src/core/attribute.ts:9](https://github.com/onyx-og
 
 > **model**: `AttributeModel`
 
-Defined in: [packages/client/src/core/attribute.ts:8](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L8)
+Defined in: [packages/client/src/core/attribute.ts:8](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L8)
 
 #### Overrides
 
@@ -110,7 +110,7 @@ Defined in: [packages/client/src/core/attribute.ts:8](https://github.com/onyx-og
 
 > **name**: `string`
 
-Defined in: [packages/client/src/core/attribute.ts:6](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L6)
+Defined in: [packages/client/src/core/attribute.ts:6](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L6)
 
 #### Overrides
 
@@ -122,7 +122,7 @@ Defined in: [packages/client/src/core/attribute.ts:6](https://github.com/onyx-og
 
 > **checkTypeValidity**(`type`): `boolean`
 
-Defined in: [packages/client/src/core/attribute.ts:226](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L226)
+Defined in: [packages/client/src/core/attribute.ts:226](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L226)
 
 #### Parameters
 
@@ -144,7 +144,7 @@ Defined in: [packages/client/src/core/attribute.ts:226](https://github.com/onyx-
 
 > **getClass**(): [`Class`](Class.md)
 
-Defined in: [packages/client/src/core/attribute.ts:176](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L176)
+Defined in: [packages/client/src/core/attribute.ts:176](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L176)
 
 #### Returns
 
@@ -160,7 +160,7 @@ Defined in: [packages/client/src/core/attribute.ts:176](https://github.com/onyx-
 
 > **getEmpty**(): `object`
 
-Defined in: [packages/client/src/core/attribute.ts:211](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L211)
+Defined in: [packages/client/src/core/attribute.ts:211](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L211)
 
 #### Returns
 
@@ -176,7 +176,7 @@ Defined in: [packages/client/src/core/attribute.ts:211](https://github.com/onyx-
 
 > **getModel**(): `AttributeModel`
 
-Defined in: [packages/client/src/core/attribute.ts:172](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L172)
+Defined in: [packages/client/src/core/attribute.ts:172](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L172)
 
 #### Returns
 
@@ -192,7 +192,7 @@ Defined in: [packages/client/src/core/attribute.ts:172](https://github.com/onyx-
 
 > **getName**(): `string`
 
-Defined in: [packages/client/src/core/attribute.ts:222](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L222)
+Defined in: [packages/client/src/core/attribute.ts:222](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L222)
 
 #### Returns
 
@@ -208,7 +208,7 @@ Defined in: [packages/client/src/core/attribute.ts:222](https://github.com/onyx-
 
 > **getType**(`type`): `"string"` \| `"boolean"` \| `"object"` \| `"integer"` \| `"decimal"` \| `"date"` \| `"foreign_key"`
 
-Defined in: [packages/client/src/core/attribute.ts:204](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L204)
+Defined in: [packages/client/src/core/attribute.ts:204](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L204)
 
 #### Parameters
 
@@ -230,7 +230,7 @@ Defined in: [packages/client/src/core/attribute.ts:204](https://github.com/onyx-
 
 > **getTypeConf**(`type`, `config`): `AttributeTypeConfig` \| `object` & `AttributeTypeConfig` \| `object` & `AttributeTypeConfig` \| `object` & `AttributeTypeConfig` \| `object` & `AttributeTypeConfig` \| `object` & `AttributeTypeConfig` \| `object` & `AttributeTypeConfig`
 
-Defined in: [packages/client/src/core/attribute.ts:239](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L239)
+Defined in: [packages/client/src/core/attribute.ts:239](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L239)
 
 #### Parameters
 
@@ -256,7 +256,7 @@ Defined in: [packages/client/src/core/attribute.ts:239](https://github.com/onyx-
 
 > **isMandatory**(): `boolean`
 
-Defined in: [packages/client/src/core/attribute.ts:168](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L168)
+Defined in: [packages/client/src/core/attribute.ts:168](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L168)
 
 #### Returns
 
@@ -272,7 +272,7 @@ Defined in: [packages/client/src/core/attribute.ts:168](https://github.com/onyx-
 
 > **isPrimaryKey**(): `boolean`
 
-Defined in: [packages/client/src/core/attribute.ts:163](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L163)
+Defined in: [packages/client/src/core/attribute.ts:163](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L163)
 
 #### Returns
 
@@ -288,7 +288,7 @@ Defined in: [packages/client/src/core/attribute.ts:163](https://github.com/onyx-
 
 > **setField**(): `void`
 
-Defined in: [packages/client/src/core/attribute.ts:31](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L31)
+Defined in: [packages/client/src/core/attribute.ts:31](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L31)
 
 #### Returns
 
@@ -304,7 +304,7 @@ Defined in: [packages/client/src/core/attribute.ts:31](https://github.com/onyx-o
 
 > **setModel**(`model`): `void`
 
-Defined in: [packages/client/src/core/attribute.ts:196](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L196)
+Defined in: [packages/client/src/core/attribute.ts:196](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L196)
 
 #### Parameters
 
@@ -326,7 +326,7 @@ Defined in: [packages/client/src/core/attribute.ts:196](https://github.com/onyx-
 
 > **validate**(`data`): `Promise`\<`ZodSafeParseResult`\<`unknown`\>\>
 
-Defined in: [packages/client/src/core/attribute.ts:181](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L181)
+Defined in: [packages/client/src/core/attribute.ts:181](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L181)
 
 #### Parameters
 
@@ -348,7 +348,7 @@ Defined in: [packages/client/src/core/attribute.ts:181](https://github.com/onyx-
 
 > `static` **build**(`attributeObj`): `Promise`\<`Attribute`\>
 
-Defined in: [packages/client/src/core/attribute.ts:185](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L185)
+Defined in: [packages/client/src/core/attribute.ts:185](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L185)
 
 #### Parameters
 
@@ -370,7 +370,7 @@ Defined in: [packages/client/src/core/attribute.ts:185](https://github.com/onyx-
 
 > `static` **create**(`classObj`, `name`, `type`, `description?`, `config?`): `Promise`\<`Attribute`\>
 
-Defined in: [packages/client/src/core/attribute.ts:151](https://github.com/onyx-og/docstack/blob/8fe77cd2e0f22df702409b01965e114b72d2f5c7/packages/client/src/core/attribute.ts#L151)
+Defined in: [packages/client/src/core/attribute.ts:151](https://github.com/onyx-og/docstack/blob/4c91ccc0c048deefa90df955aedb28105b2e2ce1/packages/client/src/core/attribute.ts#L151)
 
 #### Parameters
 

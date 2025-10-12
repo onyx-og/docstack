@@ -6,7 +6,7 @@
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://onyx-og.github.io/docstack/blog"/>
     <subtitle>DocStack Blog</subtitle>
-    <icon>https://onyx-og.github.io/docstack/img/logo.png</icon>
+    <icon>https://onyx-og.github.io/docstack/img/favicon.ico</icon>
     <entry>
         <title type="html"><![CDATA[Welcome]]></title>
         <id>https://onyx-og.github.io/docstack/blog/welcome</id>
