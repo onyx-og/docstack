@@ -22,7 +22,7 @@ class Class extends Class_ {
     /* Populated in init() */
     name!: string;
     /* Populated in init() */
-    type!: string;
+    type!: "class";
     description?: string;
     attributes: {[name: string]: Attribute} = {};
     schema: ClassModel["schema"] = {};
@@ -68,7 +68,7 @@ class Class extends Class_ {
                 }
                 
             } else {
-                reject("Missing db configuration");
+                reject("Missing stack assignment");
             }
         })
     }
@@ -76,7 +76,7 @@ class Class extends Class_ {
     init = (
         stack: Stack | null,
         name: string,
-        type: string,
+        type: "class",
         description?: string,
         schema: ClassModel["schema"] = {}
         // parentClass: Class | null
@@ -108,7 +108,7 @@ class Class extends Class_ {
     public static get = (
         stack: Stack,
         name: string,
-        type: string = "class",
+        type: "class" = "class",
         description?: string,
         schema: ClassModel["schema"] = {},
     ) => {
@@ -130,7 +130,7 @@ class Class extends Class_ {
     public static create = async (
         stack: Stack,
         name: string,
-        type: string = "class",
+        type: "class" = "class",
         description?: string,
         schema: ClassModel["schema"] = {},
         // parentClass: Class | null = null

@@ -3,7 +3,7 @@ import type Class from "./utils/stack/class";
 import Trigger from "./utils/stack/trigger";
 
 
-export const ATTRIBUTE_TYPES = ["string", "number", "integer", "reference", "boolean"];
+export const ATTRIBUTE_TYPES = ["string", "decimal", "integer", "foreign_key", "date", "enum", "reference", "object", "boolean"];
 
 export type AttributeTypeConfig = {
     isArray?: boolean,
@@ -49,10 +49,20 @@ export type AttributeTypeObject = {
     name: string,
     config: {} & AttributeTypeConfig
 }
+export type AttributeTypeEnum = {
+    type: "enum",
+    name: string,
+    config: {
+        values: {
+            value: string | number | object
+        }[],
+        type: AttributeType["type"]
+    } & AttributeTypeConfig
+}
 export type AttributeType = 
     AttributeTypeString | AttributeTypeInteger | AttribruteTypeDate |
     AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey |
-    AttributeTypeObject;
+    AttributeTypeObject | AttributeTypeEnum;
 export type AttributeModel = {
     name: string,
     description?: string,
@@ -61,7 +71,7 @@ export type AttributeModel = {
 }
 
 export interface ClassModel extends Document {
-    type: string,
+    type: "class",
     name: string,
     description?: string,
     parentClass?: string,
@@ -70,6 +80,17 @@ export interface ClassModel extends Document {
     triggers: TriggerModel[];
 }
 
+export interface DomainModel extends Document {
+    type: "domain",
+    name: string,
+    relation: "1:1" | "1:N" | "N:1" | "N:N";
+    sourceClass: string;
+    targetClass: string;
+    description?: string,
+    parentDomain?: string,
+    _rev?: PouchDB.Core.RevisionId | undefined;
+    // schema: {[name: string]: AttributeModel};
+}
 
 export type Document = PouchDB.Core.Document<{
     type: string;

@@ -31,34 +31,38 @@ export const BASE_SCHEMA: ClassModel["schema"] = {
 }
 export const CLASS_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    "schema": { name: "schema", type: "object", config: { maxLength: 1000, isArray: true }},
+    "type": { name: "type", type: "string", config: { defaultValue: "class"} },
+    "schema": { name: "schema", type: "object", config: { maxLength: 1000, isArray: false }},
     "parentClass": { name: "parentClass", type: "foreign_key", config: { isArray: false } },
 }
 const DOMAIN_SCHEMA: ClassModel["schema"] = {
+    ...BASE_SCHEMA,
+    "type": { name: "type", type: "string", config: { defaultValue: "domain"} },
     "schema": { name: "schema", type: "object", config: { 
         isArray: true,
-        defaultValue: [
-            {
+        defaultValue: {
+            "source": {
                 name: "source",
                 type: "foreign_key",
                 config: {
                     isArray: false
                 }
             },
-            {
+            "target": {
                 name: "target",
                 type: "foreign_key",
                 config: {
                     isArray: false
                 }
             }
-        ]
+        }
     }},
-    "parentDomain": { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
-    "relation": { name: "relation", type: "string", config: { maxLength: 100 , isArray: false } },
+    // "parentDomain": { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
+    "relation": { name: "relation", type: "enum", config: { isArray: false, values: [
+        {value: "1:1"}, {value: "1:N"}, {value: "N:1"}, {value: "N:N"}
+    ] } },
     "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
     "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: true } },
-    ...BASE_SCHEMA
 };
 class ClientStack extends Stack {
     /* Initialized asynchronously */
