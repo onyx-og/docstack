@@ -167,7 +167,7 @@ class Domain extends EventTarget {
     }
 
     static fetch = async ( stack: Stack, domainName: string ) => {
-        let domainModel = await stack.getClassModel(domainName);
+        let domainModel = await stack.getDomainModel(domainName);
         if ( domainModel ) {
             return Domain.buildFromModel(stack, domainModel);
         } else {
