@@ -1,3 +1,4 @@
+import Domain from "./utils/stack/domain";
 import Stack from "./utils/stack";
 import type Class from "./utils/stack/class";
 import Trigger from "./utils/stack/trigger";
@@ -59,10 +60,17 @@ export type AttributeTypeEnum = {
         type: AttributeType["type"]
     } & AttributeTypeConfig
 }
+export type AttributeTypeRelation = {
+    type: "relation",
+    name: string,
+    config: {
+        domain: string
+    } & AttributeTypeConfig
+}
 export type AttributeType = 
     AttributeTypeString | AttributeTypeInteger | AttribruteTypeDate |
     AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey |
-    AttributeTypeObject | AttributeTypeEnum;
+    AttributeTypeObject | AttributeTypeEnum | AttributeTypeRelation;
 export type AttributeModel = {
     name: string,
     description?: string,
@@ -145,6 +153,10 @@ export type StackConfig = ({
 } & StackOptions) | string | `db-${string}`;
 
 export type CachedClass = Class & {
+    ttl: number
+}
+
+export type CachedDomain = Domain & {
     ttl: number
 }
 

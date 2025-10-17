@@ -4,9 +4,12 @@ import {
     StackOptions,
     ClassModel,
     Patch,
+    CachedDomain,
+    DomainModel,
 } from "../../types";
 
 import Class from "./class";
+import Domain from "./domain";
 
 abstract class Stack extends EventTarget {
     /* Initialized asynchronously */
@@ -22,7 +25,7 @@ abstract class Stack extends EventTarget {
     abstract patches: Patch[];
     /* Used to retrieve faster data */
     public cache: {
-        [className: string]: CachedClass
+        [className: string]: CachedClass | CachedDomain
     } = {}
     public patchCount!: number;
 
@@ -40,7 +43,11 @@ abstract class Stack extends EventTarget {
 
     abstract getClass: (className: string, fresh?: boolean) => Promise<Class | null>;
 
+    abstract getDomain: (domainName: string, fresh?: boolean) => Promise<Domain | null>;
+
     abstract addClass: (classObj: Class) => Promise<ClassModel>;
+
+    abstract addDomain: (domainObj: Domain) => Promise<DomainModel>;
 
     abstract updateClass: (classObj: Class) => Promise<Document | null>;
 
@@ -65,6 +72,8 @@ abstract class Stack extends EventTarget {
 
 
     abstract getClassModel: (className: string) => Promise<ClassModel | null>;
+
+    abstract getDomainModel: (domainName: string) => Promise<DomainModel | null>;
 
     abstract deleteDocument: (_id: string) => Promise<boolean>;
 

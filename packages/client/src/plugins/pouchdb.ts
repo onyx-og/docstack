@@ -1,5 +1,5 @@
 import { isClassModel, isDocument, Stack } from "@docstack/shared";
-import type {ClassModel, StackPluginType} from "@docstack/shared";
+import type {ClassModel, Document, StackPluginType} from "@docstack/shared";
 // import Stack from "../utils/stack";
 import PouchDB from "pouchdb-browser";
 import { Trigger } from "../core/trigger";
@@ -18,26 +18,82 @@ const logger = createLogger().child({module: "pouchdb"});
 export const StackPlugin: StackPluginType = (stack: Stack) => {
     const pouchBulkDocs = PouchDB.prototype.bulkDocs;
     return {
-        bulkDocs: async function (docs, options, callback) {
+        bulkDocs: async function (docs, options: PouchDB.Core.BulkDocsOptions & {
+            isPostOp?: boolean
+        } | null, callback) {
             const fnLogger = logger.child({method: "bulkDocs"});
             if (typeof options == 'function') {
                 callback = options
                 options = {}
             }
 
-            const originalFn = () => {
-                if (callback) {
-                    return pouchBulkDocs.call(this, docs, options, callback);
-                } else {
-                    return pouchBulkDocs.call(this, docs, options);
-                }
-            }
+            // const originalFn: typeof this.bulkDocs = () => {
+            //     if (callback) {
+            //         return pouchBulkDocs.call(this, docs, options, callback);
+            //     } else {
+            //         return pouchBulkDocs.call(this, docs, options);
+            //     }
+            // }
 
             let documentsToProcess: typeof docs;
             if (Array.isArray(docs)) {
                 documentsToProcess = docs;
             } else {
                 documentsToProcess = (docs as any).docs;
+            }
+
+            const relationQueue: {
+                domainId: string,
+                sourceId: string,
+                targetId: string,
+                type: "1:1" | "1:N" | "N:1" |"N:N"
+            }[] = [];
+
+            const triggerQueue: Record<string, Trigger[]> = Object.create(null);
+
+            const postOperations = async (
+                error: PouchDB.Core.Error | null,
+                result: (PouchDB.Core.Error | PouchDB.Core.Response)[] | null
+            ) => {
+                if (error) {
+                    return {error, result}
+                } else if (result) {
+                    const docs: Document[] = []
+                    for (const docRes of result) {
+                        if (docRes.id) {
+                            const doc = await stack.db.get(docRes.id) as Document;
+                            const afterTriggers = triggerQueue[docRes.id]
+                            for (const afterTrigger of afterTriggers) {
+                                const updatedDoc = await afterTrigger.execute(doc);
+                                Object.assign(doc, updatedDoc);
+                            }
+                            docs.push(doc);
+                        }
+                    }
+                    const recurse: Promise<{
+                        error: PouchDB.Core.Error | null,
+                        result: (PouchDB.Core.Error | PouchDB.Core.Response)[] | null
+                    }> = new Promise((resolve, reject) => {
+                        (this.bulkDocs as any).apply(this, [docs, {
+                            isPostOp: true
+                        }, (rErr: typeof error, rRes: typeof result) => resolve({
+                            error: rErr, 
+                            result: rRes
+                        })])
+                    })
+                    const {error: rErr, result: rRes} = await recurse;
+                    return {error: rErr, result: rRes}
+                }
+                return {error, result}
+            }
+
+            const postExec: typeof callback = async (error, result) => {
+                if (!options?.isPostOp) {
+                    const {error: err, result: res} = await postOperations(error, result);
+                    if (callback) callback(err, res);
+                } else if (callback) {
+                    callback(error, result);
+                }
             }
 
             for (const doc of documentsToProcess) {
@@ -52,11 +108,11 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         const revisionIDList = docWithRevs._revisions!.ids;
                         if (revisionIDList.length == 1) {
                             fnLogger.info(`Class '${className}' was just created. Nothing to do.`);
-                            return originalFn();
+                            return pouchBulkDocs.call(this, docs, options, postExec);
                         }
                     } catch (e: any) {
                         if (e.name === 'not_found') {
-                            return originalFn();
+                            return pouchBulkDocs.call(this, docs, options, postExec);
                         }
                     }
                     // Fetch the current (next old) version of the class document.
@@ -70,14 +126,14 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
 
                     if (!schemaDelta) {
                         fnLogger.info(`Class '${className}' has no changes on schema.`)
-                        return originalFn();
+                        return pouchBulkDocs.call(this, docs, options, postExec);
                     }
 
                     const documents = await classObj.getCards();
 
                     if (documents.length === 0) {
                         fnLogger.info(`No documents found for class '${className}' after its update.`);
-                        return originalFn();
+                        return pouchBulkDocs.call(this, docs, options, postExec);
                     }
 
                     const updates = await Promise.all(documents.map(async doc => {
@@ -93,12 +149,42 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     try {
                         const classObj = await stack.getClass(className);
                         if (classObj) {
+
+                            const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => a.model.type === "relation");
+                            for (const attr of relationalAttrs) {
+                                const relationValue = doc[attr.name];
+                                if (!relationValue) continue;
+                                const domainId = attr.model.config.domain;
+                                const domain = await stack.getDomain(domainId);
+                                if (!domain) throw new Error(`Domain not found: ${domainId}`);
+
+                                // Validate relation constraint
+                                const isValid = await domain.validateRelation(doc, relationValue);
+                                if (!isValid) {
+                                    throw new Error(`Invalid relation for ${attr.name} on ${doc._id}`);
+                                }
+
+                                // Queue relation creation
+                                relationQueue.push({
+                                    domainId: domain.id,
+                                    sourceId: doc._id,
+                                    targetId: relationValue,
+                                    type: domain.relation
+                                });
+                            }
+                            // TODO: skip execution of before triggers if option.isPostOp
                             const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
+                            const afterTriggers = classObj.triggers.filter( t => t.order === "before");
 
                             for (const trigger of beforeTriggers) {
                                 const updatedDoc = await trigger.execute(doc);
                                 Object.assign(doc, updatedDoc); // Merge changes back.
                             }
+
+                            triggerQueue[doc._id] = [
+                                ...(triggerQueue[doc._id] || []),
+                                ...afterTriggers
+                            ];
 
                             // Perform validation using the schema.
                             const validationResult = await classObj.validate(doc);
@@ -110,9 +196,9 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         return Promise.reject(error);
                     }
                 }
-            }
-            return originalFn();
+            }            
             
+            return pouchBulkDocs.call(this, docs, options, postExec);
         },
 
     };

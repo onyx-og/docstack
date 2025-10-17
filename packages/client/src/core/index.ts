@@ -1,6 +1,7 @@
 import PouchDB from "pouchdb";
 import createLogger from "../utils/logger";
 import Class from "./class";
+import Domain from "./domain";
 import { decryptString } from "../utils/crypto";
 import { importJsonFile, countPatches } from "./datamodel";
 import {
@@ -9,7 +10,9 @@ import {
     CachedClass,
     ClassModelPropagationStart,
     ClassModelPropagationComplete,
-    isClassModel
+    isClassModel,
+    CachedDomain,
+    DomainModel
 } from "@docstack/shared";
 
 
@@ -18,6 +21,7 @@ import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDec
     AttributeTypeInteger,
     AttributeTypeString} from "@docstack/shared";
 import { StackPlugin } from "../plugins/pouchdb";
+import { domain } from "zod/v4/core/regexes.cjs";
 
 const logger = createLogger().child({module: "stack"});
 
@@ -76,7 +80,7 @@ class ClientStack extends Stack {
     appVersion: string = "0.0.1";
     /* Used to retrieve faster data */
     cache: {
-        [className: string]: CachedClass
+        [className: string]: CachedClass | CachedDomain
     }
     patchCount!: number;
 
@@ -473,11 +477,12 @@ class ClientStack extends Stack {
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
     getClass = async (className: string, fresh =  false): Promise<Class | null> => {
+        const fnLogger = logger.child({method: "getDomain", args: {className, fresh}});
         if (!fresh) {
             // Check if class is in cache and not expired
             if (this.cache[className] && Date.now() < this.cache[className].ttl) {
-                logger.info("getClass -  retrieving class from cache", {ttl: this.cache[className].ttl})
-                return this.cache[className];
+                fnLogger.info("Retrieving class from cache", {ttl: this.cache[className].ttl})
+                return this.cache[className] as Class;
             }
         }
         
@@ -487,6 +492,23 @@ class ClientStack extends Stack {
             this.cache[className] = classObj as CachedClass;
         }
         return classObj;
+    }
+
+    getDomain = async (domainName: string, fresh =  false): Promise<Domain | null> => {
+        const fnLogger = logger.child({method: "getDomain", args: {domainName, fresh}});
+        if (!fresh) {
+            if (this.cache[domainName] && Date.now() < this.cache[domainName].ttl) {
+                fnLogger.info("Retrieving domain from cache", {ttl: this.cache[domainName].ttl});
+                return this.cache[domainName] as Domain;
+            }
+        }
+
+        const domainObj = await Domain.fetch(this, domainName);
+        if (domainObj) {
+            (domainObj as CachedDomain).ttl = Date.now() + 60000 * 15; // 15 minutes expiration
+            this.cache[domainName] = domainObj as CachedDomain;
+        }
+        return domainObj;
     }
 
     async initIndex () {
@@ -614,6 +636,24 @@ class ClientStack extends Stack {
         }
     }
 
+    getDomainModel = async ( domainName: string ) => {
+        let selector = {
+            type: { $eq: "domain" },
+            name: { $eq: domainName }
+        };
+
+        try {
+            let response = await this.findDocument(selector);
+            if (response == null) return null;
+            let result: DomainModel = response as DomainModel
+            logger.info("getDomainModel - result", {result: result})
+            return result;
+        } catch(e: any) {
+            logger.info("getDomainModel - error", e)
+            throw new Error(e)
+        }
+    }
+
     /*
     async getDomainModel( domainName: string ) {
         let selector = {
@@ -730,34 +770,28 @@ class ClientStack extends Stack {
         logger.info("addClass - got class model", {classModel})
         let existingDoc = await this.getClassModel(classModel.name);
         if ( existingDoc == null ) {
-            let resultDoc = await this.createDoc(classModel.name, 'class', classObj, classModel);
+            let resultDoc = await this.createDoc(classModel.name, 'class', CLASS_SCHEMA, classModel);
             logger.info("addClass - result", {result: resultDoc});
-            // [TODO] Consider creating a design doc for easier filtering
-            // this.db.put({
-            //     _id: `_design/${classModel.name}`,
-            //     filters: {
-            //         classDocs: function (doc) {
-            //         return doc.type == `${classModel.name}`;
-            //         }.toString()
-            //     }
-            // });
+            // TODO: Consider creating a design doc for easier filtering
             return resultDoc as ClassModel;
         } else {
             return existingDoc;
         } 
     }
 
-    // async addDomain( domainObj: Domain ) {
-    //     let domainModel = domainObj.getModel();
-    //     let existingDoc = await this.getDomainModel(domainModel.name);
-    //     if ( existingDoc == null ) {
-    //         let resultDoc = await this.createDoc(domainModel.name, domainObj, domainModel);
-    //         logger.info("addClass - result", resultDoc)
-    //         return resultDoc as DomainModel;
-    //     } else {
-    //         return existingDoc;
-    //     }
-    // }
+    addDomain = async ( domainObj: Domain ) => {
+        let domainModel = domainObj.getModel();
+        logger.info("addDomain - got domain model", {domainModel})
+        let existingDoc = await this.getDomainModel(domainModel.name);
+        if ( existingDoc == null ) {
+            let resultDoc = await this.createDoc(domainModel.name, 'domain', DOMAIN_SCHEMA, domainModel);
+            logger.info("addDomain - result", {result: resultDoc});
+            // TODO: Consider creating a design doc for easier filtering
+            return resultDoc as DomainModel;
+        } else {
+            return existingDoc;
+        } 
+    }
 
     updateClass = async (classObj: Class) => {
         // logger.info("updateClass - classObj", classObj)
@@ -1038,8 +1072,13 @@ class ClientStack extends Stack {
         return params;
     }
 
-    createDoc = async (docId: string | null, type: string,classObj: Class, params: {}) => {
-        let schema = classObj.buildSchema();
+    createDoc = async (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}) => {
+        let schema: ClassModel["schema"] = {};
+        if (classObj instanceof Class) {
+            schema = classObj.buildSchema();
+        } else {
+            schema = classObj;
+        }
         // [TODO] Custom triggers goes here
         logger.info("createDoc - args", {docId, type, params, schema});
         let db = this.db,

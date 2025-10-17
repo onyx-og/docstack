@@ -1,11 +1,11 @@
-import { DomainModel, Stack } from "@docstack/shared";
+import { Document, Domain as Domain_, DomainModel, Stack } from "@docstack/shared";
 import { createLogger, Logger } from "winston";
 
-class Domain extends EventTarget {
+class Domain extends Domain_ {
     stack: Stack | undefined;
     name!: string;
     type!: "domain";
-    description?: string;
+    description: string | undefined;
     id!: string;
     schema: DomainModel["schema"] = {};
     relation!: DomainModel["relation"];
@@ -192,6 +192,35 @@ class Domain extends EventTarget {
         };
         return model;
     }
+
+    validateRelation = async (sourceDoc: Document, targetId: string) => {
+        const source = this.sourceClass;
+        const target = this.targetClass;
+        const type = this.relation;
+
+        if (this.stack) {
+            const targetDoc = await this.stack.db.get(targetId).catch(() => null);
+            if (!targetDoc) return false; // Target must exist.
+
+            switch (type) {
+                case "1:1":
+                    // Ensure neither already participates in another relation
+                    return true
+                case "1:N":
+                    // Ensure target is not linked to another source
+                    return true
+
+                case "N:N":
+                    return true;
+
+                default:
+                    throw new Error(`Unsupported relation type ${type}`);
+            }
+        } else {
+            throw new Error(`Stack is not defined for Domain ${this.name}`);
+        }
+    }
+
 }
 
 export default Domain;
