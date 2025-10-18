@@ -654,56 +654,98 @@ class ClientStack extends Stack {
         }
     }
 
-    /*
-    async getDomainModel( domainName: string ) {
-        let selector = {
-            type: { $eq: "domain" },
-            name: { $eq: domainName }
+    // TODO: move listener to stack field, for easier un-registering
+    async getClassModels(conf: { listen?: boolean, filter?: string[], search?: string } = {}) {
+        const {listen, filter, search} = conf;
+        const selector: {[field: string]: object} = { type: { $eq: "class" } };
+        if (Array.isArray(filter) && filter.length > 0) {
+            selector._id = { $in: filter };
         }
 
-        let response = await this.findDocument(selector)
-        let result: DomainModel = response as DomainModel
-        logger.info("getDomainModel - result", {result})
-        return result;
-    } */
+        // Case 2: A search query (partial match)
+        else if (search && typeof search === 'string') {
+            // Mango doesn’t have full regex support, so we use $regex via the pouchdb-find plugin.
+            selector.$or = [
+                { _id: { $regex: RegExp(search, "i") } },
+                { name: { $regex: RegExp(search, "i") } },
+                { description: { $regex: RegExp(search, "i") } }
+            ];
+        }
+        const fields = ['_id', 'name', 'description', 'schema'];
 
-    // [TODO] Implement abstract
-    getAllClasses = async () => {
-        const fnLogger = logger.child({"method": "getAllClasses"});
+        const response = await this.findDocuments(selector, fields);
+        const result: ClassModel[] = response.docs as ClassModel[];
+
+        if (!conf.listen) {
+            return { list: result };
+        }
+
+        // Create a live listener via PouchDB changes feed
+        const listener = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            selector
+        });
+
+        return {
+            list: result,
+            listener
+        };
+    }
+
+    getClasses = async (conf: {filter?: string[], search?: string}) => {
+        const classNames = conf.filter;
+        const searchFilter = conf.search;
+        const fnLogger = logger.child({ method: "getAllClasses" });
         fnLogger.info("Requesting");
-        let classModels =  await this.getAllClassModels();
-        fnLogger.info("Received classes models", {classModels});
-        let classList: Class[] = [];
+
+        const { list: classModels, listener } = await this.getClassModels({
+            listen: true, filter: classNames, search: searchFilter
+        });
+        fnLogger.info("Received class models", { classModels });
+
+        const classList: Class[] = [];
+
+        // Get current class list
         for (const classModel of classModels) {
-            fnLogger.info(`Building class "${classModel.name}" from model`, {classModel});
+            fnLogger.info(`Building class "${classModel.name}"`);
             const classObj = await Class.buildFromModel(this, classModel);
             classList.push(classObj);
         }
-        fnLogger.info("Completed classes build");
+
+        // Queue for occasional addition/deletion
+        if (listener) {
+            listener.on("change", async (change) => {
+                debugger;
+                if (!change.deleted) {
+                    const className = change.id;
+                    fnLogger.info(`Received class model change with "${className}"`);
+                    const existingIndex = classList.findIndex(c => c.model._id === className);
+                    const classObj = await Class.buildFromModel(this, change.doc as ClassModel);
+                    if (existingIndex === -1) {
+                        classList.push(classObj);
+                    } else {
+                        classList[existingIndex] = classObj;
+                    }
+                    const evt = new CustomEvent("classListChange", {detail: classList});
+                    this.dispatchEvent(evt);
+                } else {
+                    // remove from classList without altering the array reference
+                    const idx = classList.findIndex(c => c.model._id === change.id);
+                    if (idx !== -1) {
+                        classList.splice(idx, 1);
+                        const evt = new CustomEvent("classListChange", {detail: classList});
+                        this.dispatchEvent(evt);
+                    }
+                }
+            })
+        }
+
+        fnLogger.info("Completed inital classes build");
+
         return classList;
-    }
-
-    async getAllClassModels() {
-        let selector = {
-            type: { $eq: "class" }
-        };
-        let fields = ['_id', 'name', 'description', 'schema'];
-
-        let response = await this.findDocuments(selector, fields);
-        let result: ClassModel[] = response.docs as ClassModel[];
-        return result;
-    }
-
-    async getClassModels( classNames: string[] ) {
-        let allClasses = await this.getAllClassModels();
-        // TODO: Consider directly querying while applying the filter
-        // let selector = {
-        //     type: { $eq: "class" },
-        //     $or: [ _id: { $eq: className}]
-        // };
-        let result = allClasses.filter( classObj => classNames.includes(classObj.name) );
-        return result;
-    }
+    };
 
     async incrementLastDocId() {
         let docId = "lastDocId",

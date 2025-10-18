@@ -24,7 +24,7 @@ const Dashboard = () => {
         dispatch(saveState(true));
     },[dispatch]);
 
-    const { loading, error, classList } = useClassList(stackName);
+    const { loading, error, classList } = useClassList({stack: stackName});
 
     const { Modal: ClassCreationModal, open: openClassCreationModal, close: closeClassCreationModal } = useModal({areaId: "root"});
 

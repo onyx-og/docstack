@@ -34,7 +34,8 @@ export const useClassCreate = (stack: string) => {
     );
 }
 
-export const useClassList = (stack: string) => {
+export const useClassList = (conf: {stack: string, filter?: string[], search?: string}) => {
+    const {stack, filter, search} = conf;
     const docStack = React.useContext(DocStackContext);
     const [loading, setLoading] = React.useState<boolean>(false);
     const [error, setError] = React.useState();
@@ -51,17 +52,18 @@ export const useClassList = (stack: string) => {
             return;
         }
 
+        const changeListener = (change: CustomEvent) => {
+            setClassList([...change.detail])
+        }
 
         const fetchClasses = async () => {
             try {
                 // Run the initial query
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
-                    const classList = await stackInstance.getAllClasses();
-                    // TODO: setup listener for class add/delete
-                    if (classList.length) {
-                        setClassList(classList);
-                    }
+                    const classList = await stackInstance.getClasses({filter, search});
+                    setClassList(classList);
+                    stackInstance.addEventListener("classListChange", changeListener as EventListener)
                 }
                 
             } catch (err: any) {
@@ -81,10 +83,13 @@ export const useClassList = (stack: string) => {
 
         return () => {
             setClassList([]);
+            const stackInstance = docStack.getStack(stack);
+            if (stackInstance) 
+                stackInstance.removeEventListener("classListChange", changeListener as EventListener)
             // queryRef.current = false;
         }
 
-    }, [docStack, stack]);
+    }, [docStack, stack, filter, search]);
 
     return { loading, classList, error };
 }

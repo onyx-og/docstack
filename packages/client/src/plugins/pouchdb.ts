@@ -61,28 +61,36 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     const docs: Document[] = []
                     for (const docRes of result) {
                         if (docRes.id) {
-                            const doc = await stack.db.get(docRes.id) as Document;
-                            const afterTriggers = triggerQueue[docRes.id]
-                            for (const afterTrigger of afterTriggers) {
-                                const updatedDoc = await afterTrigger.execute(doc);
-                                Object.assign(doc, updatedDoc);
+                            // const doc = await stack.db.get(docRes.id, { rev: (docRes as any).rev }) as Document;
+                            const doc = documentsToProcess.find(d => d._id === docRes.id) as Document | undefined;
+                            if (doc) {
+                                const afterTriggers = triggerQueue[docRes.id]
+                                if (afterTriggers) {
+                                    debugger;
+                                    for (const afterTrigger of afterTriggers) {
+                                        const updatedDoc = await afterTrigger.execute(doc);
+                                        Object.assign(doc, updatedDoc);
+                                    }
+                                    docs.push(doc);
+                                }
                             }
-                            docs.push(doc);
                         }
                     }
-                    const recurse: Promise<{
-                        error: PouchDB.Core.Error | null,
-                        result: (PouchDB.Core.Error | PouchDB.Core.Response)[] | null
-                    }> = new Promise((resolve, reject) => {
-                        (this.bulkDocs as any).apply(this, [docs, {
-                            isPostOp: true
-                        }, (rErr: typeof error, rRes: typeof result) => resolve({
-                            error: rErr, 
-                            result: rRes
-                        })])
-                    })
-                    const {error: rErr, result: rRes} = await recurse;
-                    return {error: rErr, result: rRes}
+                    if (docs.length) {
+                        const recurse: Promise<{
+                            error: PouchDB.Core.Error | null,
+                            result: (PouchDB.Core.Error | PouchDB.Core.Response)[] | null
+                        }> = new Promise((resolve, reject) => {
+                            (this.bulkDocs as any).apply(this, [docs, {
+                                isPostOp: true
+                            }, (rErr: typeof error, rRes: typeof result) => resolve({
+                                error: rErr, 
+                                result: rRes
+                            })])
+                        })
+                        const {error: rErr, result: rRes} = await recurse;
+                        return {error: rErr, result: rRes}
+                    }
                 }
                 return {error, result}
             }
