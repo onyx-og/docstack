@@ -41,7 +41,8 @@ const Dashboard = () => {
             >
                 {
                     classList.map((classObj) => {
-                        return <ClassCard 
+                        return <ClassCard
+                            key={classObj.name}
                             name={classObj.name} description={classObj.description}
                             attributes={Object.values(classObj.getAttributes())}
                         />

@@ -106,7 +106,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
 
             for (const doc of documentsToProcess) {
                 if (isClassModel(doc)) {
-                    debugger;
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
                     const className = doc._id;

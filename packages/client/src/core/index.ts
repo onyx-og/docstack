@@ -717,7 +717,6 @@ class ClientStack extends Stack {
         // Queue for occasional addition/deletion
         if (listener) {
             listener.on("change", async (change) => {
-                debugger;
                 if (!change.deleted) {
                     const className = change.id;
                     fnLogger.info(`Received class model change with "${className}"`);
