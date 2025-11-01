@@ -1,5 +1,4 @@
 # DocStack
-# DocStack
 
 DocStack is a versatile framework for managing NoSQL databases. It provides a full suite of tools, from a powerful backend to a user-friendly graphical interface, making it easier than ever to interact with and manage your data. It's built around [PouchDB](https://pouchdb.com/).
 
