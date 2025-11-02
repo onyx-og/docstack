@@ -1,0 +1,31 @@
+import { Document, Domain as Domain_, DomainModel, Stack } from "@docstack/shared";
+import { Logger } from "winston";
+declare class Domain extends Domain_ {
+    stack: Stack | undefined;
+    name: string;
+    type: "domain";
+    description: string | undefined;
+    id: string;
+    schema: DomainModel["schema"];
+    relation: DomainModel["relation"];
+    sourceClass: string;
+    targetClass: string;
+    model: DomainModel;
+    state: "busy" | "idle";
+    static logger: Logger;
+    logger: Logger;
+    private constructor();
+    getStack: () => Stack | undefined;
+    setId: (id: string) => void;
+    setModel: (model?: DomainModel) => void;
+    build: () => Promise<Domain>;
+    init: (stack: Stack | null, name: string, type: "domain", relation: typeof this.relation, sourceClass: string, targetClass: string, description?: string) => void;
+    static get: (stack: Stack, name: string, type: "domain" | undefined, relation: "1:1" | "1:N" | "N:1" | "N:N", sourceClass: string, targetClass: string, description?: string, schema?: DomainModel["schema"]) => Domain;
+    static create: (stack: Stack, name: string, type: "domain" | undefined, relation: "1:1" | "1:N" | "N:1" | "N:N", sourceClass: string, targetClass: string, description?: string, schema?: DomainModel["schema"]) => Promise<Domain>;
+    static buildFromModel: (stack: Stack, domainModel: DomainModel) => Promise<Domain>;
+    static fetch: (stack: Stack, domainName: string) => Promise<Domain | null>;
+    getModel: () => DomainModel;
+    validateRelation: (sourceDoc: Document, targetId: string) => Promise<boolean>;
+    addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
+}
+export default Domain;

@@ -1,12 +1,12 @@
-import React from "react";
+import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
 import {Document} from "@docstack/shared";
 
 export const useClassCreate = (stack: string) => {
-    const docStack = React.useContext(DocStackContext);
+    const docStack = useContext(DocStackContext);
 
-    return React.useCallback(
+    return useCallback(
         async ( className: string, classDesc?: string) => {
             try {
                 if (!docStack) {
@@ -36,14 +36,14 @@ export const useClassCreate = (stack: string) => {
 
 export const useClassList = (conf: {stack: string, filter?: string[], search?: string}) => {
     const {stack, filter, search} = conf;
-    const docStack = React.useContext(DocStackContext);
-    const [loading, setLoading] = React.useState<boolean>(false);
-    const [error, setError] = React.useState();
-    const [classList, setClassList] = React.useState<Class[]>([]);
-    // [TODO] Solve bounce of component because of React.StrictMode or other reasons
-    const queryRef = React.useRef(false);
+    const docStack = useContext(DocStackContext);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState();
+    const [classList, setClassList] = useState<Class[]>([]);
+    // [TODO] Solve bounce of component because of StrictMode or other reasons
+    const queryRef = useRef(false);
 
-    React.useEffect( () => {
+    useEffect( () => {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
@@ -95,13 +95,13 @@ export const useClassList = (conf: {stack: string, filter?: string[], search?: s
 }
 
 export const useClass = (stack: string, className: string) => {
-    const docStack = React.useContext(DocStackContext);
-    const [loading, setLoading] = React.useState<boolean>(false);
-    const [error, setError] = React.useState();
-    const [classObj, setClass] = React.useState<Class>();
-    const reqRef = React.useRef(false);
+    const docStack = useContext(DocStackContext);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState();
+    const [classObj, setClass] = useState<Class>();
+    const reqRef = useRef(false);
 
-    React.useEffect( () => {
+    useEffect( () => {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
@@ -145,17 +145,17 @@ export const useClass = (stack: string, className: string) => {
 
 
 export const useClassDocs = (stack: string, className: string, query = {}) => {
-    const docStack = React.useContext(DocStackContext);
+    const docStack = useContext(DocStackContext);
 
-    const [classObj, setClass] = React.useState<Class>();
-    const [docs, setDocs] = React.useState<Document[]>([]);
-    const docsRef = React.useRef<Document[]>([]);
+    const [classObj, setClass] = useState<Class>();
+    const [docs, setDocs] = useState<Document[]>([]);
+    const docsRef = useRef<Document[]>([]);
 
-    const [loading, setLoading] = React.useState(true);
-    const [error, setError] = React.useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     
 
-    React.useEffect(() => {
+    useEffect(() => {
         // Only run if the docStack is available and a className is provided
         if (!docStack || !className) {
             setLoading(false);
@@ -187,7 +187,7 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
         };
     }, [docStack, stack, className]); // Dependency on docStack and className
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (!classObj) {
             return;
         }
