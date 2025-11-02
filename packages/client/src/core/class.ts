@@ -463,7 +463,25 @@ class Class extends Class_ {
     // TODO: modify to pass also the current class model
     // consider first fetching/updating the local class model
     addCard = async (params: {[key:string]: any}) => {
-        return await this.stack!.createDoc(null, this.getName(), this, params);
+        const fnLogger = this.logger.child({method: "addCard", args: {params}});
+        if (!this.stack) {
+            fnLogger.error("Stack is not defined");
+            return null;
+        }
+        return await this.stack.createDoc(null, this.getName(), this, params);
+    }
+
+    addCards = async (paramsArray: {[key:string]: any}[]) => {
+        const fnLogger = this.logger.child({method: "addCards", args: {paramsArray}});
+        if (!this.stack) {
+            fnLogger.error("Stack is not defined");
+            return [];
+        }
+        let addedCards: Document[] = [];
+        addedCards = await this.stack.createDocs(
+            paramsArray.map(params => ({docId: null, params})), this.getName(), this
+        );
+        return addedCards;
     }
     
     getByPrimaryKeys = async (params: {[key: string]: any}): Promise<Document | null> => {

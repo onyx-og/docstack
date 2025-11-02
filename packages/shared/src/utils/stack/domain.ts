@@ -71,6 +71,8 @@ abstract class Domain extends EventTarget {
     abstract getModel: () => DomainModel;
 
     abstract validateRelation: (doc: Document, targetId: string) => Promise<boolean>;
+
+    abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
 }
 
 export default Domain;

@@ -9,13 +9,14 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
+    "rootDir": "src",
     "baseUrl": "src",
     "paths": {
       "components": ["components/*"],
       "hooks": ["hooks/*"],
       "utils": ["utils/*"],
-      "@docstack/client": ["../../client/src/index.ts"],
-      "@docstack/shared": ["../../shared/src"]
+      "@docstack/client": ["../../client"],
+      "@docstack/shared": ["../../shared"]
     }
   },
   "include": [
@@ -25,5 +26,13 @@
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/setupTests.ts",
+  ],
+  "references": [
+    {
+      "path": "../shared"
+    },
+    {
+      "path": "../client"
+    }
   ]
 }

@@ -1,6 +1,5 @@
 import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
-import replace from '@rollup/plugin-replace';
 
 export default {
   input: './src/index.ts',
@@ -9,7 +8,7 @@ export default {
     format: 'umd',
     name: 'docstack'
   },
-  plugins: [replace({
-    'process.env.BUILDING': 1
-  }), typescript(), json()]
+  plugins: [
+    json(), typescript()
+  ]
 };

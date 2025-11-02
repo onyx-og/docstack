@@ -116,6 +116,8 @@ abstract class Class extends EventTarget {
     // consider first fetching/updating the local class model
     abstract addCard: (params: {[key:string]: any}) => Promise<Document | null>;
 
+    abstract addCards: (paramsArray: {[key:string]: any}[]) => Promise<Document[]>;
+
     abstract addOrUpdateCard: (params: {[key:string]: any}, cardId?: string) => Promise<Document | null>;
 
     abstract updateCard: (cardId: string, params: {[key:string]: any}) => Promise<Document | null>;

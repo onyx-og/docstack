@@ -63,7 +63,23 @@ abstract class Stack extends EventTarget {
 
     abstract validateObjectByType: (obj: any, type: string, schema?: ClassModel["schema"]) => Promise<boolean>;
 
-    abstract createDoc: (docId: string | null, type: string,classObj: Class, params: {}) => Promise<Document | null> ;
+    abstract createDoc: (docId: string | null, type: string,classObj: Class | ClassModel["schema"], params: {}) => Promise<Document | null>;
+
+    abstract createDocs: ( docs: {docId: string | null, params: {}}[], type: string, classObj: Class | ClassModel["schema"] ) => Promise<Document[]>;
+
+    abstract createRelationDoc: (docId: string | null, relationName: string, domainObj: Domain, params: {
+        sourceClass: string,
+        targetClass: string,
+        sourceId: string,
+        targetId: string
+    }) => Promise<Document | null>;
+
+    abstract createRelationDocs: ( docs: {docId: string | null, params: {
+        sourceClass: string,
+        targetClass: string,
+        sourceId: string,
+        targetId: string
+    }}[], relationName: string, domainObj: Domain ) => Promise<Document[]>;
 
     abstract findDocuments: (selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => Promise<{
         [key: string]: any;

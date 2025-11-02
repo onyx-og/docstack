@@ -1,9 +1,13 @@
 {
   "name": "@docstack/react",
   "version": "0.0.1",
-  "main": "src/index.ts",
+  "description": "One does not simply stack documents.",
+  "main": "lib/index.js",
+  "src": "src/index.ts",
   "scripts": {
-    "test": "jest"
+    "build": "npm run build:prod",
+    "build:dev": "webpack --node-env=development",
+    "build:prod": "webpack --node-env=production"
   },
   "repository": {
     "type": "git",
@@ -22,5 +26,14 @@
     "url": "https://github.com/onyx-og/docstack/issues"
   },
   "homepage": "https://github.com/onyx-og/docstack#readme",
-  "description": ""
+  "dependencies": {
+    "@docstack/client": "file:../client",
+    "@docstack/shared": "file:../shared"
+  },
+  "devDependencies": {
+    "eslint": "^9.38.0",
+    "eslint-webpack-plugin": "^5.0.2",
+    "https-browserify": "^1.0.0",
+    "stream-http": "^3.2.0"
+  }
 }

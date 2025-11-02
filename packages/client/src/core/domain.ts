@@ -221,6 +221,31 @@ class Domain extends Domain_ {
         }
     }
 
+    addRelation = async ( sourceDoc: Document, targetId: string ) => {
+        const fnLogger = this.logger.child({method: "addRelation", args: {sourceDoc, targetId}});
+
+        if (!this.stack) {
+            fnLogger.error("Stack is not defined");
+            throw new Error("Stack is not defined");
+        }
+
+        if (await this.validateRelation(sourceDoc, targetId)) {
+            // Create document representing the relation
+            fnLogger.info("addRelation - relation validated");
+            const params = {
+                sourceClass: this.sourceClass,
+                targetClass: this.targetClass,
+                sourceId: sourceDoc.id,
+                targetId
+            };
+            const relationDoc = await this.stack.createRelationDoc(null, this.name, this, params);
+            fnLogger.info("addRelation - relationDoc created", {relationDoc});
+            return relationDoc;
+        } else {
+            fnLogger.error("addRelation - relation validation failed");
+            throw new Error("Relation validation failed");
+        }
+    }
 }
 
 export default Domain;

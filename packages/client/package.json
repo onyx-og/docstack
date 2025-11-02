@@ -1,9 +1,12 @@
 {
   "name": "@docstack/client",
   "version": "0.0.1",
-  "main": "src/index.ts",
+  "main": "lib/index.js",
+  "src": "src/index.ts",
   "scripts": {
-    "test": "jest"
+    "build:types": "npx tsc -build --force ./tsconfig.json",
+    "build": "rollup --config ./rollup.config.js && npm run build:types",
+    "lint": "eslint ./src --ext .ts,.tsx"
   },
   "repository": {
     "type": "git",
@@ -21,5 +24,18 @@
     "url": "https://github.com/onyx-og/docstack/issues"
   },
   "homepage": "https://github.com/onyx-og/docstack#readme",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "@docstack/shared": "file:../shared",
+    "semver": "^7.7.3"
+  },
+  "devDependencies": {
+    "@rollup/plugin-json": "^6.1.0",
+    "@types/semver": "^7.7.1",
+    "cpy-cli": "^6.0.0",
+    "eslint": "^9.38.0",
+    "eslint-webpack-plugin": "^5.0.2",
+    "replace-in-file": "^8.3.0",
+    "rollup-plugin-require-context": "^1.0.1"
+  }
 }

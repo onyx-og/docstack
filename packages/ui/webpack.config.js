@@ -55,7 +55,9 @@ const config = {
       {
         test: /\.(ts|tsx)$/i,
         loader: "ts-loader",
-        exclude: ["/node_modules/"],
+        exclude: [
+          /node_modules/,
+        ],
       },
       {
         test: /\.css$/i,
@@ -123,9 +125,9 @@ const config = {
       'features': path.resolve(__dirname, "src/features"),
       'store': path.resolve(__dirname, "src/store"),
       'utils': path.resolve(__dirname, "src/utils"),
-      '@docstack/client': path.resolve(__dirname, "../client/src"),
-      '@docstack/react': path.resolve(__dirname, "../react/src"),
-      '@docstack/shared': path.resolve(__dirname, "../shared/src"),
+      // '@docstack/client': path.resolve(__dirname, "../client/src"),
+      // '@docstack/react': path.resolve(__dirname, "../react/src"),
+      // '@docstack/shared': path.resolve(__dirname, "../shared/src"),
     }
   },
 };

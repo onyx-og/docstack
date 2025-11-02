@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2017",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "paths": {
+        "@docstack/client": ["../client/src"],
+        "@docstack/shared": ["../shared/src"]
+    },
+  },
+  "include": [
+    "./client/**/*.ts"
+  ],
+   "exclude": [
+    "node_modules"
+  ]
+}

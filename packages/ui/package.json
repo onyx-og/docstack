@@ -30,10 +30,15 @@
   "homepage": "https://github.com/onyx-og/docstack#readme",
   "description": "",
   "dependencies": {
+    "@docstack/shared": "file:../shared",
+    "@docstack/react": "file:../react",
+    "@docstack/client": "file:../client",
     "monaco-editor": "^0.52.2"
   },
   "devDependencies": {
     "@sass-collective/strip-unit": "^3.1.2",
+    "eslint": "^9.38.0",
+    "eslint-webpack-plugin": "^5.0.2",
     "json-viewer": "^2.2.0",
     "process": "^0.11.10",
     "react-markdown": "^10.1.0",

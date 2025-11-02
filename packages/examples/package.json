@@ -1,0 +1,9 @@
+{
+    "name": "@docstack/examples",
+    "description": "Examples of docstack usage scenarios",
+    "dependencies": {
+        "@docstack/client": "file:../client",
+        "@docstack/react": "file:../react",
+        "@docstack/server": "file:../server"
+    }
+}

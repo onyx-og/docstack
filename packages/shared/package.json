@@ -1,0 +1,17 @@
+{
+    "name": "@docstack/shared",
+    "version": "0.0.1",
+    "main": "lib/index.js",
+    "src": "src/index.ts",
+    "description": "Shared utilities and types for docstack packages",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/onyx-og/docstack.git"
+    },
+    "keywords": [
+        "shared",
+        "utilities",
+        "types",
+        "docstack"
+    ]
+}

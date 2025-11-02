@@ -8,19 +8,21 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "outDir": "lib",
+    "rootDir": "src",
+    "declarationDir": "lib",
     "baseUrl": "./src",
     "skipLibCheck": true,
     "strict": true,
     "alwaysStrict": true,
     "noImplicitAny": false,
     "esModuleInterop": true,
-    "emitDeclarationOnly": true,
     "declaration": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "composite": true,
     "paths": {
-      "@docstack/shared": ["../../shared/src"]
+      "@docstack/shared": ["../../shared"]
     }
   },
   "include": [
@@ -28,5 +30,10 @@
   ],
   "exclude": [
     "node_modules"
+  ],
+  "references": [
+    {
+      "path": "../shared"
+    }
   ]
 }

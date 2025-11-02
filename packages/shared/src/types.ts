@@ -104,19 +104,9 @@ export type Document = PouchDB.Core.Document<{
     type: string;
     createTimestamp?: number; // [TODO] Error prone
     updateTimestamp?: number | null;
-    active: boolean;
+    active?: boolean;
     [key: string]: any
 }>
-
-// The idea is to make this patch object be processed
-// storing the version of the patch and the documents contained in it
-export interface Patch {
-    version: string;
-    changelog: string;
-    docs: (PouchDB.Core.ExistingDocument<{
-        [key: string]: any
-    }> | PouchDB.Core.Document<{[key: string]: any}>)[]
-}
 
 export interface SystemDoc {
     _id: string;
@@ -128,8 +118,11 @@ export interface SystemDoc {
 
 // The idea is to make this patch object be processed
 // storing the version of the patch and the documents contained in it
-export interface Patch {
+export interface Patch extends Document {
+    type: "patch";
+    target: string;
     version: string;
+    changelog?: string;
     docs: (PouchDB.Core.ExistingDocument<{
         [key: string]: any
     }> | PouchDB.Core.Document<{[key: string]: any}>)[]

@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from 'react';
+import { ReactNode, createContext, useRef, useCallback, useEffect, useState } from 'react';
 import {DocStack} from '@docstack/client'; // Import your DocStack class
 import { StackConfig } from '@docstack/shared';
 
@@ -7,15 +7,15 @@ export const DocStackContext = createContext<DocStack | null>(null);
 
 export interface DocStackProviderProps {
     config: StackConfig[];
-    children?: React.ReactNode;
+    children?: ReactNode;
 }
 const StackProvider = (props: DocStackProviderProps) => {
     const { config, children } = props;
     // Use a ref to store the DocStack instance
-    const docStackRef = React.useRef<DocStack | null>(null);
+    const docStackRef = useRef<DocStack | null>(null);
     const [docStack, setDocStack] = useState<DocStack | null>(null);
 
-    const setsDocStackWhenReady = React.useCallback(() => {
+    const setsDocStackWhenReady = useCallback(() => {
         setDocStack(docStackRef.current)
     },[]);
 

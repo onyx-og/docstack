@@ -1,41 +1,134 @@
-// This method is meant to be run by nodejs to calculate 
-// the number of patches in the patch folder
+import { Patch } from "@docstack/shared";
+import semver from "semver";
 
-export const countPatches = () => {
-    let count = 0;
-    try {
-        // Browser implementation (Webpack)
-        const context = require.context('./patch', false, /\.json$/);
-        console.log("getPatchCount - Browser: counting files via require.context");
-        count = context.keys().length;
-        console.log(`countPatches - total number of patches: ${count}`)
-    } catch (e: any) {
-        console.log("countPatches - problem while reading patch folder", e)
-    }
-    return count;
+const syspatches: Patch[] = [];
+
+const sys_001: Patch = {
+    "_id": "~sys-0.0.1",
+    "type": "patch",
+    "version": "0.0.1",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.1\\\n#### New Documents: ~User, ~UserSession",
+    "docs": [
+        {
+            "_id": "~User",
+            "active": true,
+            "name": "User",
+            "description": "A user class for secure login",
+            "type": "class",
+            "schema": {
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false
+                    }
+                },
+                "password": {
+                    "name": "password",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false
+                    }
+                },
+                "email": {
+                    "name": "email",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "firstName": {
+                    "name": "firstName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "lastName": {
+                    "name": "lastName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                }
+            }
+        },
+        {
+            "_id": "~UserSession",
+            "name": "UserSession",
+            "active": true,
+            "description": "Tracks user sessions",
+            "type": "class",
+            "schema": {
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false,
+                        "primaryKey": true,
+                        "mandatory": true
+                    }
+                },
+                "sessionId": {
+                    "name": "sessionId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "primaryKey": true,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStart": {
+                    "name": "sessionStart",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStatus": {
+                    "name": "sessionStatus",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionEnd": {
+                    "name": "sessionEnd",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": false
+                    }
+                }
+            }
+        }
+    ]
+};
+
+syspatches.push(sys_001);
+
+export function getSystemPatches( currentVersion: string ) {
+    return syspatches
+        .filter( (patch) => semver.gt( patch.version, currentVersion ) )
+        .sort( (a, b) => semver.compare(a.version, b.version) );
 }
 
-export const importJsonFile = async (importFilePath: string) => {
-    try {
-        console.log("importJsonFile - Browser: importing file via require");
-        // The importFilePath must be a string literal for Webpack to resolve it
-        // This is a major limitation; you can't have a variable here.
-        // You will need to require the file directly.
-        // E.g., const data = require('./path/to/your/file.json');
-        // Webpack will treat this as an asset and include it.
-        // If you need to import different files dynamically, you must use require.context.
-        const data = require(`./${importFilePath}`); // This works if importFilePath is a simple variable
-        return data;
-    } catch (error) {
-        console.error('Error reading JSON file:', error);
-        throw error;
-    }
+export function getAllSystemPatches() {
+    return syspatches.sort( (a, b) => semver.compare(a.version, b.version) );
 }
-
-// export const setPatchCount = () => {
-//     const count = countPatches();
-//     updateEnvFile({ "PATCH_COUNT": `${count}` });
-//     console.log("PATCH_COUNT environment updated successfully. Reloading .env file...");
-// }
-
-// export default setPatchCount;
