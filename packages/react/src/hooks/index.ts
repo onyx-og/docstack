@@ -1,8 +1,60 @@
 // src/hooks/useFind.js
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { DocStackContext } from '../components/StackProvider';
-import { Document } from '../../../shared/src/types';
+import { Document, SelectAST, UnionAST } from '@docstack/shared';
 import { Class } from '@docstack/client';
+
+export const useQuery = (stack: string, sql: string, ...params: any[]) => {
+    const docStack = useContext(DocStackContext);
+    const [result, setResult] = useState<{ rows: any[]; ast: (SelectAST | UnionAST)[] | null; }>({ rows: [], ast: [] });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const queryRef = useRef(false);
+
+    useEffect(() => {
+        // Check if the docStack instance is available
+        if (!docStack) {
+            // Handle the case where the provider is not yet initialized or missing
+            // You could throw an error or return an empty state.
+            console.error('useQuery must be used within a DocStackProvider.');
+            setLoading(false);
+            return;
+        }
+
+        const runQuery = async () => {
+            try {
+                const stackInstance = docStack.getStack(stack);
+                if (stackInstance) {
+                    // Run the initial query
+                    console.log("Preparing to run query", {sql, params})
+                    debugger
+                    const queryResult = await stackInstance.query(sql, ...params);
+                    setResult(queryResult);
+
+                } else {
+                    console.log("Could not find corresponding stack", {stack})
+                }
+            } catch (err: any) {
+                console.log("Got error while running query", {error: err})
+                setError(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (!queryRef.current) {
+            queryRef.current = true;
+            setLoading(true);
+            runQuery();
+        } else {
+            console.log("Already performing query");
+        }
+        
+
+    }, [docStack, sql, ...params]); // Re-run if docStack, sql, or params change
+
+    return { result, loading, error };
+};
 
 export const useFind = (stack: string, query: {
     selector: { [key: string]: string | number },

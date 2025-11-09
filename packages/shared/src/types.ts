@@ -214,4 +214,26 @@ export interface DesignDocument extends PouchDB.Core.Document<any> {
   };
 }
 
+export type SelectAST = {
+  type: 'select';
+  distinct: boolean;
+  columns: any[];
+  from: any[];
+  joins: any[];
+  where: any | null;
+  groupBy: { type: 'group_by'; columns: any[] } | null;
+  having: any | null;
+  orderBy: Array<{ expr: any; order: 'ASC' | 'DESC' }> | null;
+  limit: number | null;
+};
+
+export type UnionAST = {
+  type: 'union';
+  /** upper SelectAST's index */
+  top: number;
+  /** lower SelectAST's index */
+  bottom: number;
+  distinct: boolean;
+}
+
 export {Class};

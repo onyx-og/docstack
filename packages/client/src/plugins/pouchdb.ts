@@ -65,7 +65,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             const doc = documentsToProcess.find(d => d._id === docRes.id) as Document | undefined;
                             if (doc) {
                                 const afterTriggers = triggerQueue[docRes.id]
-                                if (afterTriggers) {
+                                if (afterTriggers && afterTriggers.length) {
                                     debugger;
                                     for (const afterTrigger of afterTriggers) {
                                         const updatedDoc = await afterTrigger.execute(doc);

@@ -6,6 +6,8 @@ import {
     Patch,
     CachedDomain,
     DomainModel,
+    SelectAST,
+    UnionAST,
 } from "../../types";
 
 import Class from "./class";
@@ -94,6 +96,8 @@ abstract class Stack extends EventTarget {
     abstract deleteDocument: (_id: string) => Promise<boolean>;
 
     abstract addDesignDocumentPKs: (className: string, pKs: string[], temp?: boolean) => Promise<string>;
+
+    abstract query: (sql: string, ...params: any[]) => Promise<{ rows: any[]; ast: (SelectAST | UnionAST)[]; } | { rows: never[]; ast: null; }>;
 }
 
 export default Stack;

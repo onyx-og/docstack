@@ -21,6 +21,9 @@ import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDec
     AttributeTypeString} from "@docstack/shared";
 import { StackPlugin } from "../plugins/pouchdb";
 
+import { parse, createPlan, executePlan } from "./query-engine";
+import type { SelectAST, UnionAST } from "./query-engine";
+
 const logger = createLogger().child({module: "stack"});
 
 export const BASE_SCHEMA: ClassModel["schema"] = {
@@ -456,7 +459,7 @@ class ClientStack extends Stack {
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
     getClass = async (className: string, fresh =  false): Promise<Class | null> => {
-        const fnLogger = logger.child({method: "getDomain", args: {className, fresh}});
+        const fnLogger = logger.child({method: "getClass", args: {className, fresh}});
         if (!fresh) {
             // Check if class is in cache and not expired
             if (this.cache[className] && Date.now() < this.cache[className].ttl) {
@@ -1093,7 +1096,7 @@ class ClientStack extends Stack {
     }
 
     createDoc = async (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}) => {
-        const fnLogger = logger.child({method: "createDoc", args: {docId, type, params, classObj}});
+        const fnLogger = logger.child({method: "createDoc", args: {docId, type, params}});
         fnLogger.info("Creating document");
         let schema: ClassModel["schema"] = {};
         if (classObj instanceof Class) {
@@ -1105,6 +1108,7 @@ class ClientStack extends Stack {
             doc: Document | null = null,
             isNewDoc = false;
         try {
+            let newDocId = `${type}-${(this.lastDocId+1)}`;
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 fnLogger.info("Retrieved doc", {existingDoc})
@@ -1119,13 +1123,12 @@ class ClientStack extends Stack {
                     doc = this.prepareDoc(docId, type, params) as Document;
                 }
             } else {
-                docId = `${type}-${(this.lastDocId+1)}`;
-                doc = this.prepareDoc(docId, type, params) as Document;
+                doc = this.prepareDoc(newDocId, type, params) as Document;
                 isNewDoc = true;
-                fnLogger.info("Generated docId", docId);
+                fnLogger.info("Generated docId", {newDocId});
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, updateTimestamp: new Date().getTime()};
+            const doc_ = {...doc, ...params, _id: docId || newDocId, _rev: doc._rev, updateTimestamp: new Date().getTime()};
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
             let response = await db.put(doc_);
             fnLogger.info("Response after put", {"response": response});
@@ -1421,6 +1424,36 @@ class ClientStack extends Stack {
 
         return this.createDoc(null, domain, params);
     } */
+
+    query = async (sql: string, ...params: any[]) => {
+        const fnLogger = logger.child({method: "query", args: {sql, params}});
+        fnLogger.info("Executing query");
+            let astList: (SelectAST | UnionAST)[] = [];
+            try {
+                astList = parse(sql);
+                fnLogger.info("Produced AST", {astList});
+            } catch (error: any) {
+                error.ast = astList.length > 0 ? astList[0] : null;
+                throw error;
+            }
+    
+            // A UNION query is treated as a single execution, not a loop over ASTs.
+            if (astList.length > 0) {
+                    try {
+                    const plan = createPlan(astList);
+                    const rows = await executePlan(this, plan, params);
+                    // The AST for the whole query (including unions) is the list
+                    fnLogger.info("Query executed successfully", { rows, astList });
+                    return { rows, ast: astList };
+                } catch (error: any) {
+                    error.ast = astList; // Attach full AST list to error for debugging
+                    throw error;
+                }
+            }
+            
+            // Handle case where query is empty or only comments
+            return { rows: [], ast: null };
+        }
 }
 
 
