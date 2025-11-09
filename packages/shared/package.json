@@ -8,10 +8,19 @@
         "type": "git",
         "url": "git+https://github.com/onyx-og/docstack.git"
     },
+    "scripts": {
+        "build:types": "npx tsc -build --force ./tsconfig.json",
+        "build": "rollup --config ./rollup.config.js && npm run build:types",
+        "lint": "eslint ./src --ext .ts,.tsx"
+    },
     "keywords": [
         "shared",
         "utilities",
         "types",
         "docstack"
-    ]
+    ],
+    "devDependencies": {
+        "@rollup/plugin-typescript": "^12.3.0",
+        "rollup": "^4.53.1"
+    }
 }
