@@ -79,7 +79,7 @@ export type AttributeModel = {
 }
 
 export interface ClassModel extends Document {
-    type: "class",
+    type: "class" | "~self",
     name: string,
     description?: string,
     parentClass?: string,
@@ -189,7 +189,7 @@ export const isDocument = (object: object): object is Document => {
 }
 
 export const isClassModel = (object: {[key: string]: any}): object is ClassModel => {
-    if (object.hasOwnProperty("type") && object.type === "class") {
+    if (object.hasOwnProperty("type") && ["class","~self"].includes(object.type)) {
         return true;
     }
     return false;

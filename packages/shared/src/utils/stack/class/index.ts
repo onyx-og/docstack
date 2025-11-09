@@ -15,7 +15,7 @@ abstract class Class extends EventTarget {
     /* Populated in init() */
     name!: string;
     /* Populated in init() */
-    type!: "class";
+    abstract type: ClassModel["type"];
     description?: string;
     attributes: {[name: string]: Attribute} = {};
     schema: ClassModel["schema"] = {};
@@ -40,7 +40,7 @@ abstract class Class extends EventTarget {
     abstract init: (
         stack: Stack | null,
         name: string,
-        type: "class",
+        type: ClassModel["type"],
         description?: string,
         schema?: ClassModel["schema"],
         // parentClass: Class | null
@@ -49,7 +49,7 @@ abstract class Class extends EventTarget {
     static get: (
         stack: Stack,
         name: string,
-        type: "class",
+        type: ClassModel["type"],
         description?: string,
         schema?: ClassModel["schema"],
         // parentClass: Class | null = null
@@ -58,7 +58,7 @@ abstract class Class extends EventTarget {
     static create: (
         stack: Stack,
         name: string,
-        type: "class",
+        type: ClassModel["type"],
         description?: string,
         schema?: ClassModel["schema"],
         // parentClass: Class | null = null
@@ -77,7 +77,7 @@ abstract class Class extends EventTarget {
 
     abstract getDescription: () => string | undefined;
 
-    abstract getType: () => "class";
+    abstract getType: () => ClassModel["type"];
 
     abstract getId: () => string | undefined;
 

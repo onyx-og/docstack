@@ -91,6 +91,10 @@ class Attribute extends Attribute_ {
                 field = z.boolean();
                 break;
 
+            case "object":
+                field = z.object({});
+                break;
+
             case 'foreign_key':
                 if (!config.targetClass) {
                     throw new Error(
@@ -247,6 +251,21 @@ class Attribute extends Attribute_ {
             break;
             case "string":
                 config = Object.assign({ maxLength: 50, isArray: false }, config ) as AttributeTypeConfig;
+            break;
+            case "object":
+                config = Object.assign({ isArray: false }, config ) as AttributeTypeConfig;
+            break;
+            case "date":
+                config = Object.assign({ format: "iso", max: null, min: null, isArray: false}, config) as AttributeTypeConfig;
+            break;
+            case "boolean":
+                config = Object.assign({ defaultValue: false, isArray: false}, config) as AttributeTypeConfig;
+            break;
+            case "foreign_key":
+                config = Object.assign({ targetClass: null, isArray: false}, config) as AttributeTypeConfig;
+            break;
+            case "enum":
+                config = Object.assign({ values: [], isArray: false}, config) as AttributeTypeConfig;
             break;
             default:
                 throw new Error("Unexpected type: "+type);

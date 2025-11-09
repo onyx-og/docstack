@@ -602,7 +602,7 @@ class ClientStack extends Stack {
     // TODO: Understand why most classes are empty of attributes
     getClassModel = async ( className: string ) => {
         let selector = {
-            type: { $eq: "class" },
+            type: { $in: ["class", "~self"] },
             name: { $eq: className }
         };
 
@@ -641,6 +641,7 @@ class ClientStack extends Stack {
         const {listen, filter, search} = conf;
         const selector: {[field: string]: object} = { type: { $eq: "class" } };
         if (Array.isArray(filter) && filter.length > 0) {
+            // TODO: Consider checking against name field instead of _id
             selector._id = { $in: filter };
         }
 
@@ -653,7 +654,7 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        const fields = ['_id', 'name', 'description', 'schema'];
+        const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
 
         const response = await this.findDocuments(selector, fields);
         const result: ClassModel[] = response.docs as ClassModel[];
@@ -679,7 +680,7 @@ class ClientStack extends Stack {
     getClasses = async (conf: {filter?: string[], search?: string}) => {
         const classNames = conf.filter;
         const searchFilter = conf.search;
-        const fnLogger = logger.child({ method: "getAllClasses" });
+        const fnLogger = logger.child({ method: "getClasses" });
         fnLogger.info("Requesting");
 
         const { list: classModels, listener } = await this.getClassModels({
@@ -789,26 +790,40 @@ class ClientStack extends Stack {
     }
 
     addClass = async ( classObj: Class ) => {
+        const fnLogger = logger.child({method: "addClass", args: {class: classObj.name}});
+        const classOrigin = await this.getClass(classObj.type);
+        if (classOrigin == null) {
+            fnLogger.error("Class originator not found", {classType: classObj.type});
+            throw new Error(`Class originator ${classObj.type} not found in stack`);
+        }
         let classModel = classObj.getModel();
-        logger.info("addClass - got class model", {classModel})
-        let existingDoc = await this.getClassModel(classModel.name);
-        if ( existingDoc == null ) {
-            let resultDoc = await this.createDoc(classModel.name, 'class', CLASS_SCHEMA, classModel);
-            logger.info("addClass - result", {result: resultDoc});
-            // TODO: Consider creating a design doc for easier filtering
-            return resultDoc as ClassModel;
-        } else {
-            return existingDoc;
-        } 
+        fnLogger.info("Got class model", {classModel})
+        try {
+            const result = await classOrigin.addCard(classModel) as ClassModel;
+            return result;
+        } catch (e) {
+            fnLogger.error("Error adding class card", {error: e})
+            throw new Error("Failed to add class card")
+        }
+        // let existingDoc = await this.getClassModel(classModel.name);
+        // if ( existingDoc == null ) {
+        //     let resultDoc = await this.createDoc(classModel.name, 'class', CLASS_SCHEMA, classModel);
+        //     fnLogger.info("Result", {result: resultDoc});
+        //     // TODO: Consider creating a design doc for easier filtering
+        //     return resultDoc as ClassModel;
+        // } else {
+        //     return existingDoc;
+        // } 
     }
 
     addDomain = async ( domainObj: Domain ) => {
+        const fnLogger = logger.child({method: "addDomain", args: {domain: domainObj.name}});
         let domainModel = domainObj.getModel();
-        logger.info("addDomain - got domain model", {domainModel})
+        fnLogger.info("Got domain model", {domainModel})
         let existingDoc = await this.getDomainModel(domainModel.name);
         if ( existingDoc == null ) {
             let resultDoc = await this.createDoc(domainModel.name, 'domain', DOMAIN_SCHEMA, domainModel);
-            logger.info("addDomain - result", {result: resultDoc});
+            fnLogger.info("Result", {result: resultDoc});
             // TODO: Consider creating a design doc for easier filtering
             return resultDoc as DomainModel;
         } else {
@@ -817,9 +832,9 @@ class ClientStack extends Stack {
     }
 
     updateClass = async (classObj: Class) => {
-        // logger.info("updateClass - classObj", classObj)
+        const fnLogger = logger.child({method: "updateClass", args: {class: classObj.name}});
         let result = await this.createDoc(classObj.getId()!, 'class', classObj, classObj.getModel());
-        logger.info("updateClass - result", result)
+        fnLogger.info("Result", result)
         return result
     }
 
@@ -873,218 +888,8 @@ class ClientStack extends Stack {
         return designDocId;
     }
 
-    // async updateDomain(domainObj: Domain) {
-    //     return this.createDoc(domainObj.getId(), domainObj, domainObj.getModel());
-    // }
-
-    // You have an object and array of AttributeModels,
-    // therefore each element of the array has an attribute name,
-    // a type and a configuration
-    // Based on the configuration apply various checks on the given object's
-    // value at the corresponding attribute name
-
-    // [TODO] Implement also for attributes of type different from string
-    // [TODO] Implement primary key check for combination of attributes and not just one
-    async validateObject(obj: any, type: string, schema: ClassModel["schema"]): Promise<boolean> {
-        logger.info("validateObject - given args", {obj, schema})
-        let isValid = true;
-        try {
-            // schema.forEach(async model => {
-            for (let model of Object.values(schema)) {
-                let value = obj[model.name];
-                logger.info("validateObject - model", {model, value})
-                // Check if the property exists
-                if (value === undefined && model.config.mandatory) {
-                    let message = `Property ${model.name} does not exist on the object.`
-                    logger.error(message);
-                    throw new Error(message);
-                }
-    
-                if ( !model.config.mandatory && value === undefined ) {
-                    let message = `Property ${model.name} is not mandatory and does not exist on the object. Skipping validation of this attribute`
-                    logger.info(message);
-                    continue;
-                }
-    
-                // update object's value to the default value
-                if (model.config.defaultValue && value === undefined) {
-                    logger.info(`Property ${model.name} is missing, setting to default value.`);
-                    obj[model.name] = model.config.defaultValue;
-                    value = obj[model.name];
-                }
-            
-                switch(model.type) {
-                    case 'string':
-                        if (!model.config.isArray && typeof value !== model.type) {
-                            logger.info(`Property ${model.name} is not of type ${model.type}.`);
-                            return false
-                        } else if (model.config.isArray && !Array.isArray(value)) {
-                            logger.info(`Property ${model.name} is not an array.`);
-                            return false
-                        }
-                        if (model.config as AttributeTypeString["config"]) {
-                            if  (model.config.maxLength && value.length > model.config.maxLength) {
-                                logger.info(`Property ${model.name} is longer than ${model.config.maxLength} characters.`);
-                                return false
-                            }
-    
-                            if (model.config.encrypted) {
-                                // Check if incoming string is encrypted
-                                let decryptedString = decryptString(value);
-                                console.log("decryptedString", decryptedString)
-                                if (decryptedString === null) {
-                                    logger.info(`Property ${model.name} is not encrypted correctly.`);
-                                    return false
-                                }
-                            }
-    
-                            if (model.config.primaryKey) {
-                                logger.info("primaryKey check", {type, model, value})
-                                // Check if the value is unique
-                                let duplicates = await this.findDocuments({
-                                    "type": { $eq: type },
-                                    [model.name]: { $eq: value }
-                                });
-                                if (duplicates.docs.length > 0) {
-                                    logger.info(`A card with property ${model.name} already exists.`, duplicates);
-                                    throw new Error(`A card with property ${model.name} already exists.`);
-                                }
-                            }
-                        } 
-                    break;
-                    case 'decimal':
-                        // TODO: decide how to interpret decimal
-                        if (model.config as AttributeTypeDecimal["config"] ) {
-                            if (model.config.min && value < model.config.min) {
-                                logger.info(`Property ${model.name} is less than ${model.config.min}.`);
-                                return false
-                            }
-                            if (model.config.max && value > model.config.max) {
-                                logger.info(`Property ${model.name} is greater than ${model.config.max}.`);
-                                return false
-                            }
-                        }
-    
-                    break;
-                    case 'integer':
-                        if (!model.config.isArray && typeof value !== 'number') {
-                            logger.info(`Property ${model.name} is not of type ${model.type}.`);
-                        } else if (model.config.isArray && (
-                                !Array.isArray(value) || !value.every((v) => typeof v === 'number')
-                            )){
-                            logger.info(`Property ${model.name} is not an array.`);
-                            return false
-                        }
-                        if (model.config as AttributeTypeInteger["config"] ) {
-                            if (model.config.min && value < model.config.min) {
-                                logger.info(`Property ${model.name} is less than ${model.config.min}.`);
-                                return false
-                            }
-                            if (model.config.max && value > model.config.max) {
-                                logger.info(`Property ${model.name} is greater than ${model.config.max}.`);
-                                return false
-                            }
-                        }
-    
-                    break;
-                    case "foreign_key":
-                        model.config as AttributeTypeForeignKey["config"]
-                        // check if foreign key corresponds to an existing document
-                        let foreignKeyDoc = await this.getDocument(value);
-                        if (foreignKeyDoc == null) {
-                            logger.info(`Foreign key ${value} does not exist.`);
-                            return false
-                        }
-                    break;
-                    /*
-                    case "reference":
-                        model.config as AttributeTypeReference["config"]
-                        var domain = await this.getDomain(model.config.domain)
-                        if (domain == null) {
-                            logger.info(`Reference domain ${model.config.domain} does not exist.`);
-                            return false
-                        }
-                        // check if the reference it points to exists
-                        let reference = await this.getDocument(value)
-                        if (reference == null) {
-                            logger.info(`Reference ${value} does not exist.`);
-                            return false
-                        }
-                        switch (domain.relationType) {
-                            case "one-to-one":
-                                // check if the reference is unique
-                                // based on the position of the reference
-                                var selector = {
-                                    type: { $eq: domain.name },
-                                    [model.config.position]: { $eq: value }
-                                }
-                                var result = await this.findDocument(selector)
-                                if (result) {
-                                    logger.info(`Reference ${value} is not unique.`);
-                                    return false
-                                }
-                            break;
-                            case "one-to-many":
-                                // check if the reference is unique
-                                // based on the position of the reference
-                                var selector = {
-                                    type: { $eq: domain.name },
-                                    [model.config.position]: { $eq: value }
-                                    
-                                }
-                                var result = await this.findDocument(selector)
-                                if (result) {
-                                    logger.info(`Reference ${value} is not unique.`);
-                                    return false
-                                }
-                                break;
-                        }
-    
-                    break;
-                    */
-                    case "object":
-                        logger.info("Missing json validation. Skipping for now.");
-                    break;
-                    default:
-                        throw new Error("Unexpected type received")
-                }
-            }
-        } catch (e: any) {
-            logger.info("validateObject - error", e)
-            return false;
-        }
-        
-        logger.info("validateObject - result", {type, result: isValid})
-        return isValid;
-    }
-
-    validateObjectByType = async (obj: any, type: string, schema?: ClassModel["schema"]) => {
-        const fnLogger = logger.child({method: "validateObjectByType", args: {obj, type, schema}});
-        let schema_: ClassModel["schema"] = {}
-        
-        switch (type) {
-        case "class":
-            schema_ = CLASS_SCHEMA;
-            break;
-        case "domain":
-            schema_ = DOMAIN_SCHEMA;
-            break;
-        default:
-            if (!schema) {
-                try {
-                    const classDoc = await this.getClassModel(type) as ClassModel;
-                    schema_ = classDoc.schema;
-                } catch (e: any) {
-                    // if 404 validation failed because of missing class
-                    fnLogger.error(`Failed because of error: ${e}`)
-                    return false;
-                }
-            }
-        }
-        if (schema_) return await this.validateObject(obj, type, schema_);
-        else throw new Error(`Unable to retrieve schema to validate object against`);
-    }
-
+    // TODO: consider refactoring to use ~class (before, create) triggers
+    // and (before, update) triggers
     prepareDoc (_id: string, type: string, params: {[key: string] : string | number | boolean}) {
         logger.info("prepareDoc - given args", {_id: _id, type: type, params: params});
         params["_id"] = _id;
@@ -1380,50 +1185,6 @@ class ClientStack extends Stack {
             return false;
         }
     }
-
-    /*
-    async createRelationFromRef (referenceAttr: ReferenceAttribute, doc: Document) {
-        let refValue = doc[referenceAttr.name];
-        let domain = await this.getDomain(referenceAttr.domain);
-        let referenceDoc = await this.getDocument(refValue) as Document;
-        let refClassName = referenceDoc.type;
-
-        let sourceClass: string = "", targetClass: string = "";
-        let sourceId: string = "", targetId: string = "";
-        if (domain.targetClass.includes(doc.type)) {
-            targetClass = doc.type;
-        }
-        if (domain.sourceClass.includes(doc.type)) {
-            targetClass = doc.type;
-        }
-        if (referenceAttr.position === "source") {
-            if (domain.targetClass.includes(doc.type)) {
-                targetClass = doc.type;
-            }
-            if (domain.sourceClass.includes(refClassName)) {
-                sourceClass = refClassName;
-            }
-            sourceId = doc._id;
-            targetId = refValue;
-        } else if (referenceAttr.position === "target") {
-            if (domain.sourceClass.includes(doc.type)) {
-                sourceClass = doc.type;
-            }
-            if (domain.targetClass.includes(refClassName)) {
-                targetClass = refClassName;
-            }
-            sourceId = refValue;
-            targetId = doc._id;
-        }
-        let params = {
-            source: sourceId,
-            target: targetId,
-            sourceClass: sourceClass,
-            targetClass: targetClass,
-        }
-
-        return this.createDoc(null, domain, params);
-    } */
 
     query = async (sql: string, ...params: any[]) => {
         const fnLogger = logger.child({method: "query", args: {sql, params}});
