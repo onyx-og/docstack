@@ -31,11 +31,13 @@
   },
   "devDependencies": {
     "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/semver": "^7.7.1",
     "cpy-cli": "^6.0.0",
     "eslint": "^9.38.0",
     "eslint-webpack-plugin": "^5.0.2",
     "replace-in-file": "^8.3.0",
+    "rollup": "^4.53.1",
     "rollup-plugin-require-context": "^1.0.1"
   }
 }
