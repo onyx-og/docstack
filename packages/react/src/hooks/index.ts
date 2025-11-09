@@ -2,21 +2,20 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { DocStackContext } from '../components/StackProvider';
 import { Document, SelectAST, UnionAST } from '@docstack/shared';
-import { Class } from '@docstack/client';
 
-export const useQuery = (stack: string, sql: string, ...params: any[]) => {
+export const useQuerySQL = (stack: string, sql: string, ...params: any[]) => {
     const docStack = useContext(DocStackContext);
     const [result, setResult] = useState<{ rows: any[]; ast: (SelectAST | UnionAST)[] | null; }>({ rows: [], ast: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    // [TODO] Solve bounce of component because of StrictMode or other reasons
     const queryRef = useRef(false);
 
-    useEffect(() => {
-        // Check if the docStack instance is available
+    useEffect( () => {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
-            console.error('useQuery must be used within a DocStackProvider.');
+            console.error('useClassList must be used within a DocStackProvider.');
             setLoading(false);
             return;
         }
@@ -51,10 +50,14 @@ export const useQuery = (stack: string, sql: string, ...params: any[]) => {
         }
         
 
-    }, [docStack, sql, ...params]); // Re-run if docStack, sql, or params change
+        return () => {
+            //
+        }
 
-    return { result, loading, error };
-};
+    }, [docStack, stack, params]);
+
+    return { loading, result, error };
+}
 
 export const useFind = (stack: string, query: {
     selector: { [key: string]: string | number },

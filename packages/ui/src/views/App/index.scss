@@ -6,11 +6,29 @@ body,
     background-color: #f8fbf8;
 }
 
+.app-wrapper {
+    display: grid;
+    grid-template-columns: 200px 1fr;      /* Sidebar + main area */
+    grid-template-rows: auto 1fr auto;     /* Header, main, statusbar */
+    grid-template-areas:
+        "sidebar header"
+        "sidebar main"
+        "statusbar statusbar";
+    min-height: 100vh;
+    margin: 0;
+}
+
 .app-title {
     margin: 0;
 }
 
+main {
+    grid-area: main;
+    overflow-y: auto;
+}
+
 .app-header {
+    grid-area: header;
     background-color: white;
 }
 

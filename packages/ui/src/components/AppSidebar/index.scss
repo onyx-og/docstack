@@ -1,0 +1,69 @@
+.app-sidebar {
+    grid-area: sidebar;
+    background-color: #f4f4f4;
+    border-right: 1px solid #ddd;
+    padding: 16px;
+    box-sizing: border-box;
+
+    .sidebar-menu {
+        list-style: none;
+        padding: 1rem;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-height: 100vh;
+    }
+
+    .menu-item,
+    .menu-item-group {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 0.9rem;
+        border-radius: 0.5rem;
+        color: #374151;
+        /* neutral gray text */
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    /* Hover & Active states */
+    .menu-item:hover,
+    .menu-item-group:hover {
+        background-color: rgba(0,0,0,0.05);
+        color: #111827;
+    }
+
+    .menu-item.active,
+    .menu-item-group.active {
+        background-color: #eef2ff;
+        /* subtle purple tint */
+        color: #4338ca;
+        /* indigo accent */
+        font-weight: 600;
+    }
+
+    /* Optional icon style if you use SVG or react-icons inside */
+    .menu-item svg {
+        width: 18px;
+        height: 18px;
+        color: #6b7280;
+    }
+
+    .menu-item.active svg {
+        color: #4338ca;
+    }
+
+    /* Nested menu group */
+    .menu-item-group>.submenu {
+        margin-left: 1.5rem;
+        margin-top: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+}

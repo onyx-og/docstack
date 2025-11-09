@@ -1,5 +1,5 @@
 import { AttributeModel, ClassModel, Document } from "@docstack/shared";
-import { Button, Form, TextInput, Toggle, InputRefType, ActionBar, ActionBarItemConfig, Select, useModal } from "@prismal/react";
+import { Button, Form, TextInput, Toggle, InputRefType, ActionBar, ActionBarItemConfig, Select, useModal, NumberInput } from "@prismal/react";
 import { useClass } from "@docstack/react";
 import React from "react";
 import { useAppSelector } from "hooks";
@@ -39,8 +39,10 @@ const AttributeField = React.forwardRef((props: AttributeFieldProps, ref: React.
             return <TextInput required={config.mandatory} ref={ref} key={name} after={modeBtn} type="default" htmlType="text" disabled={mode=="read"} name={name} label={name} value={value} />
         case "boolean":
             return <Toggle type="switch" name={name} label={name} checked={value} />
-        // case "integer":
-        //     return <NumberInput />
+        case "integer":
+            return <NumberInput name={name} label={name} value={value} step={1} />
+         case "decimal":
+            return <NumberInput name={name} label={name} value={value} step={1} />
         default:
             throw new Error(`Unexpected attribute field type '${type}'`);
     }

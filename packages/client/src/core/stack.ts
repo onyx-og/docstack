@@ -599,8 +599,8 @@ class ClientStack extends Stack {
         return result.docs.length > 0 ? result.docs[0] : null;
     }
 
-    // TODO: Understand why most classes are empty of attributes
     getClassModel = async ( className: string ) => {
+        // TODO: understand whether to use name of _id field
         let selector = {
             type: { $in: ["class", "~self"] },
             name: { $eq: className }

@@ -1,7 +1,7 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
-import {Document} from "@docstack/shared";
+import {Document,  SelectAST, UnionAST} from "@docstack/shared";
 
 export const useClassCreate = (stack: string) => {
     const docStack = useContext(DocStackContext);

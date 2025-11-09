@@ -14,6 +14,8 @@ import { logout } from 'features/auth';
 import DebugPanel from 'components/DebugPanel';
 import StatusBar from 'components/StatusBar';
 import { DocStackContext } from '@docstack/react';
+import AppSidebar from 'components/AppSidebar';
+import ClassList from 'views/ClassList';
 
 const AppHeader = () => {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -49,13 +51,7 @@ const AppHeader = () => {
             })
         }
         items.push(
-            { item: <div className='app-title' style={{
-                    height: '40px', width: '150px',
-                    background: `url("${require('assets/type.svg')}")`,
-                    backgroundSize: 'contain',
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: 'center',
-                }}></div>, key: "dashboard-title", position: "left" },
+            // { item: , key: "dashboard-title", position: "left" },
             { item: <Button type="text" iconName="bug" onClick={openDebugPanel} />, key: "btn-bug", position: "right" },
             { item: <Button type="primary" iconName='sign-out' onClick={doLogout}/>, key: "btn-logout", position: "right" }
         )
@@ -72,6 +68,42 @@ const AppHeader = () => {
         <ActionBar items={actionBarItems} />
         
     </Header>
+}
+
+type AppWrapperProps = {
+    children: React.ReactNode;
+}
+const AppWrapper = ({ children }: AppWrapperProps) => {
+    const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+    const isAnonymous = useAppSelector((state) => state.auth.isAnonymous);
+
+     const header = React.useMemo(() => {
+        if (!isAuthenticated && !isAnonymous) {
+            return null;
+        }
+        return <AppHeader />
+    }, [isAuthenticated, isAnonymous, location]);
+
+    const statusbar = React.useMemo(() => {
+        if (!isAuthenticated && !isAnonymous) {
+            return null;
+        }
+        return <AppStatusBar />
+    },[isAuthenticated, isAnonymous, location]);
+
+    const sidebar = React.useMemo(() => {
+        if (!isAuthenticated && !isAnonymous) {
+            return null;
+        }
+        return <AppSidebar />;
+    }, [isAuthenticated, isAnonymous, location]);
+
+    return <div className="app-wrapper">
+        {sidebar}
+        {header}
+        {children}
+        {statusbar}
+    </div>;
 }
 
 const AppStatusBar = () => {
@@ -106,29 +138,13 @@ const App = () => {
         } else navigate('/');
     }, [isAuthenticated, isAnonymous]);
 
-    const header = React.useMemo(() => {
-        if (!isAuthenticated && !isAnonymous) {
-            return null;
-        }
-        return <AppHeader />
-    }, [isAuthenticated, isAnonymous, location]);
-
-    const statusbar = React.useMemo(() => {
-        if (!isAuthenticated && !isAnonymous) {
-            return null;
-        }
-        return <AppStatusBar />
-    },[isAuthenticated, isAnonymous, location]);
-
     return <StackProvider config={ dbName ? [dbName] : []}>
-        {header}
-        
         <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<AppWrapper><Dashboard /></AppWrapper>} />
             <Route path="/login" element={<AuthView />} />
-            <Route path="/class/:className" element={<ClassView />} />
+            <Route path="/classes" element={<AppWrapper><ClassList /></AppWrapper>} />
+            <Route path="/class/:className" element={<AppWrapper><ClassView /></AppWrapper>} />
         </Routes>
-        {statusbar}
     </StackProvider>;
 }
 

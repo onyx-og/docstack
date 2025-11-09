@@ -66,9 +66,8 @@ const ClassCard = (props: ClassCardProps) => {
     const attributes_ = React.useMemo(() => {
         let attrSet: {[key: string]: {}} = {};
         attributes?.forEach((attr) => {
-            console.log("attribute model", {model: attr.model});
             let modelProc: {[key: string]: string | AttributeModel["config"]} = {...attr.model};
-            modelProc["config"] = <AttributeConfChips conf={attr.model.config} />
+            modelProc["config"] = <AttributeConfChips key={attr.name} conf={attr.model.config} />
             attrSet[attr.name] = modelProc;
         })
         return attrSet;

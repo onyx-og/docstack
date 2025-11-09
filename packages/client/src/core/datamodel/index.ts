@@ -3,6 +3,10 @@ import semver from "semver";
 
 const syspatches: Patch[] = [];
 
+// TODO: implement _rev auto handler:
+// If patches include updates to existing documents, 
+// we need to ensure that the _rev field is handled correctly to avoid conflicts.
+
 const sys_001: Patch = {
     "_id": "~sys-0.0.1",
     "type": "patch",
