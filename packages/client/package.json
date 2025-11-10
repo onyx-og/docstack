@@ -3,10 +3,12 @@
   "version": "0.0.1",
   "main": "lib/index.js",
   "src": "src/index.ts",
+  "type": "module",
   "scripts": {
     "build:types": "npx tsc -build --force ./tsconfig.json",
     "build": "rollup --config ./rollup.config.js && npm run build:types",
-    "lint": "eslint ./src --ext .ts,.tsx"
+    "lint": "eslint ./src --ext .ts,.tsx",
+    "test": "jest --config jest.config.ts"
   },
   "repository": {
     "type": "git",
