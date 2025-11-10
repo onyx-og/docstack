@@ -4,7 +4,7 @@ import type {Config} from '@jest/types';
 const config: Config.InitialOptions = {
   verbose: true,
   "transform": {
-    "^.+\\.tsx?$": ["ts-jest", {"tsconfig": "./server/tsconfig.json"}]
+    "^.+\\.tsx?$": ["ts-jest", {"tsconfig": "./tsconfig.json"}]
   },
   "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
   "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"]
