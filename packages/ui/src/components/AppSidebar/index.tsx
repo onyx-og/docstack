@@ -29,7 +29,7 @@ const MenuItem = (props: MenuItemProps | MenuItemGroupProps) => {
 
     useEffect(() => {
         setActive(location.pathname === props.link);
-    }, [location, props.link]);
+    }, [location.pathname, props.link]);
 
     const doNavigate = useCallback(() => {
         if (link) {
@@ -57,6 +57,41 @@ const MenuItem = (props: MenuItemProps | MenuItemGroupProps) => {
     return component;
 }
 
+const DashboardIcon = () => {
+    return <div
+        style={{ 
+            backgroundImage: `url("${require("assets/icons/bxs_dashboard_icon.svg")}")`,
+            minWidth: "16px",
+            minHeight: "16px",
+            backgroundPosition: "center",
+            backgroundSize: "contain",
+            backgroundRepeat: "no-repeat",
+        }}></div>;
+} 
+
+const ClassesIcon = () => {
+    return <div
+        style={{ 
+            backgroundImage: `url("${require("assets/icons/category_icon.svg")}")`,
+            minWidth: "16px",
+            minHeight: "16px",
+            backgroundPosition: "center",
+            backgroundSize: "contain",
+            backgroundRepeat: "no-repeat",
+        }}></div>
+}
+
+const DomainsIcon = () => {
+    return <div
+        style={{ 
+            backgroundImage: `url("${require("assets/icons/data_class_icon.svg")}")`,
+            minWidth: "16px",
+            minHeight: "16px",
+            backgroundPosition: "center",
+            backgroundSize: "contain",
+            backgroundRepeat: "no-repeat",
+        }}></div>
+}
 
 interface AppSidebarProps {
 }
@@ -72,9 +107,9 @@ const AppSidebar = (props: AppSidebarProps) => {
             backgroundPosition: 'center',
         }}></div>
         <ul className="sidebar-menu">
-            <li><MenuItem label="Dashboard" icon="home" link="/" /></li>
-            <li><MenuItem label="Classes" icon="files-o" link="/classes" /></li>
-            <li><MenuItem label="Domains" link="/domains" /></li>
+            <li><MenuItem label="Dashboard" icon={<DashboardIcon />} link="/" /></li>
+            <li><MenuItem label="Classes" icon={<ClassesIcon />} link="/classes" /></li>
+            <li><MenuItem label="Domains" icon={<DomainsIcon />} link="/domains" /></li>
         </ul>
     </section>;
 }

@@ -1,3 +1,24 @@
-.view-dash-classes-container {
-    padding: 0 1rem;
+.view-dashboard {
+    width: 100%;
+}
+
+.dashboard-widget {
+    margin: 0.5rem;
+}
+
+.top-widgets-row {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    .dashboard-widget {
+        flex: 0 1 calc(15% - 1rem);
+        min-width: 250px;
+    }
+}
+
+.main-widgets-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
 }

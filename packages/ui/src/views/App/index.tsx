@@ -82,14 +82,14 @@ const AppWrapper = ({ children }: AppWrapperProps) => {
             return null;
         }
         return <AppHeader />
-    }, [isAuthenticated, isAnonymous, location]);
+    }, [isAuthenticated, isAnonymous]);
 
     const statusbar = React.useMemo(() => {
         if (!isAuthenticated && !isAnonymous) {
             return null;
         }
         return <AppStatusBar />
-    },[isAuthenticated, isAnonymous, location]);
+    },[isAuthenticated, isAnonymous]);
 
     const sidebar = React.useMemo(() => {
         if (!isAuthenticated && !isAnonymous) {
@@ -101,7 +101,9 @@ const AppWrapper = ({ children }: AppWrapperProps) => {
     return <div className="app-wrapper">
         {sidebar}
         {header}
-        {children}
+        <main>
+            {children}
+        </main>
         {statusbar}
     </div>;
 }
@@ -116,11 +118,11 @@ const AppStatusBar = () => {
         <ChangelogModal title="Changelog">
             <p>{docStack?.getStack(dbName)?.patches.map(patch => patch.changelog)}</p>
         </ChangelogModal>
-        <Marquee>{`Stack: ${dbName}`}</Marquee>
+        {/* <Marquee>{`Stack: ${dbName}`}</Marquee>
         <Marquee>{`Version: ${docStack?.getStack(dbName)?.appVersion}`}</Marquee>
         <Marquee onClick={openPatchChangelog}>{`Schema version: ${docStack?.getStack(dbName)?.schemaVersion}`}</Marquee>
         <Marquee speed={0.7}>Trigger definition and storing is currently in development...         Class deletion is next step in the roadmap...               
-        </Marquee>
+        </Marquee> */}
     </StatusBar>
 }
 
