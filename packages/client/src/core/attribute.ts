@@ -94,6 +94,16 @@ class Attribute extends Attribute_ {
             case "object":
                 field = z.object({});
                 break;
+            
+            case 'enum':
+                if (!config.values || !Array.isArray(config.values) || config.values.length === 0) {
+                    throw new Error(
+                        `Attribute '${name}' of type 'enum' must have a non-empty 'values' array in its config.`
+                    );
+                }
+                const enumValues = config.values.map(v => v.value);
+                field = z.enum(enumValues as [string, ...string[]]);
+                break;
 
             case 'foreign_key':
                 if (!config.targetClass) {

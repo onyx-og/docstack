@@ -56,7 +56,7 @@ const sys_001: Patch = {
         {
             "_id": "domain",
             "active": true,
-            "name": "Domain",
+            "name": "domain",
             "description": "A domain document representing a data model domain",
             "type": "~self",
             "schema": {
@@ -89,8 +89,22 @@ const sys_001: Patch = {
                         ]
                     }
                 },
-                "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
-                "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: true } },
+                "sourceClass": { 
+                    name: "sourceClass", 
+                    type: "foreign_key", 
+                    config: { 
+                        targetClass: "class",
+                        isArray: true
+                    }
+                },
+                "targetClass": {
+                    name: "targetClass",
+                    type: "foreign_key",
+                    config: {
+                        targetClass: "class",
+                        isArray: true
+                    }
+                },
             }
         }
     ]
