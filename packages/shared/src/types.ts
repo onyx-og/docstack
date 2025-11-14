@@ -89,15 +89,13 @@ export interface ClassModel extends Document {
 }
 
 export interface DomainModel extends Document {
-    type: "domain",
+    type: "domain" | "~self",
     name: string,
     relation: "1:1" | "1:N" | "N:1" | "N:N";
     sourceClass: string;
     targetClass: string;
     description?: string,
-    parentDomain?: string,
     _rev?: PouchDB.Core.RevisionId | undefined;
-    // schema: {[name: string]: AttributeModel};
 }
 
 export type Document = PouchDB.Core.Document<{

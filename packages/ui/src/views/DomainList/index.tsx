@@ -4,8 +4,8 @@ import { useAppSelector } from "hooks";
 import React from "react";
 import { useDomainList } from "@docstack/react";
 
-import ClassCard from "components/ClassCard";
-import ClassForm from "components/ClassForm";
+import DomainCard from "components/DomainCard";
+import DomainForm from "components/DomainForm";
 
 const DomainList = () => {
 

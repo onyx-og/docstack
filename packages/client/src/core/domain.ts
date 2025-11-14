@@ -4,10 +4,9 @@ import { createLogger, Logger } from "winston";
 class Domain extends Domain_ {
     stack: Stack | undefined;
     name!: string;
-    type!: "domain";
+    type!: DomainModel["type"];
     description: string | undefined;
     id!: string;
-    schema: DomainModel["schema"] = {};
     relation!: DomainModel["relation"];
     sourceClass!: string;
     targetClass!: string;
@@ -69,7 +68,7 @@ class Domain extends Domain_ {
     init = (
         stack: Stack | null,
         name: string,
-        type: "domain",
+        type: DomainModel["type"],
         relation: typeof this.relation,
         sourceClass: string,
         targetClass: string,
@@ -98,7 +97,7 @@ class Domain extends Domain_ {
     public static get = (
         stack: Stack,
         name: string,
-        type: "domain" = "domain",
+        type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: string,
         targetClass: string,
@@ -124,7 +123,7 @@ class Domain extends Domain_ {
     public static create = async (
         stack: Stack,
         name: string,
-        type: "domain" = "domain",
+        type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: string,
         targetClass: string,
@@ -219,6 +218,18 @@ class Domain extends Domain_ {
         } else {
             throw new Error(`Stack is not defined for Domain ${this.name}`);
         }
+    }
+
+    getRelations = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
+        if (!this.stack) {
+            this.logger.error("Stack is not defined");
+            throw new Error("Stack is not defined");
+        }
+
+        let _selector = { ...selector, type: this.name };
+        this.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
+        let docs = (await this.stack.findDocuments(_selector, fields, skip, limit)).docs
+        return docs;
     }
 
     addRelation = async ( sourceDoc: Document, targetId: string ) => {

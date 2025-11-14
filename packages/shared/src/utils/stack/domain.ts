@@ -5,10 +5,9 @@ import Stack from "./"
 abstract class Domain extends EventTarget {
     abstract stack: Stack | undefined;
     abstract name: string;
-    abstract type: "domain";
+    abstract type: DomainModel["type"];
     abstract description: string | undefined;
     abstract id: string;
-    abstract schema: DomainModel["schema"];
     abstract relation: DomainModel["relation"];
     abstract sourceClass: string;
     abstract targetClass: string;
@@ -33,7 +32,7 @@ abstract class Domain extends EventTarget {
     abstract init: (
         stack: Stack | null,
         name: string,
-        type: "domain",
+        type: DomainModel["type"],
         relation: typeof this.relation,
         sourceClass: string,
         targetClass: string,
@@ -44,23 +43,21 @@ abstract class Domain extends EventTarget {
     static get: (
         stack: Stack,
         name: string,
-        type: "domain",
+        type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: string,
         targetClass: string,
         description?: string,
-        schema?: DomainModel["schema"],
     ) => Domain;
 
     static create:(
         stack: Stack,
         name: string,
-        type: "domain",
+        type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: string,
         targetClass: string,
         description?: string,
-        schema?: DomainModel["schema"]
         // parentClass: Class | null = null
     ) => Promise<Domain>
 
@@ -73,6 +70,8 @@ abstract class Domain extends EventTarget {
     abstract validateRelation: (doc: Document, targetId: string) => Promise<boolean>;
 
     abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
+
+    abstract getRelations: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
 }
 
 export default Domain;
