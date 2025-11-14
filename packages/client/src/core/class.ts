@@ -392,7 +392,15 @@ class Class extends Class_ {
                 this.attributes[name] = attribute_;
                 let attributeModel = attribute_.getModel();
                 fnLogger.info("Adding attribute to schema", {attributeModel: attributeModel});
-                // TODO: 
+                const currentSchema = this.model.schema ?? {};
+                this.model.schema = {
+                    ...currentSchema,
+                    [name]: attributeModel
+                };
+                this.schemaZOD = this.schemaZOD.extend({
+                    [name]: attribute_.field
+                });
+                // TODO:
                 // this.schema[name] = attributeModel; // sometimes getting schema undefined
                 // update class on db
                 fnLogger.info("Checking for requirements before updating class on db", {stack: (this.stack != null), id: this.id})

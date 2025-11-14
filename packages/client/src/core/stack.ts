@@ -318,7 +318,19 @@ class ClientStack extends Stack {
     removeAllListeners = () => {
         this.removeEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
         this.removeEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
-        this.listeners = [];
+
+        if (this.listeners.length > 0) {
+            for (const listener of this.listeners) {
+                if (listener && typeof listener.cancel === 'function') {
+                    try {
+                        listener.cancel();
+                    } catch (error) {
+                        logger.warn('Error while cancelling listener', { error });
+                    }
+                }
+            }
+            this.listeners = [];
+        }
     }
 
     /**
@@ -671,6 +683,8 @@ class ClientStack extends Stack {
             include_docs: true,
             selector
         });
+
+        this.listeners.push(listener);
 
         return {
             list: result,
