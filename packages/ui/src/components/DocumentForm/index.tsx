@@ -37,6 +37,8 @@ const AttributeField = React.forwardRef((props: AttributeFieldProps, ref: React.
     switch (type) {
         case "string":
             return <TextInput required={config.mandatory} ref={ref} key={name} after={modeBtn} type="default" htmlType="text" disabled={mode=="read"} name={name} label={name} value={value} />
+        case "relation":
+            return <TextInput required={config.mandatory} ref={ref} key={name} after={modeBtn} type="default" htmlType="text" disabled={mode=="read"} name={name} label={name} value={value} />
         case "boolean":
             return <Toggle type="switch" name={name} label={name} checked={value} />
         case "integer":

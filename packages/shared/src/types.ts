@@ -4,7 +4,7 @@ import type Class from "./utils/stack/class";
 import Trigger from "./utils/stack/trigger";
 
 
-export const ATTRIBUTE_TYPES = ["string", "decimal", "integer", "foreign_key", "date", "enum", "reference", "object", "boolean"];
+export const ATTRIBUTE_TYPES = ["string", "decimal", "integer", "foreign_key", "date", "enum", "reference", "object", "boolean", "relation"];
 
 export type AttributeTypeConfig = {
     isArray?: boolean,
@@ -95,6 +95,7 @@ export interface DomainModel extends Document {
     sourceClass: string;
     targetClass: string;
     description?: string,
+    schema: { [name: string]: AttributeModel };
     _rev?: PouchDB.Core.RevisionId | undefined;
 }
 

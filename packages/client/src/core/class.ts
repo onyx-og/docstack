@@ -476,6 +476,11 @@ class Class extends Class_ {
             fnLogger.error("Stack is not defined");
             return null;
         }
+        const isValid = await this.validate(params);
+        if (!isValid) {
+            fnLogger.error("Validation failed while creating document", {params});
+            throw new Error(`Validation failed for class '${this.name}'`);
+        }
         return await this.stack.createDoc(null, this.getName(), this, params);
     }
 
@@ -484,6 +489,13 @@ class Class extends Class_ {
         if (!this.stack) {
             fnLogger.error("Stack is not defined");
             return [];
+        }
+        for (const params of paramsArray) {
+            const isValid = await this.validate(params);
+            if (!isValid) {
+                fnLogger.error("Validation failed while creating documents", {params});
+                throw new Error(`Validation failed for class '${this.name}'`);
+            }
         }
         let addedCards: Document[] = [];
         addedCards = await this.stack.createDocs(
@@ -544,6 +556,24 @@ class Class extends Class_ {
     updateCard = async (cardId: string, params: {[key:string]: any}) => {
         return new Promise<Document | null>( async (resolve, reject) => {
             if (this.stack) {
+                let docForValidation: {[key:string]: any} = params;
+                try {
+                    const existingDoc = await this.stack.db.get<Document>(cardId);
+                    docForValidation = {...existingDoc, ...params};
+                } catch (error: any) {
+                    if (!(error && error.status === 404)) {
+                        reject(error);
+                        return;
+                    }
+                }
+
+                const isValid = await this.validate(docForValidation);
+                if (!isValid) {
+                    this.logger.error("Validation failed while updating document", {cardId, params});
+                    reject(new Error(`Validation failed for class '${this.name}'`));
+                    return;
+                }
+
                 const res = await this.stack.createDoc(cardId, this.getName(), this, params);
                 resolve(res)
             } else {

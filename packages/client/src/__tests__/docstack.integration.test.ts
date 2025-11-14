@@ -1,4 +1,4 @@
-import { DocStack, Class, Attribute } from "..";
+import { DocStack, Class, Attribute, Domain } from "..";
 import { getAllSystemPatches } from "../core/datamodel";
 import type { ClassModel, Document } from "@docstack/shared";
 
@@ -192,6 +192,115 @@ describe("@docstack/client integration", () => {
 
             const changeEvent = await eventPromise;
             expect(changeEvent.detail).toHaveProperty("id");
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("creates domains and lists them", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const sourceClassName = `Source-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            const targetClassName = `Target-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            const sourceClass = await Class.create(stack, sourceClassName, "class", "Source class");
+            const targetClass = await Class.create(stack, targetClassName, "class", "Target class");
+
+            await Attribute.create(sourceClass, "label", "string", "Label", { mandatory: true });
+            await Attribute.create(targetClass, "label", "string", "Label", { mandatory: true });
+
+            const domainName = `Domain-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            const domain = await Domain.create(
+                stack,
+                domainName,
+                "domain",
+                "N:N",
+                sourceClassName,
+                targetClassName,
+                "Links sources and targets"
+            );
+
+            expect(domain.getModel().name).toBe(domainName);
+
+            const retrieved = await stack.getDomain(domainName);
+            expect(retrieved).toBeInstanceOf(Domain);
+
+            const domainList = await stack.getDomains({});
+            const domainNames = domainList.map(d => d.getModel().name);
+            expect(domainNames).toContain(domainName);
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("creates, validates and deletes domain relations", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const sourceClass = await Class.create(stack, `Source-${Date.now()}`, "class", "Sources");
+            const targetClass = await Class.create(stack, `Target-${Date.now()}`, "class", "Targets");
+            await Attribute.create(sourceClass, "name", "string", "Name", { mandatory: true });
+            await Attribute.create(targetClass, "name", "string", "Name", { mandatory: true });
+
+            const domainName = `Rel-${Date.now()}`;
+            const domain = await Domain.create(stack, domainName, "domain", "1:1", sourceClass.getName(), targetClass.getName());
+
+            const sourceDoc = await sourceClass.addCard({ name: "alpha" }) as Document;
+            const targetDoc = await targetClass.addCard({ name: "omega" }) as Document;
+            expect(sourceDoc).not.toBeNull();
+            expect(targetDoc).not.toBeNull();
+
+            const relationDoc = await domain.addRelation(sourceDoc, targetDoc._id as string);
+            expect(relationDoc).not.toBeNull();
+            expect(relationDoc?.type).toBe(domainName);
+
+            const duplicateTarget = await targetClass.addCard({ name: "beta" }) as Document;
+            await expect(domain.addRelation(sourceDoc, duplicateTarget._id as string)).rejects.toThrow("Relation validation failed");
+
+            const otherSource = await sourceClass.addCard({ name: "gamma" }) as Document;
+            await expect(domain.addRelation(otherSource, targetDoc._id as string)).rejects.toThrow("Relation validation failed");
+
+            const deletionResult = await domain.deleteRelation((relationDoc as Document)._id as string);
+            expect(deletionResult).toBe(true);
+            const storedRelation = await stack.getDocument((relationDoc as Document)._id as string) as Document | null;
+            expect(storedRelation?.active).toBe(false);
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("validates relation attributes during document creation", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const customerClass = await Class.create(stack, `Customer-${Date.now()}`, "class", "Customers");
+            const accountClass = await Class.create(stack, `Account-${Date.now()}`, "class", "Accounts");
+            await Attribute.create(customerClass, "name", "string", "Name", { mandatory: true });
+            await Attribute.create(accountClass, "name", "string", "Name", { mandatory: true });
+
+            const relationDomain = await Domain.create(
+                stack,
+                `CustomerAccount-${Date.now()}`,
+                "domain",
+                "N:N",
+                customerClass.getName(),
+                accountClass.getName(),
+            );
+
+            const customer = await customerClass.addCard({ name: "Alice" }) as Document;
+            const account = await accountClass.addCard({ name: "Checking" }) as Document;
+
+            const relationDoc = await relationDomain.addRelation(customer, account._id as string);
+            const relationId = (relationDoc as Document)._id as string;
+
+            const invoiceClass = await Class.create(stack, `Invoice-${Date.now()}`, "class", "Invoices");
+            await Attribute.create(invoiceClass, "title", "string", "Title", { mandatory: true });
+            await Attribute.create(invoiceClass, "customerRelation", "relation", "Customer Relation", { mandatory: true, domain: relationDomain.name });
+
+            const invoiceDoc = await invoiceClass.addCard({ title: "Invoice A", customerRelation: relationId }) as Document;
+            expect(invoiceDoc).not.toBeNull();
+            expect(invoiceDoc?.customerRelation).toBe(relationId);
+
+            await expect(
+                invoiceClass.addCard({ title: "Invoice B", customerRelation: "non-existent" })
+            ).rejects.toThrow("Validation failed for class");
         } finally {
             await cleanup();
         }

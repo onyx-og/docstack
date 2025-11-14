@@ -1,6 +1,6 @@
 import z, { ZodType } from "zod";
 import Class from "./class";
-import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig } from "@docstack/shared";
+import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, Document } from "@docstack/shared";
 
 class Attribute extends Attribute_ {
     name: string;
@@ -104,6 +104,48 @@ class Attribute extends Attribute_ {
                 const enumValues = config.values.map(v => v.value);
                 field = z.enum(enumValues as [string, ...string[]]);
                 break;
+
+            case 'relation': {
+                if (!config.domain || typeof config.domain !== "string") {
+                    throw new Error(
+                        `Attribute '${name}' of type 'relation' is missing a valid 'domain' in its config.`
+                    );
+                }
+
+                const domainName = config.domain;
+                const relationField = z.string().refine(
+                    async (value) => {
+                        if (typeof value !== "string" || value.trim().length === 0) {
+                            return false;
+                        }
+
+                        if (!this.class) {
+                            throw new Error("Missing class configuration for relation attribute validation");
+                        }
+
+                        const stack = this.class.getStack();
+                        if (!stack) {
+                            throw new Error("Missing stack connection for relation attribute validation");
+                        }
+
+                        try {
+                            const relationDoc = await stack.db.get<Document>(value);
+                            return relationDoc.type === domainName && relationDoc.active !== false;
+                        } catch (error: any) {
+                            if (error && error.status === 404) {
+                                return false;
+                            }
+                            throw error;
+                        }
+                    },
+                    {
+                        message: `Relation document not found in domain '${domainName}'.`
+                    }
+                );
+
+                field = relationField;
+                break;
+            }
 
             case 'foreign_key':
                 if (!config.targetClass) {
@@ -276,6 +318,9 @@ class Attribute extends Attribute_ {
             break;
             case "enum":
                 config = Object.assign({ values: [], isArray: false}, config) as AttributeTypeConfig;
+            break;
+            case "relation":
+                config = Object.assign({ domain: null, isArray: false }, config) as AttributeTypeConfig;
             break;
             default:
                 throw new Error("Unexpected type: "+type);

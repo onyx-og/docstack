@@ -63,20 +63,38 @@ const sys_001: Patch = {
                 "type": { name: "type", type: "string", config: { defaultValue: "domain" } },
                 "schema": {
                     name: "schema", type: "object", config: {
-                        isArray: true,
+                        isArray: false,
                         defaultValue: {
-                            "source": {
-                                name: "source",
-                                type: "foreign_key",
+                            "sourceClass": {
+                                name: "sourceClass",
+                                type: "string",
                                 config: {
-                                    isArray: false
+                                    isArray: false,
+                                    mandatory: true
                                 }
                             },
-                            "target": {
-                                name: "target",
-                                type: "foreign_key",
+                            "targetClass": {
+                                name: "targetClass",
+                                type: "string",
                                 config: {
-                                    isArray: false
+                                    isArray: false,
+                                    mandatory: true
+                                }
+                            },
+                            "sourceId": {
+                                name: "sourceId",
+                                type: "string",
+                                config: {
+                                    isArray: false,
+                                    mandatory: true
+                                }
+                            },
+                            "targetId": {
+                                name: "targetId",
+                                type: "string",
+                                config: {
+                                    isArray: false,
+                                    mandatory: true
                                 }
                             }
                         }
@@ -89,20 +107,20 @@ const sys_001: Patch = {
                         ]
                     }
                 },
-                "sourceClass": { 
-                    name: "sourceClass", 
-                    type: "foreign_key", 
-                    config: { 
-                        targetClass: "class",
-                        isArray: true
+                "sourceClass": {
+                    name: "sourceClass",
+                    type: "string",
+                    config: {
+                        isArray: false,
+                        mandatory: true
                     }
                 },
                 "targetClass": {
                     name: "targetClass",
-                    type: "foreign_key",
+                    type: "string",
                     config: {
-                        targetClass: "class",
-                        isArray: true
+                        isArray: false,
+                        mandatory: true
                     }
                 },
             }

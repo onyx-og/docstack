@@ -42,13 +42,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 documentsToProcess = (docs as any).docs;
             }
 
-            const relationQueue: {
-                domainId: string,
-                sourceId: string,
-                targetId: string,
-                type: "1:1" | "1:N" | "N:1" |"N:N"
-            }[] = [];
-
             const triggerQueue: Record<string, Trigger[]> = Object.create(null);
 
             const postOperations = async (
@@ -146,7 +139,8 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     // Fetch the current (next old) version of the class document.
                     const classObj = await stack.getClass(className, true);
                     if (classObj == null) {
-                        throw new Error(`Unexpected, can't retrieve class '${className}' (doc '${classDocId}')`);
+                        fnLogger.warn(`Class '${className}' not available during schema propagation. Skipping update.`);
+                        return pouchBulkDocs.call(this, docs, options, postExec);
                     }
                     const previousClassDoc = classObj.model;
                     fnLogger.info("Retrieved documents", {doc, previousClassDoc});
@@ -182,23 +176,15 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             for (const attr of relationalAttrs) {
                                 const relationValue = doc[attr.name];
                                 if (!relationValue) continue;
+
                                 const domainId = attr.model.config.domain;
                                 const domain = await stack.getDomain(domainId);
                                 if (!domain) throw new Error(`Domain not found: ${domainId}`);
 
-                                // Validate relation constraint
-                                const isValid = await domain.validateRelation(doc, relationValue);
-                                if (!isValid) {
+                                const relationDoc = await stack.db.get<Document>(relationValue).catch(() => null);
+                                if (!relationDoc || relationDoc.type !== domainId || relationDoc.active === false) {
                                     throw new Error(`Invalid relation for ${attr.name} on ${doc._id}`);
                                 }
-
-                                // Queue relation creation
-                                relationQueue.push({
-                                    domainId: domain.id,
-                                    sourceId: doc._id,
-                                    targetId: relationValue,
-                                    type: domain.relation
-                                });
                             }
                             // TODO: skip execution of before triggers if option.isPostOp
                             const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
@@ -217,6 +203,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // Perform validation using the schema.
                             const validationResult = await classObj.validate(doc);
                             if (!validationResult) {
+                                fnLogger.error("Validation failed while processing document", { className, doc });
                                 throw new Error("Discarded object because object not valid for its Class schema");
                             }
                         }

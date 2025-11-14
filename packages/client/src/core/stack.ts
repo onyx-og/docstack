@@ -1,7 +1,7 @@
 import PouchDB from "pouchdb";
 import createLogger from "../utils/logger";
 import Class from "./class";
-import Domain from "./domain";
+import Domain, { DEFAULT_RELATION_SCHEMA } from "./domain";
 import { decryptString } from "../utils/crypto";
 import { getAllSystemPatches, getSystemPatches } from "./datamodel";
 import {
@@ -43,31 +43,15 @@ export const CLASS_SCHEMA: ClassModel["schema"] = {
 const DOMAIN_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
     "type": { name: "type", type: "string", config: { defaultValue: "domain"} },
-    "schema": { name: "schema", type: "object", config: { 
-        isArray: true,
-        defaultValue: {
-            "source": {
-                name: "source",
-                type: "foreign_key",
-                config: {
-                    isArray: false
-                }
-            },
-            "target": {
-                name: "target",
-                type: "foreign_key",
-                config: {
-                    isArray: false
-                }
-            }
-        }
+    "schema": { name: "schema", type: "object", config: {
+        isArray: false,
+        defaultValue: DEFAULT_RELATION_SCHEMA
     }},
-    // "parentDomain": { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
     "relation": { name: "relation", type: "enum", config: { isArray: false, values: [
         {value: "1:1"}, {value: "1:N"}, {value: "N:1"}, {value: "N:N"}
     ] } },
-    "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
-    "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: true } },
+    "sourceClass": { name: "sourceClass", type: "string", config: { isArray: false, mandatory: true } },
+    "targetClass": { name: "targetClass", type: "string", config: { isArray: false, mandatory: true } },
 };
 class ClientStack extends Stack {
     /* Initialized asynchronously */
@@ -1018,7 +1002,8 @@ class ClientStack extends Stack {
         }
         let db = this.db,
             doc: Document | null = null,
-            isNewDoc = false;
+            isNewDoc = false,
+            resultDoc: Document | null = null;
         try {
             let newDocId = `${type}-${(this.lastDocId+1)}`;
             if (docId) {
@@ -1154,7 +1139,8 @@ class ClientStack extends Stack {
         fnLogger.info("Creating relation document");
         let db = this.db,
             doc: Document | null = null,
-            isNewDoc = false;
+            isNewDoc = false,
+            resultDoc: Document | null = null;
         try {
             if (docId) {
                 const existingDoc = await this.db.get(docId) as Document;
@@ -1192,10 +1178,11 @@ class ClientStack extends Stack {
                 fnLogger.error("Error, check logs", {"response": response});
                 throw new Error("createDoc - Error, check logs");
             }
+            resultDoc = {...doc_, _rev: response.rev ?? doc_._rev} as Document;
         } catch (e) {
             fnLogger.error("Error while creating relation document", {error: e});
         }
-        return doc;
+        return resultDoc;
     }
 
     createRelationDocs = async (docs: { docId: string | null; params: {

@@ -8,6 +8,7 @@ abstract class Domain extends EventTarget {
     abstract type: DomainModel["type"];
     abstract description: string | undefined;
     abstract id: string;
+    abstract schema: DomainModel["schema"];
     abstract relation: DomainModel["relation"];
     abstract sourceClass: string;
     abstract targetClass: string;
@@ -37,7 +38,7 @@ abstract class Domain extends EventTarget {
         sourceClass: string,
         targetClass: string,
         description?: string,
-        // schema: DomainModel["schema"] = {}
+        schema?: DomainModel["schema"]
     ) => void;
 
     static get: (
@@ -48,6 +49,7 @@ abstract class Domain extends EventTarget {
         sourceClass: string,
         targetClass: string,
         description?: string,
+        schema?: DomainModel["schema"]
     ) => Domain;
 
     static create:(
@@ -58,7 +60,7 @@ abstract class Domain extends EventTarget {
         sourceClass: string,
         targetClass: string,
         description?: string,
-        // parentClass: Class | null = null
+        schema?: DomainModel["schema"]
     ) => Promise<Domain>
 
     static buildFromModel: (stack: Stack, domainModel: DomainModel) => Promise<Domain>
@@ -67,9 +69,13 @@ abstract class Domain extends EventTarget {
 
     abstract getModel: () => DomainModel;
 
+    abstract getSchema: () => DomainModel["schema"];
+
     abstract validateRelation: (doc: Document, targetId: string) => Promise<boolean>;
 
     abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
+
+    abstract deleteRelation: (relationId: string) => Promise<boolean>;
 
     abstract getRelations: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
 }

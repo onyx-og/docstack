@@ -1,5 +1,33 @@
 import { Document, Domain as Domain_, DomainModel, Stack } from "@docstack/shared";
-import { createLogger, Logger } from "winston";
+import createLogger from "../utils/logger";
+import type { Logger } from "winston";
+
+const cloneDomainSchema = (schema: DomainModel["schema"]): DomainModel["schema"] => {
+    return JSON.parse(JSON.stringify(schema)) as DomainModel["schema"];
+};
+
+export const DEFAULT_RELATION_SCHEMA: DomainModel["schema"] = {
+    sourceClass: {
+        name: "sourceClass",
+        type: "string",
+        config: { mandatory: true, isArray: false }
+    },
+    targetClass: {
+        name: "targetClass",
+        type: "string",
+        config: { mandatory: true, isArray: false }
+    },
+    sourceId: {
+        name: "sourceId",
+        type: "string",
+        config: { mandatory: true, isArray: false }
+    },
+    targetId: {
+        name: "targetId",
+        type: "string",
+        config: { mandatory: true, isArray: false }
+    }
+};
 
 class Domain extends Domain_ {
     stack: Stack | undefined;
@@ -10,15 +38,25 @@ class Domain extends Domain_ {
     relation!: DomainModel["relation"];
     sourceClass!: string;
     targetClass!: string;
-    // parentDomain: Domain | null;
     model!: DomainModel;
+    schema: DomainModel["schema"] = cloneDomainSchema(DEFAULT_RELATION_SCHEMA);
     state: "busy" | "idle" = "idle";
     static logger: Logger = createLogger().child({module: "domain"});
-    logger: Logger = createLogger().child({module: "domain", domainName: this.name});
-    
+    logger: Logger = Domain.logger.child({module: "domain"});
+
     private constructor() {
         super();
     }
+
+    private mergeSchema = (schema?: DomainModel["schema"]) => {
+        if (!schema) {
+            return cloneDomainSchema(DEFAULT_RELATION_SCHEMA);
+        }
+        return {
+            ...cloneDomainSchema(DEFAULT_RELATION_SCHEMA),
+            ...cloneDomainSchema(schema)
+        };
+    };
 
     getStack = () => {
         return this.stack;
@@ -26,38 +64,60 @@ class Domain extends Domain_ {
 
     setId = ( id: string ) => {
         this.id = id;
-    } 
+    }
 
     setModel = ( model?: DomainModel ) => {
         this.logger.info("setModel - got incoming model", {model: model});
-        // Retreive current class model
-        let currentModel = this.getModel();
-        // Set model arg to the overwrite of the current model with the given one 
-        model = Object.assign(currentModel, model);
+        const incomingModel = model ? {...model} : undefined;
+        const mergedSchema = this.mergeSchema(incomingModel?.schema ?? this.schema);
 
-        this.id = model._id;
-        this.name = model.name;
-        this.description = model.description;
-        this.relation = model.relation;
-        this.sourceClass = model.sourceClass;
-        this.targetClass = model.targetClass;
-        this.model = model;
-        this.logger.info("setModel - model after processing",{ model: model})
+        const resolvedModel: DomainModel = {
+            _id: incomingModel?._id ?? this.id,
+            name: incomingModel?.name ?? this.name,
+            description: incomingModel?.description ?? this.description,
+            type: incomingModel?.type ?? this.type,
+            relation: incomingModel?.relation ?? this.relation,
+            sourceClass: incomingModel?.sourceClass ?? this.sourceClass,
+            targetClass: incomingModel?.targetClass ?? this.targetClass,
+            schema: mergedSchema,
+            active: incomingModel?.active ?? this.model?.active ?? true,
+            createTimestamp: incomingModel?.createTimestamp ?? this.model?.createTimestamp,
+            updateTimestamp: incomingModel?.updateTimestamp ?? this.model?.updateTimestamp,
+        };
+
+        if (incomingModel?._rev || this.model?._rev) {
+            resolvedModel._rev = incomingModel?._rev ?? this.model?._rev;
+        }
+
+        this.id = resolvedModel._id;
+        this.name = resolvedModel.name;
+        this.description = resolvedModel.description;
+        this.type = resolvedModel.type;
+        this.relation = resolvedModel.relation;
+        this.sourceClass = resolvedModel.sourceClass;
+        this.targetClass = resolvedModel.targetClass;
+        this.schema = mergedSchema;
+        this.model = resolvedModel;
+        this.logger = Domain.logger.child({module: "domain", domainName: this.name});
+        this.logger.info("setModel - model after processing",{ model: resolvedModel});
     }
 
     build = (): Promise<Domain> => {
         return new Promise(async (resolve, reject) => {
             let stack = this.getStack();
             if (stack) {
-                let domainModel = await stack.addDomain(this);
-                if (domainModel) {
-                    // Hydrate model
-                    this.setModel(domainModel);
-                    this.logger.info("build - domainModel", {domainModel});
-                    this.setId(domainModel._id);
-                    resolve(this)
-                } else {
-                    reject("Unable to get create domainModel. Check logs.");
+                try {
+                    let domainModel = await stack.addDomain(this);
+                    if (domainModel) {
+                        this.setModel(domainModel);
+                        this.logger.info("build - domainModel", {domainModel});
+                        this.setId(domainModel._id);
+                        resolve(this)
+                    } else {
+                        reject("Unable to get create domainModel. Check logs.");
+                    }
+                } catch (error) {
+                    reject(error);
                 }
             } else {
                 reject("Missing stack assignment");
@@ -73,9 +133,12 @@ class Domain extends Domain_ {
         sourceClass: string,
         targetClass: string,
         description?: string,
-
-        // schema: DomainModel["schema"] = {}
+        schema: DomainModel["schema"] = DEFAULT_RELATION_SCHEMA,
     ) => {
+        if (stack) {
+            this.stack = stack;
+        }
+        this.schema = this.mergeSchema(schema);
         this.name = name;
         this.id = name;
         this.description = description;
@@ -84,14 +147,16 @@ class Domain extends Domain_ {
         this.sourceClass = sourceClass;
         this.targetClass = targetClass;
         this.setModel({
-            type, _id: name, active: true,
-            name, relation, sourceClass,
-            targetClass, description,
+            type,
+            _id: name,
+            active: true,
+            name,
+            relation,
+            sourceClass,
+            targetClass,
+            description,
+            schema: this.schema,
         })
-
-        if (stack) {
-            this.stack = stack;
-        }
     }
 
     public static get = (
@@ -102,21 +167,21 @@ class Domain extends Domain_ {
         sourceClass: string,
         targetClass: string,
         description?: string,
-        schema: DomainModel["schema"] = {},
+        schema: DomainModel["schema"] = DEFAULT_RELATION_SCHEMA,
     ) => {
         const domain_ = new Domain();
         this.logger.info("Received schema", {schema})
         domain_.init(
-            stack, name, type, relation, sourceClass, targetClass,description);
-        // Add listener for new documents of this class type
-        domain_.stack!.onClassDoc(name)
-            .on("change", (change) => {
-                console.log("onClassDoc", {change})
-                const evt = new CustomEvent("doc", {
-                    detail: change
+            stack, name, type, relation, sourceClass, targetClass,description, schema);
+        if (domain_.stack) {
+            domain_.stack.onClassDoc(name)
+                .on("change", (change) => {
+                    const evt = new CustomEvent("doc", {
+                        detail: change
+                    })
+                    domain_.dispatchEvent(evt);
                 })
-                domain_.dispatchEvent(evt);
-            })
+        }
         return domain_;
     }
 
@@ -128,8 +193,7 @@ class Domain extends Domain_ {
         sourceClass: string,
         targetClass: string,
         description?: string,
-        schema: DomainModel["schema"] = {},
-        // parentClass: Class | null = null
+        schema: DomainModel["schema"] = DEFAULT_RELATION_SCHEMA,
     ) => {
         const domain_ = Domain.get(
             stack, name, type,
@@ -142,27 +206,18 @@ class Domain extends Domain_ {
 
     static buildFromModel = async (stack: Stack, domainModel: DomainModel) => {
         this.logger.info("buildFromModel - Instantiate from model", {domainModel});
-        // let parentdomainModel = (domainModel.parentClass ? await stack.getdomainModel(domainModel.parentClass) : null);
-        // let parentClass = (parentdomainModel ? await Class.buildFromModel(stack, parentdomainModel) : null);
-
-        // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
-        if (domainModel._rev) {
-            let classObj: Domain = Domain.get(
-                stack, domainModel.name, 
-                domainModel.type, domainModel.relation,
-                domainModel.sourceClass, domainModel.targetClass,
-                domainModel.description, domainModel.schema
-            )
-            return classObj;
-        } else {
-            let classObj: Domain = await Domain.create(
-                stack, domainModel.name, domainModel.type,
-                domainModel.relation, domainModel.sourceClass,
-                domainModel.targetClass, domainModel.description,
-                domainModel.schema
-            );
-            return classObj;
-        }
+        const domain = Domain.get(
+            stack,
+            domainModel.name,
+            domainModel.type,
+            domainModel.relation,
+            domainModel.sourceClass,
+            domainModel.targetClass,
+            domainModel.description,
+            domainModel.schema
+        );
+        domain.setModel(domainModel);
+        return domain;
     }
 
     static fetch = async ( stack: Stack, domainName: string ) => {
@@ -184,39 +239,65 @@ class Domain extends Domain_ {
             relation: this.relation,
             sourceClass: this.sourceClass,
             targetClass: this.targetClass,
-            // schema: this.buildSchema(),
-            active: true,
-            _rev: this.model ? this.model._rev : "", // [TODO] Error prone
+            schema: this.getSchema(),
+            active: this.model?.active ?? true,
             createTimestamp: this.model ? this.model.createTimestamp : undefined,
+            updateTimestamp: this.model ? this.model.updateTimestamp : undefined,
         };
+        if (this.model?._rev) {
+            model._rev = this.model._rev;
+        }
         return model;
     }
 
+    getSchema = () => {
+        return cloneDomainSchema(this.schema);
+    }
+
     validateRelation = async (sourceDoc: Document, targetId: string) => {
-        const source = this.sourceClass;
-        const target = this.targetClass;
-        const type = this.relation;
-
-        if (this.stack) {
-            const targetDoc = await this.stack.db.get(targetId).catch(() => null);
-            if (!targetDoc) return false; // Target must exist.
-
-            switch (type) {
-                case "1:1":
-                    // Ensure neither already participates in another relation
-                    return true
-                case "1:N":
-                    // Ensure target is not linked to another source
-                    return true
-
-                case "N:N":
-                    return true;
-
-                default:
-                    throw new Error(`Unsupported relation type ${type}`);
-            }
-        } else {
+        if (!this.stack) {
             throw new Error(`Stack is not defined for Domain ${this.name}`);
+        }
+
+        const sourceId = sourceDoc._id;
+        if (!sourceId) {
+            throw new Error("Source document must have an _id to create a relation");
+        }
+
+        if (sourceDoc.type !== this.sourceClass || sourceDoc.active === false) {
+            return false;
+        }
+
+        const targetDoc = await this.stack.db.get<Document>(targetId).catch(() => null);
+        if (!targetDoc || targetDoc.type !== this.targetClass || targetDoc.active === false) {
+            return false;
+        }
+
+        const duplicate = await this.getRelations({ sourceId, targetId });
+        if (duplicate.length > 0) {
+            return false;
+        }
+
+        switch (this.relation) {
+            case "1:1": {
+                const sourceRelations = await this.getRelations({ sourceId });
+                if (sourceRelations.length > 0) return false;
+                const targetRelations = await this.getRelations({ targetId });
+                if (targetRelations.length > 0) return false;
+                return true;
+            }
+            case "1:N": {
+                const targetRelations = await this.getRelations({ targetId });
+                return targetRelations.length === 0;
+            }
+            case "N:1": {
+                const sourceRelations = await this.getRelations({ sourceId });
+                return sourceRelations.length === 0;
+            }
+            case "N:N":
+                return true;
+            default:
+                throw new Error(`Unsupported relation type ${this.relation}`);
         }
     }
 
@@ -226,36 +307,51 @@ class Domain extends Domain_ {
             throw new Error("Stack is not defined");
         }
 
-        let _selector = { ...selector, type: this.name };
-        this.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
+        let _selector = { ...(selector ?? {}), type: this.name };
+        this.logger.info("getRelations - selector", {selector: _selector, fields, skip, limit})
         let docs = (await this.stack.findDocuments(_selector, fields, skip, limit)).docs
         return docs;
     }
 
     addRelation = async ( sourceDoc: Document, targetId: string ) => {
-        const fnLogger = this.logger.child({method: "addRelation", args: {sourceDoc, targetId}});
+        const fnLogger = this.logger.child({method: "addRelation", args: {targetId}});
 
         if (!this.stack) {
             fnLogger.error("Stack is not defined");
             throw new Error("Stack is not defined");
         }
 
+        if (!sourceDoc._id) {
+            fnLogger.error("Missing source document id");
+            throw new Error("Source document must have an _id to create a relation");
+        }
+
         if (await this.validateRelation(sourceDoc, targetId)) {
-            // Create document representing the relation
             fnLogger.info("addRelation - relation validated");
             const params = {
                 sourceClass: this.sourceClass,
                 targetClass: this.targetClass,
-                sourceId: sourceDoc.id,
+                sourceId: sourceDoc._id,
                 targetId
             };
             const relationDoc = await this.stack.createRelationDoc(null, this.name, this, params);
             fnLogger.info("addRelation - relationDoc created", {relationDoc});
+            if (!relationDoc) {
+                throw new Error("Unable to create relation document");
+            }
             return relationDoc;
         } else {
             fnLogger.error("addRelation - relation validation failed");
             throw new Error("Relation validation failed");
         }
+    }
+
+    deleteRelation = async (relationId: string) => {
+        if (!this.stack) {
+            this.logger.error("Stack is not defined");
+            throw new Error("Stack is not defined");
+        }
+        return this.stack.deleteDocument(relationId);
     }
 }
 
