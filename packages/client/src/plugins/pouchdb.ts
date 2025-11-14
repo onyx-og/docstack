@@ -127,25 +127,26 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
-                    const className = doc._id;
+                    const classDocId = doc._id;
+                    const className = typeof doc.name === "string" ? doc.name : classDocId;
                     try {
                         // Get the previous version of the class model
-                        const docWithRevs = await stack.db.get(className, {revs: true});
+                        const docWithRevs = await stack.db.get(classDocId, {revs: true});
                         const revisionIDList = docWithRevs._revisions!.ids;
                         if (revisionIDList.length == 1) {
-                            fnLogger.info(`Class '${className}' was just created. Nothing to do.`);
+                            fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
                             return pouchBulkDocs.call(this, docs, options, postExec);
                         }
                     } catch (e: any) {
                         if (e.name === 'not_found') {
-                            fnLogger.info(`Class '${className}' was just created. Nothing to do.`);
+                            fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
                             return pouchBulkDocs.call(this, docs, options, postExec);
                         }
                     }
                     // Fetch the current (next old) version of the class document.
                     const classObj = await stack.getClass(className, true);
                     if (classObj == null) {
-                        throw new Error(`Unexpected, can't retrieve class '${className}'`);
+                        throw new Error(`Unexpected, can't retrieve class '${className}' (doc '${classDocId}')`);
                     }
                     const previousClassDoc = classObj.model;
                     fnLogger.info("Retrieved documents", {doc, previousClassDoc});

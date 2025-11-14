@@ -4,9 +4,15 @@ import type {Config} from '@jest/types';
 const config: Config.InitialOptions = {
   verbose: true,
   "transform": {
-    "^.+\\.tsx?$": ["ts-jest", {"tsconfig": "./server/tsconfig.json"}]
+    "^.+\\.tsx?$": ["ts-jest", {"tsconfig": "./packages/client/tsconfig.json"}]
   },
   "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
-  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"]
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+  "setupFiles": ["<rootDir>/jest.setup.js"],
+  "moduleNameMapper": {
+    "^@docstack/shared$": "<rootDir>/packages/shared/src/index.ts",
+    "^@docstack/shared/(.*)$": "<rootDir>/packages/shared/src/$1",
+    "^jsondiffpatch$": "<rootDir>/test/__mocks__/jsondiffpatch.js"
+  }
 };
 export default config;
