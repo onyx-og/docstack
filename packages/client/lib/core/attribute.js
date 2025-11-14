@@ -53,6 +53,16 @@ class Attribute extends Attribute_ {
                 case 'boolean':
                     field = z.boolean();
                     break;
+                case "object":
+                    field = z.object({});
+                    break;
+                case 'enum':
+                    if (!config.values || !Array.isArray(config.values) || config.values.length === 0) {
+                        throw new Error(`Attribute '${name}' of type 'enum' must have a non-empty 'values' array in its config.`);
+                    }
+                    const enumValues = config.values.map(v => v.value);
+                    field = z.enum(enumValues);
+                    break;
                 case 'foreign_key':
                     if (!config.targetClass) {
                         throw new Error(`Attribute '${name}' of type 'foreign_key' is missing a 'targetClass' in its config.`);
@@ -172,6 +182,21 @@ class Attribute extends Attribute_ {
                     break;
                 case "string":
                     config = Object.assign({ maxLength: 50, isArray: false }, config);
+                    break;
+                case "object":
+                    config = Object.assign({ isArray: false }, config);
+                    break;
+                case "date":
+                    config = Object.assign({ format: "iso", max: null, min: null, isArray: false }, config);
+                    break;
+                case "boolean":
+                    config = Object.assign({ defaultValue: false, isArray: false }, config);
+                    break;
+                case "foreign_key":
+                    config = Object.assign({ targetClass: null, isArray: false }, config);
+                    break;
+                case "enum":
+                    config = Object.assign({ values: [], isArray: false }, config);
                     break;
                 default:
                     throw new Error("Unexpected type: " + type);

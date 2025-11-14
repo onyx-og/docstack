@@ -473,7 +473,7 @@ class Class extends Class_ {
 }
 _a = Class;
 Class.logger = createLogger().child({ module: "class" });
-Class.get = (stack, name, type = "class", description, schema = {}) => {
+Class.get = (stack, name, type, description, schema = {}) => {
     const class_ = new _a();
     _a.logger.info("Received schema", { schema });
     class_.init(stack, name, type, description, schema);
@@ -488,7 +488,7 @@ Class.get = (stack, name, type = "class", description, schema = {}) => {
     });
     return class_;
 };
-Class.create = async (stack, name, type = "class", description, schema = {}) => {
+Class.create = async (stack, name, type, description, schema = {}) => {
     const class_ = _a.get(stack, name, type, description, schema);
     await class_.build();
     return class_;

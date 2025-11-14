@@ -7,7 +7,7 @@ import { z } from "zod";
 declare class Class extends Class_ {
     stack: Stack | undefined;
     name: string;
-    type: "class";
+    type: ClassModel["type"];
     description?: string;
     attributes: {
         [name: string]: Attribute;
@@ -22,9 +22,9 @@ declare class Class extends Class_ {
     triggers: Trigger[];
     private constructor();
     build: () => Promise<Class>;
-    init: (stack: Stack | null, name: string, type: "class", description?: string, schema?: ClassModel["schema"]) => void;
-    static get: (stack: Stack, name: string, type?: "class", description?: string, schema?: ClassModel["schema"]) => Class;
-    static create: (stack: Stack, name: string, type?: "class", description?: string, schema?: ClassModel["schema"]) => Promise<Class>;
+    init: (stack: Stack | null, name: string, type: ClassModel["type"], description?: string, schema?: ClassModel["schema"]) => void;
+    static get: (stack: Stack, name: string, type: ClassModel["type"], description?: string, schema?: ClassModel["schema"]) => Class;
+    static create: (stack: Stack, name: string, type: ClassModel["type"], description?: string, schema?: ClassModel["schema"]) => Promise<Class>;
     static buildFromModel: (stack: Stack, classModel: ClassModel) => Promise<Class>;
     static fetch: (stack: Stack, className: string) => Promise<Class | null>;
     uniqueCheck: (doc: Document) => Promise<boolean>;
@@ -36,7 +36,7 @@ declare class Class extends Class_ {
     getName: () => string;
     getStack: () => Stack | undefined;
     getDescription: () => string | undefined;
-    getType: () => "class";
+    getType: () => "class" | "~self";
     getId: () => string | undefined;
     buildSchema: () => {
         [name: string]: AttributeModel;

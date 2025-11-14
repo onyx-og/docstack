@@ -1,4 +1,4 @@
-import { CachedClass, Document, StackOptions, ClassModel, Patch, CachedDomain, DomainModel } from "../../types";
+import { CachedClass, Document, StackOptions, ClassModel, Patch, CachedDomain, DomainModel, SelectAST, UnionAST } from "../../types";
 import Class from "./class";
 import Domain from "./domain";
 declare abstract class Stack extends EventTarget {
@@ -30,7 +30,6 @@ declare abstract class Stack extends EventTarget {
     abstract onClassModelPropagationStart: (event: CustomEvent<any>) => void;
     abstract onClassLock: (className: string) => PouchDB.Core.Changes<{}>;
     abstract onClassDoc: (className: string) => PouchDB.Core.Changes<{}>;
-    abstract validateObjectByType: (obj: any, type: string, schema?: ClassModel["schema"]) => Promise<boolean>;
     abstract createDoc: (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}) => Promise<Document | null>;
     abstract createDocs: (docs: {
         docId: string | null;
@@ -61,5 +60,12 @@ declare abstract class Stack extends EventTarget {
     abstract getDomainModel: (domainName: string) => Promise<DomainModel | null>;
     abstract deleteDocument: (_id: string) => Promise<boolean>;
     abstract addDesignDocumentPKs: (className: string, pKs: string[], temp?: boolean) => Promise<string>;
+    abstract query: (sql: string, ...params: any[]) => Promise<{
+        rows: any[];
+        ast: (SelectAST | UnionAST)[];
+    } | {
+        rows: never[];
+        ast: null;
+    }>;
 }
 export default Stack;

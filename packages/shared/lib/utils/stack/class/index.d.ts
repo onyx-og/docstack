@@ -7,7 +7,7 @@ import Trigger from '../trigger';
 declare abstract class Class extends EventTarget {
     stack: Stack | undefined;
     name: string;
-    type: "class";
+    abstract type: ClassModel["type"];
     description?: string;
     attributes: {
         [name: string]: Attribute;
@@ -23,16 +23,16 @@ declare abstract class Class extends EventTarget {
     abstract getPrimaryKeys: () => string[];
     constructor();
     abstract build: () => Promise<Class>;
-    abstract init: (stack: Stack | null, name: string, type: "class", description?: string, schema?: ClassModel["schema"]) => void;
-    static get: (stack: Stack, name: string, type: "class", description?: string, schema?: ClassModel["schema"]) => Class;
-    static create: (stack: Stack, name: string, type: "class", description?: string, schema?: ClassModel["schema"]) => Promise<Class>;
+    abstract init: (stack: Stack | null, name: string, type: ClassModel["type"], description?: string, schema?: ClassModel["schema"]) => void;
+    static get: (stack: Stack, name: string, type: ClassModel["type"], description?: string, schema?: ClassModel["schema"]) => Class;
+    static create: (stack: Stack, name: string, type: ClassModel["type"], description?: string, schema?: ClassModel["schema"]) => Promise<Class>;
     static buildFromModel: (stack: Stack, classModel: ClassModel) => Promise<Class>;
     static fetch: (stack: Stack, className: string) => Promise<Class | null>;
     abstract setId: (id: string) => void;
     abstract getName: () => string;
     abstract getStack: () => Stack | undefined;
     abstract getDescription: () => string | undefined;
-    abstract getType: () => "class";
+    abstract getType: () => ClassModel["type"];
     abstract getId: () => string | undefined;
     abstract getByPrimaryKeys: (params: {
         [key: string]: any;

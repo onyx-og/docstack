@@ -2,6 +2,7 @@ import Class from "./class";
 import Domain from "./domain";
 import { Stack, StackOptions, CachedClass, ClassModelPropagationStart, ClassModelPropagationComplete, CachedDomain, DomainModel } from "@docstack/shared";
 import { SystemDoc, Patch, ClassModel, Document } from "@docstack/shared";
+import type { SelectAST, UnionAST } from "./query-engine";
 export declare const BASE_SCHEMA: ClassModel["schema"];
 export declare const CLASS_SCHEMA: ClassModel["schema"];
 declare class ClientStack extends Stack {
@@ -73,11 +74,11 @@ declare class ClientStack extends Stack {
     findDocument(selector: any, fields?: undefined, skip?: undefined, limit?: undefined): Promise<Document | null>;
     getClassModel: (className: string) => Promise<ClassModel | null>;
     getDomainModel: (domainName: string) => Promise<DomainModel | null>;
-    getClassModels(conf?: {
+    getClassModels: (conf?: {
         listen?: boolean;
         filter?: string[];
         search?: string;
-    }): Promise<{
+    }) => Promise<{
         list: ClassModel[];
         listener?: undefined;
     } | {
@@ -88,6 +89,21 @@ declare class ClientStack extends Stack {
         filter?: string[];
         search?: string;
     }) => Promise<Class[]>;
+    getDomainModels: (conf?: {
+        listen?: boolean;
+        filter?: string[];
+        search?: string;
+    }) => Promise<{
+        list: DomainModel[];
+        listener?: undefined;
+    } | {
+        list: DomainModel[];
+        listener: PouchDB.Core.Changes<{}>;
+    }>;
+    getDomains: (conf: {
+        filter?: string[];
+        search?: string;
+    }) => Promise<Domain[]>;
     incrementLastDocId(): Promise<number | undefined>;
     reset(): Promise<this>;
     destroyDb(): Promise<false | undefined>;
@@ -96,8 +112,6 @@ declare class ClientStack extends Stack {
     addDomain: (domainObj: Domain) => Promise<DomainModel>;
     updateClass: (classObj: Class) => Promise<Document | null>;
     addDesignDocumentPKs: (className: string, pKs: string[], temp?: boolean) => Promise<string>;
-    validateObject(obj: any, type: string, schema: ClassModel["schema"]): Promise<boolean>;
-    validateObjectByType: (obj: any, type: string, schema?: ClassModel["schema"]) => Promise<boolean>;
     prepareDoc(_id: string, type: string, params: {
         [key: string]: string | number | boolean;
     }): {
@@ -129,5 +143,12 @@ declare class ClientStack extends Stack {
      * @returns Promise<boolean>
      */
     deleteDocument: (_id: string) => Promise<boolean>;
+    query: (sql: string, ...params: any[]) => Promise<{
+        rows: any;
+        ast: (SelectAST | UnionAST)[];
+    } | {
+        rows: never[];
+        ast: null;
+    }>;
 }
 export default ClientStack;

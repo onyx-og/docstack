@@ -637,7 +637,8 @@ class ClientStack extends Stack {
     }
 
     // TODO: move listener to stack field, for easier un-registering
-    async getClassModels(conf: { listen?: boolean, filter?: string[], search?: string } = {}) {
+    // TODO: Change into getClass("Class").getCards()
+    getClassModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
         const {listen, filter, search} = conf;
         const selector: {[field: string]: object} = { type: { $eq: "class" } };
         if (Array.isArray(filter) && filter.length > 0) {
@@ -727,6 +728,98 @@ class ClientStack extends Stack {
         fnLogger.info("Completed inital classes build");
 
         return classList;
+    };
+
+    getDomainModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
+        const {listen, filter, search} = conf;
+        const selector: {[field: string]: object} = { type: { $eq: "domain" } };
+        if (Array.isArray(filter) && filter.length > 0) {
+            // TODO: Consider checking against name field instead of _id
+            selector._id = { $in: filter };
+        }
+
+        // Case 2: A search query (partial match)
+        else if (search && typeof search === 'string') {
+            // Mango doesn’t have full regex support, so we use $regex via the pouchdb-find plugin.
+            selector.$or = [
+                { _id: { $regex: RegExp(search, "i") } },
+                { name: { $regex: RegExp(search, "i") } },
+                { description: { $regex: RegExp(search, "i") } }
+            ];
+        }
+        const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
+
+        const response = await this.findDocuments(selector, fields);
+        const result: DomainModel[] = response.docs as DomainModel[];
+
+        if (!conf.listen) {
+            return { list: result };
+        }
+
+        // Create a live listener via PouchDB changes feed
+        const listener = this.db.changes({
+            since: 'now',
+            live: true,
+            include_docs: true,
+            selector
+        });
+
+        return {
+            list: result,
+            listener
+        };
+    }
+    
+    getDomains = async (conf: {filter?: string[], search?: string}) => {
+        const classNames = conf.filter;
+        const searchFilter = conf.search;
+        const fnLogger = logger.child({ method: "getDomains" });
+        fnLogger.info("Requesting");
+
+        const { list: domainModels, listener } = await this.getDomainModels({
+            listen: true, filter: classNames, search: searchFilter
+        });
+        fnLogger.info("Received class models", { domainModels });
+
+        const domainList: Domain[] = [];
+
+        // Get current class list
+        for (const domainModel of domainModels) {
+            fnLogger.info(`Building class "${domainModel.name}"`);
+            const domain = await Domain.buildFromModel(this, domainModel);
+            domainList.push(domain);
+        }
+
+        // Queue for occasional addition/deletion
+        if (listener) {
+            listener.on("change", async (change) => {
+                if (!change.deleted) {
+                    const domainName = change.id;
+                    fnLogger.info(`Received class model change with "${domainName}"`);
+                    const existingIndex = domainList.findIndex(c => c.model._id === domainName);
+                    const domain = await Domain.buildFromModel(this, change.doc as DomainModel);
+                    if (existingIndex === -1) {
+                        domainList.push(domain);
+                    } else {
+                        domainList[existingIndex] = domain;
+                    }
+                    const evt = new CustomEvent("classListChange", {detail: domainList});
+                    this.dispatchEvent(evt);
+                } else {
+                    // remove from classList without altering the array reference
+                    const idx = domainList.findIndex(c => c.model._id === change.id);
+                    if (idx !== -1) {
+                        domainList.splice(idx, 1);
+                        const evt = new CustomEvent("domainListChange", {detail: domainList});
+                        this.dispatchEvent(evt);
+                    }
+                }
+            })
+        }
+
+        fnLogger.info("Completed inital domains build");
+
+        return domainList;
     };
 
     async incrementLastDocId() {

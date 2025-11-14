@@ -1,11 +1,116 @@
 import semver from "semver";
 const syspatches = [];
+// TODO: implement _rev auto handler:
+// If patches include updates to existing documents, 
+// we need to ensure that the _rev field is handled correctly to avoid conflicts.
 const sys_001 = {
     "_id": "~sys-0.0.1",
     "type": "patch",
     "version": "0.0.1",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.1\\\n#### New Documents: ~User, ~UserSession",
+    "changelog": "### Initial patch with originators: Class and Domain",
+    "docs": [
+        {
+            "_id": "class",
+            "active": true,
+            "name": "class",
+            "description": "A class document representing a data model class",
+            "type": "~self",
+            "schema": {
+                "name": {
+                    "name": "name",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "mandatory": true,
+                        "isArray": false,
+                        "maxLength": 100
+                    }
+                },
+                "description": {
+                    "name": "description",
+                    "type": "string",
+                    "config": {
+                        "mandatory": false,
+                        "isArray": false,
+                        "maxLength": 500
+                    }
+                },
+                "type": {
+                    "name": "type",
+                    "type": "string",
+                    "config": {
+                        "mandatory": true,
+                        "isArray": false,
+                        "maxLength": 50,
+                        "defaultValue": "class"
+                    }
+                },
+                "schema": { "name": "schema", "type": "object", "config": { "maxLength": 1000, "isArray": false } },
+            }
+        },
+        {
+            "_id": "domain",
+            "active": true,
+            "name": "domain",
+            "description": "A domain document representing a data model domain",
+            "type": "~self",
+            "schema": {
+                "type": { name: "type", type: "string", config: { defaultValue: "domain" } },
+                "schema": {
+                    name: "schema", type: "object", config: {
+                        isArray: true,
+                        defaultValue: {
+                            "source": {
+                                name: "source",
+                                type: "foreign_key",
+                                config: {
+                                    isArray: false
+                                }
+                            },
+                            "target": {
+                                name: "target",
+                                type: "foreign_key",
+                                config: {
+                                    isArray: false
+                                }
+                            }
+                        }
+                    }
+                },
+                "relation": {
+                    name: "relation", type: "enum", config: {
+                        isArray: false, values: [
+                            { value: "1:1" }, { value: "1:N" }, { value: "N:1" }, { value: "N:N" }
+                        ]
+                    }
+                },
+                "sourceClass": {
+                    name: "sourceClass",
+                    type: "foreign_key",
+                    config: {
+                        targetClass: "class",
+                        isArray: true
+                    }
+                },
+                "targetClass": {
+                    name: "targetClass",
+                    type: "foreign_key",
+                    config: {
+                        targetClass: "class",
+                        isArray: true
+                    }
+                },
+            }
+        }
+    ]
+};
+const sys_002 = {
+    "_id": "~sys-0.0.2",
+    "type": "patch",
+    "version": "0.0.2",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.2\\\n#### New Classes: ~User, ~UserSession",
     "docs": [
         {
             "_id": "~User",
@@ -117,7 +222,7 @@ const sys_001 = {
         }
     ]
 };
-syspatches.push(sys_001);
+syspatches.push(sys_001, sys_002);
 export function getSystemPatches(currentVersion) {
     return syspatches
         .filter((patch) => semver.gt(patch.version, currentVersion))

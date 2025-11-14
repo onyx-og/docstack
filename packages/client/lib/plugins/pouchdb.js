@@ -49,7 +49,7 @@ export const StackPlugin = (stack) => {
                             const doc = documentsToProcess.find(d => d._id === docRes.id);
                             if (doc) {
                                 const afterTriggers = triggerQueue[docRes.id];
-                                if (afterTriggers) {
+                                if (afterTriggers && afterTriggers.length) {
                                     debugger;
                                     for (const afterTrigger of afterTriggers) {
                                         const updatedDoc = await afterTrigger.execute(doc);
@@ -87,6 +87,26 @@ export const StackPlugin = (stack) => {
             };
             for (const doc of documentsToProcess) {
                 if (isClassModel(doc)) {
+                    // Validate against parent class
+                    if (doc.type !== "~self") {
+                        const parentClass = await stack.getClass(doc.type);
+                        if (parentClass) {
+                            fnLogger.info("Validating class model against parent class", { doc, parentClass: parentClass.name });
+                            const validationResult = await parentClass.validate(doc);
+                            if (!validationResult) {
+                                fnLogger.error("Class model is not valid for its parent class", { doc, parentClass: parentClass.name });
+                                throw new Error(`Discarded class model because model not valid for its parent class '${parentClass.name}' schema`);
+                            }
+                        }
+                        else {
+                            fnLogger.error("Parent class not found", { doc });
+                            throw new Error(`Parent class '${doc.type}' not found for class model '${doc._id}'`);
+                        }
+                    }
+                    else {
+                        // TODO: Consider validating against self after registering the class?
+                        fnLogger.info("Class model is of type '~self', skipping parent class validation", { doc });
+                    }
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
                     const className = doc._id;
@@ -101,6 +121,7 @@ export const StackPlugin = (stack) => {
                     }
                     catch (e) {
                         if (e.name === 'not_found') {
+                            fnLogger.info(`Class '${className}' was just created. Nothing to do.`);
                             return pouchBulkDocs.call(this, docs, options, postExec);
                         }
                     }

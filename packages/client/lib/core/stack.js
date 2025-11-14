@@ -2,10 +2,10 @@ import PouchDB from "pouchdb";
 import createLogger from "../utils/logger";
 import Class from "./class";
 import Domain from "./domain";
-import { decryptString } from "../utils/crypto";
 import { getAllSystemPatches, getSystemPatches } from "./datamodel";
 import { Stack, isClassModel, } from "@docstack/shared";
 import { StackPlugin } from "../plugins/pouchdb";
+import { parse, createPlan, executePlan } from "./query-engine";
 const logger = createLogger().child({ module: "stack" });
 export const BASE_SCHEMA = {
     "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
@@ -202,7 +202,7 @@ class ClientStack extends Stack {
         };
         // TODO: Make the caching time configurable, and implement regular cleaning of cache
         this.getClass = async (className, fresh = false) => {
-            const fnLogger = logger.child({ method: "getDomain", args: { className, fresh } });
+            const fnLogger = logger.child({ method: "getClass", args: { className, fresh } });
             if (!fresh) {
                 // Check if class is in cache and not expired
                 if (this.cache[className] && Date.now() < this.cache[className].ttl) {
@@ -268,10 +268,10 @@ class ClientStack extends Stack {
                 return { docs: [], error: e.toString(), selector, skip, limit };
             }
         };
-        // TODO: Understand why most classes are empty of attributes
         this.getClassModel = async (className) => {
+            // TODO: understand whether to use name of _id field
             let selector = {
-                type: { $eq: "class" },
+                type: { $in: ["class", "~self"] },
                 name: { $eq: className }
             };
             try {
@@ -305,10 +305,46 @@ class ClientStack extends Stack {
                 throw new Error(e);
             }
         };
+        // TODO: move listener to stack field, for easier un-registering
+        // TODO: Change into getClass("Class").getCards()
+        this.getClassModels = async (conf = {}) => {
+            const { listen, filter, search } = conf;
+            const selector = { type: { $eq: "class" } };
+            if (Array.isArray(filter) && filter.length > 0) {
+                // TODO: Consider checking against name field instead of _id
+                selector._id = { $in: filter };
+            }
+            // Case 2: A search query (partial match)
+            else if (search && typeof search === 'string') {
+                // Mango doesn’t have full regex support, so we use $regex via the pouchdb-find plugin.
+                selector.$or = [
+                    { _id: { $regex: RegExp(search, "i") } },
+                    { name: { $regex: RegExp(search, "i") } },
+                    { description: { $regex: RegExp(search, "i") } }
+                ];
+            }
+            const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
+            const response = await this.findDocuments(selector, fields);
+            const result = response.docs;
+            if (!conf.listen) {
+                return { list: result };
+            }
+            // Create a live listener via PouchDB changes feed
+            const listener = this.db.changes({
+                since: 'now',
+                live: true,
+                include_docs: true,
+                selector
+            });
+            return {
+                list: result,
+                listener
+            };
+        };
         this.getClasses = async (conf) => {
             const classNames = conf.filter;
             const searchFilter = conf.search;
-            const fnLogger = logger.child({ method: "getAllClasses" });
+            const fnLogger = logger.child({ method: "getClasses" });
             fnLogger.info("Requesting");
             const { list: classModels, listener } = await this.getClassModels({
                 listen: true, filter: classNames, search: searchFilter
@@ -352,27 +388,122 @@ class ClientStack extends Stack {
             fnLogger.info("Completed inital classes build");
             return classList;
         };
+        this.getDomainModels = async (conf = {}) => {
+            const { listen, filter, search } = conf;
+            const selector = { type: { $eq: "domain" } };
+            if (Array.isArray(filter) && filter.length > 0) {
+                // TODO: Consider checking against name field instead of _id
+                selector._id = { $in: filter };
+            }
+            // Case 2: A search query (partial match)
+            else if (search && typeof search === 'string') {
+                // Mango doesn’t have full regex support, so we use $regex via the pouchdb-find plugin.
+                selector.$or = [
+                    { _id: { $regex: RegExp(search, "i") } },
+                    { name: { $regex: RegExp(search, "i") } },
+                    { description: { $regex: RegExp(search, "i") } }
+                ];
+            }
+            const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
+            const response = await this.findDocuments(selector, fields);
+            const result = response.docs;
+            if (!conf.listen) {
+                return { list: result };
+            }
+            // Create a live listener via PouchDB changes feed
+            const listener = this.db.changes({
+                since: 'now',
+                live: true,
+                include_docs: true,
+                selector
+            });
+            return {
+                list: result,
+                listener
+            };
+        };
+        this.getDomains = async (conf) => {
+            const classNames = conf.filter;
+            const searchFilter = conf.search;
+            const fnLogger = logger.child({ method: "getDomains" });
+            fnLogger.info("Requesting");
+            const { list: domainModels, listener } = await this.getDomainModels({
+                listen: true, filter: classNames, search: searchFilter
+            });
+            fnLogger.info("Received class models", { domainModels });
+            const domainList = [];
+            // Get current class list
+            for (const domainModel of domainModels) {
+                fnLogger.info(`Building class "${domainModel.name}"`);
+                const domain = await Domain.buildFromModel(this, domainModel);
+                domainList.push(domain);
+            }
+            // Queue for occasional addition/deletion
+            if (listener) {
+                listener.on("change", async (change) => {
+                    if (!change.deleted) {
+                        const domainName = change.id;
+                        fnLogger.info(`Received class model change with "${domainName}"`);
+                        const existingIndex = domainList.findIndex(c => c.model._id === domainName);
+                        const domain = await Domain.buildFromModel(this, change.doc);
+                        if (existingIndex === -1) {
+                            domainList.push(domain);
+                        }
+                        else {
+                            domainList[existingIndex] = domain;
+                        }
+                        const evt = new CustomEvent("classListChange", { detail: domainList });
+                        this.dispatchEvent(evt);
+                    }
+                    else {
+                        // remove from classList without altering the array reference
+                        const idx = domainList.findIndex(c => c.model._id === change.id);
+                        if (idx !== -1) {
+                            domainList.splice(idx, 1);
+                            const evt = new CustomEvent("domainListChange", { detail: domainList });
+                            this.dispatchEvent(evt);
+                        }
+                    }
+                });
+            }
+            fnLogger.info("Completed inital domains build");
+            return domainList;
+        };
         this.addClass = async (classObj) => {
+            const fnLogger = logger.child({ method: "addClass", args: { class: classObj.name } });
+            const classOrigin = await this.getClass(classObj.type);
+            if (classOrigin == null) {
+                fnLogger.error("Class originator not found", { classType: classObj.type });
+                throw new Error(`Class originator ${classObj.type} not found in stack`);
+            }
             let classModel = classObj.getModel();
-            logger.info("addClass - got class model", { classModel });
-            let existingDoc = await this.getClassModel(classModel.name);
-            if (existingDoc == null) {
-                let resultDoc = await this.createDoc(classModel.name, 'class', CLASS_SCHEMA, classModel);
-                logger.info("addClass - result", { result: resultDoc });
-                // TODO: Consider creating a design doc for easier filtering
-                return resultDoc;
+            fnLogger.info("Got class model", { classModel });
+            try {
+                const result = await classOrigin.addCard(classModel);
+                return result;
             }
-            else {
-                return existingDoc;
+            catch (e) {
+                fnLogger.error("Error adding class card", { error: e });
+                throw new Error("Failed to add class card");
             }
+            // let existingDoc = await this.getClassModel(classModel.name);
+            // if ( existingDoc == null ) {
+            //     let resultDoc = await this.createDoc(classModel.name, 'class', CLASS_SCHEMA, classModel);
+            //     fnLogger.info("Result", {result: resultDoc});
+            //     // TODO: Consider creating a design doc for easier filtering
+            //     return resultDoc as ClassModel;
+            // } else {
+            //     return existingDoc;
+            // } 
         };
         this.addDomain = async (domainObj) => {
+            const fnLogger = logger.child({ method: "addDomain", args: { domain: domainObj.name } });
             let domainModel = domainObj.getModel();
-            logger.info("addDomain - got domain model", { domainModel });
+            fnLogger.info("Got domain model", { domainModel });
             let existingDoc = await this.getDomainModel(domainModel.name);
             if (existingDoc == null) {
                 let resultDoc = await this.createDoc(domainModel.name, 'domain', DOMAIN_SCHEMA, domainModel);
-                logger.info("addDomain - result", { result: resultDoc });
+                fnLogger.info("Result", { result: resultDoc });
                 // TODO: Consider creating a design doc for easier filtering
                 return resultDoc;
             }
@@ -381,9 +512,9 @@ class ClientStack extends Stack {
             }
         };
         this.updateClass = async (classObj) => {
-            // logger.info("updateClass - classObj", classObj)
+            const fnLogger = logger.child({ method: "updateClass", args: { class: classObj.name } });
             let result = await this.createDoc(classObj.getId(), 'class', classObj, classObj.getModel());
-            logger.info("updateClass - result", result);
+            fnLogger.info("Result", result);
             return result;
         };
         this.addDesignDocumentPKs = async (className, pKs, temp = false) => {
@@ -431,36 +562,8 @@ class ClientStack extends Stack {
             }
             return designDocId;
         };
-        this.validateObjectByType = async (obj, type, schema) => {
-            const fnLogger = logger.child({ method: "validateObjectByType", args: { obj, type, schema } });
-            let schema_ = {};
-            switch (type) {
-                case "class":
-                    schema_ = CLASS_SCHEMA;
-                    break;
-                case "domain":
-                    schema_ = DOMAIN_SCHEMA;
-                    break;
-                default:
-                    if (!schema) {
-                        try {
-                            const classDoc = await this.getClassModel(type);
-                            schema_ = classDoc.schema;
-                        }
-                        catch (e) {
-                            // if 404 validation failed because of missing class
-                            fnLogger.error(`Failed because of error: ${e}`);
-                            return false;
-                        }
-                    }
-            }
-            if (schema_)
-                return await this.validateObject(obj, type, schema_);
-            else
-                throw new Error(`Unable to retrieve schema to validate object against`);
-        };
         this.createDoc = async (docId, type, classObj, params) => {
-            const fnLogger = logger.child({ method: "createDoc", args: { docId, type, params, classObj } });
+            const fnLogger = logger.child({ method: "createDoc", args: { docId, type, params } });
             fnLogger.info("Creating document");
             let schema = {};
             if (classObj instanceof Class) {
@@ -471,6 +574,7 @@ class ClientStack extends Stack {
             }
             let db = this.db, doc = null, isNewDoc = false;
             try {
+                let newDocId = `${type}-${(this.lastDocId + 1)}`;
                 if (docId) {
                     const existingDoc = await this.getDocument(docId);
                     fnLogger.info("Retrieved doc", { existingDoc });
@@ -488,13 +592,12 @@ class ClientStack extends Stack {
                     }
                 }
                 else {
-                    docId = `${type}-${(this.lastDocId + 1)}`;
-                    doc = this.prepareDoc(docId, type, params);
+                    doc = this.prepareDoc(newDocId, type, params);
                     isNewDoc = true;
-                    fnLogger.info("Generated docId", docId);
+                    fnLogger.info("Generated docId", { newDocId });
                 }
                 fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
-                const doc_ = Object.assign(Object.assign(Object.assign({}, doc), params), { _id: docId, _rev: doc._rev, updateTimestamp: new Date().getTime() });
+                const doc_ = Object.assign(Object.assign(Object.assign({}, doc), params), { _id: docId || newDocId, _rev: doc._rev, updateTimestamp: new Date().getTime() });
                 fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
                 let response = await db.put(doc_);
                 fnLogger.info("Response after put", { "response": response });
@@ -735,6 +838,35 @@ class ClientStack extends Stack {
                 fnLogger.error("Found no document with given id");
                 return false;
             }
+        };
+        this.query = async (sql, ...params) => {
+            const fnLogger = logger.child({ method: "query", args: { sql, params } });
+            fnLogger.info("Executing query");
+            let astList = [];
+            try {
+                astList = parse(sql);
+                fnLogger.info("Produced AST", { astList });
+            }
+            catch (error) {
+                error.ast = astList.length > 0 ? astList[0] : null;
+                throw error;
+            }
+            // A UNION query is treated as a single execution, not a loop over ASTs.
+            if (astList.length > 0) {
+                try {
+                    const plan = createPlan(astList);
+                    const rows = await executePlan(this, plan, params);
+                    // The AST for the whole query (including unions) is the list
+                    fnLogger.info("Query executed successfully", { rows, astList });
+                    return { rows, ast: astList };
+                }
+                catch (error) {
+                    error.ast = astList; // Attach full AST list to error for debugging
+                    throw error;
+                }
+            }
+            // Handle case where query is empty or only comments
+            return { rows: [], ast: null };
         };
         // Private constructor to prevent direct instantiation
         this.cache = {};
@@ -981,40 +1113,6 @@ class ClientStack extends Stack {
         let result = await this.findDocuments(selector, fields, skip, limit);
         return result.docs.length > 0 ? result.docs[0] : null;
     }
-    // TODO: move listener to stack field, for easier un-registering
-    async getClassModels(conf = {}) {
-        const { listen, filter, search } = conf;
-        const selector = { type: { $eq: "class" } };
-        if (Array.isArray(filter) && filter.length > 0) {
-            selector._id = { $in: filter };
-        }
-        // Case 2: A search query (partial match)
-        else if (search && typeof search === 'string') {
-            // Mango doesn’t have full regex support, so we use $regex via the pouchdb-find plugin.
-            selector.$or = [
-                { _id: { $regex: RegExp(search, "i") } },
-                { name: { $regex: RegExp(search, "i") } },
-                { description: { $regex: RegExp(search, "i") } }
-            ];
-        }
-        const fields = ['_id', 'name', 'description', 'schema'];
-        const response = await this.findDocuments(selector, fields);
-        const result = response.docs;
-        if (!conf.listen) {
-            return { list: result };
-        }
-        // Create a live listener via PouchDB changes feed
-        const listener = this.db.changes({
-            since: 'now',
-            live: true,
-            include_docs: true,
-            selector
-        });
-        return {
-            list: result,
-            listener
-        };
-    }
     async incrementLastDocId() {
         let docId = "lastDocId", _rev = await this.getDocRevision(docId);
         if (_rev) {
@@ -1068,181 +1166,8 @@ class ClientStack extends Stack {
             }
         });
     }
-    // async updateDomain(domainObj: Domain) {
-    //     return this.createDoc(domainObj.getId(), domainObj, domainObj.getModel());
-    // }
-    // You have an object and array of AttributeModels,
-    // therefore each element of the array has an attribute name,
-    // a type and a configuration
-    // Based on the configuration apply various checks on the given object's
-    // value at the corresponding attribute name
-    // [TODO] Implement also for attributes of type different from string
-    // [TODO] Implement primary key check for combination of attributes and not just one
-    async validateObject(obj, type, schema) {
-        logger.info("validateObject - given args", { obj, schema });
-        let isValid = true;
-        try {
-            // schema.forEach(async model => {
-            for (let model of Object.values(schema)) {
-                let value = obj[model.name];
-                logger.info("validateObject - model", { model, value });
-                // Check if the property exists
-                if (value === undefined && model.config.mandatory) {
-                    let message = `Property ${model.name} does not exist on the object.`;
-                    logger.error(message);
-                    throw new Error(message);
-                }
-                if (!model.config.mandatory && value === undefined) {
-                    let message = `Property ${model.name} is not mandatory and does not exist on the object. Skipping validation of this attribute`;
-                    logger.info(message);
-                    continue;
-                }
-                // update object's value to the default value
-                if (model.config.defaultValue && value === undefined) {
-                    logger.info(`Property ${model.name} is missing, setting to default value.`);
-                    obj[model.name] = model.config.defaultValue;
-                    value = obj[model.name];
-                }
-                switch (model.type) {
-                    case 'string':
-                        if (!model.config.isArray && typeof value !== model.type) {
-                            logger.info(`Property ${model.name} is not of type ${model.type}.`);
-                            return false;
-                        }
-                        else if (model.config.isArray && !Array.isArray(value)) {
-                            logger.info(`Property ${model.name} is not an array.`);
-                            return false;
-                        }
-                        if (model.config) {
-                            if (model.config.maxLength && value.length > model.config.maxLength) {
-                                logger.info(`Property ${model.name} is longer than ${model.config.maxLength} characters.`);
-                                return false;
-                            }
-                            if (model.config.encrypted) {
-                                // Check if incoming string is encrypted
-                                let decryptedString = decryptString(value);
-                                console.log("decryptedString", decryptedString);
-                                if (decryptedString === null) {
-                                    logger.info(`Property ${model.name} is not encrypted correctly.`);
-                                    return false;
-                                }
-                            }
-                            if (model.config.primaryKey) {
-                                logger.info("primaryKey check", { type, model, value });
-                                // Check if the value is unique
-                                let duplicates = await this.findDocuments({
-                                    "type": { $eq: type },
-                                    [model.name]: { $eq: value }
-                                });
-                                if (duplicates.docs.length > 0) {
-                                    logger.info(`A card with property ${model.name} already exists.`, duplicates);
-                                    throw new Error(`A card with property ${model.name} already exists.`);
-                                }
-                            }
-                        }
-                        break;
-                    case 'decimal':
-                        // TODO: decide how to interpret decimal
-                        if (model.config) {
-                            if (model.config.min && value < model.config.min) {
-                                logger.info(`Property ${model.name} is less than ${model.config.min}.`);
-                                return false;
-                            }
-                            if (model.config.max && value > model.config.max) {
-                                logger.info(`Property ${model.name} is greater than ${model.config.max}.`);
-                                return false;
-                            }
-                        }
-                        break;
-                    case 'integer':
-                        if (!model.config.isArray && typeof value !== 'number') {
-                            logger.info(`Property ${model.name} is not of type ${model.type}.`);
-                        }
-                        else if (model.config.isArray && (!Array.isArray(value) || !value.every((v) => typeof v === 'number'))) {
-                            logger.info(`Property ${model.name} is not an array.`);
-                            return false;
-                        }
-                        if (model.config) {
-                            if (model.config.min && value < model.config.min) {
-                                logger.info(`Property ${model.name} is less than ${model.config.min}.`);
-                                return false;
-                            }
-                            if (model.config.max && value > model.config.max) {
-                                logger.info(`Property ${model.name} is greater than ${model.config.max}.`);
-                                return false;
-                            }
-                        }
-                        break;
-                    case "foreign_key":
-                        model.config;
-                        // check if foreign key corresponds to an existing document
-                        let foreignKeyDoc = await this.getDocument(value);
-                        if (foreignKeyDoc == null) {
-                            logger.info(`Foreign key ${value} does not exist.`);
-                            return false;
-                        }
-                        break;
-                    /*
-                    case "reference":
-                        model.config as AttributeTypeReference["config"]
-                        var domain = await this.getDomain(model.config.domain)
-                        if (domain == null) {
-                            logger.info(`Reference domain ${model.config.domain} does not exist.`);
-                            return false
-                        }
-                        // check if the reference it points to exists
-                        let reference = await this.getDocument(value)
-                        if (reference == null) {
-                            logger.info(`Reference ${value} does not exist.`);
-                            return false
-                        }
-                        switch (domain.relationType) {
-                            case "one-to-one":
-                                // check if the reference is unique
-                                // based on the position of the reference
-                                var selector = {
-                                    type: { $eq: domain.name },
-                                    [model.config.position]: { $eq: value }
-                                }
-                                var result = await this.findDocument(selector)
-                                if (result) {
-                                    logger.info(`Reference ${value} is not unique.`);
-                                    return false
-                                }
-                            break;
-                            case "one-to-many":
-                                // check if the reference is unique
-                                // based on the position of the reference
-                                var selector = {
-                                    type: { $eq: domain.name },
-                                    [model.config.position]: { $eq: value }
-                                    
-                                }
-                                var result = await this.findDocument(selector)
-                                if (result) {
-                                    logger.info(`Reference ${value} is not unique.`);
-                                    return false
-                                }
-                                break;
-                        }
-    
-                    break;
-                    */
-                    case "object":
-                        logger.info("Missing json validation. Skipping for now.");
-                        break;
-                    default:
-                        throw new Error("Unexpected type received");
-                }
-            }
-        }
-        catch (e) {
-            logger.info("validateObject - error", e);
-            return false;
-        }
-        logger.info("validateObject - result", { type, result: isValid });
-        return isValid;
-    }
+    // TODO: consider refactoring to use ~class (before, create) triggers
+    // and (before, update) triggers
     prepareDoc(_id, type, params) {
         logger.info("prepareDoc - given args", { _id: _id, type: type, params: params });
         params["_id"] = _id;

@@ -6,7 +6,7 @@ export const isDocument = (object) => {
     return false;
 };
 export const isClassModel = (object) => {
-    if (object.hasOwnProperty("type") && object.type === "class") {
+    if (object.hasOwnProperty("type") && ["class", "~self"].includes(object.type)) {
         return true;
     }
     return false;

@@ -1,45 +1,14 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
-import {Document} from "@docstack/shared";
+import {Document,  Domain,  SelectAST, UnionAST} from "@docstack/shared";
 
-export const useClassCreate = (stack: string) => {
-    const docStack = useContext(DocStackContext);
-
-    return useCallback(
-        async ( className: string, classDesc?: string) => {
-            try {
-                if (!docStack) {
-                    // Handle the case where the provider is not yet initialized or missing
-                    // You could throw an error or return an empty state.
-                    console.error('useClassCreate must be used within a DocStackProvider.');
-                    // setLoading(false);
-                    return Promise.resolve(null);
-                }
-                // Run the initial query
-                const stackInstance = docStack.getStack(stack);
-                if (stackInstance) {
-                    const classObj_ = await Class.create(stackInstance, className, "class", classDesc);
-                    await stackInstance.addClass(classObj_);
-                    return classObj_;
-                }
-                return null;
-                
-            } catch (err: any) {
-                // setError(err);
-                console.error(err);
-                return null;
-            }
-        }, [docStack, stack]
-    );
-}
-
-export const useClassList = (conf: {stack: string, filter?: string[], search?: string}) => {
+export const useDomainList = (conf: {stack: string, filter?: string[], search?: string}) => {
     const {stack, filter, search} = conf;
     const docStack = useContext(DocStackContext);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState();
-    const [classList, setClassList] = useState<Class[]>([]);
+    const [classList, setDomainList] = useState<Domain[]>([]);
     // [TODO] Solve bounce of component because of StrictMode or other reasons
     const queryRef = useRef(false);
 
@@ -47,23 +16,23 @@ export const useClassList = (conf: {stack: string, filter?: string[], search?: s
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
-            console.error('useClassList must be used within a DocStackProvider.');
+            console.error('useDomainList must be used within a DocStackProvider.');
             setLoading(false);
             return;
         }
 
         const changeListener = (change: CustomEvent) => {
-            setClassList([...change.detail])
+            setDomainList([...change.detail])
         }
 
-        const fetchClasses = async () => {
+        const fetchDomains = async () => {
             try {
                 // Run the initial query
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
-                    const classList = await stackInstance.getClasses({filter, search});
-                    setClassList(classList);
-                    stackInstance.addEventListener("classListChange", changeListener as EventListener)
+                    const domainList = await stackInstance.getDomains({filter, search});
+                    setDomainList(domainList);
+                    stackInstance.addEventListener("domainListChange", changeListener as EventListener)
                 }
                 
             } catch (err: any) {
@@ -75,17 +44,17 @@ export const useClassList = (conf: {stack: string, filter?: string[], search?: s
         if (!queryRef.current) {
             queryRef.current = true;
             setLoading(true);
-            fetchClasses();
+            fetchDomains();
         } else {
             console.log("Already performing query");
         }
         
 
         return () => {
-            setClassList([]);
+            setDomainList([]);
             const stackInstance = docStack.getStack(stack);
             if (stackInstance) 
-                stackInstance.removeEventListener("classListChange", changeListener as EventListener)
+                stackInstance.removeEventListener("domainListChange", changeListener as EventListener)
             // queryRef.current = false;
         }
 
@@ -94,18 +63,18 @@ export const useClassList = (conf: {stack: string, filter?: string[], search?: s
     return { loading, classList, error };
 }
 
-export const useClass = (stack: string, className: string) => {
+export const useDomain = (stack: string, domainName: string) => {
     const docStack = useContext(DocStackContext);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState();
-    const [classObj, setClass] = useState<Class>();
+    const [domain, setDomain] = useState<Domain>();
     const reqRef = useRef(false);
 
     useEffect( () => {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
-            console.error('useClass must be used within a DocStackProvider.');
+            console.error('useDomain must be used within a DocStackProvider.');
             setLoading(false);
             return;
         }
@@ -114,10 +83,10 @@ export const useClass = (stack: string, className: string) => {
             try {
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
-                    const res = await stackInstance.getClass(className);
+                    const res = await stackInstance.getDomain(domainName);
                     // TODO: manage class model (schema!) updates
                     if (res) {
-                        setClass(res);
+                        setDomain(res);
                     }
                 }
                 
@@ -138,16 +107,16 @@ export const useClass = (stack: string, className: string) => {
             // reqRef.current = false;
         }
 
-    }, [docStack, stack, className]);
+    }, [docStack, stack, domainName]);
 
-    return {loading, error, classObj}
+    return {loading, error, domain}
 }
 
 
-export const useClassDocs = (stack: string, className: string, query = {}) => {
+export const useDomainDocs = (stack: string, domainName: string, query = {}) => {
     const docStack = useContext(DocStackContext);
 
-    const [classObj, setClass] = useState<Class>();
+    const [domain, setDomain] = useState<Domain>();
     const [docs, setDocs] = useState<Document[]>([]);
     const docsRef = useRef<Document[]>([]);
 
@@ -157,7 +126,7 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
 
     useEffect(() => {
         // Only run if the docStack is available and a className is provided
-        if (!docStack || !className) {
+        if (!docStack || !domainName) {
             setLoading(false);
             return;
         }
@@ -168,9 +137,9 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
             try {
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
-                    const retrievedClass = await stackInstance.getClass(className);
-                    if (retrievedClass) {
-                        setClass(retrievedClass);
+                    const retrievedDomain = await stackInstance.getDomain(domainName);
+                    if (retrievedDomain) {
+                        setDomain(retrievedDomain);
                     }
                 }
                 
@@ -185,17 +154,17 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
         return () => {
             // clean what?
         };
-    }, [docStack, stack, className]); // Dependency on docStack and className
+    }, [docStack, stack, domainName]); // Dependency on docStack and className
 
     useEffect(() => {
-        if (!classObj) {
+        if (!domain) {
             return;
         }
 
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
-                const initialDocs = await classObj.getCards(query) as Document[];
+                const initialDocs = await domain.getCards(query) as Document[];
                 docsRef.current = initialDocs;
                 setDocs(docsRef.current);
             } catch (err: any) {
@@ -238,15 +207,15 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
                 setDocs([...docsRef.current])
             };
 
-            classObj.addEventListener('doc', changeListener as EventListener);
+            domain.addEventListener('doc', changeListener as EventListener);
 
             return () => {
-                classObj.removeEventListener('doc', changeListener as EventListener);
+                domain.removeEventListener('doc', changeListener as EventListener);
             };
         };
 
         runQueryAndListen();
-    }, [classObj, JSON.stringify(query)]); // Dependency on classObj and query
+    }, [domain, JSON.stringify(query)]); // Dependency on classObj and query
 
     return { docs, loading, error };
 };
