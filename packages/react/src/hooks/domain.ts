@@ -113,7 +113,7 @@ export const useDomain = (stack: string, domainName: string) => {
 }
 
 
-export const useDomainDocs = (stack: string, domainName: string, query = {}) => {
+export const useDomainRelations = (stack: string, domainName: string, query = {}) => {
     const docStack = useContext(DocStackContext);
 
     const [domain, setDomain] = useState<Domain>();
@@ -164,7 +164,7 @@ export const useDomainDocs = (stack: string, domainName: string, query = {}) => 
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
-                const initialDocs = await domain.getCards(query) as Document[];
+                const initialDocs = await domain.getRelations(query) as Document[];
                 docsRef.current = initialDocs;
                 setDocs(docsRef.current);
             } catch (err: any) {
@@ -175,10 +175,10 @@ export const useDomainDocs = (stack: string, domainName: string, query = {}) => 
 
             const changeListener = (change: CustomEvent) => {
                 const doc = change.detail.doc;
-                console.log("useClassDocs - detail", {detail: change.detail});
+                console.log("useDomainRelations - detail", {detail: change.detail});
                 if (!doc.active) {
                     // A doc was deleted
-                    console.log("useClassDocs - a doc was deleted", {doc});
+                    console.log("useDomainRelations - a doc was deleted", {doc});
                     const docIndex = docsRef.current.findIndex((d) => d._id == doc._id)
                     if (docIndex != -1) {
                         docsRef.current = [
@@ -188,11 +188,11 @@ export const useDomainDocs = (stack: string, domainName: string, query = {}) => 
                     }
                 } else {
                     // A doc was changed or added
-                    console.log("useClassDocs - a doc was changed or added", {doc});
+                    console.log("useDomainRelations - a doc was changed or added", {doc});
                     const docIndex = docsRef.current.findIndex((d) => d._id == doc._id)
                     if (docIndex != -1) {
                         // A doc was changed
-                        console.log("useClassDocs - a doc was changed", {doc});
+                        console.log("useDomainRelations - a doc was changed", {doc});
                         docsRef.current = [
                             ...docsRef.current.slice(0, docIndex),
                             doc,
@@ -200,7 +200,7 @@ export const useDomainDocs = (stack: string, domainName: string, query = {}) => 
                         ];
                     } else {
                         // A doc was added
-                        console.log("useClassDocs - a doc was added", {doc});
+                        console.log("useDomainRelations - a doc was added", {doc});
                         docsRef.current.push(doc);
                     }
                 }
