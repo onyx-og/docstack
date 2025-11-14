@@ -135,3 +135,5 @@ dist
 
 build/
 .rollup.cache
+
+package-lock.json
