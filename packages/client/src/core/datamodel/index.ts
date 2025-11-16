@@ -85,7 +85,17 @@ const sys_001: Patch = {
                     }
                 },
             }
-        },
+        }
+    ]
+}
+
+const sys_002: Patch = {
+    "_id": "~sys-0.0.2",
+    "type": "patch",
+    "version": "0.0.2",
+    "target": "system",
+    "changelog": "### Initial patch with system classes and domains",
+    "docs": [
         {
             "_id": "log",
             "active": true,
@@ -105,12 +115,12 @@ const sys_001: Patch = {
     ]
 }
 
-const sys_002: Patch = {
-    "_id": "~sys-0.0.2",
+const sys_003: Patch = {
+    "_id": "~sys-0.0.3",
     "type": "patch",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.2\\\n#### New Classes: ~User, ~UserSession",
+    "changelog": "### Schema Patch: v0.0.3\\\n#### New Classes: ~User, ~UserSession",
     "docs": [
         {
             "_id": "~User",
@@ -223,7 +233,7 @@ const sys_002: Patch = {
     ]
 };
 
-syspatches.push(sys_001, sys_002);
+syspatches.push(sys_001, sys_002, sys_003);
 
 export function getSystemPatches(currentVersion: string) {
     return syspatches

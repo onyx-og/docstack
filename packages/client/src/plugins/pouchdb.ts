@@ -50,6 +50,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 const grouped = new Map<string, { domain: Domain; drafts: { docId: string | null; params: DomainRelationParams; }[] }>();
                 while (relationQueue.length) {
                     const entry = relationQueue.shift();
+                    console.log("Processing relation queue entry", {entry})
                     if (!entry) continue;
                     const key = entry.domain.name;
                     if (!grouped.has(key)) {
@@ -150,11 +151,13 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         const revisionIDList = docWithRevs._revisions!.ids;
                         if (revisionIDList.length == 1) {
                             fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
+                            continue;
                             return pouchBulkDocs.call(this, docs, options, postExec);
                         }
                     } catch (e: any) {
                         if (e.name === 'not_found') {
                             fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
+                            continue;
                             return pouchBulkDocs.call(this, docs, options, postExec);
                         }
                     }
@@ -170,7 +173,8 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     const schemaDelta = jsondiff.diff(previousClassDoc.schema, doc.schema);
 
                     if (!schemaDelta) {
-                        fnLogger.info(`Class '${className}' has no changes on schema.`)
+                        fnLogger.info(`Class '${className}' has no changes on schema.`);
+                        continue;
                         return pouchBulkDocs.call(this, docs, options, postExec);
                     }
 
@@ -178,6 +182,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
 
                     if (documents.length === 0) {
                         fnLogger.info(`No documents found for class '${className}' after its update.`);
+                        continue;
                         return pouchBulkDocs.call(this, docs, options, postExec);
                     }
 
@@ -192,11 +197,15 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     const className = doc.type;
 
                     try {
-                        const classObj = await stack.getClass(className);
+                        const classObj = await stack.getClass(className, true);
                         if (classObj) {
-
-                            const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => a.model.type === "reference");
+                            // console.log("Validating document", {doc, className, classAttributes: classObj.getAttributes()})
+                            const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
+                                console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})
+                                return a.model.type === "reference"
+                            });
                             for (const attr of relationalAttrs) {
+                                console.log("Validating relation for attribute", {attr, docId: doc._id})
                                 const relationValue = doc[attr.name];
                                 if (!relationValue) continue;
                                 const domainId = (attr.model.config as AttributeTypeReference["config"]).domain;
@@ -206,6 +215,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                                 // Validate relation constraint
                                 const validation = await domain.validateRelation(doc, relationValue);
                                 if (!validation.exists) {
+                                    console.log("Queuing relation creation for doc", {docId: doc._id, domain: domain.name, params: validation.params})
                                     relationQueue.push({
                                         domain,
                                         params: validation.params,

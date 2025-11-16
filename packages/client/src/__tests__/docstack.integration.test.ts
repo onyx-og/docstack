@@ -247,7 +247,7 @@ describe("@docstack/client integration", () => {
             await Attribute.create(customerClass, "name", "string", "Name", { mandatory: true });
             await Attribute.create(accountClass, "name", "string", "Name", { mandatory: true });
 
-            const domain = await Domain.create(stack, `CustomerAccount-${Date.now()}`, "domain", "N:1", customerClass.id, accountClass.id);
+            const domain = await Domain.create(stack, `CustomerAccount-${Date.now()}`, "domain", "1:N", customerClass.id, accountClass.id);
             await Attribute.create(accountClass, "customer", "reference", "Customer", { mandatory: true, domain: domain.name });
 
             const customer = await customerClass.addCard({ name: "Alice" }) as Document;

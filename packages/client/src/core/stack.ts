@@ -1042,10 +1042,10 @@ class ClientStack extends Stack {
             const doc_ = {...doc, ...params, _rev: doc._rev, updateTimestamp: new Date().getTime()};
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
             let response = await db.put(doc_);
+            // Find me
             fnLogger.info("Response after put", {"response": response});
             if (response.ok && isNewDoc) {
                 await this.incrementLastDocId();
-                console.log("Incremented lastDocId to", this.lastDocId)
                 docId = response.id;
             }
             else if (response.ok) {
@@ -1067,7 +1067,6 @@ class ClientStack extends Stack {
                 throw new Error("createDoc - Problem while putting doc"+e);
             }
         }
-        console.log("Created docId", {doc});
         return doc;
     }
 
@@ -1183,7 +1182,7 @@ class ClientStack extends Stack {
             let response = await db.put(doc_);
             fnLogger.info("Response after put", {"response": response});
             if (response.ok && isNewDoc) {
-                this.incrementLastDocId();
+                await this.incrementLastDocId();
                 docId = response.id;
             }
             else if (response.ok) {
