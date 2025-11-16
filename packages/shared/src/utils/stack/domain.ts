@@ -23,6 +23,8 @@ abstract class Domain extends EventTarget {
 
     abstract getStack: () => typeof this.stack;
 
+    abstract getName: () => string;
+
     abstract setId: ( id: string ) => void; 
 
     abstract setModel: ( model?: DomainModel ) => void;

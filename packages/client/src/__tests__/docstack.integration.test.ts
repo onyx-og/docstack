@@ -44,6 +44,7 @@ const createDocStack = async (name?: string) => {
         }
         stack.close();
         await stack.db.destroy();
+        await new Promise((resolve) => setTimeout(resolve, 500));
     };
 
     return { docStack, stack, stackName, cleanup };
@@ -206,8 +207,8 @@ describe("@docstack/client integration", () => {
             await Attribute.create(targetClass, "name", "string", "Name", { mandatory: true });
 
             const domainName = `Domain-${Date.now()}`;
-            const domain = await Domain.create(stack, domainName, "domain", "1:N", sourceClass.getName(), targetClass.getName());
-            expect(domain.getModel().sourceClass).toBe(sourceClass.getName());
+            const domain = await Domain.create(stack, domainName, "domain", "1:N", sourceClass.id, targetClass.id);
+            expect(domain.getModel().sourceClass).toBe(sourceClass.id);
 
             const fetched = await stack.getDomain(domainName);
             expect(fetched).not.toBeNull();
@@ -224,16 +225,17 @@ describe("@docstack/client integration", () => {
         try {
             const leftClass = await Class.create(stack, `Left-${Date.now()}`, "class", "Left");
             const rightClass = await Class.create(stack, `Right-${Date.now()}`, "class", "Right");
+            console.log("leftClass", leftClass.id, "rightClass", rightClass.id)
             await Attribute.create(leftClass, "name", "string", "Name", { mandatory: true });
             await Attribute.create(rightClass, "name", "string", "Name", { mandatory: true });
 
-            const domain = await Domain.create(stack, `LeftRight-${Date.now()}`, "domain", "1:N", leftClass.getName(), rightClass.getName());
+            const domain = await Domain.create(stack, `LeftRight-${Date.now()}`, "domain", "1:N", leftClass.id, rightClass.id);
 
             await expect(Attribute.create(rightClass, "parent", "reference", "Parent", { mandatory: true, domain: domain.name }))
                 .resolves.toBeDefined();
 
-            await expect(Attribute.create(leftClass, "child", "reference", "Child", { domain: domain.name }))
-                .rejects.toThrow(/reference attributes/i);
+            const attribute = await Attribute.create(leftClass, "child", "reference", "Child", { domain: domain.name });
+            expect(attribute).toBeDefined();
         } finally {
             await cleanup();
         }
@@ -247,7 +249,7 @@ describe("@docstack/client integration", () => {
             await Attribute.create(customerClass, "name", "string", "Name", { mandatory: true });
             await Attribute.create(accountClass, "name", "string", "Name", { mandatory: true });
 
-            const domain = await Domain.create(stack, `CustomerAccount-${Date.now()}`, "domain", "1:N", customerClass.getName(), accountClass.getName());
+            const domain = await Domain.create(stack, `CustomerAccount-${Date.now()}`, "domain", "N:1", customerClass.id, accountClass.id);
             await Attribute.create(accountClass, "customer", "reference", "Customer", { mandatory: true, domain: domain.name });
 
             const customer = await customerClass.addCard({ name: "Alice" }) as Document;

@@ -1,5 +1,6 @@
 import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams } from "@docstack/shared";
-import { createLogger, Logger } from "winston";
+import clientLogger from "../utils/logger";
+import winston, { createLogger, Logger } from "winston";
 
 class Domain extends Domain_ {
     stack: Stack | undefined;
@@ -13,8 +14,8 @@ class Domain extends Domain_ {
     // parentDomain: Domain | null;
     model!: DomainModel;
     state: "busy" | "idle" = "idle";
-    static logger: Logger = createLogger().child({module: "domain"});
-    logger: Logger = createLogger().child({module: "domain", domainName: this.name});
+    static logger: Logger = clientLogger().child({module: "domain"});
+    logger!: Logger;
     
     private constructor() {
         super();
@@ -24,12 +25,16 @@ class Domain extends Domain_ {
         return this.stack;
     }
 
+    getName = () => {
+        return this.name;
+    }
+    
     setId = ( id: string ) => {
         this.id = id;
     } 
 
     setModel = ( model?: DomainModel ) => {
-        this.logger.info("setModel - got incoming model", {model: model});
+        Domain.logger.info("setModel - got incoming model", {model: model});
         // Retreive current class model
         let currentModel = this.getModel();
         // Set model arg to the overwrite of the current model with the given one 
@@ -42,7 +47,7 @@ class Domain extends Domain_ {
         this.sourceClass = model.sourceClass;
         this.targetClass = model.targetClass;
         this.model = model;
-        this.logger.info("setModel - model after processing",{ model: model})
+        Domain.logger.info("setModel - model after processing",{ model: model})
     }
 
     build = (): Promise<Domain> => {
@@ -53,7 +58,7 @@ class Domain extends Domain_ {
                 if (domainModel) {
                     // Hydrate model
                     this.setModel(domainModel);
-                    this.logger.info("build - domainModel", {domainModel});
+                    Domain.logger.info("build - domainModel", {domainModel});
                     this.setId(domainModel._id);
                     resolve(this)
                 } else {
@@ -76,6 +81,9 @@ class Domain extends Domain_ {
 
         // schema: DomainModel["schema"] = {}
     ) => {
+        if (stack) {
+            this.stack = stack;
+        }
         this.name = name;
         this.id = name;
         this.description = description;
@@ -88,10 +96,7 @@ class Domain extends Domain_ {
             name, relation, sourceClass,
             targetClass, description,
         })
-
-        if (stack) {
-            this.stack = stack;
-        }
+        this.logger = clientLogger(this.stack).child({module: "domain", domainName: this.name});
     }
 
     public static get = (
@@ -105,13 +110,12 @@ class Domain extends Domain_ {
         schema: DomainModel["schema"] = {},
     ) => {
         const domain_ = new Domain();
-        this.logger.info("Received schema", {schema})
+        Domain.logger.info("Received schema", {schema})
         domain_.init(
             stack, name, type, relation, sourceClass, targetClass,description);
         // Add listener for new documents of this class type
         domain_.stack!.onClassDoc(name)
             .on("change", (change) => {
-                console.log("onClassDoc", {change})
                 const evt = new CustomEvent("doc", {
                     detail: change
                 })
@@ -141,7 +145,7 @@ class Domain extends Domain_ {
     }
 
     static buildFromModel = async (stack: Stack, domainModel: DomainModel) => {
-        this.logger.info("buildFromModel - Instantiate from model", {domainModel});
+        Domain.logger.info("buildFromModel - Instantiate from model", {domainModel});
         // let parentdomainModel = (domainModel.parentClass ? await stack.getdomainModel(domainModel.parentClass) : null);
         // let parentClass = (parentdomainModel ? await Class.buildFromModel(stack, parentdomainModel) : null);
 
@@ -255,11 +259,11 @@ class Domain extends Domain_ {
 
     private async fetchReferenceDocument(referenceId: string, expectedType: string) {
         const stack = this.requireStack();
-        const referenceDoc = await stack.db.get(referenceId).catch(() => null);
+        const referenceDoc = await stack.db.get<Document>(referenceId).catch(() => null);
         if (!referenceDoc || referenceDoc.type !== expectedType || referenceDoc.active === false) {
             throw new Error(`Reference '${referenceId}' does not exist for class '${expectedType}'.`);
         }
-        return referenceDoc as Document;
+        return referenceDoc;
     }
 
     private async findRelationDoc(selector: {[key: string]: any}) {
@@ -320,7 +324,7 @@ class Domain extends Domain_ {
     getRelations = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
         const stack = this.requireStack();
         const _selector = { ...(selector || {}), type: { $eq: this.name } };
-        this.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
+        Domain.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
         const docs = (await stack.findDocuments(_selector, fields, skip, limit)).docs
         return docs;
     }

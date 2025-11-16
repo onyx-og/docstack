@@ -9,6 +9,7 @@ class Attribute extends Attribute_ {
     field: ZodType = z.any();
     class: Class | null;
     defaultValue?: any;
+    debug: object = {};
     
     constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], description?: string, config?: AttributeType["config"] ) {
         super(classObj, name, type, config);
@@ -51,21 +52,22 @@ class Attribute extends Attribute_ {
         if (!domain) {
             throw new Error(`Domain '${domainName}' was not found for attribute '${this.name}'.`);
         }
-        const className = this.class.getName();
+        const classId = this.class.id;
+        this.debug = { classId, domainName, targetClass: domain.targetClass, sourceClass: domain.sourceClass, relation: domain.relation };
         switch (domain.relation) {
             case "1:N":
-                if (className !== domain.targetClass) {
+                if (classId !== domain.targetClass) {
                     throw new Error(`Reference attributes for domain '${domainName}' can only be added to class '${domain.targetClass}'.`);
                 }
                 break;
             case "N:1":
-                if (className !== domain.sourceClass) {
+                if (classId !== domain.sourceClass) {
                     throw new Error(`Reference attributes for domain '${domainName}' can only be added to class '${domain.sourceClass}'.`);
                 }
                 break;
             case "1:1":
-                if (className !== domain.sourceClass && className !== domain.targetClass) {
-                    throw new Error(`Class '${className}' is not part of domain '${domainName}'.`);
+                if (classId !== domain.sourceClass && classId !== domain.targetClass) {
+                    throw new Error(`Class '${classId}' is not part of domain '${domainName}'.`);
                 }
                 break;
             case "N:N":
@@ -174,12 +176,13 @@ class Attribute extends Attribute_ {
                                 const stack = this.class.getStack();
                                 if (stack) {
                                     const promises = idsToValidate.map(id => stack.db.get!(id));
-                                    await Promise.all(promises);
+                                    const fetchResult = await Promise.all(promises);
                                     return true;
                                 } else throw new Error("Missing stack connection");
                             } else throw new Error("Missing class parentship");
                         } catch (error: any) {
                             if (error.status === 404) {
+                                console.error(`Foreign key validation failed: document not found in class '${foreignClass}'.`, {error});
                                 return false;
                             }
                             throw error;

@@ -61,27 +61,6 @@ const sys_001: Patch = {
             "type": "~self",
             "schema": {
                 "type": { name: "type", type: "string", config: { defaultValue: "domain" } },
-                "schema": {
-                    name: "schema", type: "object", config: {
-                        isArray: true,
-                        defaultValue: {
-                            "source": {
-                                name: "source",
-                                type: "foreign_key",
-                                config: {
-                                    isArray: false
-                                }
-                            },
-                            "target": {
-                                name: "target",
-                                type: "foreign_key",
-                                config: {
-                                    isArray: false
-                                }
-                            }
-                        }
-                    }
-                },
                 "relation": {
                     name: "relation", type: "enum", config: {
                         isArray: false, values: [
@@ -105,6 +84,22 @@ const sys_001: Patch = {
                         isArray: false
                     }
                 },
+            }
+        },
+        {
+            "_id": "log",
+            "active": true,
+            "name": "log",
+            "description": "Contains the system logs",
+            "type": "class",
+            "schema": {
+                "log": {
+                    "name": "log",
+                    "type": "object",
+                    "config": {
+                        "isArray": false
+                    }
+                }
             }
         }
     ]

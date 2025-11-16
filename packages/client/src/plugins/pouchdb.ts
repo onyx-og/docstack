@@ -6,6 +6,7 @@ import { Trigger } from "../core/trigger";
 import createLogger from "../utils/logger";
 import * as jsondiff from 'jsondiffpatch';
 import { applySchemaDelta } from "../utils/";
+import {Class} from "../core";
 
 const logger = createLogger().child({module: "pouchdb"});
 /**
@@ -158,11 +159,13 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         }
                     }
                     // Fetch the current (next old) version of the class document.
-                    const classObj = await stack.getClass(className, true);
-                    if (classObj == null) {
-                        throw new Error(`Unexpected, can't retrieve class '${className}' (doc '${classDocId}')`);
-                    }
-                    const previousClassDoc = classObj.model;
+                    const previousClassDoc = await stack.db.get<ClassModel>(classDocId);
+                    const classObj = await Class.buildFromModel(stack, previousClassDoc);
+                    // const classObj = await stack.getClass(className, true);
+                    // if (classObj == null) {
+                    //     throw new Error(`Unexpected, can't retrieve class '${className}' (doc '${classDocId}')`);
+                    // }
+                    // const previousClassDoc = classObj.model;
                     fnLogger.info("Retrieved documents", {doc, previousClassDoc});
                     const schemaDelta = jsondiff.diff(previousClassDoc.schema, doc.schema);
 
@@ -226,6 +229,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // Perform validation using the schema.
                             const validationResult = await classObj.validate(doc);
                             if (!validationResult) {
+                                console.error("Document is not valid for its class schema", {doc, className});
                                 throw new Error("Discarded object because object not valid for its Class schema");
                             }
                         }

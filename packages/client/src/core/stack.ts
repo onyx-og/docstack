@@ -15,10 +15,7 @@ import {
     DomainModel,
 } from "@docstack/shared";
 
-import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
-    AttributeTypeForeignKey, 
-    AttributeTypeInteger,
-    AttributeTypeString} from "@docstack/shared";
+import { SystemDoc, Patch, ClassModel, Document } from "@docstack/shared";
 import { StackPlugin } from "../plugins/pouchdb";
 
 import { parse, createPlan, executePlan } from "./query-engine";
@@ -1018,9 +1015,9 @@ class ClientStack extends Stack {
         }
         let db = this.db,
             doc: Document | null = null,
-            isNewDoc = false;
+            isNewDoc = false,
+            newDocId = "";
         try {
-            let newDocId = `${type}-${(this.lastDocId+1)}`;
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 fnLogger.info("Retrieved doc", {existingDoc})
@@ -1032,20 +1029,23 @@ class ClientStack extends Stack {
                     throw new Error("createDoc - Existing document type differs");
                 } else {
                     isNewDoc = true;
-                    doc = this.prepareDoc(docId, type, params) as Document;
+                    newDocId = `${type}-${(this.lastDocId+1)}`;
+                    doc = this.prepareDoc(newDocId, type, params) as Document;
                 }
             } else {
-                doc = this.prepareDoc(newDocId, type, params) as Document;
                 isNewDoc = true;
+                newDocId = `${type}-${(this.lastDocId+1)}`;
+                doc = this.prepareDoc(newDocId, type, params) as Document;
                 fnLogger.info("Generated docId", {newDocId});
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _id: docId || newDocId, _rev: doc._rev, updateTimestamp: new Date().getTime()};
+            const doc_ = {...doc, ...params, _rev: doc._rev, updateTimestamp: new Date().getTime()};
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
             let response = await db.put(doc_);
             fnLogger.info("Response after put", {"response": response});
             if (response.ok && isNewDoc) {
                 this.incrementLastDocId();
+                console.log("Incremented lastDocId to", this.lastDocId)
                 docId = response.id;
             }
             else if (response.ok) {
@@ -1067,6 +1067,7 @@ class ClientStack extends Stack {
                 throw new Error("createDoc - Problem while putting doc"+e);
             }
         }
+        console.log("Created docId", {doc});
         return doc;
     }
 

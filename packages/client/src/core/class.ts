@@ -6,6 +6,7 @@ import Attribute from "./attribute";
 import { Logger } from 'winston';
 import { Trigger } from "./trigger";
 import {z} from "zod";
+import clientLogger from "../utils/logger";
 
 /**
  * Refinement to check for a specific number of decimal places.
@@ -32,7 +33,7 @@ class Class extends Class_ {
     model!: ClassModel;
     state: "busy" | "idle" = "idle"; 
     static logger: Logger = createLogger().child({module: "class"});
-    logger: Logger = createLogger().child({module: "class", className: this.name});
+    logger!: Logger;
     triggers: Trigger[] = [];
 
     private constructor() {
@@ -60,7 +61,7 @@ class Class extends Class_ {
                 // Hydrate model
                 if (classModel) {
                     this.setModel(classModel)
-                    this.logger.info("build - classModel", {classModel: classModel})
+                    Class.logger.info("build - classModel", {classModel: classModel})
                     this.setId(classModel._id);
                     resolve(this);
                 } else {
@@ -81,6 +82,10 @@ class Class extends Class_ {
         schema: ClassModel["schema"] = {}
         // parentClass: Class | null
     ) => {
+        // this.parentClass = parentClass;
+        if (stack) {
+            this.stack = stack;
+        }
         this.name = name;
         this.id = name;
         this.description = description;
@@ -96,10 +101,8 @@ class Class extends Class_ {
             name, description,
             schema, triggers: [],
         });
-        // this.parentClass = parentClass;
-        if (stack) {
-            this.stack = stack;
-        }
+       
+        this.logger = clientLogger(stack).child({module: "class", className: this.name});
         // TODO: Waiting for test of method
         // if (parentClass) this.inheritAttributes(parentClass);
     }
@@ -113,12 +116,11 @@ class Class extends Class_ {
         schema: ClassModel["schema"] = {},
     ) => {
         const class_ = new Class();
-        this.logger.info("Received schema", {schema})
+        Class.logger.info("Received schema", {schema})
         class_.init(stack, name, type, description, schema);
         // Add listener for new documents of this class type
         class_.stack!.onClassDoc(name)
             .on("change", (change) => {
-                console.log("onClassDoc", {change})
                 const evt = new CustomEvent("doc", {
                     detail: change
                 })
@@ -141,7 +143,7 @@ class Class extends Class_ {
     }
 
     static buildFromModel = async (stack: Stack, classModel: ClassModel) => {
-        this.logger.info("buildFromModel - Instantiate from model", {classModel});
+        Class.logger.info("buildFromModel - Instantiate from model", {classModel});
         // let parentClassModel = (classModel.parentClass ? await stack.getClassModel(classModel.parentClass) : null);
         // let parentClass = (parentClassModel ? await Class.buildFromModel(stack, parentClassModel) : null);
 
@@ -159,13 +161,21 @@ class Class extends Class_ {
         }
     }
 
-    // TODO: Decide return method
+    static fetchById = async ( stack: Stack, classId: string ) => {
+        try {
+            let classModel = await stack.db.get<ClassModel>(classId);
+            const classObj = await Class.buildFromModel(stack, classModel);
+            return classObj;
+        } catch (error) {
+            throw new Error(`Class not found: ${classId}`);
+        }
+    }
+
     static fetch = async ( stack: Stack, className: string ) => {
         let classModel = await stack.getClassModel(className);
         if ( classModel ) {
             return Class.buildFromModel(stack, classModel);
         } else {
-            return null;
             throw new Error("Class not found: "+className);
         }
     }
@@ -295,7 +305,7 @@ class Class extends Class_ {
      * @param model 
      */
     setModel = ( model?: ClassModel ) => {
-        this.logger.info("setModel - got incoming model", {model: model});
+        Class.logger.info("setModel - got incoming model", {model: model});
         // Retreive current class model
         let currentModel = this.getModel();
         // Set model arg to the overwrite of the current model with the given one 
@@ -325,7 +335,7 @@ class Class extends Class_ {
         this.name = model.name;
         this.description = model.description;
         this.model = model;
-        this.logger.info("setModel - model after processing",{ model: model})
+        Class.logger.info("setModel - model after processing",{ model: model})
     }
 
     getPrimaryKeys = () => {
@@ -547,7 +557,7 @@ class Class extends Class_ {
                 const res = await this.stack.createDoc(cardId, this.getName(), this, params);
                 resolve(res)
             } else {
-                this.logger.info("no stack defined");
+                Class.logger.info("no stack defined");
                 resolve(null);
             }
         })
