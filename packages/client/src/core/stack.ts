@@ -1044,7 +1044,7 @@ class ClientStack extends Stack {
             let response = await db.put(doc_);
             fnLogger.info("Response after put", {"response": response});
             if (response.ok && isNewDoc) {
-                this.incrementLastDocId();
+                await this.incrementLastDocId();
                 console.log("Incremented lastDocId to", this.lastDocId)
                 docId = response.id;
             }

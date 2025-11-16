@@ -44,7 +44,6 @@ const createDocStack = async (name?: string) => {
         }
         stack.close();
         await stack.db.destroy();
-        await new Promise((resolve) => setTimeout(resolve, 500));
     };
 
     return { docStack, stack, stackName, cleanup };
@@ -225,7 +224,6 @@ describe("@docstack/client integration", () => {
         try {
             const leftClass = await Class.create(stack, `Left-${Date.now()}`, "class", "Left");
             const rightClass = await Class.create(stack, `Right-${Date.now()}`, "class", "Right");
-            console.log("leftClass", leftClass.id, "rightClass", rightClass.id)
             await Attribute.create(leftClass, "name", "string", "Name", { mandatory: true });
             await Attribute.create(rightClass, "name", "string", "Name", { mandatory: true });
 
@@ -234,8 +232,8 @@ describe("@docstack/client integration", () => {
             await expect(Attribute.create(rightClass, "parent", "reference", "Parent", { mandatory: true, domain: domain.name }))
                 .resolves.toBeDefined();
 
-            const attribute = await Attribute.create(leftClass, "child", "reference", "Child", { domain: domain.name });
-            expect(attribute).toBeDefined();
+            await expect(Attribute.create(leftClass, "child", "reference", "Child", { domain: domain.name }))
+                .rejects.toThrow(/reference attributes/i);
         } finally {
             await cleanup();
         }
