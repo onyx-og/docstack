@@ -66,8 +66,8 @@ const DOMAIN_SCHEMA: ClassModel["schema"] = {
     "relation": { name: "relation", type: "enum", config: { isArray: false, values: [
         {value: "1:1"}, {value: "1:N"}, {value: "N:1"}, {value: "N:N"}
     ] } },
-    "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
-    "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: true } },
+    "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: false } },
+    "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: false } },
 };
 class ClientStack extends Stack {
     /* Initialized asynchronously */
@@ -817,7 +817,7 @@ class ClientStack extends Stack {
                     } else {
                         domainList[existingIndex] = domain;
                     }
-                    const evt = new CustomEvent("classListChange", {detail: domainList});
+                    const evt = new CustomEvent("domainListChange", {detail: domainList});
                     this.dispatchEvent(evt);
                 } else {
                     // remove from classList without altering the array reference

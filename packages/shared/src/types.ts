@@ -60,6 +60,13 @@ export type AttributeTypeEnum = {
         type: AttributeType["type"]
     } & AttributeTypeConfig
 }
+export type AttributeTypeReference = {
+    type: "reference",
+    name: string,
+    config: {
+        domain: string,
+    } & AttributeTypeConfig
+}
 export type AttributeTypeRelation = {
     type: "relation",
     name: string,
@@ -67,10 +74,10 @@ export type AttributeTypeRelation = {
         domain: string
     } & AttributeTypeConfig
 }
-export type AttributeType = 
+export type AttributeType =
     AttributeTypeString | AttributeTypeInteger | AttribruteTypeDate |
     AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey |
-    AttributeTypeObject | AttributeTypeEnum | AttributeTypeRelation;
+    AttributeTypeObject | AttributeTypeEnum | AttributeTypeRelation | AttributeTypeReference;
 export type AttributeModel = {
     name: string,
     description?: string,
@@ -96,6 +103,19 @@ export interface DomainModel extends Document {
     targetClass: string;
     description?: string,
     _rev?: PouchDB.Core.RevisionId | undefined;
+}
+
+export type DomainRelationParams = {
+    sourceClass: string;
+    targetClass: string;
+    sourceId: string;
+    targetId: string;
+}
+
+export interface DomainRelationValidation {
+    params: DomainRelationParams;
+    exists: boolean;
+    relation?: Document | null;
 }
 
 export type Document = PouchDB.Core.Document<{

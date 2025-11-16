@@ -1,5 +1,5 @@
 import { Logger } from "winston";
-import { DomainModel, Document } from "../../types";
+import { DomainModel, Document, DomainRelationValidation } from "../../types";
 import Stack from "./"
 
 abstract class Domain extends EventTarget {
@@ -67,11 +67,15 @@ abstract class Domain extends EventTarget {
 
     abstract getModel: () => DomainModel;
 
-    abstract validateRelation: (doc: Document, targetId: string) => Promise<boolean>;
+    abstract validateRelation: (doc: Document, targetId: string) => Promise<DomainRelationValidation>;
 
     abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
 
     abstract getRelations: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
+
+    abstract deleteRelation: (sourceId: string, targetId: string) => Promise<boolean>;
+
+    abstract deleteRelationDoc: (relationDocId: string) => Promise<boolean>;
 }
 
 export default Domain;

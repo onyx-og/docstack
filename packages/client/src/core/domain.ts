@@ -1,4 +1,4 @@
-import { Document, Domain as Domain_, DomainModel, Stack } from "@docstack/shared";
+import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams } from "@docstack/shared";
 import { createLogger, Logger } from "winston";
 
 class Domain extends Domain_ {
@@ -192,71 +192,168 @@ class Domain extends Domain_ {
         return model;
     }
 
-    validateRelation = async (sourceDoc: Document, targetId: string) => {
-        const source = this.sourceClass;
-        const target = this.targetClass;
-        const type = this.relation;
-
-        if (this.stack) {
-            const targetDoc = await this.stack.db.get(targetId).catch(() => null);
-            if (!targetDoc) return false; // Target must exist.
-
-            switch (type) {
-                case "1:1":
-                    // Ensure neither already participates in another relation
-                    return true
-                case "1:N":
-                    // Ensure target is not linked to another source
-                    return true
-
-                case "N:N":
-                    return true;
-
-                default:
-                    throw new Error(`Unsupported relation type ${type}`);
-            }
-        } else {
+    private requireStack(): Stack {
+        if (!this.stack) {
             throw new Error(`Stack is not defined for Domain ${this.name}`);
         }
+        return this.stack;
+    }
+
+    private getDocumentRole(doc: Document): "source" | "target" {
+        if (doc.type === this.sourceClass) {
+            return "source";
+        }
+        if (doc.type === this.targetClass) {
+            return "target";
+        }
+        throw new Error(`Document of type '${doc.type}' is not part of domain '${this.name}'.`);
+    }
+
+    private assertReferenceAllowed(role: "source" | "target") {
+        switch (this.relation) {
+            case "1:N":
+                if (role !== "target") {
+                    throw new Error(`Documents of class '${this.sourceClass}' cannot hold reference attributes for domain '${this.name}'.`);
+                }
+                break;
+            case "N:1":
+                if (role !== "source") {
+                    throw new Error(`Documents of class '${this.targetClass}' cannot hold reference attributes for domain '${this.name}'.`);
+                }
+                break;
+            case "1:1":
+                break;
+            case "N:N":
+                throw new Error(`Domain '${this.name}' does not support reference attributes.`);
+            default:
+                throw new Error(`Unsupported relation type ${this.relation}`);
+        }
+    }
+
+    private buildRelationParams(doc: Document, referenceId: string, role: "source" | "target"): DomainRelationParams {
+        if (!doc._id) {
+            throw new Error("Document is missing identifier.");
+        }
+        if (typeof referenceId !== "string" || referenceId.length === 0) {
+            throw new Error(`Invalid reference value provided for domain '${this.name}'.`);
+        }
+        if (role === "source") {
+            return {
+                sourceClass: this.sourceClass,
+                targetClass: this.targetClass,
+                sourceId: doc._id,
+                targetId: referenceId
+            };
+        }
+        return {
+            sourceClass: this.sourceClass,
+            targetClass: this.targetClass,
+            sourceId: referenceId,
+            targetId: doc._id
+        };
+    }
+
+    private async fetchReferenceDocument(referenceId: string, expectedType: string) {
+        const stack = this.requireStack();
+        const referenceDoc = await stack.db.get(referenceId).catch(() => null);
+        if (!referenceDoc || referenceDoc.type !== expectedType || referenceDoc.active === false) {
+            throw new Error(`Reference '${referenceId}' does not exist for class '${expectedType}'.`);
+        }
+        return referenceDoc as Document;
+    }
+
+    private async findRelationDoc(selector: {[key: string]: any}) {
+        const stack = this.requireStack();
+        const searchSelector = {
+            type: { $eq: this.name },
+            ...selector,
+        };
+        const { docs } = await stack.findDocuments(searchSelector, undefined, 0, 1);
+        return docs[0] || null;
+    }
+
+    private async throwIfRelationExists(filter: {[key: string]: any}, params: DomainRelationParams) {
+        const relation = await this.findRelationDoc(filter);
+        if (relation) {
+            if (relation.sourceId === params.sourceId && relation.targetId === params.targetId) {
+                return relation;
+            }
+            throw new Error(`Domain '${this.name}' already contains a relation that violates cardinality constraints.`);
+        }
+        return null;
+    }
+
+    private async ensureCardinalityConstraints(params: DomainRelationParams) {
+        switch (this.relation) {
+            case "1:1":
+                await this.throwIfRelationExists({ sourceId: { $eq: params.sourceId } }, params);
+                await this.throwIfRelationExists({ targetId: { $eq: params.targetId } }, params);
+                break;
+            case "1:N":
+                await this.throwIfRelationExists({ targetId: { $eq: params.targetId } }, params);
+                break;
+            case "N:1":
+                await this.throwIfRelationExists({ sourceId: { $eq: params.sourceId } }, params);
+                break;
+        }
+    }
+
+    validateRelation = async (doc: Document, referenceId: string): Promise<DomainRelationValidation> => {
+        const fnLogger = this.logger.child({method: "validateRelation", args: {docId: doc._id, referenceId}});
+        const role = this.getDocumentRole(doc);
+        this.assertReferenceAllowed(role);
+        const expectedType = role === "source" ? this.targetClass : this.sourceClass;
+        await this.fetchReferenceDocument(referenceId, expectedType);
+        const params = this.buildRelationParams(doc, referenceId, role);
+        const existing = await this.findRelationDoc({
+            sourceId: { $eq: params.sourceId },
+            targetId: { $eq: params.targetId },
+        });
+        if (existing) {
+            fnLogger.info("validateRelation - relation already exists");
+            return { params, exists: true, relation: existing };
+        }
+        await this.ensureCardinalityConstraints(params);
+        return { params, exists: false };
     }
 
     getRelations = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
-        if (!this.stack) {
-            this.logger.error("Stack is not defined");
-            throw new Error("Stack is not defined");
-        }
-
-        let _selector = { ...selector, type: this.name };
+        const stack = this.requireStack();
+        const _selector = { ...(selector || {}), type: { $eq: this.name } };
         this.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
-        let docs = (await this.stack.findDocuments(_selector, fields, skip, limit)).docs
+        const docs = (await stack.findDocuments(_selector, fields, skip, limit)).docs
         return docs;
     }
 
-    addRelation = async ( sourceDoc: Document, targetId: string ) => {
-        const fnLogger = this.logger.child({method: "addRelation", args: {sourceDoc, targetId}});
-
-        if (!this.stack) {
-            fnLogger.error("Stack is not defined");
-            throw new Error("Stack is not defined");
+    addRelation = async ( document: Document, referenceId: string ) => {
+        const fnLogger = this.logger.child({method: "addRelation", args: {document, referenceId}});
+        const stack = this.requireStack();
+        const validation = await this.validateRelation(document, referenceId);
+        if (validation.exists) {
+            fnLogger.info("addRelation - relation already in place");
+            return validation.relation || null;
         }
-
-        if (await this.validateRelation(sourceDoc, targetId)) {
-            // Create document representing the relation
-            fnLogger.info("addRelation - relation validated");
-            const params = {
-                sourceClass: this.sourceClass,
-                targetClass: this.targetClass,
-                sourceId: sourceDoc.id,
-                targetId
-            };
-            const relationDoc = await this.stack.createRelationDoc(null, this.name, this, params);
-            fnLogger.info("addRelation - relationDoc created", {relationDoc});
-            return relationDoc;
-        } else {
-            fnLogger.error("addRelation - relation validation failed");
-            throw new Error("Relation validation failed");
-        }
+        fnLogger.info("addRelation - relation validated");
+        const relationDoc = await stack.createRelationDoc(null, this.name, this, validation.params);
+        fnLogger.info("addRelation - relationDoc created", {relationDoc});
+        return relationDoc;
     }
+
+    deleteRelation = async (sourceId: string, targetId: string) => {
+        const relation = await this.findRelationDoc({
+            sourceId: { $eq: sourceId },
+            targetId: { $eq: targetId },
+        });
+        if (!relation || !relation._id) {
+            return false;
+        }
+        return this.requireStack().deleteDocument(relation._id);
+    }
+
+    deleteRelationDoc = async (relationDocId: string) => {
+        return this.requireStack().deleteDocument(relationDocId);
+    }
+
 }
 
 export default Domain;

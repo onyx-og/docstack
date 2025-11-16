@@ -1,5 +1,5 @@
-import { isClassModel, isDocument, Stack } from "@docstack/shared";
-import type {ClassModel, Document, StackPluginType} from "@docstack/shared";
+import { isClassModel, isDocument, Stack, Domain } from "@docstack/shared";
+import type {AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType} from "@docstack/shared";
 // import Stack from "../utils/stack";
 import PouchDB from "pouchdb-browser";
 import { Trigger } from "../core/trigger";
@@ -42,12 +42,24 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 documentsToProcess = (docs as any).docs;
             }
 
-            const relationQueue: {
-                domainId: string,
-                sourceId: string,
-                targetId: string,
-                type: "1:1" | "1:N" | "N:1" |"N:N"
-            }[] = [];
+            const relationQueue: { domain: Domain; params: DomainRelationParams; }[] = [];
+
+            const flushRelationQueue = async () => {
+                if (!relationQueue.length) return;
+                const grouped = new Map<string, { domain: Domain; drafts: { docId: string | null; params: DomainRelationParams; }[] }>();
+                while (relationQueue.length) {
+                    const entry = relationQueue.shift();
+                    if (!entry) continue;
+                    const key = entry.domain.name;
+                    if (!grouped.has(key)) {
+                        grouped.set(key, { domain: entry.domain, drafts: [] });
+                    }
+                    grouped.get(key)!.drafts.push({ docId: null, params: entry.params });
+                }
+                for (const { domain, drafts } of grouped.values()) {
+                    await stack.createRelationDocs(drafts, domain.name, domain);
+                }
+            };
 
             const triggerQueue: Record<string, Trigger[]> = Object.create(null);
 
@@ -89,9 +101,11 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             })])
                         })
                         const {error: rErr, result: rRes} = await recurse;
+                        await flushRelationQueue();
                         return {error: rErr, result: rRes}
                     }
                 }
+                await flushRelationQueue();
                 return {error, result}
             }
 
@@ -178,27 +192,22 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         const classObj = await stack.getClass(className);
                         if (classObj) {
 
-                            const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => a.model.type === "relation");
+                            const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => a.model.type === "reference");
                             for (const attr of relationalAttrs) {
                                 const relationValue = doc[attr.name];
                                 if (!relationValue) continue;
-                                const domainId = attr.model.config.domain;
+                                const domainId = (attr.model.config as AttributeTypeReference["config"]).domain;
                                 const domain = await stack.getDomain(domainId);
                                 if (!domain) throw new Error(`Domain not found: ${domainId}`);
 
                                 // Validate relation constraint
-                                const isValid = await domain.validateRelation(doc, relationValue);
-                                if (!isValid) {
-                                    throw new Error(`Invalid relation for ${attr.name} on ${doc._id}`);
+                                const validation = await domain.validateRelation(doc, relationValue);
+                                if (!validation.exists) {
+                                    relationQueue.push({
+                                        domain,
+                                        params: validation.params,
+                                    });
                                 }
-
-                                // Queue relation creation
-                                relationQueue.push({
-                                    domainId: domain.id,
-                                    sourceId: doc._id,
-                                    targetId: relationValue,
-                                    type: domain.relation
-                                });
                             }
                             // TODO: skip execution of before triggers if option.isPostOp
                             const beforeTriggers = classObj.triggers.filter( t => t.order === "before");

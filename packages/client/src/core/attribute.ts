@@ -1,6 +1,6 @@
 import z, { ZodType } from "zod";
 import Class from "./class";
-import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig } from "@docstack/shared";
+import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, AttributeTypeReference } from "@docstack/shared";
 
 class Attribute extends Attribute_ {
     name: string;
@@ -26,6 +26,53 @@ class Attribute extends Attribute_ {
             // attempt to add attribute
             this.class = classObj;
         // }
+    }
+
+    private async ensureReferenceConfigIsValid() {
+        if (this.model.type !== "reference") {
+            return;
+        }
+        if (!this.class) {
+            throw new Error(`Attribute '${this.name}' must belong to a class to validate reference configuration.`);
+        }
+        const stack = this.class.getStack();
+        if (!stack) {
+            throw new Error(`Class '${this.class.getName()}' is not attached to a stack.`);
+        }
+        const config = this.model.config as AttributeTypeReference["config"];
+        const domainName = config.domain;
+        if (typeof domainName !== "string" || domainName.length === 0) {
+            throw new Error(`Attribute '${this.name}' of type 'reference' must declare a domain.`);
+        }
+        if (config.isArray) {
+            throw new Error(`Attribute '${this.name}' of type 'reference' cannot be an array.`);
+        }
+        const domain = await stack.getDomain(domainName);
+        if (!domain) {
+            throw new Error(`Domain '${domainName}' was not found for attribute '${this.name}'.`);
+        }
+        const className = this.class.getName();
+        switch (domain.relation) {
+            case "1:N":
+                if (className !== domain.targetClass) {
+                    throw new Error(`Reference attributes for domain '${domainName}' can only be added to class '${domain.targetClass}'.`);
+                }
+                break;
+            case "N:1":
+                if (className !== domain.sourceClass) {
+                    throw new Error(`Reference attributes for domain '${domainName}' can only be added to class '${domain.sourceClass}'.`);
+                }
+                break;
+            case "1:1":
+                if (className !== domain.sourceClass && className !== domain.targetClass) {
+                    throw new Error(`Class '${className}' is not part of domain '${domainName}'.`);
+                }
+                break;
+            case "N:N":
+                throw new Error(`Domain '${domainName}' does not support reference attributes.`);
+            default:
+                throw new Error(`Unsupported relation '${domain.relation}' for domain '${domainName}'.`);
+        }
     }
 
     public setField = () => {
@@ -144,6 +191,10 @@ class Attribute extends Attribute_ {
                 );
                 break;
 
+            case 'reference':
+                field = z.string().min(1);
+                break;
+
             default:
                 throw new Error(`Unsupported schema type: '${type}' for field '${name}'`);
         }
@@ -167,9 +218,10 @@ class Attribute extends Attribute_ {
         name: string,
         type: AttributeType["type"],
         description?: string,
-        config?: AttributeType["config"] 
+        config?: AttributeType["config"]
     ) {
         const attribute = new Attribute(classObj, name, type, description, config);
+        await attribute.ensureReferenceConfigIsValid();
         await Attribute.build(attribute)
         return attribute;
     }
@@ -276,6 +328,9 @@ class Attribute extends Attribute_ {
             break;
             case "enum":
                 config = Object.assign({ values: [], isArray: false}, config) as AttributeTypeConfig;
+            break;
+            case "reference":
+                config = Object.assign({ isArray: false }, config) as AttributeTypeReference["config"];
             break;
             default:
                 throw new Error("Unexpected type: "+type);

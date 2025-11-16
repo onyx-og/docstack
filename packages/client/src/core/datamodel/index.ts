@@ -89,12 +89,12 @@ const sys_001: Patch = {
                         ]
                     }
                 },
-                "sourceClass": { 
-                    name: "sourceClass", 
-                    type: "foreign_key", 
-                    config: { 
+                "sourceClass": {
+                    name: "sourceClass",
+                    type: "foreign_key",
+                    config: {
                         targetClass: "class",
-                        isArray: true
+                        isArray: false
                     }
                 },
                 "targetClass": {
@@ -102,7 +102,7 @@ const sys_001: Patch = {
                     type: "foreign_key",
                     config: {
                         targetClass: "class",
-                        isArray: true
+                        isArray: false
                     }
                 },
             }

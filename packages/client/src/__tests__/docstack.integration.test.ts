@@ -1,4 +1,4 @@
-import { DocStack, Class, Attribute } from "..";
+import { DocStack, Class, Attribute, Domain } from "..";
 import { getAllSystemPatches } from "../core/datamodel";
 import type { ClassModel, Document } from "@docstack/shared";
 
@@ -192,6 +192,79 @@ describe("@docstack/client integration", () => {
 
             const changeEvent = await eventPromise;
             expect(changeEvent.detail).toHaveProperty("id");
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("creates domains and lists them", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const sourceClass = await Class.create(stack, `Source-${Date.now()}`, "class", "Sources");
+            const targetClass = await Class.create(stack, `Target-${Date.now()}`, "class", "Targets");
+            await Attribute.create(sourceClass, "name", "string", "Name", { mandatory: true });
+            await Attribute.create(targetClass, "name", "string", "Name", { mandatory: true });
+
+            const domainName = `Domain-${Date.now()}`;
+            const domain = await Domain.create(stack, domainName, "domain", "1:N", sourceClass.getName(), targetClass.getName());
+            expect(domain.getModel().sourceClass).toBe(sourceClass.getName());
+
+            const fetched = await stack.getDomain(domainName);
+            expect(fetched).not.toBeNull();
+
+            const domains = await stack.getDomains({});
+            expect(domains.map(d => d.getName())).toContain(domainName);
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("validates reference attribute placement on domains", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const leftClass = await Class.create(stack, `Left-${Date.now()}`, "class", "Left");
+            const rightClass = await Class.create(stack, `Right-${Date.now()}`, "class", "Right");
+            await Attribute.create(leftClass, "name", "string", "Name", { mandatory: true });
+            await Attribute.create(rightClass, "name", "string", "Name", { mandatory: true });
+
+            const domain = await Domain.create(stack, `LeftRight-${Date.now()}`, "domain", "1:N", leftClass.getName(), rightClass.getName());
+
+            await expect(Attribute.create(rightClass, "parent", "reference", "Parent", { mandatory: true, domain: domain.name }))
+                .resolves.toBeDefined();
+
+            await expect(Attribute.create(leftClass, "child", "reference", "Child", { domain: domain.name }))
+                .rejects.toThrow(/reference attributes/i);
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("creates and deletes domain relations via reference attributes", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const customerClass = await Class.create(stack, `Customer-${Date.now()}`, "class", "Customers");
+            const accountClass = await Class.create(stack, `Account-${Date.now()}`, "class", "Accounts");
+            await Attribute.create(customerClass, "name", "string", "Name", { mandatory: true });
+            await Attribute.create(accountClass, "name", "string", "Name", { mandatory: true });
+
+            const domain = await Domain.create(stack, `CustomerAccount-${Date.now()}`, "domain", "1:N", customerClass.getName(), accountClass.getName());
+            await Attribute.create(accountClass, "customer", "reference", "Customer", { mandatory: true, domain: domain.name });
+
+            const customer = await customerClass.addCard({ name: "Alice" }) as Document;
+            const account = await accountClass.addCard({ name: "Primary", customer: customer._id }) as Document;
+            expect(account).toHaveProperty("_id");
+
+            const relations = await domain.getRelations();
+            expect(relations).toHaveLength(1);
+            expect(relations[0].sourceId).toBe(customer._id);
+            expect(relations[0].targetId).toBe(account._id);
+
+            await expect(accountClass.addCard({ name: "Broken", customer: "missing" })).rejects.toThrow();
+
+            const deleted = await domain.deleteRelation(customer._id as string, account._id as string);
+            expect(deleted).toBe(true);
+            const remaining = await domain.getRelations();
+            expect(remaining.length).toBe(0);
         } finally {
             await cleanup();
         }
