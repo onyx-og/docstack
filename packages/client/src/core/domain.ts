@@ -324,7 +324,8 @@ class Domain extends Domain_ {
     getRelations = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
         const stack = this.requireStack();
         const _selector = { ...(selector || {}), type: { $eq: this.name } };
-        Domain.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
+        console.log("built selector", {_selector})
+        Domain.logger.info("getRelations - selector", {selector: _selector, fields, skip, limit})
         const docs = (await stack.findDocuments(_selector, fields, skip, limit)).docs
         return docs;
     }

@@ -174,6 +174,7 @@ class Class extends Class_ {
     static fetch = async ( stack: Stack, className: string ) => {
         let classModel = await stack.getClassModel(className);
         if ( classModel ) {
+            // console.log("Fetched class model", {classModel});
             return Class.buildFromModel(stack, classModel);
         } else {
             throw new Error("Class not found: "+className);
@@ -397,6 +398,7 @@ class Class extends Class_ {
             );
         try {
             let name = attribute_.getName();
+            console.log("Adding attribute", {className: this.name, attribute: name})
             if (!this.hasAttribute(name)) {
                 fnLogger.info("Adding attribute", {name: name, type: attribute_.getModel()});
                 this.attributes[name] = attribute_;

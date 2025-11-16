@@ -1021,6 +1021,7 @@ class ClientStack extends Stack {
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 fnLogger.info("Retrieved doc", {existingDoc})
+                console.log("Existing doc", {existingDoc, params})
                 if (existingDoc && existingDoc.type === type) {
                     fnLogger.info("Assigning existing doc", {doc: existingDoc});
                     doc = {...existingDoc};
@@ -1040,6 +1041,9 @@ class ClientStack extends Stack {
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
             const doc_ = {...doc, ...params, _rev: doc._rev, updateTimestamp: new Date().getTime()};
+            if (doc_.type.startsWith("Account-")) {
+                console.log("Doc after merge", {doc_})
+            }
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
             let response = await db.put(doc_);
             // Find me

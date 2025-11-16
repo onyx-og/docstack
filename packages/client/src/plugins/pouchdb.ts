@@ -140,6 +140,10 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         // TODO: Consider validating against self after registering the class?
                         fnLogger.info("Class model is of type '~self', skipping parent class validation", {doc});
                     }
+
+                    if (doc.name.startsWith("Account-")) {
+                        console.log("Validating class model", {doc, classAttributes: doc.schema})
+                    }
                     
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
@@ -199,9 +203,11 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     try {
                         const classObj = await stack.getClass(className, true);
                         if (classObj) {
-                            // console.log("Validating document", {doc, className, classAttributes: classObj.getAttributes()})
+                            if (classObj.getName().startsWith("Account-"))
+                                console.log("Validating document", {doc, className, _rev: classObj.model._rev, classAttributes: classObj.getAttributes()})
                             const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
-                                console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})
+                                if (classObj.getName().startsWith("Account-"))
+                                    console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})
                                 return a.model.type === "reference"
                             });
                             for (const attr of relationalAttrs) {
@@ -249,6 +255,12 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 }
             }            
             
+            if (documentsToProcess[0]) {
+                if (documentsToProcess[0]._id?.startsWith("Account-")) {
+                    console.log("Final docs to be processed", {documentsToProcess})
+                }
+            }
+
             return pouchBulkDocs.call(this, docs, options, postExec);
         },
 
