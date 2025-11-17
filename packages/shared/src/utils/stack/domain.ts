@@ -1,5 +1,5 @@
 import { Logger } from "winston";
-import { DomainModel, Document, DomainRelationValidation } from "../../types";
+import { DomainModel, Document, DomainRelationValidation, DomainRelationParams } from "../../types";
 import Stack from "./"
 
 abstract class Domain extends EventTarget {
@@ -69,7 +69,23 @@ abstract class Domain extends EventTarget {
 
     abstract getModel: () => DomainModel;
 
+    abstract requireStack: () => Stack;
+
+    abstract getDocumentRole: (doc: Document) => "source" | "target";
+
+    abstract assertReferenceAllowed: (role: "source" | "target") => void;
+
+    abstract buildRelationParams: (doc: Document, referenceId: string, role: "source" | "target") => DomainRelationParams;
+
+    abstract fetchReferenceDocument: (referenceId: string, expectedType: string) => Promise<Document>;
+
     abstract validateRelation: (doc: Document, targetId: string) => Promise<DomainRelationValidation>;
+
+    abstract findRelationDoc: (selector: {[key: string]: any}) => Promise<Document | null>;
+
+    abstract throwIfRelationExists: (filter: {[key: string]: any}, params: DomainRelationParams) => Promise<Document | null>;
+
+    abstract ensureCardinalityConstraints: (params: DomainRelationParams) => Promise<void>;
 
     abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
 

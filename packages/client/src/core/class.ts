@@ -8,16 +8,6 @@ import { Trigger } from "./trigger";
 import {z} from "zod";
 import clientLogger from "../utils/logger";
 
-/**
- * Refinement to check for a specific number of decimal places.
- * @param places The number of decimal places to validate.
- */
-const hasDecimalPrecision = (places: number) => {
-  return (value: number) => {
-    const multiplier = Math.pow(10, places);
-    return Math.abs(value * multiplier) % 1 === 0;
-  };
-}
 class Class extends Class_ {
     stack: Stack | undefined;
     /* Populated in init() */

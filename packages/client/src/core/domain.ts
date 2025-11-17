@@ -196,14 +196,14 @@ class Domain extends Domain_ {
         return model;
     }
 
-    private requireStack(): Stack {
+    requireStack = (): Stack => {
         if (!this.stack) {
             throw new Error(`Stack is not defined for Domain ${this.name}`);
         }
         return this.stack;
     }
 
-    private getDocumentRole(doc: Document): "source" | "target" {
+    getDocumentRole = (doc: Document): "source" | "target" => {
         if (doc.type === this.sourceClass) {
             return "source";
         }
@@ -213,7 +213,7 @@ class Domain extends Domain_ {
         throw new Error(`Document of type '${doc.type}' is not part of domain '${this.name}'.`);
     }
 
-    private assertReferenceAllowed(role: "source" | "target") {
+    assertReferenceAllowed = (role: "source" | "target") => {
         switch (this.relation) {
             case "1:N":
                 if (role !== "target") {
@@ -234,7 +234,7 @@ class Domain extends Domain_ {
         }
     }
 
-    private buildRelationParams(doc: Document, referenceId: string, role: "source" | "target"): DomainRelationParams {
+    buildRelationParams = (doc: Document, referenceId: string, role: "source" | "target"): DomainRelationParams => {
         if (!doc._id) {
             throw new Error("Document is missing identifier.");
         }
@@ -257,16 +257,16 @@ class Domain extends Domain_ {
         };
     }
 
-    private async fetchReferenceDocument(referenceId: string, expectedType: string) {
+    fetchReferenceDocument = async (referenceId: string, expectedType: string) => {
         const stack = this.requireStack();
         const referenceDoc = await stack.db.get<Document>(referenceId).catch(() => null);
         if (!referenceDoc || referenceDoc.type !== expectedType || referenceDoc.active === false) {
             throw new Error(`Reference '${referenceId}' does not exist for class '${expectedType}'.`);
         }
-        return referenceDoc;
+        return referenceDoc as Document;
     }
 
-    private async findRelationDoc(selector: {[key: string]: any}) {
+    findRelationDoc = async (selector: {[key: string]: any}): Promise<Document | null> => {
         const stack = this.requireStack();
         const searchSelector = {
             type: { $eq: this.name },
@@ -276,7 +276,7 @@ class Domain extends Domain_ {
         return docs[0] || null;
     }
 
-    private async throwIfRelationExists(filter: {[key: string]: any}, params: DomainRelationParams) {
+    throwIfRelationExists = async (filter: {[key: string]: any}, params: DomainRelationParams) => {
         const relation = await this.findRelationDoc(filter);
         if (relation) {
             if (relation.sourceId === params.sourceId && relation.targetId === params.targetId) {
@@ -287,7 +287,7 @@ class Domain extends Domain_ {
         return null;
     }
 
-    private async ensureCardinalityConstraints(params: DomainRelationParams) {
+    ensureCardinalityConstraints = async (params: DomainRelationParams) => {
         switch (this.relation) {
             case "1:1":
                 await this.throwIfRelationExists({ sourceId: { $eq: params.sourceId } }, params);

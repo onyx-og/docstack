@@ -9,7 +9,6 @@ class Attribute extends Attribute_ {
     field: ZodType = z.any();
     class: Class | null;
     defaultValue?: any;
-    debug: object = {};
     
     constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], description?: string, config?: AttributeType["config"] ) {
         super(classObj, name, type, config);
@@ -29,7 +28,7 @@ class Attribute extends Attribute_ {
         // }
     }
 
-    private async ensureReferenceConfigIsValid() {
+    ensureReferenceConfigIsValid = async () => {
         if (this.model.type !== "reference") {
             return;
         }
@@ -53,7 +52,6 @@ class Attribute extends Attribute_ {
             throw new Error(`Domain '${domainName}' was not found for attribute '${this.name}'.`);
         }
         const classId = this.class.id;
-        this.debug = { classId, domainName, targetClass: domain.targetClass, sourceClass: domain.sourceClass, relation: domain.relation };
         switch (domain.relation) {
             case "1:N":
                 if (classId !== domain.targetClass) {
