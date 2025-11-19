@@ -52,7 +52,8 @@ class DocStack extends EventTarget {
                 plugins: [
                 // https://www.npmjs.com/package/pouchdb-adapter-memory
                 // memoryAdapter
-                ]
+                ],
+                patches: config.patches,
             });
         } else if (typeof config === "string") {
             stack = await ClientStack.create(`db-${config}`, {

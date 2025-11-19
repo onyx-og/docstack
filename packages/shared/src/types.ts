@@ -156,11 +156,13 @@ export interface SystemDoc {
 
 export type StackOptions = {
     name?: string,
-    plugins?: PouchDB.Plugin[]
+    plugins?: PouchDB.Plugin[],
+    patches?: Patch[];
 } & PouchDB.Configuration.DatabaseConfiguration
 
 export type StackConfig = ({
     connection?: string;
+    plugins?: any[];
 } & StackOptions) | string | `db-${string}`;
 
 export type CachedClass = Class & {

@@ -146,10 +146,16 @@ class ClientStack extends Stack {
 
     // asynchronous factory method
     public static async create(conn: string, options?: StackOptions): Promise<ClientStack> {
-        const store = new ClientStack();
-        await store.initialize(conn, options);
-        await store.initdb()
-        return store;
+        const stack = new ClientStack();
+        await stack.initialize(conn, options);
+        await stack.initdb()
+        if (options?.patches && options.patches.length) {
+            for (const patch of options.patches) {
+                await stack.applyPatch(patch);
+                // ClientStack.logger.info(`Applied patch '${patch._id}' to stack '${stack.name}'`);
+            }
+        }
+        return stack;
     }
     
     async getLastDocId() {
@@ -194,7 +200,7 @@ class ClientStack extends Stack {
         }
     }
 
-    private async applyPatch(patch: Patch): Promise<string> {
+    applyPatch = async (patch: Patch): Promise<string> => {
         const fnLogger = logger.child({method: "applyPatch", args: {patch}});
         try {
             fnLogger.info("Attempting to apply patch", {patch})

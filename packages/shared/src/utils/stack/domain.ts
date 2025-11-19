@@ -33,7 +33,7 @@ abstract class Domain extends EventTarget {
 
     abstract init: (
         stack: Stack | null,
-        id: string,
+        id: string | null,
         name: string,
         type: DomainModel["type"],
         relation: typeof this.relation,
