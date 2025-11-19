@@ -15,10 +15,7 @@ import {
     DomainModel,
 } from "@docstack/shared";
 
-import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
-    AttributeTypeForeignKey, 
-    AttributeTypeInteger,
-    AttributeTypeString} from "@docstack/shared";
+import { SystemDoc, Patch, ClassModel, Document } from "@docstack/shared";
 import { StackPlugin } from "../plugins/pouchdb";
 
 import { parse, createPlan, executePlan } from "./query-engine";
@@ -66,8 +63,8 @@ const DOMAIN_SCHEMA: ClassModel["schema"] = {
     "relation": { name: "relation", type: "enum", config: { isArray: false, values: [
         {value: "1:1"}, {value: "1:N"}, {value: "N:1"}, {value: "N:N"}
     ] } },
-    "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: true } },
-    "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: true } },
+    "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: false } },
+    "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: false } },
 };
 class ClientStack extends Stack {
     /* Initialized asynchronously */
@@ -614,8 +611,11 @@ class ClientStack extends Stack {
     getClassModel = async ( className: string ) => {
         // TODO: understand whether to use name of _id field
         let selector = {
-            type: { $in: ["class", "~self"] },
-            name: { $eq: className }
+            $or: [
+                { name: { $eq: className } },
+                { _id: { $eq: className } }
+            ],
+            type: { $in: ["class", "~self"] }
         };
 
         try {
@@ -817,7 +817,7 @@ class ClientStack extends Stack {
                     } else {
                         domainList[existingIndex] = domain;
                     }
-                    const evt = new CustomEvent("classListChange", {detail: domainList});
+                    const evt = new CustomEvent("domainListChange", {detail: domainList});
                     this.dispatchEvent(evt);
                 } else {
                     // remove from classList without altering the array reference
@@ -1018,12 +1018,13 @@ class ClientStack extends Stack {
         }
         let db = this.db,
             doc: Document | null = null,
-            isNewDoc = false;
+            isNewDoc = false,
+            newDocId = "";
         try {
-            let newDocId = `${type}-${(this.lastDocId+1)}`;
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 fnLogger.info("Retrieved doc", {existingDoc})
+                console.log("Existing doc", {existingDoc, params})
                 if (existingDoc && existingDoc.type === type) {
                     fnLogger.info("Assigning existing doc", {doc: existingDoc});
                     doc = {...existingDoc};
@@ -1032,20 +1033,26 @@ class ClientStack extends Stack {
                     throw new Error("createDoc - Existing document type differs");
                 } else {
                     isNewDoc = true;
-                    doc = this.prepareDoc(docId, type, params) as Document;
+                    newDocId = `${type}-${(this.lastDocId+1)}`;
+                    doc = this.prepareDoc(newDocId, type, params) as Document;
                 }
             } else {
-                doc = this.prepareDoc(newDocId, type, params) as Document;
                 isNewDoc = true;
+                newDocId = `${type}-${(this.lastDocId+1)}`;
+                doc = this.prepareDoc(newDocId, type, params) as Document;
                 fnLogger.info("Generated docId", {newDocId});
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _id: docId || newDocId, _rev: doc._rev, updateTimestamp: new Date().getTime()};
+            const doc_ = {...doc, ...params, _rev: doc._rev, updateTimestamp: new Date().getTime()};
+            if (doc_.type.startsWith("Account-")) {
+                console.log("Doc after merge", {doc_})
+            }
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
             let response = await db.put(doc_);
+            // Find me
             fnLogger.info("Response after put", {"response": response});
             if (response.ok && isNewDoc) {
-                this.incrementLastDocId();
+                await this.incrementLastDocId();
                 docId = response.id;
             }
             else if (response.ok) {
@@ -1182,7 +1189,7 @@ class ClientStack extends Stack {
             let response = await db.put(doc_);
             fnLogger.info("Response after put", {"response": response});
             if (response.ok && isNewDoc) {
-                this.incrementLastDocId();
+                await this.incrementLastDocId();
                 docId = response.id;
             }
             else if (response.ok) {
@@ -1252,7 +1259,7 @@ class ClientStack extends Stack {
                 throw new Error("createRelationDocs - Problem while preparing doc"+e);
             }
         }
-        try {
+        try {console.log("Documents to be created", {documents});
             const response = await db.bulkDocs(documents);
             fnLogger.info("Response after bulkDocs",{"response": response});
             // Increment lastDocId based on number of new docs created

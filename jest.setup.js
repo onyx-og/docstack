@@ -18,8 +18,3 @@ if (typeof globalRef.Worker === "undefined") {
   };
 }
 
-if (globalRef.console) {
-  globalRef.console.log = () => {};
-  globalRef.console.info = () => {};
-  globalRef.console.warn = () => {};
-}

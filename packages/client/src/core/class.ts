@@ -6,17 +6,8 @@ import Attribute from "./attribute";
 import { Logger } from 'winston';
 import { Trigger } from "./trigger";
 import {z} from "zod";
+import clientLogger from "../utils/logger";
 
-/**
- * Refinement to check for a specific number of decimal places.
- * @param places The number of decimal places to validate.
- */
-const hasDecimalPrecision = (places: number) => {
-  return (value: number) => {
-    const multiplier = Math.pow(10, places);
-    return Math.abs(value * multiplier) % 1 === 0;
-  };
-}
 class Class extends Class_ {
     stack: Stack | undefined;
     /* Populated in init() */
@@ -32,7 +23,7 @@ class Class extends Class_ {
     model!: ClassModel;
     state: "busy" | "idle" = "idle"; 
     static logger: Logger = createLogger().child({module: "class"});
-    logger: Logger = createLogger().child({module: "class", className: this.name});
+    logger!: Logger;
     triggers: Trigger[] = [];
 
     private constructor() {
@@ -60,7 +51,7 @@ class Class extends Class_ {
                 // Hydrate model
                 if (classModel) {
                     this.setModel(classModel)
-                    this.logger.info("build - classModel", {classModel: classModel})
+                    Class.logger.info("build - classModel", {classModel: classModel})
                     this.setId(classModel._id);
                     resolve(this);
                 } else {
@@ -75,14 +66,19 @@ class Class extends Class_ {
 
     init = (
         stack: Stack | null,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,
         schema: ClassModel["schema"] = {}
         // parentClass: Class | null
     ) => {
+        // this.parentClass = parentClass;
+        if (stack) {
+            this.stack = stack;
+        }
         this.name = name;
-        this.id = name;
+        this.id = id;
         this.description = description;
         this.type = type;
         // this.attributes = [];
@@ -92,14 +88,12 @@ class Class extends Class_ {
         //     this.schema = schema;
         // }
         this.setModel({
-            type, _id: name, active: true,
+            type, _id: id, active: true,
             name, description,
             schema, triggers: [],
         });
-        // this.parentClass = parentClass;
-        if (stack) {
-            this.stack = stack;
-        }
+       
+        this.logger = clientLogger(stack).child({module: "class", className: this.name});
         // TODO: Waiting for test of method
         // if (parentClass) this.inheritAttributes(parentClass);
     }
@@ -107,18 +101,18 @@ class Class extends Class_ {
     
     public static get = (
         stack: Stack,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,
         schema: ClassModel["schema"] = {},
     ) => {
         const class_ = new Class();
-        this.logger.info("Received schema", {schema})
-        class_.init(stack, name, type, description, schema);
+        Class.logger.info("Received schema", {schema})
+        class_.init(stack, id, name, type, description, schema);
         // Add listener for new documents of this class type
         class_.stack!.onClassDoc(name)
             .on("change", (change) => {
-                console.log("onClassDoc", {change})
                 const evt = new CustomEvent("doc", {
                     detail: change
                 })
@@ -135,20 +129,20 @@ class Class extends Class_ {
         schema: ClassModel["schema"] = {},
         // parentClass: Class | null = null
     ) => {
-        const class_ = Class.get(stack, name, type, description, schema);
+        const class_ = Class.get(stack, name, name, type, description, schema);
         await class_.build();
         return class_;
     }
 
     static buildFromModel = async (stack: Stack, classModel: ClassModel) => {
-        this.logger.info("buildFromModel - Instantiate from model", {classModel});
+        Class.logger.info("buildFromModel - Instantiate from model", {classModel});
         // let parentClassModel = (classModel.parentClass ? await stack.getClassModel(classModel.parentClass) : null);
         // let parentClass = (parentClassModel ? await Class.buildFromModel(stack, parentClassModel) : null);
 
         // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
         if (classModel._rev) {
             let classObj: Class = Class.get(
-                stack, classModel.name, 
+                stack, classModel._id, classModel.name, 
                 classModel.type, classModel.description,
                 classModel.schema
             )
@@ -159,13 +153,22 @@ class Class extends Class_ {
         }
     }
 
-    // TODO: Decide return method
+    static fetchById = async ( stack: Stack, classId: string ) => {
+        try {
+            let classModel = await stack.db.get<ClassModel>(classId);
+            const classObj = await Class.buildFromModel(stack, classModel);
+            return classObj;
+        } catch (error) {
+            throw new Error(`Class not found: ${classId}`);
+        }
+    }
+
     static fetch = async ( stack: Stack, className: string ) => {
         let classModel = await stack.getClassModel(className);
         if ( classModel ) {
+            // console.log("Fetched class model", {classModel});
             return Class.buildFromModel(stack, classModel);
         } else {
-            return null;
             throw new Error("Class not found: "+className);
         }
     }
@@ -276,7 +279,7 @@ class Class extends Class_ {
             triggers.push(trigger.model);
         }
         let model: ClassModel = {
-            _id:this.getName(),
+            _id:this.id!,
             name: this.getName(),
             description: this.getDescription(),
             type: this.getType(),
@@ -295,7 +298,7 @@ class Class extends Class_ {
      * @param model 
      */
     setModel = ( model?: ClassModel ) => {
-        this.logger.info("setModel - got incoming model", {model: model});
+        Class.logger.info("setModel - got incoming model", {model: model});
         // Retreive current class model
         let currentModel = this.getModel();
         // Set model arg to the overwrite of the current model with the given one 
@@ -325,7 +328,7 @@ class Class extends Class_ {
         this.name = model.name;
         this.description = model.description;
         this.model = model;
-        this.logger.info("setModel - model after processing",{ model: model})
+        Class.logger.info("setModel - model after processing",{ model: model})
     }
 
     getPrimaryKeys = () => {
@@ -387,6 +390,7 @@ class Class extends Class_ {
             );
         try {
             let name = attribute_.getName();
+            console.log("Adding attribute", {className: this.name, attribute: name})
             if (!this.hasAttribute(name)) {
                 fnLogger.info("Adding attribute", {name: name, type: attribute_.getModel()});
                 this.attributes[name] = attribute_;
@@ -405,6 +409,7 @@ class Class extends Class_ {
                 // update class on db
                 fnLogger.info("Checking for requirements before updating class on db", {stack: (this.stack != null), id: this.id})
                 if (this.stack && this.id) {
+                    debugger;
                     fnLogger.info("Updating class on db")
                     let res = await this.stack.updateClass(this);
                     return this;
@@ -547,7 +552,7 @@ class Class extends Class_ {
                 const res = await this.stack.createDoc(cardId, this.getName(), this, params);
                 resolve(res)
             } else {
-                this.logger.info("no stack defined");
+                Class.logger.info("no stack defined");
                 resolve(null);
             }
         })

@@ -2,19 +2,22 @@ import Transport, { TransportStreamOptions } from "winston-transport";
 import PouchDB from "pouchdb"
 import 'setimmediate';
 import * as stream from 'stream';
+import { Stack } from "@docstack/shared";
 //
 // Inherit from `winston-transport` so you can take advantage
 // of the base functionality and `.exceptions.handle()`.
 //
 class PouchDBTransport extends Transport{
-    db: PouchDB.Database<{}>;
+    stack: Stack;
     // fields for storing database connection information
-constructor(opts: {dbName: string} & TransportStreamOptions) {
+    constructor(opts: {
+        stack: Stack
+    } & TransportStreamOptions) {
     super(opts);
 
     // Make sure that the database connection information is passed
     // and use that information to connect to the database
-    this.db = new PouchDB(opts.dbName)
+    this.stack = opts.stack;
 }
 
   async log(info: Object, callback: Function) {
@@ -22,7 +25,7 @@ constructor(opts: {dbName: string} & TransportStreamOptions) {
       this.emit('logged', info);
     });
 
-    const response = await this.db.post({
+    const response = await this.stack.db.post({
         type: "log",
         log: info
     });

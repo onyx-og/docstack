@@ -61,27 +61,6 @@ const sys_001: Patch = {
             "type": "~self",
             "schema": {
                 "type": { name: "type", type: "string", config: { defaultValue: "domain" } },
-                "schema": {
-                    name: "schema", type: "object", config: {
-                        isArray: true,
-                        defaultValue: {
-                            "source": {
-                                name: "source",
-                                type: "foreign_key",
-                                config: {
-                                    isArray: false
-                                }
-                            },
-                            "target": {
-                                name: "target",
-                                type: "foreign_key",
-                                config: {
-                                    isArray: false
-                                }
-                            }
-                        }
-                    }
-                },
                 "relation": {
                     name: "relation", type: "enum", config: {
                         isArray: false, values: [
@@ -89,12 +68,12 @@ const sys_001: Patch = {
                         ]
                     }
                 },
-                "sourceClass": { 
-                    name: "sourceClass", 
-                    type: "foreign_key", 
-                    config: { 
+                "sourceClass": {
+                    name: "sourceClass",
+                    type: "foreign_key",
+                    config: {
                         targetClass: "class",
-                        isArray: true
+                        isArray: false
                     }
                 },
                 "targetClass": {
@@ -102,7 +81,7 @@ const sys_001: Patch = {
                     type: "foreign_key",
                     config: {
                         targetClass: "class",
-                        isArray: true
+                        isArray: false
                     }
                 },
             }
@@ -115,7 +94,33 @@ const sys_002: Patch = {
     "type": "patch",
     "version": "0.0.2",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.2\\\n#### New Classes: ~User, ~UserSession",
+    "changelog": "### Initial patch with system classes and domains",
+    "docs": [
+        {
+            "_id": "log",
+            "active": true,
+            "name": "log",
+            "description": "Contains the system logs",
+            "type": "class",
+            "schema": {
+                "log": {
+                    "name": "log",
+                    "type": "object",
+                    "config": {
+                        "isArray": false
+                    }
+                }
+            }
+        }
+    ]
+}
+
+const sys_003: Patch = {
+    "_id": "~sys-0.0.3",
+    "type": "patch",
+    "version": "0.0.3",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.3\\\n#### New Classes: ~User, ~UserSession",
     "docs": [
         {
             "_id": "~User",
@@ -228,7 +233,7 @@ const sys_002: Patch = {
     ]
 };
 
-syspatches.push(sys_001, sys_002);
+syspatches.push(sys_001, sys_002, sys_003);
 
 export function getSystemPatches(currentVersion: string) {
     return syspatches

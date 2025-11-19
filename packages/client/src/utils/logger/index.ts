@@ -2,18 +2,23 @@
 import * as winston from "winston";
 import { createLogger } from "winston";
 import PouchDBTransport from "./transport";
+import { Stack } from "@docstack/shared";
 
-const clientLogger = (name: string = 'log') => {
-    const transportsList = [
-        new PouchDBTransport({ dbName: name })
-    ];
-
-    if (process.env.NODE_ENV !== "test") {
-        transportsList.push(new winston.transports.Console());
+const clientLogger = (stack?: Stack | null) => {
+    const transports: winston.transport[]= [];
+    if (stack) {
+        transports.push(new PouchDBTransport({ stack }));
     }
 
+    // if (process.env.NODE_ENV !== "test") {
+        const consoleTransport = new winston.transports.Console({
+            level: "warn"
+        });
+        transports.push(consoleTransport);
+    // }
+
     return createLogger({
-        transports: transportsList
+        transports: transports
     });
 }
 

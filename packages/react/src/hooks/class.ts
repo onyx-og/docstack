@@ -53,7 +53,19 @@ export const useClassList = (conf: {stack: string, filter?: string[], search?: s
         }
 
         const changeListener = (change: CustomEvent) => {
-            setClassList([...change.detail])
+            const currentClass = classList.find(c => c.name === change.detail.name);
+            let updatedClassList;
+            if (currentClass && change.detail.active === false) {
+                // Class was deleted
+                updatedClassList = classList.filter(c => c.name !== change.detail.name);
+            } else if (currentClass) {
+                // Class was updated
+                updatedClassList = classList.map(c => c.name === change.detail.name ? change.detail : c);
+            } else {
+                // Class was added
+                updatedClassList = [...classList, change.detail];
+            }
+            setClassList(updatedClassList)
         }
 
         const fetchClasses = async () => {

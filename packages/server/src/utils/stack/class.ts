@@ -117,7 +117,6 @@ class Class extends Class_ {
         // Add listener for new documents of this class type
         class_.space!.onClassDoc(name)
             .on("change", (change) => {
-                console.log("onClassDoc", {change})
                 const evt = new CustomEvent("doc", {
                     detail: change
                 })

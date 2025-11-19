@@ -39,6 +39,7 @@ abstract class Class extends EventTarget {
 
     abstract init: (
         stack: Stack | null,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,
@@ -48,6 +49,7 @@ abstract class Class extends EventTarget {
 
     static get: (
         stack: Stack,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,
@@ -66,7 +68,9 @@ abstract class Class extends EventTarget {
 
     static buildFromModel: (stack: Stack, classModel: ClassModel) => Promise<Class>;
 
-    static fetch: ( stack: Stack, className: string ) => Promise<Class | null>;
+    static fetchById: ( stack: Stack, classId: string ) => Promise<Class>;
+
+    static fetch: ( stack: Stack, className: string ) => Promise<Class>;
 
     // TODO Turn into method (after factory method instantiation refactory is done)
     abstract setId: ( id: string ) => void;

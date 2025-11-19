@@ -50,6 +50,8 @@ abstract class Attribute {
     abstract checkTypeValidity: (type: string) => boolean;
 
     abstract getTypeConf: ( type: AttributeType["type"], config: AttributeType["config"] | undefined ) => AttributeTypeConfig;
+
+    abstract ensureReferenceConfigIsValid: () => Promise<void>;
 }
 
 export default Attribute;

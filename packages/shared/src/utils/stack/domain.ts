@@ -1,5 +1,5 @@
 import { Logger } from "winston";
-import { DomainModel, Document } from "../../types";
+import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class } from "../../types";
 import Stack from "./"
 
 abstract class Domain extends EventTarget {
@@ -9,8 +9,8 @@ abstract class Domain extends EventTarget {
     abstract description: string | undefined;
     abstract id: string;
     abstract relation: DomainModel["relation"];
-    abstract sourceClass: string;
-    abstract targetClass: string;
+    abstract sourceClass: Class;
+    abstract targetClass: Class;
     // parentDomain: Domain | null;
     abstract model: DomainModel;
     abstract state: "busy" | "idle";
@@ -23,6 +23,8 @@ abstract class Domain extends EventTarget {
 
     abstract getStack: () => typeof this.stack;
 
+    abstract getName: () => string;
+
     abstract setId: ( id: string ) => void; 
 
     abstract setModel: ( model?: DomainModel ) => void;
@@ -31,32 +33,35 @@ abstract class Domain extends EventTarget {
 
     abstract init: (
         stack: Stack | null,
+        id: string,
         name: string,
         type: DomainModel["type"],
         relation: typeof this.relation,
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
         // schema: DomainModel["schema"] = {}
     ) => void;
 
     static get: (
         stack: Stack,
+        id: string,
         name: string,
         type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
     ) => Domain;
 
     static create:(
         stack: Stack,
+        id: string | null,
         name: string,
         type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
         // parentClass: Class | null = null
     ) => Promise<Domain>
@@ -67,11 +72,31 @@ abstract class Domain extends EventTarget {
 
     abstract getModel: () => DomainModel;
 
-    abstract validateRelation: (doc: Document, targetId: string) => Promise<boolean>;
+    abstract requireStack: () => Stack;
+
+    abstract getDocumentRole: (doc: Document) => "source" | "target";
+
+    abstract assertReferenceAllowed: (role: "source" | "target") => void;
+
+    abstract buildRelationParams: (doc: Document, referenceId: string, role: "source" | "target") => DomainRelationParams;
+
+    abstract fetchReferenceDocument: (referenceId: string, expectedType: string) => Promise<Document>;
+
+    abstract validateRelation: (doc: Document, targetId: string) => Promise<DomainRelationValidation>;
+
+    abstract findRelationDoc: (selector: {[key: string]: any}) => Promise<Document | null>;
+
+    abstract throwIfRelationExists: (filter: {[key: string]: any}, params: DomainRelationParams) => Promise<Document | null>;
+
+    abstract ensureCardinalityConstraints: (params: DomainRelationParams) => Promise<void>;
 
     abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
 
     abstract getRelations: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
+
+    abstract deleteRelation: (sourceId: string, targetId: string) => Promise<boolean>;
+
+    abstract deleteRelationDoc: (relationDocId: string) => Promise<boolean>;
 }
 
 export default Domain;
