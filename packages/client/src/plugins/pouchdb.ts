@@ -1,4 +1,4 @@
-import { isClassModel, isDocument, Stack, Domain } from "@docstack/shared";
+import { isClassModel, isDocument, isRelation, Stack, Domain } from "@docstack/shared";
 import type {AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType} from "@docstack/shared";
 // import Stack from "../utils/stack";
 import PouchDB from "pouchdb-browser";
@@ -141,10 +141,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         fnLogger.info("Class model is of type '~self', skipping parent class validation", {doc});
                     }
 
-                    if (doc.name.startsWith("Account-")) {
-                        console.log("Validating class model", {doc, classAttributes: doc.schema})
-                    }
-                    
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
                     const classDocId = doc._id;
@@ -197,17 +193,19 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
 
                     const result = await stack.db.bulkDocs(updates);
                     fnLogger.info('Propagated updates');
+                } else if (isRelation(doc)) {
+                    const domain = await stack.getDomain(doc.type);
+                    if (!domain) {
+                        throw new Error(`Domain not found: ${doc.type}`);
+                    }
+                    // TODO: to be
+                    continue; //d
                 } else if (isDocument(doc)) {
                     const className = doc.type;
 
                     try {
                         const classObj = await stack.getClass(className, true);
                         if (classObj) {
-                            if (classObj.getName().startsWith("Account-")) {
-                                const classModel = await stack.db.get<ClassModel>(classObj.getId()!);
-                                console.log("Validating document", {doc, className, _rev: classObj.model._rev, model: classModel})
-
-                            }
                                 
                             const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
                                 if (classObj.getName().startsWith("Account-"))
@@ -215,7 +213,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                                 return a.model.type === "reference"
                             });
                             for (const attr of relationalAttrs) {
-                                console.log("Validating relation for attribute", {attr, docId: doc._id})
                                 const relationValue = doc[attr.name];
                                 if (!relationValue) continue;
                                 const domainId = (attr.model.config as AttributeTypeReference["config"]).domain;
@@ -249,7 +246,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // Perform validation using the schema.
                             const validationResult = await classObj.validate(doc);
                             if (!validationResult) {
-                                console.error("Document is not valid for its class schema", {doc, className});
                                 throw new Error("Discarded object because object not valid for its Class schema");
                             }
                         }
@@ -258,12 +254,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     }
                 }
             }            
-            
-            if (documentsToProcess[0]) {
-                if (documentsToProcess[0]._id?.startsWith("Account-")) {
-                    console.log("Final docs to be processed", {documentsToProcess})
-                }
-            }
 
             return pouchBulkDocs.call(this, docs, options, postExec);
         },

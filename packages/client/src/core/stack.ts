@@ -611,8 +611,11 @@ class ClientStack extends Stack {
     getClassModel = async ( className: string ) => {
         // TODO: understand whether to use name of _id field
         let selector = {
-            type: { $in: ["class", "~self"] },
-            name: { $eq: className }
+            $or: [
+                { name: { $eq: className } },
+                { _id: { $eq: className } }
+            ],
+            type: { $in: ["class", "~self"] }
         };
 
         try {
@@ -1256,7 +1259,7 @@ class ClientStack extends Stack {
                 throw new Error("createRelationDocs - Problem while preparing doc"+e);
             }
         }
-        try {
+        try {console.log("Documents to be created", {documents});
             const response = await db.bulkDocs(documents);
             fnLogger.info("Response after bulkDocs",{"response": response});
             // Increment lastDocId based on number of new docs created

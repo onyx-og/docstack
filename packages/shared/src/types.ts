@@ -206,6 +206,16 @@ export const isDocument = (object: object): object is Document => {
     return false;
 }
 
+export const isRelation = (object: {[key: string]: any}): object is DomainModel => {
+    if (
+        object.hasOwnProperty("sourceClass") && object.hasOwnProperty("targetClass") 
+        && object.hasOwnProperty("sourceId") && object.hasOwnProperty("targetId"))
+    {
+        return true;
+    }
+    return false;
+}
+
 export const isClassModel = (object: {[key: string]: any}): object is ClassModel => {
     if (object.hasOwnProperty("type") && ["class","~self"].includes(object.type)) {
         return true;

@@ -91,12 +91,10 @@ class Domain extends Domain_ {
         this.relation = relation;
         this.sourceClass = sourceClass;
         this.targetClass = targetClass;
-        console.log(sourceClass ? 'Got sourceClass' : 'SourceClassEmpty')
-        console.log(targetClass ? 'Got targetClass' : 'TargetClassEmpty')
         this.setModel({
             type, _id: id!, active: true,
-            name, relation, sourceClass: sourceClass.name,
-            targetClass: targetClass.name, description,
+            name, relation, sourceClass: sourceClass.id!,
+            targetClass: targetClass.id!, description,
         })
         this.logger = clientLogger(this.stack).child({module: "domain", domainName: this.name});
     }
@@ -194,8 +192,8 @@ class Domain extends Domain_ {
             description: this.description,
             type: this.type,
             relation: this.relation,
-            sourceClass: this.sourceClass.getName(),
-            targetClass: this.targetClass.getName(),
+            sourceClass: this.sourceClass.id!,
+            targetClass: this.targetClass.id!,
             // schema: this.buildSchema(),
             active: true,
             _rev: this.model ? this.model._rev : "", // [TODO] Error prone
@@ -251,15 +249,15 @@ class Domain extends Domain_ {
         }
         if (role === "source") {
             return {
-                sourceClass: this.sourceClass.getName(),
-                targetClass: this.targetClass.getName(),
+                sourceClass: this.sourceClass.id!,
+                targetClass: this.targetClass.id!,
                 sourceId: doc._id,
                 targetId: referenceId
             };
         }
         return {
-            sourceClass: this.sourceClass.getName(),
-            targetClass: this.targetClass.getName(),
+            sourceClass: this.sourceClass.id!,
+            targetClass: this.targetClass.id!,
             sourceId: referenceId,
             targetId: doc._id
         };

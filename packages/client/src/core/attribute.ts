@@ -54,17 +54,17 @@ class Attribute extends Attribute_ {
         const classId = this.class.id;
         switch (domain.relation) {
             case "1:N":
-                if (classId !== domain.targetClass) {
-                    throw new Error(`Reference attributes for domain '${domainName}' can only be added to class '${domain.targetClass}'.`);
+                if (classId !== domain.targetClass.id) {
+                    throw new Error(`Given classId '${classId}' Reference attributes for domain '${domainName}' can only be added to class '${domain.targetClass}'.`);
                 }
                 break;
             case "N:1":
-                if (classId !== domain.sourceClass) {
-                    throw new Error(`Reference attributes for domain '${domainName}' can only be added to class '${domain.sourceClass}'.`);
+                if (classId !== domain.sourceClass.id) {
+                    throw new Error(`Given classId '${classId}' Reference attributes for domain '${domainName}' can only be added to class '${domain.sourceClass}'.`);
                 }
                 break;
             case "1:1":
-                if (classId !== domain.sourceClass && classId !== domain.targetClass) {
+                if (classId !== domain.sourceClass.id && classId !== domain.targetClass.id) {
                     throw new Error(`Class '${classId}' is not part of domain '${domainName}'.`);
                 }
                 break;
