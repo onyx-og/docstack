@@ -206,7 +206,7 @@ describe("@docstack/client integration", () => {
             await Attribute.create(targetClass, "name", "string", "Name", { mandatory: true });
 
             const domainName = `Domain-${Date.now()}`;
-            const domain = await Domain.create(stack, domainName, "domain", "1:N", sourceClass.id!, targetClass.id!);
+            const domain = await Domain.create(stack, null, domainName, "domain", "1:N", sourceClass, targetClass);
             expect(domain.getModel().sourceClass).toBe(sourceClass.id);
 
             const fetched = await stack.getDomain(domainName);
@@ -227,7 +227,7 @@ describe("@docstack/client integration", () => {
             await Attribute.create(leftClass, "name", "string", "Name", { mandatory: true });
             await Attribute.create(rightClass, "name", "string", "Name", { mandatory: true });
 
-            const domain = await Domain.create(stack, `LeftRight-${Date.now()}`, "domain", "1:N", leftClass.id!, rightClass.id!);
+            const domain = await Domain.create(stack, null, `LeftRight-${Date.now()}`, "domain", "1:N", leftClass, rightClass);
 
             await expect(Attribute.create(rightClass, "parent", "reference", "Parent", { mandatory: true, domain: domain.name }))
                 .resolves.toBeDefined();
@@ -247,7 +247,7 @@ describe("@docstack/client integration", () => {
             await Attribute.create(customerClass, "name", "string", "Name", { mandatory: true });
             await Attribute.create(accountClass, "name", "string", "Name", { mandatory: true });
 
-            const domain = await Domain.create(stack, `CustomerAccount-${Date.now()}`, "domain", "1:N", customerClass.id!, accountClass.id!);
+            const domain = await Domain.create(stack, null, `CustomerAccount-${Date.now()}`, "domain", "1:N", customerClass, accountClass);
             await Attribute.create(accountClass, "customer", "reference", "Customer", { mandatory: true, domain: domain.name });
 
             const customer = await customerClass.addCard({ name: "Alice" }) as Document;

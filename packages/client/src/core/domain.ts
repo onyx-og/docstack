@@ -1,4 +1,4 @@
-import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams } from "@docstack/shared";
+import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams, Class } from "@docstack/shared";
 import clientLogger from "../utils/logger";
 import winston, { createLogger, Logger } from "winston";
 
@@ -9,8 +9,8 @@ class Domain extends Domain_ {
     description: string | undefined;
     id!: string;
     relation!: DomainModel["relation"];
-    sourceClass!: string;
-    targetClass!: string;
+    sourceClass!: Class;
+    targetClass!: Class;
     // parentDomain: Domain | null;
     model!: DomainModel;
     state: "busy" | "idle" = "idle";
@@ -44,8 +44,6 @@ class Domain extends Domain_ {
         this.name = model.name;
         this.description = model.description;
         this.relation = model.relation;
-        this.sourceClass = model.sourceClass;
-        this.targetClass = model.targetClass;
         this.model = model;
         Domain.logger.info("setModel - model after processing",{ model: model})
     }
@@ -72,11 +70,12 @@ class Domain extends Domain_ {
 
     init = (
         stack: Stack | null,
+        id: string | null,
         name: string,
         type: DomainModel["type"],
         relation: typeof this.relation,
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
 
         // schema: DomainModel["schema"] = {}
@@ -85,34 +84,38 @@ class Domain extends Domain_ {
             this.stack = stack;
         }
         this.name = name;
-        this.id = name;
+        this.id = id!;
+        
         this.description = description;
         this.type = type;
         this.relation = relation;
         this.sourceClass = sourceClass;
         this.targetClass = targetClass;
+        console.log(sourceClass ? 'Got sourceClass' : 'SourceClassEmpty')
+        console.log(targetClass ? 'Got targetClass' : 'TargetClassEmpty')
         this.setModel({
-            type, _id: name, active: true,
-            name, relation, sourceClass,
-            targetClass, description,
+            type, _id: id!, active: true,
+            name, relation, sourceClass: sourceClass.name,
+            targetClass: targetClass.name, description,
         })
         this.logger = clientLogger(this.stack).child({module: "domain", domainName: this.name});
     }
 
     public static get = (
         stack: Stack,
+        id: string | null,
         name: string,
         type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
         schema: DomainModel["schema"] = {},
     ) => {
         const domain_ = new Domain();
         Domain.logger.info("Received schema", {schema})
         domain_.init(
-            stack, name, type, relation, sourceClass, targetClass,description);
+            stack, id, name, type, relation, sourceClass, targetClass,description);
         // Add listener for new documents of this class type
         domain_.stack!.onClassDoc(name)
             .on("change", (change) => {
@@ -126,17 +129,18 @@ class Domain extends Domain_ {
 
     public static create = async (
         stack: Stack,
+        id: string | null,
         name: string,
         type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
         schema: DomainModel["schema"] = {},
         // parentClass: Class | null = null
     ) => {
         const domain_ = Domain.get(
-            stack, name, type,
+            stack, null, name, type,
             relation, sourceClass, targetClass,
             description, schema
         );
@@ -148,21 +152,25 @@ class Domain extends Domain_ {
         Domain.logger.info("buildFromModel - Instantiate from model", {domainModel});
         // let parentdomainModel = (domainModel.parentClass ? await stack.getdomainModel(domainModel.parentClass) : null);
         // let parentClass = (parentdomainModel ? await Class.buildFromModel(stack, parentdomainModel) : null);
-
+        const sourceClass = await stack.getClass(domainModel.sourceClass);
+        const targetClass = await stack.getClass(domainModel.targetClass);
+        if (!sourceClass || !targetClass) {
+            throw new Error("Source or target class not found for domain "+domainModel.name);
+        }
         // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
         if (domainModel._rev) {
             let classObj: Domain = Domain.get(
-                stack, domainModel.name, 
+                stack, domainModel._id, domainModel.name, 
                 domainModel.type, domainModel.relation,
-                domainModel.sourceClass, domainModel.targetClass,
+                sourceClass, targetClass,
                 domainModel.description, domainModel.schema
             )
             return classObj;
         } else {
             let classObj: Domain = await Domain.create(
-                stack, domainModel.name, domainModel.type,
-                domainModel.relation, domainModel.sourceClass,
-                domainModel.targetClass, domainModel.description,
+                stack, domainModel._id, domainModel.name, domainModel.type,
+                domainModel.relation, sourceClass,
+                targetClass, domainModel.description,
                 domainModel.schema
             );
             return classObj;
@@ -186,8 +194,8 @@ class Domain extends Domain_ {
             description: this.description,
             type: this.type,
             relation: this.relation,
-            sourceClass: this.sourceClass,
-            targetClass: this.targetClass,
+            sourceClass: this.sourceClass.getName(),
+            targetClass: this.targetClass.getName(),
             // schema: this.buildSchema(),
             active: true,
             _rev: this.model ? this.model._rev : "", // [TODO] Error prone
@@ -204,10 +212,10 @@ class Domain extends Domain_ {
     }
 
     getDocumentRole = (doc: Document): "source" | "target" => {
-        if (doc.type === this.sourceClass) {
+        if (doc.type === this.sourceClass.getName()) {
             return "source";
         }
-        if (doc.type === this.targetClass) {
+        if (doc.type === this.targetClass.getName()) {
             return "target";
         }
         throw new Error(`Document of type '${doc.type}' is not part of domain '${this.name}'.`);
@@ -243,15 +251,15 @@ class Domain extends Domain_ {
         }
         if (role === "source") {
             return {
-                sourceClass: this.sourceClass,
-                targetClass: this.targetClass,
+                sourceClass: this.sourceClass.getName(),
+                targetClass: this.targetClass.getName(),
                 sourceId: doc._id,
                 targetId: referenceId
             };
         }
         return {
-            sourceClass: this.sourceClass,
-            targetClass: this.targetClass,
+            sourceClass: this.sourceClass.getName(),
+            targetClass: this.targetClass.getName(),
             sourceId: referenceId,
             targetId: doc._id
         };
@@ -306,7 +314,7 @@ class Domain extends Domain_ {
         const fnLogger = this.logger.child({method: "validateRelation", args: {docId: doc._id, referenceId}});
         const role = this.getDocumentRole(doc);
         this.assertReferenceAllowed(role);
-        const expectedType = role === "source" ? this.targetClass : this.sourceClass;
+        const expectedType = role === "source" ? this.targetClass.getName() : this.sourceClass.getName();
         await this.fetchReferenceDocument(referenceId, expectedType);
         const params = this.buildRelationParams(doc, referenceId, role);
         const existing = await this.findRelationDoc({

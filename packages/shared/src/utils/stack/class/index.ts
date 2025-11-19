@@ -39,6 +39,7 @@ abstract class Class extends EventTarget {
 
     abstract init: (
         stack: Stack | null,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,
@@ -48,6 +49,7 @@ abstract class Class extends EventTarget {
 
     static get: (
         stack: Stack,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,

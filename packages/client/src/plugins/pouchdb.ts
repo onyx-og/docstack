@@ -6,7 +6,7 @@ import { Trigger } from "../core/trigger";
 import createLogger from "../utils/logger";
 import * as jsondiff from 'jsondiffpatch';
 import { applySchemaDelta } from "../utils/";
-import {Class} from "../core";
+import Class from "../core/class";
 
 const logger = createLogger().child({module: "pouchdb"});
 /**
@@ -28,13 +28,13 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 options = {}
             }
 
-            // const originalFn: typeof this.bulkDocs = () => {
-            //     if (callback) {
-            //         return pouchBulkDocs.call(this, docs, options, callback);
-            //     } else {
-            //         return pouchBulkDocs.call(this, docs, options);
-            //     }
-            // }
+            const originalFn = () => {
+                if (callback) {
+                    return pouchBulkDocs.call(this, docs, options, callback);
+                } else {
+                    return pouchBulkDocs.call(this, docs, options);
+                }
+            }
 
             let documentsToProcess: typeof docs;
             if (Array.isArray(docs)) {
@@ -203,8 +203,12 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     try {
                         const classObj = await stack.getClass(className, true);
                         if (classObj) {
-                            if (classObj.getName().startsWith("Account-"))
-                                console.log("Validating document", {doc, className, _rev: classObj.model._rev, classAttributes: classObj.getAttributes()})
+                            if (classObj.getName().startsWith("Account-")) {
+                                const classModel = await stack.db.get<ClassModel>(classObj.getId()!);
+                                console.log("Validating document", {doc, className, _rev: classObj.model._rev, model: classModel})
+
+                            }
+                                
                             const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
                                 if (classObj.getName().startsWith("Account-"))
                                     console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})

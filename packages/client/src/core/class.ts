@@ -66,6 +66,7 @@ class Class extends Class_ {
 
     init = (
         stack: Stack | null,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,
@@ -77,7 +78,7 @@ class Class extends Class_ {
             this.stack = stack;
         }
         this.name = name;
-        this.id = name;
+        this.id = id;
         this.description = description;
         this.type = type;
         // this.attributes = [];
@@ -87,7 +88,7 @@ class Class extends Class_ {
         //     this.schema = schema;
         // }
         this.setModel({
-            type, _id: name, active: true,
+            type, _id: id, active: true,
             name, description,
             schema, triggers: [],
         });
@@ -100,6 +101,7 @@ class Class extends Class_ {
     
     public static get = (
         stack: Stack,
+        id: string,
         name: string,
         type: ClassModel["type"],
         description?: string,
@@ -107,7 +109,7 @@ class Class extends Class_ {
     ) => {
         const class_ = new Class();
         Class.logger.info("Received schema", {schema})
-        class_.init(stack, name, type, description, schema);
+        class_.init(stack, id, name, type, description, schema);
         // Add listener for new documents of this class type
         class_.stack!.onClassDoc(name)
             .on("change", (change) => {
@@ -127,7 +129,7 @@ class Class extends Class_ {
         schema: ClassModel["schema"] = {},
         // parentClass: Class | null = null
     ) => {
-        const class_ = Class.get(stack, name, type, description, schema);
+        const class_ = Class.get(stack, name, name, type, description, schema);
         await class_.build();
         return class_;
     }
@@ -140,7 +142,7 @@ class Class extends Class_ {
         // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
         if (classModel._rev) {
             let classObj: Class = Class.get(
-                stack, classModel.name, 
+                stack, classModel._id, classModel.name, 
                 classModel.type, classModel.description,
                 classModel.schema
             )
@@ -277,7 +279,7 @@ class Class extends Class_ {
             triggers.push(trigger.model);
         }
         let model: ClassModel = {
-            _id:this.getName(),
+            _id:this.id!,
             name: this.getName(),
             description: this.getDescription(),
             type: this.getType(),
@@ -407,6 +409,7 @@ class Class extends Class_ {
                 // update class on db
                 fnLogger.info("Checking for requirements before updating class on db", {stack: (this.stack != null), id: this.id})
                 if (this.stack && this.id) {
+                    debugger;
                     fnLogger.info("Updating class on db")
                     let res = await this.stack.updateClass(this);
                     return this;

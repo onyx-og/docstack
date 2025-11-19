@@ -180,7 +180,7 @@ class Attribute extends Attribute_ {
                             } else throw new Error("Missing class parentship");
                         } catch (error: any) {
                             if (error.status === 404) {
-                                console.error(`Foreign key validation failed: document not found in class '${foreignClass}'.`, {error});
+                                console.error(`Foreign key validation failed: document not found in class '${foreignClass}'. ${this.class?.getName()}`, {error});
                                 return false;
                             }
                             throw error;

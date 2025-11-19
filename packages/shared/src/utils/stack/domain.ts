@@ -1,5 +1,5 @@
 import { Logger } from "winston";
-import { DomainModel, Document, DomainRelationValidation, DomainRelationParams } from "../../types";
+import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class } from "../../types";
 import Stack from "./"
 
 abstract class Domain extends EventTarget {
@@ -9,8 +9,8 @@ abstract class Domain extends EventTarget {
     abstract description: string | undefined;
     abstract id: string;
     abstract relation: DomainModel["relation"];
-    abstract sourceClass: string;
-    abstract targetClass: string;
+    abstract sourceClass: Class;
+    abstract targetClass: Class;
     // parentDomain: Domain | null;
     abstract model: DomainModel;
     abstract state: "busy" | "idle";
@@ -33,32 +33,35 @@ abstract class Domain extends EventTarget {
 
     abstract init: (
         stack: Stack | null,
+        id: string,
         name: string,
         type: DomainModel["type"],
         relation: typeof this.relation,
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
         // schema: DomainModel["schema"] = {}
     ) => void;
 
     static get: (
         stack: Stack,
+        id: string,
         name: string,
         type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
     ) => Domain;
 
     static create:(
         stack: Stack,
+        id: string | null,
         name: string,
         type: DomainModel["type"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
-        sourceClass: string,
-        targetClass: string,
+        sourceClass: Class,
+        targetClass: Class,
         description?: string,
         // parentClass: Class | null = null
     ) => Promise<Domain>
