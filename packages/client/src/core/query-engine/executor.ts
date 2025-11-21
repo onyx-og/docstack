@@ -219,7 +219,6 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
     if (!fromClass) throw new Error(`Table not found: ${plan.fromTable.table}`);
 
     const leftSelector = buildSelector(plan.filters.left);
-    console.log("Left selector", {planFiltersLeft: plan.filters.left})
     let leftRows = (await fromClass.getCards(leftSelector)).map(row => ({ [plan.fromTable.as || plan.fromTable.table]: row }));
 
     // 2. Execute Joins
@@ -334,7 +333,6 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
     
     // 3. Apply residual filters
     let filteredRows = joinedRows;
-    console.log("Got residuals", {residual: plan.filters.residual});
     if (plan.filters.residual.length > 0) {
         const evaluators = plan.filters.residual.map(predicate => createRowEvaluator(predicate, stack, executePlan, outerRow, null));
         filteredRows = await asyncFilter(joinedRows, async (row) => {

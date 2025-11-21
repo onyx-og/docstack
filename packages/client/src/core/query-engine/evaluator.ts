@@ -12,7 +12,6 @@
  * @returns {function(object): Promise<boolean>} An async function that takes a row and returns true if it matches the predicate.
  */
 export function createRowEvaluator(astNode, stack, executePlan, outerRow, outerAliases) {
-    console.log("Got astNode", {astNode});
     return async (row) => {
         // Determine aliases from the current row context
         const fromAlias = Object.keys(row).find(k => row[k] !== null) || Object.keys(row)[0];
@@ -45,7 +44,6 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
         case 'scalar_subquery': {
             // Dynamically import planner to avoid circular dependency
             const { createPlan } = await import('./planner');
-            console.log({expr})
             const subqueryPlan = createPlan([expr.ast]);
             // Execute the subquery, passing the current row as the outer context for correlation
             const result = await executePlan(stack, subqueryPlan, [], row, null); // Pass outer row, but no aliases
@@ -89,7 +87,6 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
         }
         
         case 'binary_expr': {
-            console.log("Evaluating binary expression", {left: expr.left, right: expr.right})
             const left = await evalExpression(row, expr.left, fromAlias, joinAliases, stack, executePlan, outerRow, outerAliases);
             let right;
             if (expr.right.type === 'param') {

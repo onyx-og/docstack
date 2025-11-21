@@ -56,7 +56,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 const grouped = new Map<string, { domain: Domain; drafts: { docId: string | null; params: DomainRelationParams; }[] }>();
                 while (relationQueue.length) {
                     const entry = relationQueue.shift();
-                    console.log("Processing relation queue entry", {entry})
                     if (!entry) continue;
                     const key = entry.domain.name;
                     if (!grouped.has(key)) {

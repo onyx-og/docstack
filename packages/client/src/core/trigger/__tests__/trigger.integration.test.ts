@@ -107,4 +107,35 @@ describe("Trigger integration", () => {
             await cleanup();
         }
     });
+    /*
+    it("fails validation when after trigger violates constraints", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const className = `AfterTriggerValidation-${Date.now()}`;
+            const classObj = await Class.create(stack, className, "class", "after trigger validation test");
+
+            await Attribute.create(classObj, "name", "string", "Name", { mandatory: true });
+            await Attribute.create(classObj, "status", "string", "Status", { mandatory: true });
+
+            await classObj.addTrigger("after:status", {
+                name: "afterStatus",
+                order: "after",
+                run: `
+                    // This after trigger will delete the mandatory 'status' field
+                    delete document.status;
+                    return document;
+                `,
+            });
+
+            // Attempt to create a document with valid data
+            // The after trigger will remove 'status', causing validation to fail
+            await expect(
+                classObj.addCard({ name: "Test", status: "active" }).catch((err) => {
+                    throw new Error(err.message);
+                })
+            ).rejects.toThrow();
+        } finally {
+            await cleanup();
+        }
+    },500); */
 });
