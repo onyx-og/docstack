@@ -10,8 +10,8 @@ const config: Config.InitialOptions = {
   "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
   "setupFiles": ["<rootDir>/jest.setup.js"],
   "moduleNameMapper": {
-    "^@docstack/shared$": "<rootDir>/packages/shared/src/index.ts",
-    "^@docstack/shared/(.*)$": "<rootDir>/packages/shared/src/$1",
+    "^@docstack/shared$": "<rootDir>/../shared/src/index.ts",
+    "^@docstack/shared/(.*)$": "<rootDir>/../shared/src/$1",
     "^jsondiffpatch$": "<rootDir>/test/__mocks__/jsondiffpatch.js"
   }
 };
