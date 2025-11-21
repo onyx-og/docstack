@@ -265,7 +265,7 @@ describe("@docstack/client integration", () => {
             const response = await stack.db.bulkDocs([validRelation]);
             expect(response).toHaveLength(1);
 
-            const savedRelation = await stack.db.get(validRelation._id);
+            const savedRelation = await stack.db.get<Document>(validRelation._id);
             expect(savedRelation.sourceId).toBe(sourceDoc._id);
             expect(savedRelation.targetId).toBe(targetDoc._id);
         } finally {
