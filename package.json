@@ -40,8 +40,8 @@
     "build:server": "rollup --config server/rollup.config.js && npm run build:types && cp -r server/src/utils/dbManager/datamodel/patch lib/",
     "build:shared": "npm run -w packages/shared build",
     "build:client": "npm run -w packages/client build",
+    "test:client": "npm run -w packages/client test",
     "build:react": "npm run -w packages/react build",
-    "test": "jest --config jest.config.ts",
     "start:docs": "npm run -w packages/docs start",
     "build:docs": "npm run -w packages/docs build"
   },
