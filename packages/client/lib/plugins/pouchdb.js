@@ -88,8 +88,8 @@ export const StackPlugin = (stack) => {
             for (const doc of documentsToProcess) {
                 if (isClassModel(doc)) {
                     // Validate against parent class
-                    if (doc.type !== "~self") {
-                        const parentClass = await stack.getClass(doc.type);
+                    if (doc["~class"] !== "~self") {
+                        const parentClass = await stack.getClass(doc["~class"]);
                         if (parentClass) {
                             fnLogger.info("Validating class model against parent class", { doc, parentClass: parentClass.name });
                             const validationResult = await parentClass.validate(doc);
@@ -100,7 +100,7 @@ export const StackPlugin = (stack) => {
                         }
                         else {
                             fnLogger.error("Parent class not found", { doc });
-                            throw new Error(`Parent class '${doc.type}' not found for class model '${doc._id}'`);
+                            throw new Error(`Parent class '${doc["~class"]}' not found for class model '${doc._id}'`);
                         }
                     }
                     else {
@@ -150,7 +150,7 @@ export const StackPlugin = (stack) => {
                     fnLogger.info('Propagated updates');
                 }
                 else if (isDocument(doc)) {
-                    const className = doc.type;
+                    const className = doc["~class"];
                     try {
                         const classObj = await stack.getClass(className);
                         if (classObj) {

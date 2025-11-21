@@ -5,7 +5,7 @@ import Stack from "./"
 abstract class Domain extends EventTarget {
     abstract stack: Stack | undefined;
     abstract name: string;
-    abstract type: DomainModel["type"];
+    abstract type: DomainModel["~class"];
     abstract description: string | undefined;
     abstract id: string;
     abstract relation: DomainModel["relation"];
@@ -35,7 +35,7 @@ abstract class Domain extends EventTarget {
         stack: Stack | null,
         id: string | null,
         name: string,
-        type: DomainModel["type"],
+        type: DomainModel["~class"],
         relation: typeof this.relation,
         sourceClass: Class,
         targetClass: Class,
@@ -47,7 +47,7 @@ abstract class Domain extends EventTarget {
         stack: Stack,
         id: string,
         name: string,
-        type: DomainModel["type"],
+        type: DomainModel["~class"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: Class,
         targetClass: Class,
@@ -58,7 +58,7 @@ abstract class Domain extends EventTarget {
         stack: Stack,
         id: string | null,
         name: string,
-        type: DomainModel["type"],
+        type: DomainModel["~class"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: Class,
         targetClass: Class,

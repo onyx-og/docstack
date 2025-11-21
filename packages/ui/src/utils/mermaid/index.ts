@@ -18,7 +18,7 @@ export const generateMermaidERD = (...schemas: ClassModel[]): string => {
 
         attributes.forEach(attr => {
             // Check if the attribute is from the BASE_SCHEMA and skip common fields
-            if (['active', '_id', 'type', 'createTimestamp', 'updateTimestamp', 'description'].includes(attr.name)) {
+            if (['active', '_id', '~class', '~createTimestamp', '~updateTimestamp', 'description', '~domain'].includes(attr.name)) {
                 // We'll skip the standard DocStack fields for a cleaner diagram, but you can remove this
                 return;
             }

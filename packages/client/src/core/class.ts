@@ -13,7 +13,7 @@ class Class extends Class_ {
     /* Populated in init() */
     name!: string;
     /* Populated in init() */
-    type!: ClassModel["type"];
+    type!: ClassModel["~class"];
     description?: string;
     attributes: {[name: string]: Attribute} = {};
     schema: ClassModel["schema"] = {};
@@ -68,7 +68,7 @@ class Class extends Class_ {
         stack: Stack | null,
         id: string,
         name: string,
-        type: ClassModel["type"],
+        type: ClassModel["~class"],
         description?: string,
         schema: ClassModel["schema"] = {}
         // parentClass: Class | null
@@ -88,7 +88,7 @@ class Class extends Class_ {
         //     this.schema = schema;
         // }
         this.setModel({
-            type, _id: id, active: true,
+            "~class": type, _id: id, active: true,
             name, description,
             schema, triggers: [],
         });
@@ -103,7 +103,7 @@ class Class extends Class_ {
         stack: Stack,
         id: string,
         name: string,
-        type: ClassModel["type"],
+        type: ClassModel["~class"],
         description?: string,
         schema: ClassModel["schema"] = {},
     ) => {
@@ -124,7 +124,7 @@ class Class extends Class_ {
     public static create = async (
         stack: Stack,
         name: string,
-        type: ClassModel["type"],
+        type: ClassModel["~class"],
         description?: string,
         schema: ClassModel["schema"] = {},
         // parentClass: Class | null = null
@@ -142,13 +142,13 @@ class Class extends Class_ {
         // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
         if (classModel._rev) {
             let classObj: Class = Class.get(
-                stack, classModel._id, classModel.name, 
-                classModel.type, classModel.description,
+                stack, classModel._id, classModel.name,
+                classModel["~class"], classModel.description,
                 classModel.schema
             )
             return classObj;
         } else {
-            let classObj: Class = await Class.create(stack, classModel.name, classModel.type, classModel.type, classModel.schema);
+            let classObj: Class = await Class.create(stack, classModel.name, classModel["~class"], classModel["~class"], classModel.schema);
             return classObj;
         }
     }
@@ -282,12 +282,12 @@ class Class extends Class_ {
             _id:this.id!,
             name: this.getName(),
             description: this.getDescription(),
-            type: this.getType(),
+            "~class": this.getType(),
             schema: this.buildSchema(),
             triggers: triggers,
             active: true,
             _rev: this.model ? this.model._rev : "", // [TODO] Error prone
-            createTimestamp: this.model ? this.model.createTimestamp : undefined,
+            "~createTimestamp": this.model ? this.model["~createTimestamp"] : undefined,
         };
         return model;
     }
@@ -327,6 +327,7 @@ class Class extends Class_ {
 
         this.name = model.name;
         this.description = model.description;
+        this.type = model["~class"];
         this.model = model;
         Class.logger.info("setModel - model after processing",{ model: model})
     }

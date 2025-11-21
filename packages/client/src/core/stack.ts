@@ -25,21 +25,21 @@ const logger = createLogger().child({module: "stack"});
 
 export const BASE_SCHEMA: ClassModel["schema"] = {
     "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
-    "type": { name: "type", type: "string", config: { maxLength: 100 } },
-    "createTimestamp": { name: "createTimestamp", type: "integer", config: { min: 0 } },
-    "updateTimestamp": { name: "updateTimestamp", type: "integer", config: { min: 0 } },
+    "~class": { name: "~class", type: "string", config: { maxLength: 100 } },
+    "~createTimestamp": { name: "~createTimestamp", type: "integer", config: { min: 0 } },
+    "~updateTimestamp": { name: "~updateTimestamp", type: "integer", config: { min: 0 } },
     "description": { name: "description", type: "string", config: { maxLength: 1000 } },
     "active": { name: "active", type: "boolean", config: { defaultValue: true , primaryKey: true } }
 }
 export const CLASS_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    "type": { name: "type", type: "string", config: { defaultValue: "class"} },
+    "~class": { name: "~class", type: "string", config: { defaultValue: "class"} },
     "schema": { name: "schema", type: "object", config: { maxLength: 1000, isArray: false }},
     "parentClass": { name: "parentClass", type: "foreign_key", config: { isArray: false } },
 }
 const DOMAIN_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    "type": { name: "type", type: "string", config: { defaultValue: "domain"} },
+    "~class": { name: "~class", type: "string", config: { defaultValue: "domain"} },
     "schema": { name: "schema", type: "object", config: { 
         isArray: true,
         defaultValue: {
@@ -214,7 +214,7 @@ class ClientStack extends Stack {
                 }
                 return doc;
             }));
-            await this.db.bulkDocs(hydratedDocs);
+            await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions);
             fnLogger.info("Successfully applied patch", {version: patch.version});
             return patch.version;
         } catch (e: any) {
@@ -377,7 +377,7 @@ class ClientStack extends Stack {
             live: true,
             include_docs: true,
             filter: (doc) => {
-                return doc.type == "class";
+                return doc["~class"] == "class";
             }
         }).on("change", async (change) => {
             const doc = change.doc;
@@ -402,7 +402,7 @@ class ClientStack extends Stack {
             live: true,
             include_docs: true,
             filter: (doc) => {
-                return doc.type == "~lock" && doc._id == `~lock-propagation-${className}`;
+                return doc["~class"] == "~lock" && doc._id == `~lock-propagation-${className}`;
             }
         });
         this.listeners.push(classLockListener);
@@ -419,7 +419,7 @@ class ClientStack extends Stack {
             }
             const response = await this.db.put({
                 _id: `~lock-propagation-${className}`,
-                type: `~Lock`,
+                "~class": `~Lock`,
                 _rev
             });
             fnLogger.info(`Adding class lock response`, {response});
@@ -450,7 +450,7 @@ class ClientStack extends Stack {
             live: true,
             include_docs: true,
             filter: (doc) => {
-                return doc.type == className;
+                return doc["~class"] == className;
             }
         });
         this.listeners.push(onClassDocListener);
@@ -564,7 +564,7 @@ class ClientStack extends Stack {
         return _rev;
     }
 
-    // Expects a selector like { type: { $eq: "class" } }
+    // Expects a selector like { "~class": { $eq: "class" } }
     findDocuments = async ( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
         const fnLogger = logger.child({method: "findDocuments", args: {selector, fields, skip, limit}});
 
@@ -621,7 +621,7 @@ class ClientStack extends Stack {
                 { name: { $eq: className } },
                 { _id: { $eq: className } }
             ],
-            type: { $in: ["class", "~self"] }
+            "~class": { $in: ["class", "~self"] }
         };
 
         try {
@@ -638,7 +638,7 @@ class ClientStack extends Stack {
 
     getDomainModel = async ( domainName: string ) => {
         let selector = {
-            type: { $eq: "domain" },
+            "~class": { $eq: "domain" },
             name: { $eq: domainName }
         };
 
@@ -658,7 +658,7 @@ class ClientStack extends Stack {
     // TODO: Change into getClass("Class").getCards()
     getClassModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
         const {listen, filter, search} = conf;
-        const selector: {[field: string]: object} = { type: { $eq: "class" } };
+        const selector: {[field: string]: object} = { "~class": { $eq: "class" } };
         if (Array.isArray(filter) && filter.length > 0) {
             // TODO: Consider checking against name field instead of _id
             selector._id = { $in: filter };
@@ -673,7 +673,7 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev'];
 
         const response = await this.findDocuments(selector, fields);
         const result: ClassModel[] = response.docs as ClassModel[];
@@ -752,7 +752,7 @@ class ClientStack extends Stack {
 
     getDomainModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
         const {listen, filter, search} = conf;
-        const selector: {[field: string]: object} = { type: { $eq: "domain" } };
+        const selector: {[field: string]: object} = { "~class": { $eq: "domain" } };
         if (Array.isArray(filter) && filter.length > 0) {
             // TODO: Consider checking against name field instead of _id
             selector._id = { $in: filter };
@@ -767,7 +767,7 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev'];
 
         const response = await this.findDocuments(selector, fields);
         const result: DomainModel[] = response.docs as DomainModel[];
@@ -959,7 +959,7 @@ class ClientStack extends Stack {
         // The 'map' function as a string
         const mapCode = `function (doc) {
             const hasAllKeys = ${pKs.map(key => `doc.${key}`).join(' && ')};
-            if (hasAllKeys && doc.type === '${className}') {
+            if (hasAllKeys && doc["~class"] === '${className}') {
             emit([${keyString}], doc._id);
             }
         }`;
@@ -1003,11 +1003,16 @@ class ClientStack extends Stack {
 
     // TODO: consider refactoring to use ~class (before, create) triggers
     // and (before, update) triggers
-    prepareDoc (_id: string, type: string, params: {[key: string] : string | number | boolean}) {
+    prepareDoc (
+        _id: string,
+        type: string,
+        params: {[key: string] : string | number | boolean},
+        metaKey: "~class" | "~domain" = "~class"
+    ) {
         logger.info("prepareDoc - given args", {_id: _id, type: type, params: params});
         params["_id"] = _id;
-        params["type"] = type;
-        params["createTimestamp"] = new Date().getTime();
+        params[metaKey] = type;
+        params["~createTimestamp"] = new Date().getTime();
         params["active"] = true;
         logger.info("prepareDoc - after elaborations", {params} );
         return params;
@@ -1031,10 +1036,10 @@ class ClientStack extends Stack {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 fnLogger.info("Retrieved doc", {existingDoc})
                 console.log("Existing doc", {existingDoc, params})
-                if (existingDoc && existingDoc.type === type) {
+                if (existingDoc && existingDoc["~class"] === type) {
                     fnLogger.info("Assigning existing doc", {doc: existingDoc});
                     doc = {...existingDoc};
-                } else if (existingDoc && existingDoc.type !== type) {
+                } else if (existingDoc && existingDoc["~class"] !== type) {
                     fnLogger.error("Existing document type differs");
                     throw new Error("createDoc - Existing document type differs");
                 } else {
@@ -1049,8 +1054,8 @@ class ClientStack extends Stack {
                 fnLogger.info("Generated docId", {newDocId});
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _rev: doc._rev, updateTimestamp: new Date().getTime()};
-            if (doc_.type.startsWith("Account-")) {
+            const doc_ = {...doc, ...params, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
+            if (doc_["~class"]?.startsWith("Account-")) {
                 console.log("Doc after merge", {doc_})
             }
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
@@ -1106,10 +1111,10 @@ class ClientStack extends Stack {
                 if (docId) {
                     const existingDoc = await this.getDocument(docId) as unknown as Document;
                     fnLogger.info("retrieved doc", {existingDoc})
-                    if (existingDoc && existingDoc.type === type) {
+                    if (existingDoc && existingDoc["~class"] === type) {
                         fnLogger.info("createDocs - assigning existing doc", {doc: existingDoc});
                         doc = {...existingDoc};
-                    } else if (existingDoc && existingDoc.type !== type) {
+                    } else if (existingDoc && existingDoc["~class"] !== type) {
                         throw new Error("createDocs - Existing document type differs");
                     } else {
                         isNewDoc = true;
@@ -1122,7 +1127,7 @@ class ClientStack extends Stack {
                     fnLogger.info("Generated docId", docId);
                 }
                 fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-                const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, updateTimestamp: new Date().getTime()};
+                const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
                 fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
                 documents.push(doc_);
                 if (isNewDoc) newDocsIds.push(docId);
@@ -1172,25 +1177,25 @@ class ClientStack extends Stack {
             if (docId) {
                 const existingDoc = await this.db.get(docId) as Document;
                 fnLogger.info("retrieved doc", {existingDoc})
-                if (existingDoc && existingDoc.type === domainObj.name) {
+                if (existingDoc && existingDoc["~domain"] === domainObj.name) {
                     fnLogger.info("Assigning existing doc", {doc: existingDoc});
                     doc = {...existingDoc};
-                } else if (existingDoc && existingDoc.type !== domainObj.name) {
+                } else if (existingDoc && existingDoc["~domain"] !== domainObj.name) {
                     fnLogger.error("Existing document type differs");
                     throw new Error("createDoc - Existing document type differs");
                 } else {
                     fnLogger.warn("No relation document");
                     isNewDoc = true;
-                    doc = this.prepareDoc(docId, domainObj.name, params) as Document;
+                    doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
                 }
             } else {
                 docId = `${domainObj.name}-${(this.lastDocId+1)}`;
-                doc = this.prepareDoc(docId, domainObj.name, params) as Document;
+                doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
                 isNewDoc = true;
                 fnLogger.info("Generated docId", docId);
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, updateTimestamp: new Date().getTime()};
+            const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
             let response = await db.put(doc_);
             fnLogger.info("Response after put", {"response": response});
@@ -1231,18 +1236,18 @@ class ClientStack extends Stack {
                 if (docId) {
                     const existingDoc = await db.get(docId) as Document;
                     fnLogger.info("retrieved doc", {existingDoc})
-                    if (existingDoc && existingDoc.type === domainObj.name) {
+                    if (existingDoc && existingDoc["~domain"] === domainObj.name) {
                         fnLogger.info("createRelationDocs - assigning existing doc", {doc: existingDoc});
                         doc = {...existingDoc};
-                    } else if (existingDoc && existingDoc.type !== domainObj.name) {
+                    } else if (existingDoc && existingDoc["~domain"] !== domainObj.name) {
                         throw new Error("createRelationDocs - Existing document type differs");
                     } else {
                         isNewDoc = true;
-                        doc = this.prepareDoc(docId, domainObj.name, params) as Document;
+                        doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
                     }
                 } else {
                     docId = `${domainObj.name}-${(this.lastDocId+1)}`;
-                    doc = this.prepareDoc(docId, domainObj.name, params) as Document;
+                    doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
                 }
@@ -1252,7 +1257,7 @@ class ClientStack extends Stack {
                     ...params,
                     _id: docId, 
                     _rev: doc._rev, 
-                    updateTimestamp: new Date().getTime()
+                    "~updateTimestamp": new Date().getTime()
                 };
                 fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
                 documents.push(doc_);

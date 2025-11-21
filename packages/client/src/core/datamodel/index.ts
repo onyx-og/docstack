@@ -9,7 +9,7 @@ const syspatches: Patch[] = [];
 
 const sys_001: Patch = {
     "_id": "~sys-0.0.1",
-    "type": "patch",
+    "~class": "patch",
     "version": "0.0.1",
     "target": "system",
     "changelog": "### Initial patch with originators: Class and Domain",
@@ -19,7 +19,7 @@ const sys_001: Patch = {
             "active": true,
             "name": "class",
             "description": "A class document representing a data model class",
-            "type": "~self",
+            "~class": "~self",
             "schema": {
                 "name": {
                     "name": "name",
@@ -40,8 +40,8 @@ const sys_001: Patch = {
                         "maxLength": 500
                     }
                 },
-                "type": {
-                    "name": "type",
+                "~class": {
+                    "name": "~class",
                     "type": "string",
                     "config": {
                         "mandatory": true,
@@ -58,9 +58,9 @@ const sys_001: Patch = {
             "active": true,
             "name": "domain",
             "description": "A domain document representing a data model domain",
-            "type": "~self",
+            "~class": "~self",
             "schema": {
-                "type": { name: "type", type: "string", config: { defaultValue: "domain" } },
+                "~class": { name: "~class", type: "string", config: { defaultValue: "domain" } },
                 "relation": {
                     name: "relation", type: "enum", config: {
                         isArray: false, values: [
@@ -91,7 +91,7 @@ const sys_001: Patch = {
 
 const sys_002: Patch = {
     "_id": "~sys-0.0.2",
-    "type": "patch",
+    "~class": "patch",
     "version": "0.0.2",
     "target": "system",
     "changelog": "### Initial patch with system classes and domains",
@@ -101,7 +101,7 @@ const sys_002: Patch = {
             "active": true,
             "name": "log",
             "description": "Contains the system logs",
-            "type": "class",
+            "~class": "class",
             "schema": {
                 "log": {
                     "name": "log",
@@ -117,7 +117,7 @@ const sys_002: Patch = {
 
 const sys_003: Patch = {
     "_id": "~sys-0.0.3",
-    "type": "patch",
+    "~class": "patch",
     "version": "0.0.3",
     "target": "system",
     "changelog": "### Schema Patch: v0.0.3\\\n#### New Classes: ~User, ~UserSession",
@@ -127,7 +127,7 @@ const sys_003: Patch = {
             "active": true,
             "name": "User",
             "description": "A user class for secure login",
-            "type": "class",
+            "~class": "class",
             "schema": {
                 "username": {
                     "name": "username",
@@ -179,7 +179,7 @@ const sys_003: Patch = {
             "name": "UserSession",
             "active": true,
             "description": "Tracks user sessions",
-            "type": "class",
+            "~class": "class",
             "schema": {
                 "username": {
                     "name": "username",

@@ -28,12 +28,18 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 options = {}
             }
 
+            const skipPatchValidation = Boolean((options as any)?.isPatch);
+
             const originalFn = () => {
                 if (callback) {
                     return pouchBulkDocs.call(this, docs, options, callback);
                 } else {
                     return pouchBulkDocs.call(this, docs, options);
                 }
+            }
+
+            if (skipPatchValidation) {
+                return originalFn();
             }
 
             let documentsToProcess: typeof docs;
@@ -123,8 +129,8 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             for (const doc of documentsToProcess) {
                 if (isClassModel(doc)) {
                     // Validate against parent class
-                    if (doc.type !== "~self") {
-                        const parentClass = await stack.getClass(doc.type);
+                    if (doc["~class"] !== "~self") {
+                        const parentClass = await stack.getClass(doc["~class"]);
                         if (parentClass) {
                             fnLogger.info("Validating class model against parent class", {doc, parentClass: parentClass.name});
                             const validationResult = await parentClass.validate(doc);
@@ -134,7 +140,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             }
                         } else {
                             fnLogger.error("Parent class not found", {doc});
-                            throw new Error(`Parent class '${doc.type}' not found for class model '${doc._id}'`);
+                            throw new Error(`Parent class '${doc["~class"]}' not found for class model '${doc._id}'`);
                         }
                     } else {
                         // TODO: Consider validating against self after registering the class?
@@ -194,9 +200,9 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     const result = await stack.db.bulkDocs(updates);
                     fnLogger.info('Propagated updates');
                 } else if (isRelation(doc)) {
-                    const domain = await stack.getDomain(doc.type);
+                    const domain = await stack.getDomain(doc["~domain"]);
                     if (!domain) {
-                        throw new Error(`Domain not found: ${doc.type}`);
+                        throw new Error(`Domain not found: ${doc["~domain"]}`);
                     }
                     if (doc.sourceClass !== domain.sourceClass.id || doc.targetClass !== domain.targetClass.id) {
                         throw new Error(`Relation document classes do not match domain '${domain.name}'.`);
@@ -217,7 +223,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
 
                     continue;
                 } else if (isDocument(doc)) {
-                    const className = doc.type;
+                    const className = doc["~class"];
 
                     try {
                         const classObj = await stack.getClass(className, true);

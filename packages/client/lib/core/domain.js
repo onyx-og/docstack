@@ -23,6 +23,7 @@ class Domain extends Domain_ {
             this.name = model.name;
             this.description = model.description;
             this.relation = model.relation;
+            this.type = model["~class"];
             this.sourceClass = model.sourceClass;
             this.targetClass = model.targetClass;
             this.model = model;
@@ -58,7 +59,7 @@ class Domain extends Domain_ {
             this.sourceClass = sourceClass;
             this.targetClass = targetClass;
             this.setModel({
-                type, _id: name, active: true,
+                "~class": type, _id: name, active: true,
                 name, relation, sourceClass,
                 targetClass, description,
             });
@@ -71,14 +72,14 @@ class Domain extends Domain_ {
                 _id: this.id,
                 name: this.name,
                 description: this.description,
-                type: this.type,
+                "~class": this.type,
                 relation: this.relation,
                 sourceClass: this.sourceClass,
                 targetClass: this.targetClass,
                 // schema: this.buildSchema(),
                 active: true,
                 _rev: this.model ? this.model._rev : "", // [TODO] Error prone
-                createTimestamp: this.model ? this.model.createTimestamp : undefined,
+                "~createTimestamp": this.model ? this.model["~createTimestamp"] : undefined,
             };
             return model;
         };
@@ -161,11 +162,11 @@ Domain.buildFromModel = async (stack, domainModel) => {
     // let parentClass = (parentdomainModel ? await Class.buildFromModel(stack, parentdomainModel) : null);
     // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
     if (domainModel._rev) {
-        let classObj = _a.get(stack, domainModel.name, domainModel.type, domainModel.relation, domainModel.sourceClass, domainModel.targetClass, domainModel.description, domainModel.schema);
+        let classObj = _a.get(stack, domainModel.name, domainModel["~class"], domainModel.relation, domainModel.sourceClass, domainModel.targetClass, domainModel.description, domainModel.schema);
         return classObj;
     }
     else {
-        let classObj = await _a.create(stack, domainModel.name, domainModel.type, domainModel.relation, domainModel.sourceClass, domainModel.targetClass, domainModel.description, domainModel.schema);
+        let classObj = await _a.create(stack, domainModel.name, domainModel["~class"], domainModel.relation, domainModel.sourceClass, domainModel.targetClass, domainModel.description, domainModel.schema);
         return classObj;
     }
 };

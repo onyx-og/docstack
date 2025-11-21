@@ -153,7 +153,7 @@ const EmptySummaryPusher = (props: EmptySummaryPusherProps) => {
     const {classObj, updateSummary} = props;
     const stackName  = classObj.getStack()!.name;
 
-    const { loading, result, error } = useQuerySQL(stackName, `SELECT COUNT(*) as docCount, MAX(updateTimestamp) as lastUpdated FROM ${classObj.getName()}`);
+    const { loading, result, error } = useQuerySQL(stackName, `SELECT COUNT(*) as docCount, MAX(~updateTimestamp) as lastUpdated FROM ${classObj.getName()}`);
 
     useEffect(() => {
         if (result && result.rows.length > 0 && updateSummary) {

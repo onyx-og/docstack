@@ -91,7 +91,7 @@ export type AttributeModel = {
     type: AttributeType["type"];
 };
 export interface ClassModel extends Document {
-    type: "class" | "~self";
+    "~class": "class" | "~self";
     name: string;
     description?: string;
     parentClass?: string;
@@ -102,7 +102,7 @@ export interface ClassModel extends Document {
     triggers: TriggerModel[];
 }
 export interface DomainModel extends Document {
-    type: "domain";
+    "~class": "domain" | "~self";
     name: string;
     relation: "1:1" | "1:N" | "N:1" | "N:N";
     sourceClass: string;
@@ -112,9 +112,10 @@ export interface DomainModel extends Document {
     _rev?: PouchDB.Core.RevisionId | undefined;
 }
 export type Document = PouchDB.Core.Document<{
-    type: string;
-    createTimestamp?: number;
-    updateTimestamp?: number | null;
+    "~class"?: string;
+    "~domain"?: string;
+    "~createTimestamp"?: number;
+    "~updateTimestamp"?: number | null;
     active?: boolean;
     [key: string]: any;
 }>;
@@ -126,7 +127,7 @@ export interface SystemDoc {
     startupTime: number;
 }
 export interface Patch extends Document {
-    type: "patch";
+    "~class": "patch";
     target: string;
     version: string;
     changelog?: string;

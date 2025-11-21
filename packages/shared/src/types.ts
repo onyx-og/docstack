@@ -86,7 +86,7 @@ export type AttributeModel = {
 }
 
 export interface ClassModel extends Document {
-    type: "class" | "~self",
+    "~class": "class" | "~self",
     name: string,
     description?: string,
     parentClass?: string,
@@ -96,7 +96,7 @@ export interface ClassModel extends Document {
 }
 
 export interface DomainModel extends Document {
-    type: "domain" | "~self",
+    "~class": "domain" | "~self",
     name: string,
     relation: "1:1" | "1:N" | "N:1" | "N:N";
     sourceClass: string;
@@ -119,9 +119,10 @@ export interface DomainRelationValidation {
 }
 
 export type Document = PouchDB.Core.Document<{
-    type: string;
-    createTimestamp?: number; // [TODO] Error prone
-    updateTimestamp?: number | null;
+    "~class"?: string;
+    "~domain"?: string;
+    "~createTimestamp"?: number; // [TODO] Error prone
+    "~updateTimestamp"?: number | null;
     active?: boolean;
     [key: string]: any
 }>
@@ -137,7 +138,7 @@ export interface SystemDoc {
 // The idea is to make this patch object be processed
 // storing the version of the patch and the documents contained in it
 export interface Patch extends Document {
-    type: "patch";
+    "~class": "patch";
     target: string;
     version: string;
     changelog?: string;
@@ -202,24 +203,18 @@ export type DocstackReady = CustomEventInit<{
 }>
 
 export const isDocument = (object: object): object is Document => {
-    if (object.hasOwnProperty("type")) {
-        return true;
-    }
-    return false;
+    return object.hasOwnProperty("~class");
 }
 
 export const isRelation = (object: {[key: string]: any}): object is DomainModel => {
-    if (
-        object.hasOwnProperty("sourceClass") && object.hasOwnProperty("targetClass") 
-        && object.hasOwnProperty("sourceId") && object.hasOwnProperty("targetId"))
-    {
+    if (object.hasOwnProperty("~domain")) {
         return true;
     }
     return false;
 }
 
 export const isClassModel = (object: {[key: string]: any}): object is ClassModel => {
-    if (object.hasOwnProperty("type") && ["class","~self"].includes(object.type)) {
+    if (object.hasOwnProperty("~class") && ["class","~self"].includes(object["~class"])) {
         return true;
     }
     return false;

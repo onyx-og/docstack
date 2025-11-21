@@ -125,7 +125,7 @@ describe("@docstack/client integration", () => {
             await expect(classOrigin!.validate({
                 name: "Example",
                 description: "Sample class",
-                type: "class"
+                "~class": "class"
             })).resolves.toBe(true);
         } finally {
             await cleanup();
@@ -233,7 +233,7 @@ describe("@docstack/client integration", () => {
 
             const invalidClassesDoc = {
                 _id: `${domain.name}-bad-classes`,
-                type: domain.name,
+                "~domain": domain.name,
                 sourceClass: "wrong-class",
                 targetClass: domain.targetClass.id!,
                 sourceId: sourceDoc._id as string,
@@ -244,7 +244,7 @@ describe("@docstack/client integration", () => {
 
             const missingTargetDoc = {
                 _id: `${domain.name}-missing-target`,
-                type: domain.name,
+                "~domain": domain.name,
                 sourceClass: domain.sourceClass.id!,
                 targetClass: domain.targetClass.id!,
                 sourceId: sourceDoc._id as string,
@@ -255,7 +255,7 @@ describe("@docstack/client integration", () => {
 
             const validRelation = {
                 _id: `${domain.name}-valid`,
-                type: domain.name,
+                "~domain": domain.name,
                 sourceClass: domain.sourceClass.id!,
                 targetClass: domain.targetClass.id!,
                 sourceId: sourceDoc._id as string,
