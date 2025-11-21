@@ -67,7 +67,7 @@ class Class extends Class_ {
             //     this.schema = schema;
             // }
             this.setModel({
-                type, _id: name, active: true,
+                "~class": type, _id: name, active: true,
                 name, description,
                 schema, triggers: [],
             });
@@ -180,12 +180,12 @@ class Class extends Class_ {
                 _id: this.getName(),
                 name: this.getName(),
                 description: this.getDescription(),
-                type: this.getType(),
+                "~class": this.getType(),
                 schema: this.buildSchema(),
                 triggers: triggers,
                 active: true,
                 _rev: this.model ? this.model._rev : "", // [TODO] Error prone
-                createTimestamp: this.model ? this.model.createTimestamp : undefined,
+                "~createTimestamp": this.model ? this.model["~createTimestamp"] : undefined,
             };
             return model;
         };
@@ -220,6 +220,7 @@ class Class extends Class_ {
             }
             this.name = model.name;
             this.description = model.description;
+            this.type = model["~class"];
             this.model = model;
             this.logger.info("setModel - model after processing", { model: model });
         };
@@ -499,11 +500,11 @@ Class.buildFromModel = async (stack, classModel) => {
     // let parentClass = (parentClassModel ? await Class.buildFromModel(stack, parentClassModel) : null);
     // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
     if (classModel._rev) {
-        let classObj = _a.get(stack, classModel.name, classModel.type, classModel.description, classModel.schema);
+        let classObj = _a.get(stack, classModel.name, classModel["~class"], classModel.description, classModel.schema);
         return classObj;
     }
     else {
-        let classObj = await _a.create(stack, classModel.name, classModel.type, classModel.type, classModel.schema);
+        let classObj = await _a.create(stack, classModel.name, classModel["~class"], classModel["~class"], classModel.schema);
         return classObj;
     }
 };

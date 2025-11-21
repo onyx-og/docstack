@@ -5,7 +5,7 @@ import winston, { createLogger, Logger } from "winston";
 class Domain extends Domain_ {
     stack: Stack | undefined;
     name!: string;
-    type!: DomainModel["type"];
+    type!: DomainModel["~class"];
     description: string | undefined;
     id!: string;
     relation!: DomainModel["relation"];
@@ -44,6 +44,7 @@ class Domain extends Domain_ {
         this.name = model.name;
         this.description = model.description;
         this.relation = model.relation;
+        this.type = model["~class"];
         this.model = model;
         Domain.logger.info("setModel - model after processing",{ model: model})
     }
@@ -72,7 +73,7 @@ class Domain extends Domain_ {
         stack: Stack | null,
         id: string | null,
         name: string,
-        type: DomainModel["type"],
+        type: DomainModel["~class"],
         relation: typeof this.relation,
         sourceClass: Class,
         targetClass: Class,
@@ -92,7 +93,7 @@ class Domain extends Domain_ {
         this.sourceClass = sourceClass;
         this.targetClass = targetClass;
         this.setModel({
-            type, _id: id!, active: true,
+            "~class": type, _id: id!, active: true,
             name, relation, sourceClass: sourceClass.id!,
             targetClass: targetClass.id!, description,
         })
@@ -103,7 +104,7 @@ class Domain extends Domain_ {
         stack: Stack,
         id: string | null,
         name: string,
-        type: DomainModel["type"],
+        type: DomainModel["~class"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: Class,
         targetClass: Class,
@@ -129,7 +130,7 @@ class Domain extends Domain_ {
         stack: Stack,
         id: string | null,
         name: string,
-        type: DomainModel["type"],
+        type: DomainModel["~class"],
         relation: "1:1" | "1:N" | "N:1" | "N:N",
         sourceClass: Class,
         targetClass: Class,
@@ -158,15 +159,15 @@ class Domain extends Domain_ {
         // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
         if (domainModel._rev) {
             let classObj: Domain = Domain.get(
-                stack, domainModel._id, domainModel.name, 
-                domainModel.type, domainModel.relation,
+                stack, domainModel._id, domainModel.name,
+                domainModel["~class"], domainModel.relation,
                 sourceClass, targetClass,
                 domainModel.description, domainModel.schema
             )
             return classObj;
         } else {
             let classObj: Domain = await Domain.create(
-                stack, domainModel._id, domainModel.name, domainModel.type,
+                stack, domainModel._id, domainModel.name, domainModel["~class"],
                 domainModel.relation, sourceClass,
                 targetClass, domainModel.description,
                 domainModel.schema
@@ -190,14 +191,14 @@ class Domain extends Domain_ {
             _id:this.id,
             name: this.name,
             description: this.description,
-            type: this.type,
+            "~class": this.type,
             relation: this.relation,
             sourceClass: this.sourceClass.id!,
             targetClass: this.targetClass.id!,
             // schema: this.buildSchema(),
             active: true,
             _rev: this.model ? this.model._rev : "", // [TODO] Error prone
-            createTimestamp: this.model ? this.model.createTimestamp : undefined,
+            "~createTimestamp": this.model ? this.model["~createTimestamp"] : undefined,
         };
         return model;
     }
@@ -210,13 +211,13 @@ class Domain extends Domain_ {
     }
 
     getDocumentRole = (doc: Document): "source" | "target" => {
-        if (doc.type === this.sourceClass.getName()) {
+        if (doc["~class"] === this.sourceClass.getName()) {
             return "source";
         }
-        if (doc.type === this.targetClass.getName()) {
+        if (doc["~class"] === this.targetClass.getName()) {
             return "target";
         }
-        throw new Error(`Document of type '${doc.type}' is not part of domain '${this.name}'.`);
+        throw new Error(`Document of type '${doc["~class"]}' is not part of domain '${this.name}'.`);
     }
 
     assertReferenceAllowed = (role: "source" | "target") => {
