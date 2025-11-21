@@ -134,6 +134,7 @@ dist
 .pnp.*
 
 build/
+lib/
 .rollup.cache
 
 package-lock.json
