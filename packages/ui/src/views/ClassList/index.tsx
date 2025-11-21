@@ -11,7 +11,7 @@ const ClassList = () => {
 
     const stackName = useAppSelector(s => s.stack.name);
 
-    const { loading, error, classList } = useClassList({stack: stackName});
+    const { loading, error, classList } = useClassList(stackName, {});
 
     const { Modal: ClassCreationModal, open: openClassCreationModal, close: closeClassCreationModal } = useModal({areaId: "root"});
 
