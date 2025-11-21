@@ -267,7 +267,7 @@ class Domain extends Domain_ {
     fetchReferenceDocument = async (referenceId: string, expectedType: string) => {
         const stack = this.requireStack();
         const referenceDoc = await stack.db.get<Document>(referenceId).catch(() => null);
-        if (!referenceDoc || referenceDoc.type !== expectedType || referenceDoc.active === false) {
+        if (!referenceDoc || referenceDoc["~class"] !== expectedType || referenceDoc.active === false) {
             throw new Error(`Reference '${referenceId}' does not exist for class '${expectedType}'.`);
         }
         return referenceDoc as Document;
@@ -276,7 +276,7 @@ class Domain extends Domain_ {
     findRelationDoc = async (selector: {[key: string]: any}): Promise<Document | null> => {
         const stack = this.requireStack();
         const searchSelector = {
-            type: { $eq: this.name },
+            "~domain": { $eq: this.name },
             ...selector,
         };
         const { docs } = await stack.findDocuments(searchSelector, undefined, 0, 1);
@@ -330,8 +330,7 @@ class Domain extends Domain_ {
 
     getRelations = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
         const stack = this.requireStack();
-        const _selector = { ...(selector || {}), type: { $eq: this.name } };
-        console.log("built selector", {_selector})
+        const _selector = { ...(selector || {}), "~domain": { $eq: this.name } };
         Domain.logger.info("getRelations - selector", {selector: _selector, fields, skip, limit})
         const docs = (await stack.findDocuments(_selector, fields, skip, limit)).docs
         return docs;

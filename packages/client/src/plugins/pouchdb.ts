@@ -28,12 +28,18 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 options = {}
             }
 
+            const skipPatchValidation = Boolean((options as any)?.isPatch);
+
             const originalFn = () => {
                 if (callback) {
                     return pouchBulkDocs.call(this, docs, options, callback);
                 } else {
                     return pouchBulkDocs.call(this, docs, options);
                 }
+            }
+
+            if (skipPatchValidation) {
+                return originalFn();
             }
 
             let documentsToProcess: typeof docs;

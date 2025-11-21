@@ -214,7 +214,7 @@ class ClientStack extends Stack {
                 }
                 return doc;
             }));
-            await this.db.bulkDocs(hydratedDocs);
+            await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions);
             fnLogger.info("Successfully applied patch", {version: patch.version});
             return patch.version;
         } catch (e: any) {
@@ -564,7 +564,7 @@ class ClientStack extends Stack {
         return _rev;
     }
 
-    // Expects a selector like { type: { $eq: "class" } }
+    // Expects a selector like { "~class": { $eq: "class" } }
     findDocuments = async ( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
         const fnLogger = logger.child({method: "findDocuments", args: {selector, fields, skip, limit}});
 
@@ -621,7 +621,7 @@ class ClientStack extends Stack {
                 { name: { $eq: className } },
                 { _id: { $eq: className } }
             ],
-            type: { $in: ["class", "~self"] }
+            "~class": { $in: ["class", "~self"] }
         };
 
         try {
@@ -638,7 +638,7 @@ class ClientStack extends Stack {
 
     getDomainModel = async ( domainName: string ) => {
         let selector = {
-            type: { $eq: "domain" },
+            "~class": { $eq: "domain" },
             name: { $eq: domainName }
         };
 
@@ -658,7 +658,7 @@ class ClientStack extends Stack {
     // TODO: Change into getClass("Class").getCards()
     getClassModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
         const {listen, filter, search} = conf;
-        const selector: {[field: string]: object} = { type: { $eq: "class" } };
+        const selector: {[field: string]: object} = { "~class": { $eq: "class" } };
         if (Array.isArray(filter) && filter.length > 0) {
             // TODO: Consider checking against name field instead of _id
             selector._id = { $in: filter };
@@ -673,7 +673,7 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev'];
 
         const response = await this.findDocuments(selector, fields);
         const result: ClassModel[] = response.docs as ClassModel[];
@@ -752,7 +752,7 @@ class ClientStack extends Stack {
 
     getDomainModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
         const {listen, filter, search} = conf;
-        const selector: {[field: string]: object} = { type: { $eq: "domain" } };
+        const selector: {[field: string]: object} = { "~class": { $eq: "domain" } };
         if (Array.isArray(filter) && filter.length > 0) {
             // TODO: Consider checking against name field instead of _id
             selector._id = { $in: filter };
@@ -767,7 +767,7 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        const fields = ['_id', 'name', 'description', 'schema', 'type', '_rev'];
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev'];
 
         const response = await this.findDocuments(selector, fields);
         const result: DomainModel[] = response.docs as DomainModel[];
