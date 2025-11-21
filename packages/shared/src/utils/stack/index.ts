@@ -8,6 +8,7 @@ import {
     DomainModel,
     SelectAST,
     UnionAST,
+    RelationDocument,
 } from "../../types";
 
 import Class from "./class";
@@ -72,18 +73,18 @@ abstract class Stack extends EventTarget {
         targetClass: string,
         sourceId: string,
         targetId: string
-    }) => Promise<Document | null>;
+    }) => Promise<RelationDocument | null>;
 
     abstract createRelationDocs: ( docs: {docId: string | null, params: {
         sourceClass: string,
         targetClass: string,
         sourceId: string,
         targetId: string
-    }}[], relationName: string, domainObj: Domain ) => Promise<Document[]>;
+    }}[], relationName: string, domainObj: Domain ) => Promise<RelationDocument[]>;
 
-    abstract findDocuments: (selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => Promise<{
+    abstract findDocuments: <T extends Document | RelationDocument>(selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => Promise<{
         [key: string]: any;
-        docs: Document[];
+        docs: T[];
     }>;
 
 

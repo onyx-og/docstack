@@ -1057,12 +1057,12 @@ class ClientStack extends Stack {
                 } else {
                     isNewDoc = true;
                     newDocId = `${type}-${(this.lastDocId+1)}`;
-                    doc = this.prepareDoc(newDocId, type, params) as Document;
+                    doc = this.prepareDoc(newDocId, type, params, "~class") as Document;
                 }
             } else {
                 isNewDoc = true;
                 newDocId = `${type}-${(this.lastDocId+1)}`;
-                doc = this.prepareDoc(newDocId, type, params) as Document;
+                doc = this.prepareDoc(newDocId, type, params, "~class") as Document;
                 fnLogger.info("Generated docId", {newDocId});
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
@@ -1112,7 +1112,7 @@ class ClientStack extends Stack {
         fnLogger.info("Determined schema", {schema});
 
         let db = this.db;
-        const documents: RelationDocument[] = [];
+        const documents: Document[] = [];
         let newDocsIds: string[] = [];
 
         for (const draft of docs) {
@@ -1130,11 +1130,11 @@ class ClientStack extends Stack {
                         throw new Error("createDocs - Existing document type differs");
                     } else {
                         isNewDoc = true;
-                        doc = this.prepareDoc(docId, type, params) as Document;
+                        doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     }
                 } else {
                     docId = `${type}-${(this.lastDocId+1)}`;
-                    doc = this.prepareDoc(docId, type, params) as Document;
+                    doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
                 }

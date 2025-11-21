@@ -67,17 +67,10 @@ export type AttributeTypeReference = {
         domain: string,
     } & AttributeTypeConfig
 }
-export type AttributeTypeRelation = {
-    type: "relation",
-    name: string,
-    config: {
-        domain: string
-    } & AttributeTypeConfig
-}
 export type AttributeType =
     AttributeTypeString | AttributeTypeInteger | AttribruteTypeDate |
     AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey |
-    AttributeTypeObject | AttributeTypeEnum | AttributeTypeRelation | AttributeTypeReference;
+    AttributeTypeObject | AttributeTypeEnum | AttributeTypeReference;
 export type AttributeModel = {
     name: string,
     description?: string,
