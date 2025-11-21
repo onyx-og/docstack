@@ -5,7 +5,9 @@ describe("ClientStack.query execution", () => {
     const dbName = `query-execution-${Date.now()}`;
     let stack: ClientStack;
     let movieClass: Class;
+    let actorClass: Class;
     let createdMovies: unknown[] = [];
+    let actorIdsByName: Record<string, string> = {};
 
     const movieSchema: ClassModel["schema"] = {
         title: {
@@ -22,20 +24,61 @@ describe("ClientStack.query execution", () => {
             name: "rating",
             type: "decimal",
             config: { min: 0, max: 10 }
+        },
+        actors: {
+            name: "actors",
+            type: "string",
+            config: { isArray: true }
         }
     };
 
     beforeAll(async () => {
         stack = await ClientStack.create(dbName);
+        actorClass = await Class.create(stack, "Actor", "class", "Actors for query execution", {
+            name: {
+                name: "name",
+                type: "string",
+                config: { maxLength: 200, mandatory: true, primaryKey: true }
+            },
+            born: {
+                name: "born",
+                type: "integer",
+                config: { min: 1900 }
+            }
+        });
         movieClass = await Class.create(stack, "Movie", "class", "Movies for query execution", movieSchema);
-        const movies = [
-            { title: "The Matrix", year: 1999, rating: 8.7 },
-            { title: "Inception", year: 2010, rating: 8.8 },
-            { title: "Interstellar", year: 2014, rating: 8.6 },
-            { title: "Memento", year: 2000, rating: 8.4 }
+        const actors = [
+            { name: "Keanu Reeves", born: 1964 },
+            { name: "Carrie-Anne Moss", born: 1967 },
+            { name: "Laurence Fishburne", born: 1961 },
+            { name: "Leonardo DiCaprio", born: 1974 },
+            { name: "Ken Watanabe", born: 1959 },
+            { name: "Matthew McConaughey", born: 1969 },
+            { name: "Anne Hathaway", born: 1982 },
+            { name: "Guy Pearce", born: 1967 }
         ];
+
+        for (const actor of actors) {
+            await actorClass.addCard(actor);
+        }
+
+        const createdActors = await actorClass.getCards();
+        actorIdsByName = Object.fromEntries(
+            createdActors.map((actor) => [actor.name, actor._id!])
+        );
+
+        const movies = [
+            { title: "The Matrix", year: 1999, rating: 8.7, actors: ["Keanu Reeves", "Carrie-Anne Moss", "Laurence Fishburne"] },
+            { title: "Inception", year: 2010, rating: 8.8, actors: ["Leonardo DiCaprio", "Ken Watanabe"] },
+            { title: "Interstellar", year: 2014, rating: 8.6, actors: ["Matthew McConaughey", "Anne Hathaway"] },
+            { title: "Memento", year: 2000, rating: 8.4, actors: ["Guy Pearce"] }
+        ];
+
         for (const movie of movies) {
-            await movieClass.addCard(movie);
+            await movieClass.addCard({
+                ...movie,
+                actors: movie.actors.map((actorName) => actorIdsByName[actorName])
+            });
         }
         createdMovies = await movieClass.getCards();
     });
@@ -72,5 +115,56 @@ describe("ClientStack.query execution", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ total_movies: 4 });
         expect(rows[0].avg_rating).toBeCloseTo((8.7 + 8.8 + 8.6 + 8.4) / 4, 5);
+    });
+
+    it("supports joining array references to related actor documents", async () => {
+        const { rows } = await stack.query(`
+            SELECT m.title, a.name AS actor_name
+            FROM Movie AS m
+            JOIN Actor AS a ON a._id IN m.actors
+            WHERE m.year >= 2000
+            ORDER BY m.title ASC, actor_name ASC;
+        `);
+
+        expect(rows).toEqual([
+            { title: "Inception", actor_name: "Ken Watanabe" },
+            { title: "Inception", actor_name: "Leonardo DiCaprio" },
+            { title: "Interstellar", actor_name: "Anne Hathaway" },
+            { title: "Interstellar", actor_name: "Matthew McConaughey" },
+            { title: "Memento", actor_name: "Guy Pearce" }
+        ]);
+    });
+
+    it("filters using scalar subqueries", async () => {
+        const { rows } = await stack.query(`
+            SELECT m.title
+            FROM Movie AS m
+            WHERE m.rating > (SELECT AVG(m2.rating) FROM Movie AS m2)
+            ORDER BY m.title ASC;
+        `);
+
+        expect(rows).toEqual([
+            { title: "Inception" },
+            { title: "The Matrix" }
+        ]);
+    });
+
+    it("combines joins with subquery filters", async () => {
+        const { rows } = await stack.query(`
+            SELECT a.name AS actor_name, m.title
+            FROM Movie AS m
+            JOIN Actor AS a ON a._id IN m.actors
+            WHERE m.rating >= (
+                SELECT MAX(m2.rating)
+                FROM Movie AS m2
+                WHERE m2.year >= 2000
+            )
+            ORDER BY actor_name ASC;
+        `);
+
+        expect(rows).toEqual([
+            { actor_name: "Ken Watanabe", title: "Inception" },
+            { actor_name: "Leonardo DiCaprio", title: "Inception" }
+        ]);
     });
 });
