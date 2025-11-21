@@ -1,66 +1,108 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
-import {Document,  Domain,  SelectAST, UnionAST} from "@docstack/shared";
+import {Document,  Domain,  RelationDocument,  SelectAST, UnionAST} from "@docstack/shared";
 
-export const useDomainList = (conf: {stack: string, filter?: string[], search?: string}) => {
-    const {stack, filter, search} = conf;
+export const useDomainList = (stack: string, selector: {[key: string]: any}) => {
     const docStack = useContext(DocStackContext);
-    const [loading, setLoading] = useState<boolean>(false);
-    const [error, setError] = useState();
-    const [classList, setDomainList] = useState<Domain[]>([]);
-    // [TODO] Solve bounce of component because of StrictMode or other reasons
-    const queryRef = useRef(false);
 
-    useEffect( () => {
+    const [originClass, setOriginClass] = useState<Class>();
+    const [domainList, setDomainList] = useState<Document[]>([]);
+    const domainListRef = useRef<Document[]>([]);
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+
+    useEffect(() => {
+        // Only run if the docStack is available and a className is provided
         if (!docStack) {
-            // Handle the case where the provider is not yet initialized or missing
-            // You could throw an error or return an empty state.
-            console.error('useDomainList must be used within a DocStackProvider.');
             setLoading(false);
             return;
         }
 
-        const changeListener = (change: CustomEvent) => {
-            setDomainList([...change.detail])
-        }
-
-        const fetchDomains = async () => {
+        const fetchClass = async () => {
+            setLoading(true);
+            setError(null);
             try {
-                // Run the initial query
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
-                    const domainList = await stackInstance.getDomains({filter, search});
-                    setDomainList(domainList);
-                    stackInstance.addEventListener("domainListChange", changeListener as EventListener)
+                    const retrievedClass = await stackInstance.getClass('domain');
+                    if (retrievedClass) {
+                        setOriginClass(retrievedClass);
+                    }
                 }
                 
+            } catch (err: any) {
+                setError(err);
+                setLoading(false);
+            }
+        };
+
+        fetchClass();
+
+        return () => {
+            // clean what?
+        };
+    }, [docStack, stack]); // Dependency on docStack and stack
+
+    useEffect(() => {
+        if (!originClass) {
+            return;
+        }
+
+        const runQueryAndListen = async () => {
+            setLoading(true);
+            try {
+                const initialDomainList = await originClass.getCards(selector) as Document[];
+                domainListRef.current = initialDomainList;
+                setDomainList(domainListRef.current);
             } catch (err: any) {
                 setError(err);
             } finally {
                 setLoading(false);
             }
-        }
-        if (!queryRef.current) {
-            queryRef.current = true;
-            setLoading(true);
-            fetchDomains();
-        } else {
-            console.log("Already performing query");
-        }
-        
 
-        return () => {
-            setDomainList([]);
-            const stackInstance = docStack.getStack(stack);
-            if (stackInstance) 
-                stackInstance.removeEventListener("domainListChange", changeListener as EventListener)
-            // queryRef.current = false;
-        }
+            const changeListener = (change: CustomEvent) => {
+                const doc = change.detail.doc;
+                if (!doc.active) {
+                    // A doc was deleted
+                    const docIndex = domainListRef.current.findIndex((d) => d._id == doc._id)
+                    if (docIndex != -1) {
+                        domainListRef.current = [
+                            ...domainListRef.current.slice(0, docIndex),
+                            ...domainListRef.current.slice(docIndex+1, domainListRef.current.length)
+                        ];
+                    }
+                } else {
+                    // A doc was changed or added
+                    const docIndex = domainListRef.current.findIndex((d) => d._id == doc._id)
+                    if (docIndex != -1) {
+                        // A doc was changed
+                        domainListRef.current = [
+                            ...domainListRef.current.slice(0, docIndex),
+                            doc,
+                            ...domainListRef.current.slice(docIndex+1, domainListRef.current.length)
+                        ];
+                    } else {
+                        // A doc was added
+                        domainListRef.current.push(doc);
+                    }
+                }
+                setDomainList([...domainListRef.current])
+            };
 
-    }, [docStack, stack, filter, search]);
+            originClass.addEventListener('doc', changeListener as EventListener);
 
-    return { loading, classList, error };
+            return () => {
+                originClass.removeEventListener('doc', changeListener as EventListener);
+            };
+        };
+
+        runQueryAndListen();
+    }, [originClass, JSON.stringify(selector)]); // Dependency on classObj and query
+
+    return { domainList, loading, error };
 }
 
 export const useDomain = (stack: string, domainName: string) => {
@@ -117,8 +159,8 @@ export const useDomainRelations = (stack: string, domainName: string, query = {}
     const docStack = useContext(DocStackContext);
 
     const [domain, setDomain] = useState<Domain>();
-    const [docs, setDocs] = useState<Document[]>([]);
-    const docsRef = useRef<Document[]>([]);
+    const [docs, setDocs] = useState<RelationDocument[]>([]);
+    const docsRef = useRef<RelationDocument[]>([]);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -164,7 +206,7 @@ export const useDomainRelations = (stack: string, domainName: string, query = {}
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
-                const initialDocs = await domain.getRelations(query) as Document[];
+                const initialDocs = await domain.getRelations(query);
                 docsRef.current = initialDocs;
                 setDocs(docsRef.current);
             } catch (err: any) {
@@ -175,10 +217,8 @@ export const useDomainRelations = (stack: string, domainName: string, query = {}
 
             const changeListener = (change: CustomEvent) => {
                 const doc = change.detail.doc;
-                console.log("useDomainRelations - detail", {detail: change.detail});
                 if (!doc.active) {
                     // A doc was deleted
-                    console.log("useDomainRelations - a doc was deleted", {doc});
                     const docIndex = docsRef.current.findIndex((d) => d._id == doc._id)
                     if (docIndex != -1) {
                         docsRef.current = [

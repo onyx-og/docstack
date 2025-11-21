@@ -34,77 +34,109 @@ export const useClassCreate = (stack: string) => {
     );
 }
 
-export const useClassList = (conf: {stack: string, filter?: string[], search?: string}) => {
-    const {stack, filter, search} = conf;
+export const useClassList = (stack: string, selector: {[key: string]: any}) => {
     const docStack = useContext(DocStackContext);
-    const [loading, setLoading] = useState<boolean>(false);
-    const [error, setError] = useState();
-    const [classList, setClassList] = useState<Class[]>([]);
-    // [TODO] Solve bounce of component because of StrictMode or other reasons
-    const queryRef = useRef(false);
 
-    useEffect( () => {
+    const [originClass, setOriginClass] = useState<Class>();
+    const [classList, setClassList] = useState<Document[]>([]);
+    const classListRef = useRef<Document[]>([]);
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+
+    useEffect(() => {
+        // Only run if the docStack is available and a className is provided
         if (!docStack) {
-            // Handle the case where the provider is not yet initialized or missing
-            // You could throw an error or return an empty state.
-            console.error('useClassList must be used within a DocStackProvider.');
             setLoading(false);
             return;
         }
 
-        const changeListener = (change: CustomEvent) => {
-            const currentClass = classList.find(c => c.name === change.detail.name);
-            let updatedClassList;
-            if (currentClass && change.detail.active === false) {
-                // Class was deleted
-                updatedClassList = classList.filter(c => c.name !== change.detail.name);
-            } else if (currentClass) {
-                // Class was updated
-                updatedClassList = classList.map(c => c.name === change.detail.name ? change.detail : c);
-            } else {
-                // Class was added
-                updatedClassList = [...classList, change.detail];
-            }
-            setClassList(updatedClassList)
-        }
-
-        const fetchClasses = async () => {
+        const fetchClass = async () => {
+            setLoading(true);
+            setError(null);
             try {
-                // Run the initial query
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
-                    const classList = await stackInstance.getClasses({filter, search});
-                    setClassList(classList);
-                    stackInstance.addEventListener("classListChange", changeListener as EventListener)
+                    const retrievedClass = await stackInstance.getClass('class');
+                    if (retrievedClass) {
+                        setOriginClass(retrievedClass);
+                    }
                 }
                 
+            } catch (err: any) {
+                setError(err);
+                setLoading(false);
+            }
+        };
+
+        fetchClass();
+
+        return () => {
+            // clean what?
+        };
+    }, [docStack, stack]); // Dependency on docStack and stack
+
+    useEffect(() => {
+        if (!originClass) {
+            return;
+        }
+
+        const runQueryAndListen = async () => {
+            setLoading(true);
+            try {
+                const initialClassList = await originClass.getCards(selector) as Document[];
+                classListRef.current = initialClassList;
+                setClassList(classListRef.current);
             } catch (err: any) {
                 setError(err);
             } finally {
                 setLoading(false);
             }
-        }
-        if (!queryRef.current) {
-            queryRef.current = true;
-            setLoading(true);
-            fetchClasses();
-        } else {
-            console.log("Already performing query");
-        }
-        
 
-        return () => {
-            setClassList([]);
-            const stackInstance = docStack.getStack(stack);
-            if (stackInstance) 
-                stackInstance.removeEventListener("classListChange", changeListener as EventListener)
-            // queryRef.current = false;
-        }
+            const changeListener = (change: CustomEvent) => {
+                const doc = change.detail.doc;
+                console.log("useClassDocs - detail", {detail: change.detail});
+                if (!doc.active) {
+                    // A doc was deleted
+                    console.log("useClassDocs - a doc was deleted", {doc});
+                    const docIndex = classListRef.current.findIndex((d) => d._id == doc._id)
+                    if (docIndex != -1) {
+                        classListRef.current = [
+                            ...classListRef.current.slice(0, docIndex),
+                            ...classListRef.current.slice(docIndex+1, classListRef.current.length)
+                        ];
+                    }
+                } else {
+                    // A doc was changed or added
+                    const docIndex = classListRef.current.findIndex((d) => d._id == doc._id)
+                    if (docIndex != -1) {
+                        // A doc was changed
+                        classListRef.current = [
+                            ...classListRef.current.slice(0, docIndex),
+                            doc,
+                            ...classListRef.current.slice(docIndex+1, classListRef.current.length)
+                        ];
+                    } else {
+                        // A doc was added
+                        classListRef.current.push(doc);
+                    }
+                }
+                setClassList([...classListRef.current])
+            };
 
-    }, [docStack, stack, filter, search]);
+            originClass.addEventListener('doc', changeListener as EventListener);
 
-    return { loading, classList, error };
-}
+            return () => {
+                originClass.removeEventListener('doc', changeListener as EventListener);
+            };
+        };
+
+        runQueryAndListen();
+    }, [originClass, JSON.stringify(selector)]); // Dependency on classObj and query
+
+    return { classList, loading, error };
+};
 
 export const useClass = (stack: string, className: string) => {
     const docStack = useContext(DocStackContext);
