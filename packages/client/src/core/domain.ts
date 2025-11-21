@@ -1,4 +1,4 @@
-import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams, Class } from "@docstack/shared";
+import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "@docstack/shared";
 import clientLogger from "../utils/logger";
 import winston, { createLogger, Logger } from "winston";
 
@@ -273,13 +273,13 @@ class Domain extends Domain_ {
         return referenceDoc as Document;
     }
 
-    findRelationDoc = async (selector: {[key: string]: any}): Promise<Document | null> => {
+    findRelationDoc = async (selector: {[key: string]: any}): Promise<RelationDocument | null> => {
         const stack = this.requireStack();
         const searchSelector = {
             "~domain": { $eq: this.name },
             ...selector,
         };
-        const { docs } = await stack.findDocuments(searchSelector, undefined, 0, 1);
+        const { docs } = await stack.findDocuments<RelationDocument>(searchSelector, undefined, 0, 1);
         return docs[0] || null;
     }
 
@@ -332,7 +332,7 @@ class Domain extends Domain_ {
         const stack = this.requireStack();
         const _selector = { ...(selector || {}), "~domain": { $eq: this.name } };
         Domain.logger.info("getRelations - selector", {selector: _selector, fields, skip, limit})
-        const docs = (await stack.findDocuments(_selector, fields, skip, limit)).docs
+        const docs = (await stack.findDocuments<RelationDocument>(_selector, fields, skip, limit)).docs
         return docs;
     }
 
