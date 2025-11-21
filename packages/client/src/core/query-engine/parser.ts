@@ -70,7 +70,32 @@ class Scanner {
 
 // ---------- Helper parsers ----------
 
-function parseSimpleIdentifier(scan: Scanner): string {
+function parseIdentifier(scan: Scanner): string {
+    scan.skipWSAndComments();
+
+    if (scan.peekChar() === '"') {
+        scan.pos++;
+        let value = '';
+        while (!scan.eof()) {
+            const char = scan.peekChar();
+            scan.pos++;
+
+            if (char === '"') {
+                // Support escaped double quotes by doubling them: "".
+                if (scan.peekChar() === '"') {
+                    value += '"';
+                    scan.pos++;
+                    continue;
+                }
+                return value;
+            }
+
+            value += char;
+        }
+
+        throw new Error('Unterminated quoted identifier');
+    }
+
     const match = scan.consumeRe(/^[a-zA-Z_][a-zA-Z0-9_]*/, 'Expected identifier');
     return match[0];
 }
@@ -87,11 +112,11 @@ function parseColumnExpr(scan: Scanner) {
         return { type: 'literal', value: 1 };
     }
 
-    const part1 = parseSimpleIdentifier(scan);
+    const part1 = parseIdentifier(scan);
     scan.skipWSAndComments();
     if (scan.peekChar() === '.') {
         scan.pos++;
-        const part2 = parseSimpleIdentifier(scan);
+        const part2 = parseIdentifier(scan);
         return { type: 'column_ref', table: part1, column: part2 };
     }
     return { type: 'column_ref', table: null, column: part1 };
@@ -208,18 +233,20 @@ function parseSelectItem(scan: Scanner) {
     const expr = parseExpression(scan);
     let alias = null;
     if (scan.tryKW('AS')) {
-        alias = parseSimpleIdentifier(scan);
+        alias = parseIdentifier(scan);
     }
     return { expr, as: alias };
 }
 
 function parseSingleFrom(scan: Scanner) {
-    const table = parseSimpleIdentifier(scan);
+    const table = parseIdentifier(scan);
     scan.skipWSAndComments();
     let alias = null;
 
     if (scan.tryKW('AS')) {
-        alias = parseSimpleIdentifier(scan);
+        alias = parseIdentifier(scan);
+    } else if (scan.peekChar() === '"') {
+        alias = parseIdentifier(scan);
     } else {
         const aliasMatch = scan.matchRe(/^[a-zA-Z_][a-zA-Z0-9_]*/);
         if (aliasMatch) {
