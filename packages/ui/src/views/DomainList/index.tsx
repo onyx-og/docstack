@@ -11,7 +11,7 @@ const DomainList = () => {
 
     const stackName = useAppSelector(s => s.stack.name);
 
-    const { loading, error, domainList } = useDomainList({stack: stackName});
+    const { loading, error, domainList } = useDomainList(stackName, {});
 
     const { Modal: DomainCreationModal, open: openDomainCreationModal, close: closeDomainCreationModal } = useModal({areaId: "root"});
 
@@ -28,10 +28,13 @@ const DomainList = () => {
             >
                 {
                     domainList.map((domain) => {
-                        return <ClassCard
-                            key={domain.name}
-                            name={domain.name} description={domain.description}
-                            attributes={Object.values(domain.getAttributes())}
+                        return <DomainCard
+                            key={domain.name as string}
+                            name={domain.name as string}
+                            description={domain.description as string}
+                            cardinality={domain.cardinality as string}
+                            sourceClass={domain.sourceClass as string}
+                            targetClass={domain.targetClass as string}
                         />
                     })
                 }

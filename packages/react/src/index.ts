@@ -7,4 +7,4 @@ export { StackProvider, DocStackContext };
 export { useFind, useQuerySQL };
 
 export { useClassList, useClass, useClassDocs, useClassCreate };
-export { useDomainList }
+export { useDomainList, useDomain, useDomainRelations, useDomainCreate };

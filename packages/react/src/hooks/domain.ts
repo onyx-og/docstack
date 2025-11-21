@@ -3,6 +3,36 @@ import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
 import {Document,  Domain,  RelationDocument,  SelectAST, UnionAST} from "@docstack/shared";
 
+export const useDomainCreate = (stack: string) => {
+    const docStack = useContext(DocStackContext);
+
+    return useCallback(
+        async (domainName: string, cardinality: "1:1" | "1:N" | "N:1" | "N:N", sourceClass: Class, targetClass: Class, domainDesc?: string) => {
+            try {
+                if (!docStack) {
+                    // Handle the case where the provider is not yet initialized or missing
+                    // You could throw an error or return an empty state.
+                    console.error('useDomainCreate must be used within a DocStackProvider.');
+                    // setLoading(false);
+                    return Promise.resolve(null);
+                }
+                // Run the initial query
+                const stackInstance = docStack.getStack(stack);
+                if (stackInstance) {
+                    const domain = await Domain.create(stackInstance, null, domainName, "domain", cardinality, sourceClass, targetClass, domainDesc);
+                    return domain;
+                }
+                return null;
+                
+            } catch (err: any) {
+                // setError(err);
+                console.error(err);
+                return null;
+            }
+        }, [docStack, stack]
+    );
+}
+
 export const useDomainList = (stack: string, selector: {[key: string]: any}) => {
     const docStack = useContext(DocStackContext);
 

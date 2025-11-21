@@ -1,0 +1,22 @@
+.domain-card {
+    margin-bottom: 1rem;
+}
+
+.dashboard-domain-header {
+    width: 100%;
+}
+
+.domain-relationship {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+.domain-relationship span {
+    font-size: 0.9rem;
+}
+
+.domain-relationship strong {
+    margin-right: 0.5rem;
+}
