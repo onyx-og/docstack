@@ -1,5 +1,5 @@
 import { Logger } from "winston";
-import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class } from "../../types";
+import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "../../types";
 import Stack from "./"
 
 abstract class Domain extends EventTarget {
@@ -84,15 +84,15 @@ abstract class Domain extends EventTarget {
 
     abstract validateRelation: (doc: Document, targetId: string) => Promise<DomainRelationValidation>;
 
-    abstract findRelationDoc: (selector: {[key: string]: any}) => Promise<Document | null>;
+    abstract findRelationDoc: (selector: {[key: string]: any}) => Promise<RelationDocument | null>;
 
-    abstract throwIfRelationExists: (filter: {[key: string]: any}, params: DomainRelationParams) => Promise<Document | null>;
+    abstract throwIfRelationExists: (filter: {[key: string]: any}, params: DomainRelationParams) => Promise<RelationDocument | null>;
 
     abstract ensureCardinalityConstraints: (params: DomainRelationParams) => Promise<void>;
 
-    abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<Document | null>;
+    abstract addRelation: (sourceDoc: Document, targetId: string) => Promise<RelationDocument | null>;
 
-    abstract getRelations: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
+    abstract getRelations: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<RelationDocument[]>;
 
     abstract deleteRelation: (sourceId: string, targetId: string) => Promise<boolean>;
 

@@ -115,17 +115,25 @@ export type DomainRelationParams = {
 export interface DomainRelationValidation {
     params: DomainRelationParams;
     exists: boolean;
-    relation?: Document | null;
+    relation?: RelationDocument | null;
 }
 
-export type Document = PouchDB.Core.Document<{
-    "~class"?: string;
-    "~domain"?: string;
+type BaseDocumentFields = {
     "~createTimestamp"?: number; // [TODO] Error prone
     "~updateTimestamp"?: number | null;
     active?: boolean;
     [key: string]: any
-}>
+}
+
+export type Document = PouchDB.Core.Document<{
+    "~class": string;
+    "~domain"?: never;
+} & BaseDocumentFields>
+
+export type RelationDocument = PouchDB.Core.Document<{
+    "~domain": string;
+    "~class"?: never;
+} & BaseDocumentFields>
 
 export interface SystemDoc {
     _id: string;
@@ -206,8 +214,8 @@ export const isDocument = (object: object): object is Document => {
     return object.hasOwnProperty("~class");
 }
 
-export const isRelation = (object: {[key: string]: any}): object is DomainModel => {
-    if (object.hasOwnProperty("~domain")) {
+export const isRelation = (object: {[key: string]: any}): object is RelationDocument => {
+    if (object.hasOwnProperty("~domain") && !object.hasOwnProperty("~class")) {
         return true;
     }
     return false;

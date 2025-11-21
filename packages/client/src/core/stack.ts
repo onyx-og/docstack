@@ -15,7 +15,7 @@ import {
     DomainModel,
 } from "@docstack/shared";
 
-import { SystemDoc, Patch, ClassModel, Document } from "@docstack/shared";
+import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
 import { StackPlugin } from "../plugins/pouchdb";
 
 import { parse, createPlan, executePlan } from "./query-engine";
@@ -565,7 +565,7 @@ class ClientStack extends Stack {
     }
 
     // Expects a selector like { "~class": { $eq: "class" } }
-    findDocuments = async ( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
+    findDocuments = async <T extends Document | RelationDocument = Document>( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
         const fnLogger = logger.child({method: "findDocuments", args: {selector, fields, skip, limit}});
 
         // By default request for only active documents
@@ -577,7 +577,7 @@ class ClientStack extends Stack {
         fnLogger.info("Produced index fields from selector", {indexFields});
 
         let result: {
-            docs: Document[],
+            docs: T[],
             [key: string]: any
         } = {
             docs: []
@@ -601,7 +601,7 @@ class ClientStack extends Stack {
                 result: foundResult,
                 selector: selector,
             });
-            result = { docs: foundResult.docs as unknown as Document[], selector, skip, limit };
+            result = { docs: foundResult.docs as unknown as T[], selector, skip, limit };
             return result;
         } catch (e: any) {
             fnLogger.error("findDocument - error",e);
@@ -609,8 +609,8 @@ class ClientStack extends Stack {
         }
     }
 
-    async findDocument( selector: any, fields = undefined, skip = undefined, limit = undefined ) {
-        let result = await this.findDocuments(selector, fields, skip, limit);
+    async findDocument<T extends Document | RelationDocument = Document>( selector: any, fields = undefined, skip = undefined, limit = undefined ) {
+        let result = await this.findDocuments<T>(selector, fields, skip, limit);
         return result.docs.length > 0 ? result.docs[0] : null;
     }
 
@@ -1007,15 +1007,27 @@ class ClientStack extends Stack {
         _id: string,
         type: string,
         params: {[key: string] : string | number | boolean},
+        metaKey: "~class"
+    ): Document;
+    prepareDoc (
+        _id: string,
+        type: string,
+        params: {[key: string] : string | number | boolean},
+        metaKey: "~domain"
+    ): RelationDocument;
+    prepareDoc (
+        _id: string,
+        type: string,
+        params: {[key: string] : string | number | boolean},
         metaKey: "~class" | "~domain" = "~class"
-    ) {
+    ): Document | RelationDocument {
         logger.info("prepareDoc - given args", {_id: _id, type: type, params: params});
         params["_id"] = _id;
         params[metaKey] = type;
         params["~createTimestamp"] = new Date().getTime();
         params["active"] = true;
         logger.info("prepareDoc - after elaborations", {params} );
-        return params;
+        return params as unknown as Document | RelationDocument;
     }
 
     createDoc = async (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}) => {
@@ -1100,7 +1112,7 @@ class ClientStack extends Stack {
         fnLogger.info("Determined schema", {schema});
 
         let db = this.db;
-        const documents: Document[] = [];
+        const documents: RelationDocument[] = [];
         let newDocsIds: string[] = [];
 
         for (const draft of docs) {
@@ -1159,23 +1171,23 @@ class ClientStack extends Stack {
     }
 
     createRelationDoc = async (
-        docId: string | null, 
-        relationName: string, 
-        domainObj: Domain, 
+        docId: string | null,
+        relationName: string,
+        domainObj: Domain,
         params: {
             sourceClass: string,
             targetClass: string,
             sourceId: string,
             targetId: string
-        }) => {
+        }): Promise<RelationDocument | null> => {
         const fnLogger = logger.child({method: "createRelationDoc", args: {docId, relationName, params}});
         fnLogger.info("Creating relation document");
         let db = this.db,
-            doc: Document | null = null,
+            doc: RelationDocument | null = null,
             isNewDoc = false;
         try {
             if (docId) {
-                const existingDoc = await this.db.get(docId) as Document;
+                const existingDoc = await this.db.get(docId) as RelationDocument;
                 fnLogger.info("retrieved doc", {existingDoc})
                 if (existingDoc && existingDoc["~domain"] === domainObj.name) {
                     fnLogger.info("Assigning existing doc", {doc: existingDoc});
@@ -1186,11 +1198,11 @@ class ClientStack extends Stack {
                 } else {
                     fnLogger.warn("No relation document");
                     isNewDoc = true;
-                    doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
+                    doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                 }
             } else {
                 docId = `${domainObj.name}-${(this.lastDocId+1)}`;
-                doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
+                doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                 isNewDoc = true;
                 fnLogger.info("Generated docId", docId);
             }
@@ -1219,22 +1231,22 @@ class ClientStack extends Stack {
     createRelationDocs = async (docs: { docId: string | null; params: {
         sourceClass: string;
         targetClass: string;
-        sourceId: string; 
-        targetId: string; 
-    }; }[], relationName: string, domainObj: Domain) => {
+        sourceId: string;
+        targetId: string;
+    }; }[], relationName: string, domainObj: Domain): Promise<RelationDocument[]> => {
         const fnLogger = logger.child({method: "createRelationDocs", args: {docs, relationName}});
 
         let db = this.db;
-        const documents: Document[] = [];
+        const documents: RelationDocument[] = [];
         let newDocsIds: string[] = [];
         
         for (const draft of docs) {
             let {docId, params} = draft;
-            let doc: Document | null = null;
+            let doc: RelationDocument | null = null;
             let isNewDoc = false;
             try {
                 if (docId) {
-                    const existingDoc = await db.get(docId) as Document;
+                    const existingDoc = await db.get(docId) as RelationDocument;
                     fnLogger.info("retrieved doc", {existingDoc})
                     if (existingDoc && existingDoc["~domain"] === domainObj.name) {
                         fnLogger.info("createRelationDocs - assigning existing doc", {doc: existingDoc});
@@ -1243,11 +1255,11 @@ class ClientStack extends Stack {
                         throw new Error("createRelationDocs - Existing document type differs");
                     } else {
                         isNewDoc = true;
-                        doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
+                        doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     }
                 } else {
                     docId = `${domainObj.name}-${(this.lastDocId+1)}`;
-                    doc = this.prepareDoc(docId, domainObj.name, params, "~domain") as Document;
+                    doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
                 }
