@@ -196,6 +196,7 @@ function createSingleSelectPlan(ast) {
     const plan = {
         type: 'select',
         distinct: ast.distinct,
+        distinctOn: ast.distinctOn,
         fromTable: ast.from[0],
         joins: [],
         filters: {

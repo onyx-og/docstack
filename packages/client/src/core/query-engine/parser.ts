@@ -313,7 +313,19 @@ const SelectHandler: ClauseHandler = {
   canStart: ({ scan }) => scan.peekKW('SELECT'),
   parse: ({ scan, ast }) => {
     scan.expectKW('SELECT');
-    if (scan.tryKW('DISTINCT')) ast.distinct = true;
+    if (scan.tryKW('DISTINCT')) {
+      ast.distinct = true;
+      if (scan.tryKW('ON')) {
+        scan.consumeRe(/^\s*\(/, 'Expected ( after DISTINCT ON');
+        const distinctExprs: any[] = [];
+        while (!scan.eof()) {
+          distinctExprs.push(parseColumnExpr(scan));
+          if (!scan.tryKW(',')) break;
+        }
+        scan.consumeRe(/^\s*\)/, 'Expected ) after DISTINCT ON expressions');
+        ast.distinctOn = distinctExprs;
+      }
+    }
     const cols: any[] = [];
     while (!scan.eof()) {
       scan.skipWSAndComments();
