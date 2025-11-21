@@ -198,8 +198,24 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     if (!domain) {
                         throw new Error(`Domain not found: ${doc.type}`);
                     }
-                    // TODO: to be
-                    continue; //d
+                    if (doc.sourceClass !== domain.sourceClass.id || doc.targetClass !== domain.targetClass.id) {
+                        throw new Error(`Relation document classes do not match domain '${domain.name}'.`);
+                    }
+
+                    const [sourceDoc, targetDoc] = await Promise.all([
+                        stack.db.get<Document>(doc.sourceId).catch(() => null),
+                        stack.db.get<Document>(doc.targetId).catch(() => null),
+                    ]);
+
+                    if (!sourceDoc) {
+                        throw new Error(`Source document '${doc.sourceId}' does not exist for domain '${domain.name}'.`);
+                    }
+
+                    if (!targetDoc) {
+                        throw new Error(`Target document '${doc.targetId}' does not exist for domain '${domain.name}'.`);
+                    }
+
+                    continue;
                 } else if (isDocument(doc)) {
                     const className = doc.type;
 

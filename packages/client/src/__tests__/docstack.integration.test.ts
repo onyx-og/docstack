@@ -219,6 +219,60 @@ describe("@docstack/client integration", () => {
         }
     });
 
+    it("validates relation documents passed through bulkDocs", async () => {
+        const { stack, cleanup } = await createDocStack();
+        try {
+            const sourceClass = await Class.create(stack, `BulkSource-${Date.now()}`, "class", "Sources");
+            const targetClass = await Class.create(stack, `BulkTarget-${Date.now()}`, "class", "Targets");
+            await Attribute.create(sourceClass, "name", "string", "Name", { mandatory: true });
+            await Attribute.create(targetClass, "name", "string", "Name", { mandatory: true });
+
+            const domain = await Domain.create(stack, null, `BulkDomain-${Date.now()}`, "domain", "1:N", sourceClass, targetClass);
+            const sourceDoc = await sourceClass.addCard({ name: "Source" }) as Document;
+            const targetDoc = await targetClass.addCard({ name: "Target" }) as Document;
+
+            const invalidClassesDoc = {
+                _id: `${domain.name}-bad-classes`,
+                type: domain.name,
+                sourceClass: "wrong-class",
+                targetClass: domain.targetClass.id!,
+                sourceId: sourceDoc._id as string,
+                targetId: targetDoc._id as string,
+            };
+
+            await expect(stack.db.bulkDocs([invalidClassesDoc])).rejects.toThrow(/classes do not match domain/i);
+
+            const missingTargetDoc = {
+                _id: `${domain.name}-missing-target`,
+                type: domain.name,
+                sourceClass: domain.sourceClass.id!,
+                targetClass: domain.targetClass.id!,
+                sourceId: sourceDoc._id as string,
+                targetId: "missing-target-id",
+            };
+
+            await expect(stack.db.bulkDocs([missingTargetDoc])).rejects.toThrow(/Target document 'missing-target-id' does not exist/i);
+
+            const validRelation = {
+                _id: `${domain.name}-valid`,
+                type: domain.name,
+                sourceClass: domain.sourceClass.id!,
+                targetClass: domain.targetClass.id!,
+                sourceId: sourceDoc._id as string,
+                targetId: targetDoc._id as string,
+            };
+
+            const response = await stack.db.bulkDocs([validRelation]);
+            expect(response).toHaveLength(1);
+
+            const savedRelation = await stack.db.get(validRelation._id);
+            expect(savedRelation.sourceId).toBe(sourceDoc._id);
+            expect(savedRelation.targetId).toBe(targetDoc._id);
+        } finally {
+            await cleanup();
+        }
+    });
+
     it("validates reference attribute placement on domains", async () => {
         const { stack, cleanup } = await createDocStack();
         try {
