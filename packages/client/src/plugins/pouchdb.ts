@@ -84,6 +84,10 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // const doc = await stack.db.get(docRes.id, { rev: (docRes as any).rev }) as Document;
                             const doc = documentsToProcess.find(d => d._id === docRes.id) as Document | undefined;
                             if (doc) {
+                                const updatedRev = (docRes as any).rev;
+                                if (updatedRev) {
+                                    doc._rev = updatedRev;
+                                }
                                 const afterTriggers = triggerQueue[docRes.id]
                                 if (afterTriggers && afterTriggers.length) {
                                     debugger;
@@ -253,7 +257,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             }
                             // TODO: skip execution of before triggers if option.isPostOp
                             const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
-                            const afterTriggers = classObj.triggers.filter( t => t.order === "before");
+                            const afterTriggers = classObj.triggers.filter( t => t.order === "after");
 
                             for (const trigger of beforeTriggers) {
                                 const updatedDoc = await trigger.execute(doc);
