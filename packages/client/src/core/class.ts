@@ -146,9 +146,11 @@ class Class extends Class_ {
                 classModel["~class"], classModel.description,
                 classModel.schema
             )
+            classObj.setModel(classModel);
             return classObj;
         } else {
             let classObj: Class = await Class.create(stack, classModel.name, classModel["~class"], classModel["~class"], classModel.schema);
+            classObj.setModel(classModel);
             return classObj;
         }
     }
@@ -319,6 +321,7 @@ class Class extends Class_ {
         }
 
         if (model.triggers) {
+            this.triggers = [];
             for (const trigger of model.triggers) {
                 let trigger_ = new Trigger(trigger, this);
                 this.triggers.push(trigger_);
