@@ -239,6 +239,43 @@ describe('SQL Parser and Planner', () => {
     expect(plan.unionOps[0].distinct).toBe(false);
   });
 
+  it('should support quoted identifiers with special characters', () => {
+    const sql = `
+      SELECT
+        "~column",
+        "t~"."$column1"
+      FROM "~Table" AS "t~"
+      WHERE "t~"."$column1" = 5;
+    `;
+
+    const expectedAst = [
+      {
+        "type": "select",
+        "distinct": false,
+        "columns": [
+          { "expr": { "type": "column_ref", "table": null, "column": "~column" }, "as": null },
+          { "expr": { "type": "column_ref", "table": "t~", "column": "$column1" }, "as": null }
+        ],
+        "from": [{ "table": "~Table", "as": "t~" }],
+        "joins": [],
+        "where": { "type": "binary_expr", "operator": "=", "left": { "type": "column_ref", "table": "t~", "column": "$column1" }, "right": { "type": "param", "value": "5" } },
+        "groupBy": null,
+        "having": null,
+        "orderBy": null,
+        "limit": null
+      }
+    ];
+
+    const parsedAst = parse(sql);
+    expect(parsedAst).toEqual(expectedAst);
+
+    const plan = createPlan(parsedAst);
+    expect(plan.fromTable.table).toBe('~Table');
+    expect(plan.fromTable.as).toBe('t~');
+    expect(plan.filters.left.length).toBe(1);
+    expect(plan.filters.left[0].left.column).toBe('$column1');
+  });
+
   describe('Subqueries', () => {
     it('should parse a NOT EXISTS subquery correctly', () => {
       const sql = `
