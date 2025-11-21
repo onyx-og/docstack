@@ -571,7 +571,7 @@ class Class extends Class_ {
     }
 
     getCards = async (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => {
-        let _selector = { ...selector, type: this.name };
+        const _selector = { ...(selector || {}), "~class": { $eq: this.name } };
         this.logger.info("getCards - selector", {selector: _selector, fields, skip, limit})
         let docs = (await this.stack!.findDocuments(_selector, fields, skip, limit)).docs
         return docs;

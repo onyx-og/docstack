@@ -71,7 +71,7 @@ async function applyProjections(rows, projections, fromAlias, joinAliases, stack
  * @param {Array<object>} rows The rows to de-duplicate.
  * @returns {Array<object>} The de-duplicated rows.
  */
-function applyDistinct(rows) {
+function applyDistinct(rows, columns = null) {
     if (!rows || rows.length === 0) return [];
 
     const seen = new Set();
@@ -80,7 +80,11 @@ function applyDistinct(rows) {
     for (const row of rows) {
         // Create a stable key based on the row's values.
         // Sorting keys ensures that {a:1, b:2} and {b:2, a:1} are treated as the same.
-        const key = JSON.stringify(Object.keys(row).sort().map(k => row[k]));
+        const key = JSON.stringify(
+            columns && columns.length > 0
+                ? columns.map(col => row[col])
+                : Object.keys(row).sort().map(k => row[k])
+        );
         if (!seen.has(key)) {
             seen.add(key);
             result.push(row);
@@ -377,14 +381,19 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
         projectedRows = await applyProjections(finalRows, plan.projections, fromAlias, joinAliases, stack, executePlan);
     }
     
-    // 5.5 Apply DISTINCT to final result set if specified
-    let distinctRows = projectedRows;
-    if (plan.distinct) {
-        distinctRows = applyDistinct(projectedRows);
+    // 5.5 Apply DISTINCT/DISTINCT ON to final result set if specified
+    let orderedRows = projectedRows;
+    if (plan.distinct && plan.distinctOn) {
+        const distinctColumns = plan.distinctOn.map(expr => expr.column);
+        orderedRows = applyOrderBy(orderedRows, plan.orderBy);
+        orderedRows = applyDistinct(orderedRows, distinctColumns);
+    } else {
+        let distinctRows = projectedRows;
+        if (plan.distinct) {
+            distinctRows = applyDistinct(projectedRows);
+        }
+        orderedRows = applyOrderBy(distinctRows, plan.orderBy);
     }
-
-    // 6. Order By
-    let orderedRows = applyOrderBy(distinctRows, plan.orderBy);
 
     // 7. Limit
     if (plan.limit !== null && plan.limit !== undefined) {
