@@ -1,7 +1,7 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
-import {Document,  Domain,  RelationDocument,  SelectAST, UnionAST} from "@docstack/shared";
+import {Document,  Domain,  DomainModel,  RelationDocument,  SelectAST, UnionAST} from "@docstack/shared";
 
 export const useDomainCreate = (stack: string) => {
     const docStack = useContext(DocStackContext);
@@ -37,8 +37,8 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
     const docStack = useContext(DocStackContext);
 
     const [originClass, setOriginClass] = useState<Class>();
-    const [domainList, setDomainList] = useState<Document[]>([]);
-    const domainListRef = useRef<Document[]>([]);
+    const [domainList, setDomainList] = useState<Domain[]>([]);
+    const domainListRef = useRef<Domain[]>([]);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -84,8 +84,11 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
-                const initialDomainList = await originClass.getCards(selector) as Document[];
-                domainListRef.current = initialDomainList;
+                const stackInstance = docStack!.getStack(stack)!;
+                const initialDomainModelList = await originClass.getCards(selector) as DomainModel[];
+                const initDomainList = await Promise.all(initialDomainModelList.map(async (dm) => await Domain.buildFromModel(stackInstance, dm)));
+                
+                domainListRef.current = initDomainList;
                 setDomainList(domainListRef.current);
             } catch (err: any) {
                 setError(err);
@@ -97,7 +100,7 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
                 const doc = change.detail.doc;
                 if (!doc.active) {
                     // A doc was deleted
-                    const docIndex = domainListRef.current.findIndex((d) => d._id == doc._id)
+                    const docIndex = domainListRef.current.findIndex((d) => d.id == doc._id)
                     if (docIndex != -1) {
                         domainListRef.current = [
                             ...domainListRef.current.slice(0, docIndex),
@@ -106,7 +109,7 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
                     }
                 } else {
                     // A doc was changed or added
-                    const docIndex = domainListRef.current.findIndex((d) => d._id == doc._id)
+                    const docIndex = domainListRef.current.findIndex((d) => d.id == doc._id)
                     if (docIndex != -1) {
                         // A doc was changed
                         domainListRef.current = [

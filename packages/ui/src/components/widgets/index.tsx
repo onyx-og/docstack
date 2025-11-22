@@ -109,7 +109,7 @@ export const TopClassesByDocCountWidget = (props: TopClassesByDocCountWidgetProp
     const {limit = 5} = props;
     const stackName = useAppSelector(s => s.stack.name);
     const [data, setData] = React.useState<{className: string, count: number}[]>([]);
-    const {loading, classList, error} = useClassList({stack: stackName});
+    const {loading, classList, error} = useClassList(stackName, {});
 
     const updateCount = useCallback((className: string, count: number) => {
         setData(prevData => {
@@ -169,7 +169,7 @@ type TopClassesSummaryWidgetProps = {
 export const TopClassesSummaryWidget = (props: TopClassesSummaryWidgetProps) => {
     const {limit = 5} = props;
     const stackName = useAppSelector(s => s.stack.name);
-    const {loading, classList, error} = useClassList({stack: stackName});
+    const {loading, classList, error} = useClassList(stackName, {});
     const [data, setData] = React.useState<{className: string, count: number, lastUpdated: number}[]>([]);
 
     const sortedData = useMemo(() => {

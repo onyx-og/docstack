@@ -1,7 +1,7 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider";
 import { Class } from "@docstack/client";
-import {Document} from "@docstack/shared";
+import {ClassModel, Document} from "@docstack/shared";
 
 export const useClassCreate = (stack: string) => {
     const docStack = useContext(DocStackContext);
@@ -36,10 +36,9 @@ export const useClassCreate = (stack: string) => {
 
 export const useClassList = (stack: string, selector: {[key: string]: any}) => {
     const docStack = useContext(DocStackContext);
-
     const [originClass, setOriginClass] = useState<Class>();
-    const [classList, setClassList] = useState<Document[]>([]);
-    const classListRef = useRef<Document[]>([]);
+    const [classList, setClassList] = useState<Class[]>([]);
+    const classListRef = useRef<Class[]>([]);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -85,7 +84,13 @@ export const useClassList = (stack: string, selector: {[key: string]: any}) => {
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
-                const initialClassList = await originClass.getCards(selector) as Document[];
+                const initialClassModelList = await originClass.getCards(selector) as ClassModel[];
+                const initialClassList: Class[] = [];
+                const stackInstance = docStack!.getStack(stack);
+                for (const cls of initialClassModelList) {
+                    const classInstance = await Class.buildFromModel(stackInstance!, cls);
+                    initialClassList.push(classInstance);
+                }
                 classListRef.current = initialClassList;
                 setClassList(classListRef.current);
             } catch (err: any) {
@@ -100,7 +105,7 @@ export const useClassList = (stack: string, selector: {[key: string]: any}) => {
                 if (!doc.active) {
                     // A doc was deleted
                     console.log("useClassDocs - a doc was deleted", {doc});
-                    const docIndex = classListRef.current.findIndex((d) => d._id == doc._id)
+                    const docIndex = classListRef.current.findIndex((d) => d.id == doc._id)
                     if (docIndex != -1) {
                         classListRef.current = [
                             ...classListRef.current.slice(0, docIndex),
@@ -109,7 +114,7 @@ export const useClassList = (stack: string, selector: {[key: string]: any}) => {
                     }
                 } else {
                     // A doc was changed or added
-                    const docIndex = classListRef.current.findIndex((d) => d._id == doc._id)
+                    const docIndex = classListRef.current.findIndex((d) => d.id == doc._id)
                     if (docIndex != -1) {
                         // A doc was changed
                         classListRef.current = [

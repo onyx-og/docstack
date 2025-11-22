@@ -32,9 +32,9 @@ const DomainList = () => {
                             key={domain.name as string}
                             name={domain.name as string}
                             description={domain.description as string}
-                            cardinality={domain.cardinality as string}
-                            sourceClass={domain.sourceClass as string}
-                            targetClass={domain.targetClass as string}
+                            cardinality={domain.relation as string}
+                            sourceClass={domain.sourceClass.getName()}
+                            targetClass={domain.targetClass.getName()}
                         />
                     })
                 }
