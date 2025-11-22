@@ -30,9 +30,10 @@
   "homepage": "https://github.com/onyx-og/docstack#readme",
   "description": "",
   "dependencies": {
-    "@docstack/shared": "file:../shared",
-    "@docstack/react": "file:../react",
     "@docstack/client": "file:../client",
+    "@docstack/react": "file:../react",
+    "@docstack/shared": "file:../shared",
+    "@prismal/react": "^1.0.1",
     "monaco-editor": "^0.52.2"
   },
   "devDependencies": {
