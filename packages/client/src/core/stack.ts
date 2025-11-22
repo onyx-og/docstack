@@ -293,12 +293,13 @@ class ClientStack extends Stack {
         this.addEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
         this.addEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
 
-        fnLogger.info("Setting up class model worker");
-        this.modelWorker = new Worker(require("../workers/dataModel"), {type: "module"});
+        // fnLogger.info("Setting up class model worker");
+        // this.modelWorker = new Worker(require("../workers/dataModel"), {type: "module"});
 
         fnLogger.info("Setting up class model changes listener");
         const classModelChanges = this.onClassModelChanges();
 
+        /*
         this.modelWorker.onmessage = (event) => {
             const { status, className, message } = event.data;
             
@@ -310,6 +311,7 @@ class ClientStack extends Stack {
                 fnLogger.error(`Model worker error for class '${className}': ${message}`);
             }
         };
+        */
 
         // Store listener for later
         this.listeners.push(classModelChanges);
