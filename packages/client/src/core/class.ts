@@ -1,12 +1,12 @@
 import { Class as Class_, DesignDocument, TriggerModel } from "@docstack/shared";
-import createLogger from "../utils/logger";
+import createLogger from "../utils/logger/index.js";
 // import ReferenceAttribute from '../Reference';
 import {Stack, ClassModel, AttributeModel, Document} from "@docstack/shared";
-import Attribute from "./attribute";
+import Attribute from "./attribute.js";
 import { Logger } from 'winston';
-import { Trigger } from "./trigger";
+import { Trigger } from "./trigger/index.js";
 import {z} from "zod";
-import clientLogger from "../utils/logger";
+import clientLogger from "../utils/logger/index.js";
 
 class Class extends Class_ {
     stack: Stack | undefined;

@@ -1,8 +1,8 @@
 import { AttributeModel, Document } from "@docstack/shared";
-import Attribute from "../core/attribute";
-import Class from "../core/class";
+import Attribute from "../core/attribute.js";
+import Class from "../core/class.js";
 import * as jsondiff from 'jsondiffpatch';
-import createLogger from "./logger";
+import createLogger from "./logger/index.js";
 
 const attributeEffect = async (
     operation: "delete" | "add" | "change",

@@ -1,5 +1,5 @@
-import type Class from "../../class";
-import { Trigger } from "..";
+import type Class from "../../class.js";
+import { Trigger } from "../index.js";
 import type { Document } from "@docstack/shared";
 
 describe("Trigger", () => {

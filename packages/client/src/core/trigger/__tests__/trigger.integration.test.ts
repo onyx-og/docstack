@@ -1,4 +1,4 @@
-import { Attribute, Class, DocStack } from "../..";
+import { Attribute, Class, DocStack } from "../../index.js";
 import type { Document } from "@docstack/shared";
 
 jest.setTimeout(30000);

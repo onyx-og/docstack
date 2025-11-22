@@ -1,7 +1,7 @@
 
 import * as winston from "winston";
 import { createLogger } from "winston";
-import PouchDBTransport from "./transport";
+import PouchDBTransport from "./transport.js";
 import { Stack } from "@docstack/shared";
 
 const clientLogger = (stack?: Stack | null) => {

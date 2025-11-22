@@ -1,4 +1,4 @@
-import createLogger from "../utils/logger";
+import createLogger from "../utils/logger/index.js";
 
 const logger = createLogger().child({module: "dataModel"});
 

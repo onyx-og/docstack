@@ -2,11 +2,11 @@ import { isClassModel, isDocument, isRelation, Stack, Domain } from "@docstack/s
 import type {AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType} from "@docstack/shared";
 // import Stack from "../utils/stack";
 import PouchDB from "pouchdb-browser";
-import { Trigger } from "../core/trigger";
-import createLogger from "../utils/logger";
+import { Trigger } from "../core/trigger/index.js";
+import createLogger from "../utils/logger/index.js";
 import * as jsondiff from 'jsondiffpatch';
-import { applySchemaDelta } from "../utils/";
-import Class from "../core/class";
+import { applySchemaDelta } from "../utils/index.js";
+import Class from "../core/class.js";
 
 const logger = createLogger().child({module: "pouchdb"});
 /**
