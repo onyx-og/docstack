@@ -1,5 +1,5 @@
 import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "@docstack/shared";
-import clientLogger from "../utils/logger";
+import clientLogger from "../utils/logger/index.js";
 import winston, { createLogger, Logger } from "winston";
 
 class Domain extends Domain_ {

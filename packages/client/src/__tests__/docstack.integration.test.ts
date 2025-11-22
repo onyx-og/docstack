@@ -1,5 +1,5 @@
-import { DocStack, Class, Attribute, Domain } from "..";
-import { getAllSystemPatches } from "../core/datamodel";
+import { DocStack, Class, Attribute, Domain } from "../index.js";
+import { getAllSystemPatches } from "../core/datamodel/index.js";
 import type { ClassModel, Document } from "@docstack/shared";
 
 jest.setTimeout(30000);

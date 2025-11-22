@@ -1,5 +1,5 @@
 import z, { ZodType } from "zod";
-import Class from "./class";
+import Class from "./class.js";
 import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, AttributeTypeReference } from "@docstack/shared";
 
 class Attribute extends Attribute_ {

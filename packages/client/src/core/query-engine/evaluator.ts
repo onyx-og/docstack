@@ -43,7 +43,7 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
     switch (expr.type) {
         case 'scalar_subquery': {
             // Dynamically import planner to avoid circular dependency
-            const { createPlan } = await import('./planner');
+            const { createPlan } = await import('./planner.js');
             const subqueryPlan = createPlan([expr.ast]);
             // Execute the subquery, passing the current row as the outer context for correlation
             const result = await executePlan(stack, subqueryPlan, [], row, null); // Pass outer row, but no aliases

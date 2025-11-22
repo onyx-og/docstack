@@ -1,9 +1,9 @@
 import PouchDB from "pouchdb";
-import createLogger from "../utils/logger";
-import Class from "./class";
-import Domain from "./domain";
-import { decryptString } from "../utils/crypto";
-import { getAllSystemPatches, getSystemPatches } from "./datamodel";
+import createLogger from "../utils/logger/index.js";
+import Class from "./class.js";
+import Domain from "./domain.js";
+import { decryptString } from "../utils/crypto/index.js";
+import { getAllSystemPatches, getSystemPatches } from "./datamodel/index.js";
 import {
     Stack,
     StackOptions,
@@ -16,10 +16,10 @@ import {
 } from "@docstack/shared";
 
 import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
-import { StackPlugin } from "../plugins/pouchdb";
+import { StackPlugin } from "../plugins/pouchdb.js";
 
-import { parse, createPlan, executePlan } from "./query-engine";
-import type { SelectAST, UnionAST } from "./query-engine";
+import { parse, createPlan, executePlan } from "./query-engine/index.js";
+import type { SelectAST, UnionAST } from "./query-engine/index.js";
 
 const logger = createLogger().child({module: "stack"});
 
@@ -293,12 +293,13 @@ class ClientStack extends Stack {
         this.addEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
         this.addEventListener('class-model-propagation-complete', this.onClassModelPropagationComplete as EventListener);
 
-        fnLogger.info("Setting up class model worker");
-        this.modelWorker = new Worker(require("../workers/dataModel"), {type: "module"});
+        // fnLogger.info("Setting up class model worker");
+        // this.modelWorker = new Worker(require("../workers/dataModel"), {type: "module"});
 
         fnLogger.info("Setting up class model changes listener");
         const classModelChanges = this.onClassModelChanges();
 
+        /*
         this.modelWorker.onmessage = (event) => {
             const { status, className, message } = event.data;
             
@@ -310,6 +311,7 @@ class ClientStack extends Stack {
                 fnLogger.error(`Model worker error for class '${className}': ${message}`);
             }
         };
+        */
 
         // Store listener for later
         this.listeners.push(classModelChanges);

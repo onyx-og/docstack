@@ -1,7 +1,7 @@
 
 // @ts-nocheck
-import { parse } from './parser';
-import { createPlan } from './planner';
+import { parse } from './parser.js';
+import { createPlan } from './planner.js';
 
 describe('SQL Parser and Planner', () => {
 
