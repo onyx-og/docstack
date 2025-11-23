@@ -25,15 +25,18 @@ class PouchDBTransport extends Transport{
       this.emit('logged', info);
     });
 
-    const response = await this.stack.db.post({
-        type: "log",
-        log: info
-    });
-    if (response.ok) {
-      // console.log("pouchdb-transport - pushed to pouchdb", response.id)
-    }
-    else {
-      console.log("pouchdb-transport - failed to push to pouchdb", response)
+    const logClass = await this.stack.getClass("log");
+    if (!logClass) {
+      console.log("pouchdb-transport - log class not found, cannot log");
+    } else {
+      try {
+        const response = await logClass.addCard({
+          "~class": "log",
+          log: info
+        });
+      } catch (e: any) {
+        console.log("pouchdb-transport - failed to log to pouchdb", e);
+      }
     }
     // Perform the writing to the remote service
     callback();

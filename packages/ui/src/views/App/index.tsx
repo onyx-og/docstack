@@ -1,7 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AuthView from "views/AuthView";
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import Dashboard from 'views/Dashboard';
 
 import { StackProvider } from "@docstack/react";
@@ -16,6 +16,7 @@ import StatusBar from 'components/StatusBar';
 import { DocStackContext } from '@docstack/react';
 import AppSidebar from 'components/AppSidebar';
 import ClassList from 'views/ClassList';
+import DomainList from 'views/DomainList';
 
 const AppHeader = () => {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -118,11 +119,11 @@ const AppStatusBar = () => {
         <ChangelogModal title="Changelog">
             <p>{docStack?.getStack(dbName)?.patches.map(patch => patch.changelog)}</p>
         </ChangelogModal>
-        {/* <Marquee>{`Stack: ${dbName}`}</Marquee>
+        <Marquee>{`Stack: ${dbName}`}</Marquee>
         <Marquee>{`Version: ${docStack?.getStack(dbName)?.appVersion}`}</Marquee>
         <Marquee onClick={openPatchChangelog}>{`Schema version: ${docStack?.getStack(dbName)?.schemaVersion}`}</Marquee>
         <Marquee speed={0.7}>Trigger definition and storing is currently in development...         Class deletion is next step in the roadmap...               
-        </Marquee> */}
+        </Marquee>
     </StatusBar>
 }
 
@@ -134,7 +135,7 @@ const App = () => {
 
     const location = useLocation();
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (!isAuthenticated && !isAnonymous) {
             navigate('/login');
         } else navigate('/');
@@ -144,6 +145,7 @@ const App = () => {
         <Routes>
             <Route path="/" element={<AppWrapper><Dashboard /></AppWrapper>} />
             <Route path="/login" element={<AuthView />} />
+            <Route path="/domains" element={<AppWrapper><DomainList /></AppWrapper>} />
             <Route path="/classes" element={<AppWrapper><ClassList /></AppWrapper>} />
             <Route path="/class/:className" element={<AppWrapper><ClassView /></AppWrapper>} />
         </Routes>

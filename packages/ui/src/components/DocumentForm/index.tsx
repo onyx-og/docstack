@@ -3,6 +3,7 @@ import { Button, Form, TextInput, Toggle, InputRefType, ActionBar, ActionBarItem
 import { useClass } from "@docstack/react";
 import React from "react";
 import { useAppSelector } from "hooks";
+import JsonView from "@uiw/react-json-view";
 
 interface AttributeFieldProps extends AttributeModel {
     value?: any;
@@ -41,8 +42,10 @@ const AttributeField = React.forwardRef((props: AttributeFieldProps, ref: React.
             return <Toggle type="switch" name={name} label={name} checked={value} />
         case "integer":
             return <NumberInput name={name} label={name} value={value} step={1} />
-         case "decimal":
+        case "decimal":
             return <NumberInput name={name} label={name} value={value} step={1} />
+        case "object":
+            return <JsonView value={value} collapsed={false} />
         default:
             throw new Error(`Unexpected attribute field type '${type}'`);
     }

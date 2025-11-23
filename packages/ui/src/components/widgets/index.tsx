@@ -1,14 +1,18 @@
 import { Card, Text, Graph, GraphType, Table } from "@prismal/react";
 import React, { useCallback, useEffect, useMemo } from "react";
 import { useClassList, useQuerySQL } from "@docstack/react";
+import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "hooks";
 import { Class } from "@docstack/client";
 
 export const ClassCountWidget = () => {
     const stackName = useAppSelector(s => s.stack.name);
-
+    const navigate = useNavigate();
     const { loading, result, error } = useQuerySQL(stackName, "SELECT COUNT(*) FROM class");
 
+    const navigateToClasses = useCallback(() => {
+        navigate('/classes');
+    }, [navigate]);
 
     if (loading) return <div>Loading...</div>;
     if (error) {
@@ -18,30 +22,35 @@ export const ClassCountWidget = () => {
     if (!result || result.rows.length === 0) {
         return <div>No data</div>;
     }
-    return <Card  className="dashboard-widget" borderRadius={"sm"}>
-        <div style={{
-            display: "flex",
-            gap: "1rem"
+    return <Card className="dashboard-widget" borderRadius={"sm"}>
+        <div onClick={navigateToClasses} style={{
+            height: "100%",
+            width: "100%",
         }}>
-            <div className="widget-icon"
-                style={{
-                    backgroundImage: `url("${require("assets/icons/category_icon.svg")}")`,
-                    minWidth: "40px",
-                    minHeight: "40px",
-                    backgroundPosition: "center",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                }}></div>
-            <Text type="body"
-                style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                }}
-            >{result.rows[0].COUNT}</Text>
-        </div>
+            <div style={{
+                display: "flex",
+                gap: "1rem"
+            }}>
+                <div className="widget-icon"
+                    style={{
+                        backgroundImage: `url("${require("assets/icons/category_icon.svg")}")`,
+                        minWidth: "40px",
+                        minHeight: "40px",
+                        backgroundPosition: "center",
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                    }}></div>
+                <Text type="body"
+                    style={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                    }}
+                >{result.rows[0].COUNT}</Text>
+            </div>
 
-        <h2>Total classes</h2>
+            <h2>Total classes</h2>
+        </div>
     </Card>
 }
 

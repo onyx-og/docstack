@@ -3,6 +3,7 @@ import { ClassModel, Document } from "@docstack/shared";
 import { ActionBar, Button, Select, Table, useModal } from "@prismal/react";
 import DocumentForm from "components/DocumentForm";
 import React from "react";
+import JsonView from '@uiw/react-json-view';
 
 import "./index.scss";
 import { useAppSelector } from "hooks";
@@ -65,12 +66,20 @@ const ClassDocsPanel: React.FC<ClassDocsPanelProps> = (props) => {
         const key = `${coords ? coords.concat() : null}`;
         const className = `doc-cell mode-${tableMode}`;
 
+        if (!data) {
+            return <td className={className} key={key}></td>;
+        }
+        let content: JSX.Element | string = data.toString()
+        if (typeof data === "object") {
+            content = <JsonView value={data} collapsed={true} />
+        }
+
         return <td onClick={() => {
             if (tableMode == "edit") doOpenDocForm(Number(coords![0]));
         }} className={className} onDoubleClick={() => {
             if (tableMode == "view") doOpenDocForm(Number(coords![0]))
         }}
-        key={key}>{data?.toString( )}</td>
+        key={key}>{content}</td>
     }, [tableMode, doOpenDocForm]);
 
     const table = React.useMemo(() => {

@@ -34,6 +34,7 @@
     "@docstack/react": "file:../react",
     "@docstack/shared": "file:../shared",
     "@prismal/react": "^1.0.1",
+    "@uiw/react-json-view": "^2.0.0-alpha.39",
     "monaco-editor": "^0.52.2"
   },
   "devDependencies": {
