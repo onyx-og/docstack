@@ -23,25 +23,38 @@ export class Trigger extends Trigger_ {
         this.order = model.order;
         this.classObj = classObj;
 
-        // Security and validation checks before hydration.
-        if (typeof model.run !== 'string') {
+        if (model.run !== undefined && typeof model.run !== "string") {
             throw new Error("Trigger model's 'run' field must be a string representation of a function.");
         }
 
-        // Hydrate the run function from the string.
-        try {
-            // Use 'new Function()' for secure, sandboxed execution.
-            // We pass dependencies as explicit arguments to the function's scope.
-            // The `this` context is not used to prevent unwanted access.
-            this.run = new Function('document', 'classObj', 'stack', `
-                "use strict";
-                // The developer's code is placed here.
-                return (async () => {
-                    ${model.run}
-                })();
-            `) as TriggerRunFunction;
-        } catch (error) {
-            throw new Error(`Failed to hydrate trigger '${model.name}': ${error}`);
+        if (!model.run && !model.jobId) {
+            throw new Error("Trigger requires either a 'run' script or a 'jobId'.");
+        }
+
+        if (model.jobId) {
+            this.run = async (document, _classObj, stack) => {
+                if (!stack || !stack.jobEngine) {
+                    throw new Error(`Stack does not expose a job engine for trigger '${model.name}'.`);
+                }
+                await (stack as any).jobEngine.executeJob(model.jobId as string, { document }, "event");
+                return document;
+            }
+        } else if (model.run) {
+            // Hydrate the run function from the string.
+            try {
+                // Use 'new Function()' for secure, sandboxed execution.
+                // We pass dependencies as explicit arguments to the function's scope.
+                // The `this` context is not used to prevent unwanted access.
+                this.run = new Function('document', 'classObj', 'stack', `
+                    "use strict";
+                    // The developer's code is placed here.
+                    return (async () => {
+                        ${model.run}
+                    })();
+                `) as TriggerRunFunction;
+            } catch (error) {
+                throw new Error(`Failed to hydrate trigger '${model.name}': ${error}`);
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 import { ClientStack, Class } from "../src";
 import type { ClassModel } from "@docstack/shared";
+import { createSessionProof } from "../src/core/test-utils/docstack";
 
 describe("ClientStack.query execution", () => {
     const dbName = `query-execution-${Date.now()}`;
@@ -34,6 +35,7 @@ describe("ClientStack.query execution", () => {
 
     beforeAll(async () => {
         stack = await ClientStack.create(dbName);
+        await createSessionProof(stack, "query-execution");
         actorClass = await Class.create(stack, "Actor", "class", "Actors for query execution", {
             name: {
                 name: "name",

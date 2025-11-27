@@ -313,7 +313,7 @@ class Attribute extends Attribute_ {
                 config = Object.assign({ max: null, min: null, isArray: false}, config) as AttributeTypeConfig;
             break;
             case "string":
-                config = Object.assign({ maxLength: 50, isArray: false }, config ) as AttributeTypeConfig;
+                config = Object.assign({ isArray: false }, config ) as AttributeTypeConfig;
             break;
             case "object":
                 config = Object.assign({ isArray: false }, config ) as AttributeTypeConfig;

@@ -9,6 +9,7 @@ import {
     SelectAST,
     UnionAST,
     RelationDocument,
+    AuthSessionProof,
 } from "../../types";
 
 import Class from "./class";
@@ -35,6 +36,8 @@ abstract class Stack extends EventTarget {
     listeners: PouchDB.Core.Changes<{}>[] = [];
 
     modelWorker: Worker | null = null;
+    jobEngine?: unknown;
+    authSession?: AuthSessionProof;
 
     abstract dump: () => Promise<PouchDB.Core.AllDocsResponse<{}>>;
 

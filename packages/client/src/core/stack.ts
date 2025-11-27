@@ -1,4 +1,5 @@
 import PouchDB from "pouchdb";
+import crypto from "crypto";
 import createLogger from "../utils/logger/index.js";
 import Class from "./class.js";
 import Domain from "./domain.js";
@@ -7,12 +8,18 @@ import { getAllSystemPatches, getSystemPatches } from "./datamodel/index.js";
 import {
     Stack,
     StackOptions,
+    AuthSessionProof,
+    ClientCredentials,
     CachedClass,
     ClassModelPropagationStart,
     ClassModelPropagationComplete,
     isClassModel,
     CachedDomain,
     DomainModel,
+    UserModel,
+    UserSessionModel,
+    AuthModuleModel,
+    PolicyModel,
 } from "@docstack/shared";
 
 import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
@@ -20,6 +27,8 @@ import { StackPlugin } from "../plugins/pouchdb.js";
 
 import { parse, createPlan, executePlan } from "./query-engine/index.js";
 import type { SelectAST, UnionAST } from "./query-engine/index.js";
+import { JobEngine } from "./job-engine/index.js";
+import { PolicyEngine } from "./policy-engine/index.js";
 
 const logger = createLogger().child({module: "stack"});
 
@@ -86,7 +95,10 @@ class ClientStack extends Stack {
     listeners: PouchDB.Core.Changes<{}>[] = [];
 
     modelWorker: Worker | null = null;
+    jobEngine!: JobEngine;
+    policyEngine!: PolicyEngine;
     schemaVersion: string | undefined;
+    authSession?: AuthSessionProof;
 
     private constructor() {
         super();
@@ -125,6 +137,8 @@ class ClientStack extends Stack {
         this.cache = {
             // empty at init
         }
+        this.jobEngine = new JobEngine(this);
+        this.policyEngine = new PolicyEngine(this);
     }
 
     public getDb() {
@@ -139,9 +153,42 @@ class ClientStack extends Stack {
         return this.db.name;
     }
 
+    public setAuthSession(proof: AuthSessionProof) {
+        this.authSession = proof;
+    }
+
+    public clearAuthSession() {
+        this.authSession = undefined;
+    }
+
     public dump = async () => {
         const all = await this.db.allDocs({include_docs: true});
         return all;
+    }
+
+    private async ensureDefaultPolicyForClass(targetClass: ClassModel) {
+        const fnLogger = logger.child({ method: "ensureDefaultPolicyForClass", targetClass: targetClass._id });
+        const result = await this.db.allDocs<{ doc: PolicyModel }>({ include_docs: true });
+        const existing = result.rows.find((row) => row.doc?.targetClass?.includes(targetClass._id));
+        if (existing) {
+            return;
+        }
+
+        const policyDoc: PolicyModel = {
+            _id: `Policy-${targetClass._id}`,
+            "~class": "~Policy",
+            userId: "system",
+            rule: "return session && session.sessionStatus === 'active';",
+            description: `Default policy for ${targetClass.name || targetClass._id}`,
+            targetClass: [targetClass._id],
+        };
+
+        fnLogger.info("Creating default policy", { policyDoc });
+        try {
+            await this.db.bulkDocs([policyDoc as any]);
+        } catch (error: any) {
+            throw new Error(`Failed to create default policy for ${targetClass._id}: ${error?.message || error}`);
+        }
     }
 
     // asynchronous factory method
@@ -155,7 +202,50 @@ class ClientStack extends Stack {
                 // ClientStack.logger.info(`Applied patch '${patch._id}' to stack '${stack.name}'`);
             }
         }
+        if (options?.credentials) {
+            await stack.authenticate(options.credentials);
+        }
         return stack;
+    }
+
+    public async authenticate(credentials: ClientCredentials) {
+        const { username, password } = credentials;
+        const user = await this.findDocument<UserModel>({
+            "~class": { $eq: "~User" },
+            username: { $eq: username },
+        });
+
+        if (!user) {
+            throw new Error(`User '${username}' not found`);
+        }
+
+        const authModuleId = user.authMethod || "AuthMod-Classic";
+        const authModule = await this.db.get<AuthModuleModel>(authModuleId);
+        const jobId = authModule.jobId;
+        const run = await this.jobEngine.executeJob(jobId, {
+            password,
+            salt: user.keyDerivationSalt,
+            keyDerivationSalt: user.keyDerivationSalt,
+        });
+
+        const derivedKey = (run.finalMetadata as any)?.derivedKey ?? (run.initialMetadata as any)?.derivedKey;
+        const sessionId = `session-${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString("hex")}`;
+        const sessionDoc: UserSessionModel = {
+            _id: sessionId,
+            "~class": "~UserSession",
+            username: user.username,
+            sessionId,
+            sessionStart: new Date().toISOString(),
+            sessionStatus: "active",
+        };
+
+        const sessionClassModel = (await this.getClassModel("~UserSession")) || (await this.getClassModel("UserSession"));
+        const sessionSchema = sessionClassModel?.schema || {};
+        await this.createDoc(sessionDoc._id, sessionDoc["~class"], sessionSchema, sessionDoc);
+
+        const proof: AuthSessionProof = { session: sessionDoc, derivedKey };
+        this.setAuthSession(proof);
+        return proof;
     }
     
     async getLastDocId() {
@@ -598,16 +688,24 @@ class ClientStack extends Stack {
                 skip: skip,
                 limit: limit
             });
-    
+
             fnLogger.info("Found", {
                 result: foundResult,
                 selector: selector,
             });
-            result = { docs: foundResult.docs as unknown as T[], selector, skip, limit };
+            const readableDocs: T[] = [];
+            for (const doc of foundResult.docs as unknown as Document[]) {
+                const canRead = await this.policyEngine.isReadableDocument(doc);
+                if (canRead) {
+                    readableDocs.push(doc as unknown as T);
+                }
+            }
+
+            result = { docs: readableDocs, selector, skip, limit };
             return result;
         } catch (e: any) {
             fnLogger.error("findDocument - error",e);
-            return {docs: [], error: e.toString(),selector, skip, limit};
+            throw e;
         }
     }
 
@@ -915,10 +1013,13 @@ class ClientStack extends Stack {
         fnLogger.info("Got class model", {classModel})
         try {
             const result = await classOrigin.addCard(classModel) as ClassModel;
+            fnLogger.info("Added class card", {result});
+            await this.ensureDefaultPolicyForClass(result);
             return result;
         } catch (e) {
             fnLogger.error("Error adding class card", {error: e})
-            throw new Error("Failed to add class card")
+            const message = (e as Error)?.message || "Failed to add class card";
+            throw new Error(message)
         }
         // let existingDoc = await this.getClassModel(classModel.name);
         // if ( existingDoc == null ) {
@@ -1073,6 +1174,7 @@ class ClientStack extends Stack {
                 console.log("Doc after merge", {doc_})
             }
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
+            await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
             let response = await db.put(doc_);
             // Find me
             fnLogger.info("Response after put", {"response": response});
@@ -1143,6 +1245,7 @@ class ClientStack extends Stack {
                 fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
                 const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
                 fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
+                await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
                 documents.push(doc_);
                 if (isNewDoc) newDocsIds.push(docId);
             } catch (e: any) {
@@ -1313,6 +1416,8 @@ class ClientStack extends Stack {
         const doc = await this.db.get(_id);
         if (doc) {
             try {
+                const targetClass = (doc as any)["~class"] as string;
+                await this.policyEngine.ensureWriteAllowed(targetClass, doc as Document);
                 await this.db.put({...doc, active: false});
                 return true;
             } catch (e: any) {

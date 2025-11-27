@@ -1,57 +1,13 @@
-import { DocStack, Class, Attribute, Domain } from "../index.js";
+import { Class, Attribute, Domain } from "../index.js";
 import { getAllSystemPatches } from "../core/datamodel/index.js";
+import { createTestDocStack } from "../core/test-utils/docstack";
 import type { ClassModel, Document } from "@docstack/shared";
 
 jest.setTimeout(30000);
 
-const waitForDocStackReady = (docStack: DocStack, timeout = 10000): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        const onReady = (event: Event) => {
-            clearTimeout(timer);
-            docStack.removeEventListener("ready", onReady as EventListener);
-            resolve();
-        };
-
-        const timer = setTimeout(() => {
-            docStack.removeEventListener("ready", onReady as EventListener);
-            reject(new Error("DocStack did not become ready within the expected time"));
-        }, timeout);
-
-        docStack.addEventListener("ready", onReady as EventListener);
-    });
-};
-
-const createDocStack = async (name?: string) => {
-    const stackName = name ?? `test-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const docStack = new DocStack({ name: stackName });
-    await waitForDocStackReady(docStack);
-
-    const stack = docStack.getStack(stackName);
-    if (!stack) {
-        throw new Error(`Failed to resolve stack '${stackName}'`);
-    }
-
-    if (typeof (stack.db as any).setMaxListeners === "function") {
-        (stack.db as any).setMaxListeners(0);
-    }
-
-    const cleanup = async () => {
-        const listeners = [...stack.listeners];
-        for (const listener of listeners) {
-            if (typeof listener.cancel === "function") {
-                listener.cancel();
-            }
-        }
-        stack.close();
-        await stack.db.destroy();
-    };
-
-    return { docStack, stack, stackName, cleanup };
-};
-
 describe("@docstack/client integration", () => {
     it("initializes DocStack and exposes the configured stack", async () => {
-        const { docStack, stack, stackName, cleanup } = await createDocStack();
+        const { docStack, stack, stackName, cleanup } = await createTestDocStack("integration");
         try {
             expect(docStack.getReadyState()).toBe(true);
             expect(stack.getDbName()).toContain(stackName);
@@ -61,7 +17,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("fetches the initial class list", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-classes");
         try {
             const classList = await stack.getClasses({});
             const classNames = classList.map(cls => cls.getName());
@@ -74,7 +30,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("instantiates existing classes from the stack", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-instantiation");
         try {
             const classOrigin = await stack.getClass("class");
             expect(classOrigin).toBeInstanceOf(Class);
@@ -85,7 +41,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("creates classes and manages attributes", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-attributes");
         try {
             const className = `Book-${Math.random().toString(16).slice(2)}`;
             const classObj = await Class.create(stack, className, "class", "Books catalog");
@@ -106,7 +62,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("matches the system class schema with patch definitions", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-schema");
         try {
             const classOrigin = await stack.getClass("class");
             expect(classOrigin).not.toBeNull();
@@ -133,7 +89,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("creates, updates, deletes and validates documents for a class", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-listeners");
         try {
             const className = `Card-${Math.random().toString(16).slice(2)}`;
             const classObj = await Class.create(stack, className, "class", "Cards");
@@ -166,7 +122,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("notifies class listeners when documents change", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-documents");
         try {
             const className = `Listener-${Math.random().toString(16).slice(2)}`;
             const classObj = await Class.create(stack, className, "class", "Listeners");
@@ -198,7 +154,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("creates domains and lists them", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-bulkdoc-validation");
         try {
             const sourceClass = await Class.create(stack, `Source-${Date.now()}`, "class", "Sources");
             const targetClass = await Class.create(stack, `Target-${Date.now()}`, "class", "Targets");
@@ -220,7 +176,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("validates relation documents passed through bulkDocs", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-domain-validation");
         try {
             const sourceClass = await Class.create(stack, `BulkSource-${Date.now()}`, "class", "Sources");
             const targetClass = await Class.create(stack, `BulkTarget-${Date.now()}`, "class", "Targets");
@@ -274,7 +230,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("validates reference attribute placement on domains", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-reference-domain");
         try {
             const leftClass = await Class.create(stack, `Left-${Date.now()}`, "class", "Left");
             const rightClass = await Class.create(stack, `Right-${Date.now()}`, "class", "Right");
@@ -294,7 +250,7 @@ describe("@docstack/client integration", () => {
     });
 
     it("creates and deletes domain relations via reference attributes", async () => {
-        const { stack, cleanup } = await createDocStack();
+        const { stack, cleanup } = await createTestDocStack("integration-reference-delete");
         try {
             const customerClass = await Class.create(stack, `Customer-${Date.now()}`, "class", "Customers");
             const accountClass = await Class.create(stack, `Account-${Date.now()}`, "class", "Accounts");
