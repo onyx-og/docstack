@@ -29,7 +29,6 @@
   "description": "",
   "dependencies": {
     "@docstack/shared": "file:../shared",
-    "isolated-vm": "^4.7.2",
     "semver": "^7.7.3"
   },
   "devDependencies": {
