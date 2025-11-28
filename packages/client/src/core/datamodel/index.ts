@@ -659,7 +659,117 @@ const sys_005: Patch = {
     ]
 };
 
-syspatches.push(sys_005);
+const sys_006: Patch = {
+    "_id": "~sys-0.0.6",
+    "~class": "patch",
+    "version": "0.0.6",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.6\\n#### Updates: support wrapped document keys and encrypted user secrets",
+    "docs": [
+        {
+            "_id": "~User",
+            "_rev": "auto",
+            "active": true,
+            "name": "User",
+            "description": "A user class for secure login",
+            "~class": "class",
+            "schema": {
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false
+                    }
+                },
+                "password": {
+                    "name": "password",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false,
+                        "encrypted": true
+                    }
+                },
+                "email": {
+                    "name": "email",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "firstName": {
+                    "name": "firstName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "lastName": {
+                    "name": "lastName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "authMethod": {
+                    "name": "authMethod",
+                    "type": "foreign_key",
+                    "config": { "mandatory": true, "targetClass": "~AuthModule" }
+                },
+                "externalId": {
+                    "name": "externalId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "isArray": false
+                    }
+                },
+                "keyDerivationSalt": {
+                    "name": "keyDerivationSalt",
+                    "type": "string",
+                    "config": {
+                        "mandatory": true,
+                        "maxLength": 200,
+                        "isArray": false
+                    }
+                },
+                "wrappedDocumentKey": {
+                    "name": "wrappedDocumentKey",
+                    "type": "string",
+                    "config": {
+                        "mandatory": false,
+                        "maxLength": 4096,
+                        "isArray": false,
+                        "encrypted": true
+                    }
+                }
+            }
+        },
+        {
+            "_id": "system",
+            "_rev": "auto",
+            "~class": "~User",
+            "username": "system",
+            "password": "system",
+            "email": "",
+            "firstName": "System",
+            "lastName": "User",
+            "authMethod": "AuthMod-Classic",
+            "externalId": "",
+            "keyDerivationSalt": "system-salt",
+            "wrappedDocumentKey": ""
+        }
+    ]
+};
+
+syspatches.push(sys_005, sys_006);
 
 export function getSystemPatches(currentVersion: string) {
     return syspatches

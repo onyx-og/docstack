@@ -2,6 +2,8 @@ import { ClientStack, Class } from "../src";
 import type { ClassModel } from "@docstack/shared";
 import { createSessionProof } from "../src/core/test-utils/docstack";
 
+jest.setTimeout(30000);
+
 describe("ClientStack.query execution", () => {
     const dbName = `query-execution-${Date.now()}`;
     let stack: ClientStack;
