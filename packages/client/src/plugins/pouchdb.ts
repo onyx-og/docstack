@@ -28,6 +28,10 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 options = {}
             }
 
+            // The `isPatch` flag is reserved for bootstrapping system patches where
+            // schema documents might not yet validate against the current runtime
+            // (e.g. during initial migration). Regular application code should not
+            // set this flag because it bypasses validation and trigger execution.
             const skipPatchValidation = Boolean((options as any)?.isPatch);
 
             const originalFn = () => {

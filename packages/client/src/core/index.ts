@@ -14,9 +14,10 @@ import ClientStack from './stack.js';
 import Class from "./class.js";
 import Domain from './domain.js';
 import {Trigger} from "./trigger/index.js";
+import { JobEngine } from "./job-engine/index.js";
 // import AbstractClass from '../../shared/src//utils/stack/class';
 import Attribute from './attribute.js';
-import {AttributeType, DocstackReady, StackConfig, StackOptions} from "@docstack/shared";
+import {AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions} from "@docstack/shared";
 import { createLogger, Logger } from "winston";
 // import { EventTarget } from 'node:events';
 
@@ -48,17 +49,18 @@ class DocStack extends EventTarget {
         if (typeof config == "object" && config.name) {
             stack = await ClientStack.create(`db-${config.name}`, {
                 // defaults to leveldb
-                // adapter: 'memory', 
+                // adapter: 'memory',
                 plugins: [
                 // https://www.npmjs.com/package/pouchdb-adapter-memory
                 // memoryAdapter
                 ],
                 patches: config.patches,
+                credentials: (config as any).credentials,
             });
         } else if (typeof config === "string") {
             stack = await ClientStack.create(`db-${config}`, {
                 // defaults to leveldb
-                // adapter: 'memory', 
+                // adapter: 'memory',
                 plugins: [
                 // https://www.npmjs.com/package/pouchdb-adapter-memory
                 // memoryAdapter
@@ -107,6 +109,14 @@ class DocStack extends EventTarget {
 
     public getStack = (name: string) => {
         return this.stacks.find(s => s.name == name || s.connection == name );
+    }
+
+    public async authenticateStack(name: string, credentials: ClientCredentials) {
+        const stack = this.getStack(name);
+        if (!stack) {
+            throw new Error(`Stack '${name}' not found`);
+        }
+        return stack.authenticate(credentials);
     }
 
     public getReadyState() {
@@ -402,5 +412,5 @@ class DocStack extends EventTarget {
     // }
 }
 
-export { ClientStack, Trigger, Class, Attribute, Domain };
+export { ClientStack, Trigger, Class, Attribute, Domain, JobEngine };
 export { DocStack };

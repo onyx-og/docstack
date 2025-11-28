@@ -3,6 +3,11 @@ import Stack from "./utils/stack";
 import type Class from "./utils/stack/class";
 import Trigger from "./utils/stack/trigger";
 
+export type JobStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILURE" | "CANCELED" | "SKIPPED";
+export type JobTriggerType = "manual" | "scheduled" | "event";
+export type JobType = "system" | "user";
+export type JobWorkerPlatform = "client" | "server" | "hybrid";
+
 
 export const ATTRIBUTE_TYPES = ["string", "decimal", "integer", "foreign_key", "date", "enum", "reference", "object", "boolean"];
 
@@ -160,6 +165,7 @@ export type StackOptions = {
     name?: string,
     plugins?: PouchDB.Plugin[],
     patches?: Patch[];
+    credentials?: ClientCredentials;
 } & PouchDB.Configuration.DatabaseConfiguration
 
 export type StackConfig = ({
@@ -189,7 +195,8 @@ export interface ClassModelPropagationComplete {
 export interface TriggerModel {
     name: string;
     order: "before" | "after";
-    run: string;
+    run?: string;
+    jobId?: string;
 }
 
 /**
@@ -198,6 +205,86 @@ export interface TriggerModel {
  * It is now asynchronous by default.
  */
 export type TriggerRunFunction = (document: Document, classObj?: Class, stack?: Stack) => Document | Promise<Document>;
+
+export interface JobModel extends Document {
+    "~class": "~Job";
+    name: string;
+    description?: string;
+    type: JobType;
+    workerPlatform: JobWorkerPlatform;
+    content: string;
+    hash: string;
+    schedule?: string | null;
+    isSingleton?: boolean;
+    isEnabled: boolean;
+    nextRunTimestamp?: number | null;
+    defaultParams?: Record<string, any>;
+    metadata?: Record<string, any>;
+}
+
+export interface JobRunModel extends Document {
+    "~class": "~JobRun";
+    jobId: string;
+    status: JobStatus;
+    triggerType: JobTriggerType;
+    startTime: number;
+    endTime?: number;
+    durationMs?: number;
+    runtimeArgs?: Record<string, any>;
+    initialMetadata?: Record<string, any>;
+    finalMetadata?: Record<string, any>;
+    errorMessage?: string;
+    errorStack?: string;
+    logs?: string | string[];
+    workerId?: string;
+}
+
+export interface PolicyModel extends Document {
+    "~class": "~Policy";
+    userId: string;
+    rule: string;
+    description?: string;
+    targetClass: string[];
+}
+
+export interface AuthModuleModel extends Document {
+    "~class": "~AuthModule";
+    name: string;
+    config?: Record<string, any>;
+    jobId: string;
+}
+
+export interface UserModel extends Document {
+    "~class": "~User";
+    username: string;
+    password: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    authMethod: string;
+    externalId?: string;
+    keyDerivationSalt: string;
+}
+
+export interface UserSessionModel extends Document {
+    "~class": "~UserSession";
+    username: string;
+    sessionId: string;
+    sessionStart: string;
+    sessionStatus: string;
+    sessionEnd?: string;
+}
+
+export interface AuthSessionProof {
+    session: UserSessionModel;
+    derivedKey?: string;
+}
+
+export type ClientCredentials = {
+    username: string;
+    password: string;
+    stackName?: string;
+};
 
 export type DocstackReady = CustomEventInit<{
     stack: Stack
