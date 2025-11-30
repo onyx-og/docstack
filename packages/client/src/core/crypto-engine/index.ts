@@ -1,4 +1,4 @@
-import { Document } from "@docstack/shared";
+import { AttributeModel, Document } from "@docstack/shared";
 import createLogger from "../../utils/logger/index.js";
 import Class from "../class.js";
 import type ClientStack from "../stack.js";
