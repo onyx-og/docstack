@@ -20,7 +20,7 @@ export class CryptoEngine {
 
     constructor(stack: ClientStack) {
         this.stack = stack;
-        this.enabled = process.env.DOCSTACK_DISABLE_CRYPTO_ENGINE !== "true";
+        this.enabled = !stack.isCryptoEngineDisabled();
     }
 
     public async setDocumentKey(documentKey?: string | null) {
@@ -31,6 +31,13 @@ export class CryptoEngine {
 
     public getDocumentKey() {
         return this.enabled ? this.documentKey : undefined;
+    }
+
+    public async encryptValueForMarker(value: unknown) {
+        if (!this.enabled) return null;
+        const key = await this.getCryptoKey();
+        if (!key) return null;
+        return this.encryptValue(value, key) as EncryptedPayload;
     }
 
     public isEnabled() {

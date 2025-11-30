@@ -56,6 +56,7 @@ class DocStack extends EventTarget {
                 ],
                 patches: config.patches,
                 credentials: (config as any).credentials,
+                disableCryptoEngine: (config as StackOptions).disableCryptoEngine,
             });
         } else if (typeof config === "string") {
             stack = await ClientStack.create(`db-${config}`, {

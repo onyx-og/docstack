@@ -30,6 +30,7 @@ import type { SelectAST, UnionAST } from "./query-engine/index.js";
 import { JobEngine } from "./job-engine/index.js";
 import { PolicyEngine } from "./policy-engine/index.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
+import { isEncryptedPayload } from "./crypto-engine/utils.js";
 
 const logger = createLogger().child({module: "stack"});
 
@@ -77,6 +78,7 @@ const DOMAIN_SCHEMA: ClassModel["schema"] = {
     "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: false } },
 };
 class ClientStack extends Stack {
+    private static readonly CRYPTO_CONFIG_DOC_ID = "~crypto-engine-config";
     /* Initialized asynchronously */
     db!: PouchDB.Database<{}>;
     name!: string;
@@ -101,6 +103,7 @@ class ClientStack extends Stack {
     cryptoEngine!: CryptoEngine;
     schemaVersion: string | undefined;
     authSession?: AuthSessionProof;
+    private cryptoEngineDisabled!: boolean;
 
     private constructor() {
         super();
@@ -112,6 +115,7 @@ class ClientStack extends Stack {
         // Store the connection string and options
         this.connection = conn;
         this.options = options;
+        this.cryptoEngineDisabled = Boolean(options?.disableCryptoEngine);
         if (options?.name) {
             this.name = options?.name
         }
@@ -154,6 +158,10 @@ class ClientStack extends Stack {
 
     public getDbName() {
         return this.db.name;
+    }
+
+    public isCryptoEngineDisabled() {
+        return this.cryptoEngineDisabled;
     }
 
     public setAuthSession(proof: AuthSessionProof) {
@@ -251,6 +259,7 @@ class ClientStack extends Stack {
 
         const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey };
         this.setAuthSession(proof);
+        await this.ensureCryptoMarkerEncryption();
         return proof;
     }
     
@@ -559,10 +568,87 @@ class ClientStack extends Stack {
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
     async initdb () {
+        await this.ensureCryptoConfigDocument();
         await this.initIndex();
         await this.checkSystem();
         this.setListeners();
         return this;
+    }
+
+    private async ensureCryptoConfigDocument() {
+        const markerId = ClientStack.CRYPTO_CONFIG_DOC_ID;
+        const existing = await this.db.get<{ cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }>(markerId).catch((error: any) => {
+            if (error?.name === "not_found" || error?.status === 404) return null;
+            throw error;
+        });
+
+        if (existing) {
+            this.validateCryptoConfig(existing);
+            return existing;
+        }
+
+        const markerDoc: PouchDB.Core.PutDocument<Record<string, unknown>> = {
+            _id: markerId,
+            cryptoEngineDisabled: this.cryptoEngineDisabled,
+            createdAt: new Date().toISOString(),
+        };
+
+        if (!this.cryptoEngineDisabled) {
+            const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({
+                nonce: crypto.randomBytes(12).toString("hex"),
+            });
+            if (encryptedMarker) {
+                (markerDoc as any).encryptedMarker = encryptedMarker;
+            }
+        }
+
+        try {
+            await this.db.put(markerDoc as any);
+            return markerDoc;
+        } catch (error: any) {
+            if (error?.status === 409 || error?.name === "conflict") {
+                const current = await this.db.get<{ cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }>(markerId);
+                this.validateCryptoConfig(current);
+                return current;
+            }
+            throw error;
+        }
+    }
+
+    private async ensureCryptoMarkerEncryption() {
+        if (this.cryptoEngineDisabled || !this.cryptoEngine.isEnabled()) return;
+
+        const markerId = ClientStack.CRYPTO_CONFIG_DOC_ID;
+        const markerDoc = await this.db.get<{ encryptedMarker?: unknown }>(markerId).catch((error: any) => {
+            if (error?.name === "not_found" || error?.status === 404) return null;
+            throw error;
+        });
+
+        if (!markerDoc || isEncryptedPayload((markerDoc as any).encryptedMarker)) return;
+
+        const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({
+            nonce: crypto.randomBytes(12).toString("hex"),
+        });
+
+        if (!encryptedMarker) return;
+
+        (markerDoc as any).encryptedMarker = encryptedMarker;
+        await this.db.put(markerDoc as any);
+    }
+
+    private validateCryptoConfig(existing: { cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }) {
+        const storedDisabled = Boolean(existing.cryptoEngineDisabled);
+        if (storedDisabled !== this.cryptoEngineDisabled) {
+            throw new Error(
+                storedDisabled
+                    ? "Stack was initialized with crypto engine disabled; re-open it with disableCryptoEngine set to true."
+                    : "Stack requires the crypto engine; remove disableCryptoEngine to continue."
+            );
+        }
+
+        if (!storedDisabled && isEncryptedPayload((existing as any).encryptedMarker) && !this.cryptoEngine.isEnabled()) {
+            throw new Error("Crypto engine must be enabled to access this stack because it contains encrypted data.");
+        }
     }
 
     close = () => {
@@ -613,12 +699,21 @@ class ClientStack extends Stack {
             if (!lastDocId) {
                 lastDocId = Number(lastDocId);
                 // logger.info("initdb - initializing db")
-                let response = await this.db.put({
-                    _id: "lastDocId",
-                    value: ++lastDocId
-                });
-                if (response.ok) this.lastDocId = lastDocId;
-                else throw new Error("Got problem while putting doc"+ response);
+                try {
+                    let response = await this.db.put({
+                        _id: "lastDocId",
+                        value: ++lastDocId
+                    });
+                    if (response.ok) this.lastDocId = lastDocId;
+                    else throw new Error("Got problem while putting doc"+ response);
+                } catch (error: any) {
+                    if (error?.status === 409 || error?.name === "conflict") {
+                        const existing = await this.db.get<{ value: number }>("lastDocId");
+                        this.lastDocId = Number(existing.value);
+                        return;
+                    }
+                    throw error;
+                }
             } else {
                 logger.info("initdb - db already initialized, consider purge")
             }
