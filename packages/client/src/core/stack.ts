@@ -29,6 +29,7 @@ import { parse, createPlan, executePlan } from "./query-engine/index.js";
 import type { SelectAST, UnionAST } from "./query-engine/index.js";
 import { JobEngine } from "./job-engine/index.js";
 import { PolicyEngine } from "./policy-engine/index.js";
+import { CryptoEngine } from "./crypto-engine/index.js";
 
 const logger = createLogger().child({module: "stack"});
 
@@ -97,6 +98,7 @@ class ClientStack extends Stack {
     modelWorker: Worker | null = null;
     jobEngine!: JobEngine;
     policyEngine!: PolicyEngine;
+    cryptoEngine!: CryptoEngine;
     schemaVersion: string | undefined;
     authSession?: AuthSessionProof;
 
@@ -139,6 +141,7 @@ class ClientStack extends Stack {
         }
         this.jobEngine = new JobEngine(this);
         this.policyEngine = new PolicyEngine(this);
+        this.cryptoEngine = new CryptoEngine(this);
     }
 
     public getDb() {
@@ -159,6 +162,7 @@ class ClientStack extends Stack {
 
     public clearAuthSession() {
         this.authSession = undefined;
+        this.cryptoEngine.setDocumentKey(null);
     }
 
     public dump = async () => {
@@ -243,7 +247,9 @@ class ClientStack extends Stack {
         const sessionSchema = sessionClassModel?.schema || {};
         await this.createDoc(sessionDoc._id, sessionDoc["~class"], sessionSchema, sessionDoc);
 
-        const proof: AuthSessionProof = { session: sessionDoc, derivedKey };
+        const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey);
+
+        const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey };
         this.setAuthSession(proof);
         return proof;
     }
@@ -696,8 +702,16 @@ class ClientStack extends Stack {
             const readableDocs: T[] = [];
             for (const doc of foundResult.docs as unknown as Document[]) {
                 const canRead = await this.policyEngine.isReadableDocument(doc);
-                if (canRead) {
-                    readableDocs.push(doc as unknown as T);
+                if (!canRead) continue;
+
+                const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc as Document);
+                const classObj = encryptedKeys.length || (fields && fields.length)
+                    ? await this.getClass(doc["~class"], true).catch(() => null)
+                    : null;
+
+                const processedDoc = await this.processReadableDocument(doc as Document, classObj, fields, encryptedKeys);
+                if (processedDoc) {
+                    readableDocs.push(processedDoc as unknown as T);
                 }
             }
 
@@ -707,6 +721,54 @@ class ClientStack extends Stack {
             fnLogger.error("findDocument - error",e);
             throw e;
         }
+    }
+
+    private async processReadableDocument(doc: Document, classObj: Class | null, fields?: string[], precomputedEncryptedKeys?: string[]) {
+        if (!this.cryptoEngine.isEnabled()) {
+            return doc;
+        }
+
+        const encryptedKeys = precomputedEncryptedKeys ?? this.cryptoEngine.identifyEncryptedKeys(doc, classObj);
+        if (!encryptedKeys.length && (!fields || !fields.length)) {
+            return doc;
+        }
+
+        const clone: Document = { ...doc } as Document;
+        const hasDocumentKey = Boolean(this.cryptoEngine.getDocumentKey());
+
+        if (hasDocumentKey && encryptedKeys.length) {
+            await this.cryptoEngine.decryptDocument(clone, classObj, encryptedKeys);
+        } else if (encryptedKeys.length) {
+            for (const key of encryptedKeys) {
+                if ((clone as any)[key] !== undefined) {
+                    (clone as any)[key] = null;
+                }
+            }
+        }
+
+        const encryptedKeySet = new Set(encryptedKeys);
+        const visibleKeys = Object.keys(clone).filter((key) => {
+            if (key === "_id" || key === "_rev" || key === "~rev" || key === "~class" || key === "active" || key === "~createTimestamp" || key === "~updateTimestamp" || key === "description") {
+                return false;
+            }
+            if (fields && fields.length) {
+                return fields.includes(key) && (clone as any)[key] !== undefined;
+            }
+            return (clone as any)[key] !== undefined;
+        });
+
+        if (!hasDocumentKey && encryptedKeySet.size) {
+            const nonEncryptedVisible = visibleKeys.filter((key) => !encryptedKeySet.has(key));
+            if (!nonEncryptedVisible.length) {
+                return null;
+            }
+        }
+
+        if (!visibleKeys.length) {
+            return null;
+        }
+
+        return clone;
     }
 
     async findDocument<T extends Document | RelationDocument = Document>( selector: any, fields = undefined, skip = undefined, limit = undefined ) {

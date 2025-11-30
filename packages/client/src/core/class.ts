@@ -25,6 +25,7 @@ class Class extends Class_ {
     static logger: Logger = createLogger().child({module: "class"});
     logger!: Logger;
     triggers: Trigger[] = [];
+    private encryptedAttributesCache?: Attribute[];
 
     private constructor() {
         super();
@@ -309,6 +310,7 @@ class Class extends Class_ {
             // model.schema = {...this.model.schema, ...model.schema};
             this.attributes = {};
             this.schemaZOD = z.object({});
+            this.encryptedAttributesCache = undefined;
             for (const [key, attrModel] of Object.entries(model.schema)) {
                 let attribute = new Attribute(
                     this, attrModel.name, attrModel.type, attrModel.description, attrModel.config
@@ -379,6 +381,16 @@ class Class extends Class_ {
         return result;
     }
 
+    getEncryptedAttributes() {
+        if (!this.encryptedAttributesCache) {
+            this.encryptedAttributesCache = Object.values(this.attributes).filter((attribute) => {
+                const config = attribute.model.config;
+                return config?.encrypted === true && config?.primaryKey !== true;
+            });
+        }
+        return this.encryptedAttributesCache;
+    }
+
     // interface of hasAnyAttributes
     hasAttribute = ( name: string ) => {
         return this.hasAnyAttributes( name )
@@ -398,6 +410,7 @@ class Class extends Class_ {
             if (!this.hasAttribute(name)) {
                 fnLogger.info("Adding attribute", {name: name, type: attribute_.getModel()});
                 this.attributes[name] = attribute_;
+                this.encryptedAttributesCache = undefined;
                 let attributeModel = attribute_.getModel();
                 fnLogger.info("Adding attribute to schema", {attributeModel: attributeModel});
                 const currentSchema = this.model.schema ?? {};
@@ -445,6 +458,7 @@ class Class extends Class_ {
             fnLogger.info(`Attempting to change attribute definition.`);
             delete this.model.schema[name];
             delete this.attributes[name];
+            this.encryptedAttributesCache = undefined;
             this.schemaZOD = this.schemaZOD.omit({[name]: true});
             return this.addAttribute(attribute_);
         } catch (e: any) {
@@ -464,6 +478,7 @@ class Class extends Class_ {
             fnLogger.info(`Attempting to remove attribute from class.`);
             delete this.model.schema[name];
             delete this.attributes[name];
+            this.encryptedAttributesCache = undefined;
             this.schemaZOD = this.schemaZOD.omit({[name]: true});
             if (this.stack) {
                 this.stack.updateClass(this);

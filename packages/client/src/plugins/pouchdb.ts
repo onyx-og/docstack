@@ -18,6 +18,8 @@ const logger = createLogger().child({module: "pouchdb"});
  */
 export const StackPlugin: StackPluginType = (stack: Stack) => {
     const pouchBulkDocs = PouchDB.prototype.bulkDocs;
+    const pouchGet = PouchDB.prototype.get;
+    const pouchPut = PouchDB.prototype.put;
     return {
         bulkDocs: async function (docs, options: PouchDB.Core.BulkDocsOptions & {
             isPostOp?: boolean
@@ -73,6 +75,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             };
 
             const triggerQueue: Record<string, Trigger[]> = Object.create(null);
+            const classCache = new Map<string, Class>();
 
             const postOperations = async (
                 error: PouchDB.Core.Error | null,
@@ -235,7 +238,12 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     try {
                         const classObj = await stack.getClass(className, true);
                         if (classObj) {
-                                
+                        classCache.set(className, classObj);
+                        const encryptableAttributes = classObj.getEncryptedAttributes();
+                        if (stack.cryptoEngine.isEnabled() && encryptableAttributes.length) {
+                            await stack.cryptoEngine.decryptDocument(doc as Document, classObj);
+                        }
+
                             const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
                                 if (classObj.getName().startsWith("Account-"))
                                     console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})
@@ -275,6 +283,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // Perform validation using the schema.
                             const validationResult = await classObj.validate(doc);
                             if (!validationResult) {
+                                fnLogger.error("Validation failed for document", { id: doc._id, className, doc });
                                 throw new Error("Discarded object because object not valid for its Class schema");
                             }
                         }
@@ -284,7 +293,82 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 }
             }            
 
-            return pouchBulkDocs.call(this, docs, options, postExec);
+            if (!stack.cryptoEngine.isEnabled()) {
+                return pouchBulkDocs.call(this, docs as any, options, postExec);
+            }
+
+            const originalDocs = Array.isArray(docs) ? documentsToProcess : (docs as any).docs;
+            const encryptedDocs = await Promise.all((originalDocs || []).map(async (doc) => {
+                if (isDocument(doc)) {
+                    const className = doc["~class"];
+                    const classObj = classCache.get(className) || await stack.getClass(className, true);
+                    if (classObj) {
+                        const encryptableAttributes = classObj.getEncryptedAttributes();
+                        if (!stack.cryptoEngine.isEnabled() || !encryptableAttributes.length) {
+                            return doc;
+                        }
+                        classCache.set(className, classObj);
+                        const clone = { ...doc } as Document;
+                        await stack.cryptoEngine.encryptDocument(clone, classObj);
+                        return clone;
+                    }
+                }
+                return doc;
+            }));
+
+            const payload = Array.isArray(docs)
+                ? encryptedDocs
+                : { ...(docs as any), docs: encryptedDocs };
+
+            return pouchBulkDocs.call(this, payload as any, options, postExec);
+        },
+
+        get: async function (docId, options?: PouchDB.Core.GetOptions | null, callback?) {
+            if (typeof options === "function") {
+                callback = options;
+                options = undefined;
+            }
+
+                const exec = async () => {
+                    const result = await pouchGet.call(this, docId, options ?? {});
+                    if (result && isDocument(result) && stack.cryptoEngine.isEnabled()) {
+                        const classObj = await stack.getClass(result["~class"], true).catch(() => null);
+                        if (classObj && classObj.getEncryptedAttributes().length) {
+                            await stack.cryptoEngine.decryptDocument(result as Document, classObj);
+                        }
+                    }
+                    return result;
+                };
+
+            if (callback) {
+                exec().then((res) => callback(null, res)).catch((err) => callback(err));
+                return;
+            }
+            return exec();
+        },
+
+        put: async function (doc, options?: PouchDB.Core.PutOptions | null, callback?) {
+            if (typeof options === "function") {
+                callback = options;
+                options = undefined;
+            }
+                const exec = async () => {
+                    let payload = doc as any;
+                if (isDocument(doc) && stack.cryptoEngine.isEnabled()) {
+                    const classObj = await stack.getClass(doc["~class"], true).catch(() => null);
+                    if (classObj && classObj.getEncryptedAttributes().length) {
+                        payload = { ...doc } as Document;
+                        await stack.cryptoEngine.encryptDocument(payload as Document, classObj);
+                    }
+                }
+                return pouchPut.call(this, payload, options ?? {});
+            };
+
+            if (callback) {
+                exec().then((res) => callback(null, res)).catch((err) => callback(err));
+                return;
+            }
+            return exec();
         },
 
     };
