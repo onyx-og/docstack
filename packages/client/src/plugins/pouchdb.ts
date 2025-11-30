@@ -236,56 +236,64 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     const className = doc["~class"];
 
                     try {
-                        const classObj = await stack.getClass(className, true);
-                        if (classObj) {
+                        let classObj: Class | null;
+                        try {
+                            classObj = classCache.get(className) || await stack.getClass(className, true);
+                        } catch (error) {
+                            throw new Error(`Class '${className}' not found for document '${doc._id}'.`);
+                        }
+
+                        if (!classObj) {
+                            throw new Error(`Class '${className}' not found for document '${doc._id}'.`);
+                        }
+
                         classCache.set(className, classObj);
                         const encryptableAttributes = classObj.getEncryptedAttributes();
                         if (stack.cryptoEngine.isEnabled() && encryptableAttributes.length) {
                             await stack.cryptoEngine.decryptDocument(doc as Document, classObj);
                         }
 
-                            const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
-                                if (classObj.getName().startsWith("Account-"))
-                                    console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})
-                                return a.model.type === "reference"
-                            });
-                            for (const attr of relationalAttrs) {
-                                const relationValue = doc[attr.name];
-                                if (!relationValue) continue;
-                                const domainId = (attr.model.config as AttributeTypeReference["config"]).domain;
-                                const domain = await stack.getDomain(domainId);
-                                if (!domain) throw new Error(`Domain not found: ${domainId}`);
+                        const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
+                            if (classObj.getName().startsWith("Account-"))
+                                console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})
+                            return a.model.type === "reference"
+                        });
+                        for (const attr of relationalAttrs) {
+                            const relationValue = doc[attr.name];
+                            if (!relationValue) continue;
+                            const domainId = (attr.model.config as AttributeTypeReference["config"]).domain;
+                            const domain = await stack.getDomain(domainId);
+                            if (!domain) throw new Error(`Domain not found: ${domainId}`);
 
-                                // Validate relation constraint
-                                const validation = await domain.validateRelation(doc, relationValue);
-                                if (!validation.exists) {
-                                    console.log("Queuing relation creation for doc", {docId: doc._id, domain: domain.name, params: validation.params})
-                                    relationQueue.push({
-                                        domain,
-                                        params: validation.params,
-                                    });
-                                }
+                            // Validate relation constraint
+                            const validation = await domain.validateRelation(doc, relationValue);
+                            if (!validation.exists) {
+                                console.log("Queuing relation creation for doc", {docId: doc._id, domain: domain.name, params: validation.params})
+                                relationQueue.push({
+                                    domain,
+                                    params: validation.params,
+                                });
                             }
-                            // TODO: skip execution of before triggers if option.isPostOp
-                            const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
-                            const afterTriggers = classObj.triggers.filter( t => t.order === "after");
+                        }
+                        // TODO: skip execution of before triggers if option.isPostOp
+                        const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
+                        const afterTriggers = classObj.triggers.filter( t => t.order === "after");
 
-                            for (const trigger of beforeTriggers) {
-                                const updatedDoc = await trigger.execute(doc);
-                                Object.assign(doc, updatedDoc); // Merge changes back.
-                            }
+                        for (const trigger of beforeTriggers) {
+                            const updatedDoc = await trigger.execute(doc);
+                            Object.assign(doc, updatedDoc); // Merge changes back.
+                        }
 
-                            triggerQueue[doc._id] = [
-                                ...(triggerQueue[doc._id] || []),
-                                ...afterTriggers
-                            ];
+                        triggerQueue[doc._id] = [
+                            ...(triggerQueue[doc._id] || []),
+                            ...afterTriggers
+                        ];
 
-                            // Perform validation using the schema.
-                            const validationResult = await classObj.validate(doc);
-                            if (!validationResult) {
-                                fnLogger.error("Validation failed for document", { id: doc._id, className, doc });
-                                throw new Error("Discarded object because object not valid for its Class schema");
-                            }
+                        // Perform validation using the schema.
+                        const validationResult = await classObj.validate(doc);
+                        if (!validationResult) {
+                            fnLogger.error("Validation failed for document", { id: doc._id, className, doc });
+                            throw new Error("Discarded object because object not valid for its Class schema");
                         }
                     } catch (error) {
                         return Promise.reject(error);
