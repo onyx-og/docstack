@@ -401,7 +401,7 @@ class Class extends Class_ {
             );
         try {
             let name = attribute_.getName();
-            console.log("Adding attribute", {className: this.name, attribute: name})
+            // console.log("Adding attribute", {className: this.name, attribute: name})
             if (!this.hasAttribute(name)) {
                 fnLogger.info("Adding attribute", {name: name, type: attribute_.getModel()});
                 this.attributes[name] = attribute_;

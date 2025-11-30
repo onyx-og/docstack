@@ -14,6 +14,7 @@ const config: Config.InitialOptions = {
     "^@docstack/shared$": "<rootDir>/../shared/src/index.ts",
     "^@docstack/shared/(.*)$": "<rootDir>/../shared/src/$1",
     "^jsondiffpatch$": "<rootDir>/test/__mocks__/jsondiffpatch.js"
-  }
+  },
+  "testPathIgnorePatterns": ["<rootDir>/lib/"]
 };
 export default config;

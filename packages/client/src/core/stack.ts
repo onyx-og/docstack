@@ -1307,7 +1307,7 @@ class ClientStack extends Stack {
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
                 fnLogger.info("Retrieved doc", {existingDoc})
-                console.log("Existing doc", {existingDoc, params})
+                // console.log("Existing doc", {existingDoc, params})
                 if (existingDoc && existingDoc["~class"] === type) {
                     fnLogger.info("Assigning existing doc", {doc: existingDoc});
                     doc = {...existingDoc};
