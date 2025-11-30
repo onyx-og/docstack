@@ -29,6 +29,8 @@ import { parse, createPlan, executePlan } from "./query-engine/index.js";
 import type { SelectAST, UnionAST } from "./query-engine/index.js";
 import { JobEngine } from "./job-engine/index.js";
 import { PolicyEngine } from "./policy-engine/index.js";
+import { CryptoEngine } from "./crypto-engine/index.js";
+import { isEncryptedPayload } from "./crypto-engine/utils.js";
 
 const logger = createLogger().child({module: "stack"});
 
@@ -97,6 +99,7 @@ class ClientStack extends Stack {
     modelWorker: Worker | null = null;
     jobEngine!: JobEngine;
     policyEngine!: PolicyEngine;
+    cryptoEngine!: CryptoEngine;
     schemaVersion: string | undefined;
     authSession?: AuthSessionProof;
 
@@ -139,6 +142,7 @@ class ClientStack extends Stack {
         }
         this.jobEngine = new JobEngine(this);
         this.policyEngine = new PolicyEngine(this);
+        this.cryptoEngine = new CryptoEngine(this);
     }
 
     public getDb() {
@@ -159,6 +163,7 @@ class ClientStack extends Stack {
 
     public clearAuthSession() {
         this.authSession = undefined;
+        this.cryptoEngine.setDocumentKey(null);
     }
 
     public dump = async () => {
@@ -243,7 +248,9 @@ class ClientStack extends Stack {
         const sessionSchema = sessionClassModel?.schema || {};
         await this.createDoc(sessionDoc._id, sessionDoc["~class"], sessionSchema, sessionDoc);
 
-        const proof: AuthSessionProof = { session: sessionDoc, derivedKey };
+        const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey);
+
+        const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey };
         this.setAuthSession(proof);
         return proof;
     }
@@ -696,8 +703,12 @@ class ClientStack extends Stack {
             const readableDocs: T[] = [];
             for (const doc of foundResult.docs as unknown as Document[]) {
                 const canRead = await this.policyEngine.isReadableDocument(doc);
-                if (canRead) {
-                    readableDocs.push(doc as unknown as T);
+                if (!canRead) continue;
+
+                const classObj = await this.getClass(doc["~class"], true).catch(() => null);
+                const processedDoc = await this.processReadableDocument(doc as Document, classObj, fields);
+                if (processedDoc) {
+                    readableDocs.push(processedDoc as unknown as T);
                 }
             }
 
@@ -707,6 +718,56 @@ class ClientStack extends Stack {
             fnLogger.error("findDocument - error",e);
             throw e;
         }
+    }
+
+    private async processReadableDocument(doc: Document, classObj: Class | null, fields?: string[]) {
+        const clone: Document = { ...doc } as Document;
+
+        if (classObj) {
+            await this.cryptoEngine.decryptDocument(clone, classObj);
+
+            const encryptedAttributes = Object.values(classObj.getAttributes()).filter((attr) => attr.model.config?.encrypted);
+            if (!this.cryptoEngine.getDocumentKey() && encryptedAttributes.length) {
+                for (const attribute of encryptedAttributes) {
+                    const name = attribute.getName();
+                    const value = (clone as any)[name];
+                    if (isEncryptedPayload(value) || value !== undefined) {
+                        delete (clone as any)[name];
+                    }
+                }
+            }
+        }
+
+        const encryptedKeys = new Set(
+            classObj
+                ? Object.values(classObj.getAttributes())
+                    .filter((attr) => attr.model.config?.encrypted)
+                    .map((attr) => attr.getName())
+                : []
+        );
+
+        const visibleKeys = Object.keys(clone).filter((key) => {
+            if (key === "_id" || key === "_rev" || key === "~rev" || key === "~class" || key === "active" || key === "~createTimestamp" || key === "~updateTimestamp" || key === "description") {
+                return false;
+            }
+            if (fields && fields.length) {
+                return fields.includes(key) && (clone as any)[key] !== undefined;
+            }
+            return (clone as any)[key] !== undefined;
+        });
+
+        if (!this.cryptoEngine.getDocumentKey() && encryptedKeys.size) {
+            const nonEncryptedVisible = visibleKeys.filter((key) => !encryptedKeys.has(key));
+            if (!nonEncryptedVisible.length) {
+                return null;
+            }
+        }
+
+        if (!visibleKeys.length) {
+            return null;
+        }
+
+        return clone;
     }
 
     async findDocument<T extends Document | RelationDocument = Document>( selector: any, fields = undefined, skip = undefined, limit = undefined ) {

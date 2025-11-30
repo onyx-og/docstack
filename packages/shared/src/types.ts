@@ -15,6 +15,7 @@ export type AttributeTypeConfig = {
     isArray?: boolean,
     primaryKey?: boolean,
     mandatory?: boolean,
+    encrypted?: boolean,
     defaultValue?: any,
     [key: string]: any
 }
@@ -31,7 +32,7 @@ export type AttributeTypeInteger = {
 export type AttributeTypeString = {
     type: "string",
     name: string,
-    config: {maxLength?: number, encrypted?: boolean, defaultValue?: string} & AttributeTypeConfig
+    config: {maxLength?: number, defaultValue?: string} & AttributeTypeConfig
 }
 
 export type AttribruteTypeDate = {
@@ -264,6 +265,7 @@ export interface UserModel extends Document {
     authMethod: string;
     externalId?: string;
     keyDerivationSalt: string;
+    wrappedDocumentKey?: string;
 }
 
 export interface UserSessionModel extends Document {
@@ -278,6 +280,7 @@ export interface UserSessionModel extends Document {
 export interface AuthSessionProof {
     session: UserSessionModel;
     derivedKey?: string;
+    documentKey?: string;
 }
 
 export type ClientCredentials = {
@@ -313,6 +316,16 @@ export type StackPluginType = (stackInstance: Stack) => {
         docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
         options: PouchDB.Core.BulkDocsOptions | null,
         callback: PouchDB.Core.Callback<Array<PouchDB.Core.Response | PouchDB.Core.Error>>,
+    ): void;
+    put<Model>(
+        doc: PouchDB.Core.PutDocument<{} & Model>,
+        options?: PouchDB.Core.PutOptions | null,
+        callback?: PouchDB.Core.Callback<PouchDB.Core.Response>,
+    ): void;
+    get<Model>(
+        docId: PouchDB.Core.DocumentId,
+        options?: PouchDB.Core.GetOptions | null,
+        callback?: PouchDB.Core.Callback<PouchDB.Core.Document<{} & Model>>,
     ): void;
 }
 
