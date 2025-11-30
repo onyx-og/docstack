@@ -26,3 +26,7 @@ import {DocStack} from '@docstack/client';
 const client = new DocStack('local-ds');
 ```
 Then, use the provided methods to interact with your local data. Most methods are asynchronous and return a Promise.
+
+## ⏱️ Performance note: query execution with crypto engine
+
+Recent profiling of the `test/query-execution.test.ts` integration suite shows a noticeable slowdown when the crypto engine is enabled. Stacks can opt out of client-side crypto by creating them with `disableCryptoEngine: true` in the stack configuration; this choice is persisted on first use and enforced on reopen, so it cannot be toggled later. With crypto disabled at stack creation, the suite completes in about **111 seconds** versus roughly **160 seconds** with encryption enabled, reflecting the additional encryption/decryption work performed inside the query pipeline. These timings were captured with `--runInBand` to avoid parallelism and under a 180-second Jest timeout for the suite.

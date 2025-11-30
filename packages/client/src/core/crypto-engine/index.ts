@@ -16,21 +16,36 @@ export class CryptoEngine {
     private cryptoKey?: CryptoKey;
     private readonly logger = createLogger().child({ module: "crypto-engine" });
     private readonly stack: ClientStack;
+    private readonly enabled: boolean;
 
     constructor(stack: ClientStack) {
         this.stack = stack;
+        this.enabled = !stack.isCryptoEngineDisabled();
     }
 
     public async setDocumentKey(documentKey?: string | null) {
+        if (!this.enabled) return;
         this.documentKey = documentKey || undefined;
         this.cryptoKey = undefined;
     }
 
     public getDocumentKey() {
-        return this.documentKey;
+        return this.enabled ? this.documentKey : undefined;
+    }
+
+    public async encryptValueForMarker(value: unknown) {
+        if (!this.enabled) return null;
+        const key = await this.getCryptoKey();
+        if (!key) return null;
+        return this.encryptValue(value, key) as EncryptedPayload;
+    }
+
+    public isEnabled() {
+        return this.enabled;
     }
 
     public async unwrapAndStoreDocumentKey(wrappedDocumentKey?: string | null, derivedKey?: string | null) {
+        if (!this.enabled) return null;
         if (!wrappedDocumentKey || !derivedKey) return null;
 
         const key = await unwrapDocumentKey(wrappedDocumentKey, derivedKey);
@@ -39,6 +54,7 @@ export class CryptoEngine {
     }
 
     private async getCryptoKey() {
+        if (!this.enabled) return null;
         if (!this.documentKey) return null;
         if (this.cryptoKey) return this.cryptoKey;
 
@@ -46,11 +62,8 @@ export class CryptoEngine {
         return this.cryptoKey;
     }
 
-    private shouldEncrypt(attribute: AttributeModel) {
-        return attribute.config?.encrypted === true && attribute.config?.primaryKey !== true;
-    }
-
     private async encryptValue(value: unknown, key: CryptoKey | null): Promise<EncryptedPayload | unknown> {
+        if (!this.enabled) return value;
         if (!key) return value;
         if (value === undefined || value === null) return value;
         if (isEncryptedPayload(value)) return value;
@@ -59,6 +72,7 @@ export class CryptoEngine {
     }
 
     private async decryptValue(value: unknown, key: CryptoKey | null): Promise<unknown> {
+        if (!this.enabled) return value;
         if (!key) return value;
         if (!isEncryptedPayload(value)) return value;
         try {
@@ -70,9 +84,25 @@ export class CryptoEngine {
         }
     }
 
+    public identifyEncryptedKeys(document: Document, classObj?: Class): string[] {
+        if (!this.enabled) return [];
+        const encryptedFromSchema = classObj?.getEncryptedAttributes().map((attribute) => attribute.getName()) ?? [];
+        const encryptedFromPayload = Object.keys(document).filter((key) => isEncryptedPayload((document as any)[key]));
+
+        if (!encryptedFromSchema.length) {
+            return encryptedFromPayload;
+        }
+
+        const merged = new Set<string>(encryptedFromSchema);
+        for (const key of encryptedFromPayload) {
+            merged.add(key);
+        }
+        return Array.from(merged);
+    }
+
     public async encryptDocument(document: Document, classObj: Class) {
-        const attributes = Object.values(classObj.getAttributes());
-        const encryptableAttributes = attributes.filter((attribute) => this.shouldEncrypt(attribute.getModel()));
+        if (!this.enabled) return;
+        const encryptableAttributes = classObj.getEncryptedAttributes();
         if (!encryptableAttributes.length) return;
 
         const key = await this.getCryptoKey();
@@ -89,19 +119,18 @@ export class CryptoEngine {
         }
     }
 
-    public async decryptDocument(document: Document, classObj: Class) {
-        const attributes = Object.values(classObj.getAttributes());
-        const encryptedAttributes = attributes.filter((attribute) => this.shouldEncrypt(attribute.getModel()));
+    public async decryptDocument(document: Document, classObj?: Class, encryptedKeys?: string[]) {
+        if (!this.enabled) return;
+        const encryptedAttributes = encryptedKeys ?? this.identifyEncryptedKeys(document, classObj);
         if (!encryptedAttributes.length) return;
 
         const key = await this.getCryptoKey();
         if (!key) {
-            this.logger.warn("Document key is not available; returning encrypted payload", { className: classObj.getName?.() ?? classObj.model?.name });
+            this.logger.warn("Document key is not available; returning encrypted payload", { className: classObj?.getName?.() ?? classObj?.model?.name });
             return;
         }
 
-        for (const attribute of encryptedAttributes) {
-            const name = attribute.getName();
+        for (const name of encryptedAttributes) {
             const decrypted = await this.decryptValue((document as any)[name], key);
             (document as any)[name] = decrypted;
         }

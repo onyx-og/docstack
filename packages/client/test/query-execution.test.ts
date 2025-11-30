@@ -5,6 +5,13 @@ import { createSessionProof } from "../src/core/test-utils/docstack";
 jest.setTimeout(30000);
 
 describe("ClientStack.query execution", () => {
+    // Note: This suite intentionally executes a wide spread of SQL features (joins, subqueries,
+    // UNION/UNION ALL, DISTINCT/DISTINCT ON, HAVING) back-to-back against a live ClientStack.
+    // Each call to stack.query runs through the naive query executor, which performs full
+    // collection scans via Class.getCards for the base table and every join/subquery
+    // (packages/client/src/core/query-engine/executor.ts). That repeated work across ten
+    // end-to-end queries is the primary reason this suite runs noticeably slower than other
+    // integration tests that only issue one or two simple queries.
     const dbName = `query-execution-${Date.now()}`;
     let stack: ClientStack;
     let movieClass: Class;

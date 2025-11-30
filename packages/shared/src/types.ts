@@ -167,6 +167,11 @@ export type StackOptions = {
     plugins?: PouchDB.Plugin[],
     patches?: Patch[];
     credentials?: ClientCredentials;
+    /**
+     * Disable the client-side crypto engine for this stack. This flag is persisted on
+     * first use and cannot be changed when reopening the same database.
+     */
+    disableCryptoEngine?: boolean;
 } & PouchDB.Configuration.DatabaseConfiguration
 
 export type StackConfig = ({

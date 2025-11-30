@@ -379,6 +379,13 @@ class Class extends Class_ {
         return result;
     }
 
+    getEncryptedAttributes() {
+        return Object.values(this.attributes).filter((attribute) => {
+            const config = attribute.model.config;
+            return config?.encrypted === true && config?.primaryKey !== true;
+        });
+    }
+
     // interface of hasAnyAttributes
     hasAttribute = ( name: string ) => {
         return this.hasAnyAttributes( name )
@@ -394,7 +401,7 @@ class Class extends Class_ {
             );
         try {
             let name = attribute_.getName();
-            console.log("Adding attribute", {className: this.name, attribute: name})
+            // console.log("Adding attribute", {className: this.name, attribute: name})
             if (!this.hasAttribute(name)) {
                 fnLogger.info("Adding attribute", {name: name, type: attribute_.getModel()});
                 this.attributes[name] = attribute_;

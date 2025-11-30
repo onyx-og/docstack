@@ -12,7 +12,7 @@ describe("CryptoEngine", () => {
         const derivedKey = deriveKey("strong-password", "user-salt");
         const wrapped = await wrapDocumentKey("doc-key-123", derivedKey);
 
-        const engine = new CryptoEngine({} as any);
+        const engine = new CryptoEngine({ isCryptoEngineDisabled: () => false } as any);
         const unwrapped = await engine.unwrapAndStoreDocumentKey(wrapped, derivedKey);
 
         expect(unwrapped).toBe("doc-key-123");

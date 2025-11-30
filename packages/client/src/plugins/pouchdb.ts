@@ -238,8 +238,11 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     try {
                         const classObj = await stack.getClass(className, true);
                         if (classObj) {
-                            classCache.set(className, classObj);
+                        classCache.set(className, classObj);
+                        const encryptableAttributes = classObj.getEncryptedAttributes();
+                        if (stack.cryptoEngine.isEnabled() && encryptableAttributes.length) {
                             await stack.cryptoEngine.decryptDocument(doc as Document, classObj);
+                        }
 
                             const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
                                 if (classObj.getName().startsWith("Account-"))
@@ -290,12 +293,20 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 }
             }            
 
+            if (!stack.cryptoEngine.isEnabled()) {
+                return pouchBulkDocs.call(this, docs as any, options, postExec);
+            }
+
             const originalDocs = Array.isArray(docs) ? documentsToProcess : (docs as any).docs;
             const encryptedDocs = await Promise.all((originalDocs || []).map(async (doc) => {
                 if (isDocument(doc)) {
                     const className = doc["~class"];
                     const classObj = classCache.get(className) || await stack.getClass(className, true);
                     if (classObj) {
+                        const encryptableAttributes = classObj.getEncryptedAttributes();
+                        if (!stack.cryptoEngine.isEnabled() || !encryptableAttributes.length) {
+                            return doc;
+                        }
                         classCache.set(className, classObj);
                         const clone = { ...doc } as Document;
                         await stack.cryptoEngine.encryptDocument(clone, classObj);
@@ -318,16 +329,16 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 options = undefined;
             }
 
-            const exec = async () => {
-                const result = await pouchGet.call(this, docId, options ?? {});
-                if (result && isDocument(result)) {
-                    const classObj = await stack.getClass(result["~class"], true).catch(() => null);
-                    if (classObj) {
-                        await stack.cryptoEngine.decryptDocument(result as Document, classObj);
+                const exec = async () => {
+                    const result = await pouchGet.call(this, docId, options ?? {});
+                    if (result && isDocument(result) && stack.cryptoEngine.isEnabled()) {
+                        const classObj = await stack.getClass(result["~class"], true).catch(() => null);
+                        if (classObj && classObj.getEncryptedAttributes().length) {
+                            await stack.cryptoEngine.decryptDocument(result as Document, classObj);
+                        }
                     }
-                }
-                return result;
-            };
+                    return result;
+                };
 
             if (callback) {
                 exec().then((res) => callback(null, res)).catch((err) => callback(err));
@@ -341,11 +352,11 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 callback = options;
                 options = undefined;
             }
-            const exec = async () => {
-                let payload = doc as any;
-                if (isDocument(doc)) {
+                const exec = async () => {
+                    let payload = doc as any;
+                if (isDocument(doc) && stack.cryptoEngine.isEnabled()) {
                     const classObj = await stack.getClass(doc["~class"], true).catch(() => null);
-                    if (classObj) {
+                    if (classObj && classObj.getEncryptedAttributes().length) {
                         payload = { ...doc } as Document;
                         await stack.cryptoEngine.encryptDocument(payload as Document, classObj);
                     }
