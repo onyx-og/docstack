@@ -87,6 +87,9 @@ export const seedClassicUser = async (
 };
 
 export const createSessionProof = async (stack: ClientStack, username: string): Promise<UserSessionModel> => {
+    // NOTE: PolicyEngine bypasses system classes like ~UserSession (see SYSTEM_CLASSES in policy-engine),
+    // so this helper can create a session document even when the referenced user does not exist yet.
+    // This is intended for tests that need to seed an authenticated context before creating the user document.
     const session: UserSessionModel = {
         _id: `sess-${username}`,
         "~class": "~UserSession",
