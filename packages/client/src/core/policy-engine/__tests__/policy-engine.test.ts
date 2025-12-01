@@ -20,7 +20,7 @@ describe("PolicyEngine", () => {
             const ownerPolicy: PolicyModel = {
                 _id: "Policy-Note-owner",
                 "~class": "~Policy",
-                userId: "system",
+                groupId: "Group-Tester",
                 rule: "if (document.owner !== session.username) return false; return true;",
                 description: "Only allow owners to access notes",
                 targetClass: [noteClass.getModel()._id],

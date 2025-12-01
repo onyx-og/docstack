@@ -27,6 +27,47 @@ export const waitForDocStackReady = (docStack: DocStack, timeout = 10000): Promi
     });
 };
 
+export const ensureGroup = async (stack: ClientStack, groupId: string, name = groupId.replace(/^Group-/, "")) => {
+    const previousSession = (stack as any).authSession as AuthSessionProof | undefined;
+    const restoreSession = () => {
+        if (previousSession) {
+            stack.setAuthSession(previousSession);
+        } else {
+            stack.clearAuthSession();
+        }
+    };
+
+    stack.setAuthSession({
+        session: {
+            _id: `sess-bootstrap-${groupId}`,
+            "~class": "~UserSession",
+            userId: "system",
+            groupId: ["Group-Admin"],
+            username: "system",
+            sessionId: `sess-bootstrap-${groupId}`,
+            sessionStart: new Date().toISOString(),
+            sessionStatus: "active",
+        },
+    });
+
+    const existingGroup = await stack.findDocument({
+        "~class": { $eq: "~Group" },
+        _id: { $eq: groupId },
+    });
+
+    if (existingGroup) {
+        restoreSession();
+        return existingGroup;
+    }
+
+    const groupClassModel = (await stack.getClassModel("~Group")) || (await stack.getClassModel("Group"));
+    const schema = groupClassModel?.schema || {};
+    const groupDoc = { _id: groupId, "~class": "~Group", name };
+    await stack.createDoc(groupId, "~Group", schema, groupDoc as any);
+    restoreSession();
+    return groupDoc;
+};
+
 export const createTestDocStack = async (
     namePrefix = "docstack-test",
     options?: { withSession?: boolean; sessionUsername?: string }
@@ -42,6 +83,28 @@ export const createTestDocStack = async (
 
     if (typeof (stack.db as any).setMaxListeners === "function") {
         (stack.db as any).setMaxListeners(0);
+    }
+
+    const originalSession = (stack as any).authSession as AuthSessionProof | undefined;
+    stack.setAuthSession({
+        session: {
+            _id: `sess-bootstrap-${stackName}`,
+            "~class": "~UserSession",
+            userId: "system",
+            groupId: ["Group-Admin"],
+            username: "system",
+            sessionId: `sess-bootstrap-${stackName}`,
+            sessionStart: new Date().toISOString(),
+            sessionStatus: "active",
+        },
+    });
+
+    await ensureGroup(stack, "Group-Tester", "Tester");
+
+    if (originalSession) {
+        stack.setAuthSession(originalSession);
+    } else {
+        stack.clearAuthSession();
     }
 
     if (options?.withSession !== false) {
@@ -87,12 +150,18 @@ export const seedClassicUser = async (
                 _id: `sess-bootstrap-${user.username}`,
                 "~class": "~UserSession",
                 userId: "system",
+                groupId: ["Group-Admin"],
                 username: "system",
                 sessionId: `sess-bootstrap-${user.username}`,
                 sessionStart: new Date().toISOString(),
                 sessionStatus: "active",
             },
         });
+    }
+
+    const requestedGroups = user.groupId && user.groupId.length ? user.groupId : ["Group-Tester"];
+    for (const groupId of requestedGroups) {
+        await ensureGroup(stack, groupId, groupId.replace(/^Group-/, ""));
     }
 
     const userClassModel = (await stack.getClassModel("~User")) || (await stack.getClassModel("User"));
@@ -103,6 +172,7 @@ export const seedClassicUser = async (
         "~class": "~User",
         username: user.username,
         password: user.password,
+        groupId: requestedGroups,
         email: user.email || "",
         firstName: user.firstName || "",
         lastName: user.lastName || "",
@@ -135,6 +205,7 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
                 _id: `sess-bootstrap-${username}`,
                 "~class": "~UserSession",
                 userId: "system",
+                groupId: ["Group-Admin"],
                 username: "system",
                 sessionId: `sess-bootstrap-${username}`,
                 sessionStart: new Date().toISOString(),
@@ -165,6 +236,7 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
         _id: `sess-${username}`,
         "~class": "~UserSession",
         userId: user._id || user.username,
+        groupId: Array.isArray(user.groupId) ? user.groupId : user.groupId ? [user.groupId] : ["Group-Default"],
         username,
         sessionId: `sess-${username}`,
         sessionStart: new Date().toISOString(),

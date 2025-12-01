@@ -878,6 +878,263 @@ const sys_008: Patch = {
 
 syspatches.push(sys_008);
 
+const sys_009: Patch = {
+    "_id": "~sys-0.0.9",
+    "~class": "patch",
+    "version": "0.0.9",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.9\\n#### Updates: introduce groups, optional policy principals, and group-aware sessions",
+    "docs": [
+        {
+            "_id": "~Group",
+            "active": true,
+            "name": "Group",
+            "description": "Represents a user group",
+            "~class": "class",
+            "schema": {
+                "name": {
+                    "name": "name",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "mandatory": true,
+                        "maxLength": 100,
+                        "isArray": false
+                    }
+                }
+            }
+        },
+        {
+            "_id": "Group-Admin",
+            "~class": "~Group",
+            "name": "Admin"
+        },
+        {
+            "_id": "Group-Default",
+            "~class": "~Group",
+            "name": "Default"
+        },
+        {
+            "_id": "~User",
+            "_rev": "auto",
+            "active": true,
+            "name": "User",
+            "description": "A user class for secure login",
+            "~class": "class",
+            "schema": {
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false
+                    }
+                },
+                "password": {
+                    "name": "password",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false,
+                        "encrypted": true
+                    }
+                },
+                "groupId": {
+                    "name": "groupId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "isArray": true,
+                        "targetClass": "~Group"
+                    }
+                },
+                "email": {
+                    "name": "email",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "firstName": {
+                    "name": "firstName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "lastName": {
+                    "name": "lastName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "authMethod": {
+                    "name": "authMethod",
+                    "type": "foreign_key",
+                    "config": { "mandatory": true, "targetClass": "~AuthModule" }
+                },
+                "externalId": {
+                    "name": "externalId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "isArray": false
+                    }
+                },
+                "keyDerivationSalt": {
+                    "name": "keyDerivationSalt",
+                    "type": "string",
+                    "config": {
+                        "mandatory": true,
+                        "maxLength": 200,
+                        "isArray": false
+                    }
+                },
+                "wrappedDocumentKey": {
+                    "name": "wrappedDocumentKey",
+                    "type": "string",
+                    "config": {
+                        "mandatory": false,
+                        "maxLength": 4096,
+                        "isArray": false,
+                        "encrypted": true
+                    }
+                }
+            }
+        },
+        {
+            "_id": "~UserSession",
+            "_rev": "auto",
+            "name": "UserSession",
+            "active": true,
+            "description": "Tracks user sessions",
+            "~class": "class",
+            "schema": {
+                "userId": {
+                    "name": "userId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "targetClass": "~User",
+                        "isArray": false
+                    }
+                },
+                "groupId": {
+                    "name": "groupId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "targetClass": "~Group",
+                        "isArray": true
+                    }
+                },
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false,
+                        "primaryKey": true,
+                        "mandatory": true
+                    }
+                },
+                "sessionId": {
+                    "name": "sessionId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "primaryKey": true,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStart": {
+                    "name": "sessionStart",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStatus": {
+                    "name": "sessionStatus",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionEnd": {
+                    "name": "sessionEnd",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": false
+                    }
+                }
+            }
+        },
+        {
+            "_id": "~Policy",
+            "_rev": "auto",
+            "active": true,
+            "name": "Policy",
+            "description": "Access policies for classes and documents",
+            "~class": "class",
+            "schema": {
+                "userId": { "name": "userId", "type": "foreign_key", "config": { "mandatory": false, "targetClass": "~User" } },
+                "groupId": { "name": "groupId", "type": "foreign_key", "config": { "mandatory": false, "targetClass": "~Group" } },
+                "rule": { "name": "rule", "type": "string", "config": { "mandatory": true, "maxLength": 2000 } },
+                "description": { "name": "description", "type": "string", "config": { "mandatory": false } },
+                "targetClass": { "name": "targetClass", "type": "foreign_key", "config": { "mandatory": true, "isArray": true, "targetClass": "class" } }
+            }
+        },
+        {
+            "_id": "system",
+            "_rev": "auto",
+            "~class": "~User",
+            "username": "system",
+            "password": "system",
+            "groupId": ["Group-Admin"],
+            "email": "",
+            "firstName": "System",
+            "lastName": "User",
+            "authMethod": "AuthMod-Classic",
+            "externalId": "",
+            "keyDerivationSalt": "system-salt",
+            "wrappedDocumentKey": ""
+        },
+        {
+            "_id": "Policy-Admin",
+            "~class": "~Policy",
+            "groupId": "Group-Admin",
+            "rule": "return true;",
+            "description": "Default admin policy",
+            "targetClass": ["class", "~UserSession", "~Policy", "~Job", "~JobRun", "~AuthModule", "~Group"]
+        },
+        {
+            "_id": "Policy-User-SelfAccess",
+            "_rev": "auto",
+            "~class": "~Policy",
+            "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
+            "description": "Allow users to access only their own user document or the system user",
+            "targetClass": ["~User"]
+        }
+    ]
+};
+
+syspatches.push(sys_009);
+
 export function getSystemPatches(currentVersion: string) {
     return syspatches
         .filter((patch) => semver.gt(patch.version, currentVersion))

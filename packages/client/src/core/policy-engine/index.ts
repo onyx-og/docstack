@@ -30,11 +30,29 @@ export class PolicyEngine {
         return SYSTEM_CLASSES.has(normalized);
     }
 
-    private async loadPolicies(targetClass: string): Promise<PolicyModel[]> {
+    private async loadPolicies(targetClass: string, aliases: string[] = []): Promise<PolicyModel[]> {
         const result = await this.stack.db.allDocs<{ doc: PolicyModel }>({ include_docs: true });
+        const identifiers = new Set([targetClass, ...aliases]);
         return result.rows
             .map((row) => row.doc)
-            .filter((doc): doc is PolicyModel => !!doc && doc["~class"] === "~Policy" && Array.isArray(doc.targetClass) && doc.targetClass.includes(targetClass));
+            .filter((doc): doc is PolicyModel => {
+                if (!doc || doc["~class"] !== "~Policy" || !Array.isArray(doc.targetClass)) return false;
+                return doc.targetClass.some((entry) => identifiers.has(entry));
+            });
+    }
+
+    private getTargetIdentifiers(targetId: string, targetName: string) {
+        const identifiers = new Set<string>();
+        const variants = [targetId, targetName];
+        for (const value of variants) {
+            identifiers.add(value);
+            if (value.startsWith("~")) {
+                identifiers.add(value.slice(1));
+            } else {
+                identifiers.add(`~${value}`);
+            }
+        }
+        return Array.from(identifiers);
     }
 
     private async resolveClassTarget(targetClass: string) {
@@ -49,10 +67,11 @@ export class PolicyEngine {
         const executor = new Function(
             "document",
             "session",
+            "groupId",
             `"use strict"; ${policy.rule}`
-        ) as (doc: Document, sess: AuthSessionProof["session"]) => any;
+        ) as (doc: Document, sess: AuthSessionProof["session"], groupId: string | string[]) => any;
 
-        const result = executor(document || {}, session.session);
+        const result = executor(document || {}, session.session, session.session.groupId);
         if (result instanceof Promise) {
             return Boolean(await result);
         }
@@ -60,14 +79,30 @@ export class PolicyEngine {
         return Boolean(result);
     }
 
+    private filterPoliciesForSession(policies: PolicyModel[], session: AuthSessionProof) {
+        const sessionUserId = session.session.userId || session.session.username;
+        const sessionGroups = Array.isArray((session.session as any).groupId)
+            ? (session.session as any).groupId
+            : (session.session as any).groupId
+                ? [(session.session as any).groupId]
+                : [];
+
+        return policies.filter((policy) => {
+            const matchesUser = !policy.userId || policy.userId === sessionUserId || policy.userId === session.session.username;
+            const matchesGroup = !policy.groupId || sessionGroups.includes(policy.groupId);
+            return matchesUser && matchesGroup;
+        });
+    }
+
     private async authorize(targetClass: string, operation: PolicyOperation, document: Document | null): Promise<boolean> {
         const { id: targetId, name: targetName } = await this.resolveClassTarget(targetClass);
+        const identifiers = this.getTargetIdentifiers(targetId, targetName);
 
         if (this.shouldBypass(targetName)) {
             return true;
         }
 
-        const policies = await this.loadPolicies(targetId);
+        const policies = await this.loadPolicies(targetId, identifiers);
         if (policies.length === 0) {
             return true;
         }
@@ -77,8 +112,18 @@ export class PolicyEngine {
             throw new Error("Stack is not authenticated for policy evaluation");
         }
 
+        const targetedPolicies = policies.filter((policy) => policy.userId || policy.groupId);
+        const basePolicies = policies.filter((policy) => !policy.userId && !policy.groupId);
+        const matchingPolicies = targetedPolicies.length > 0
+            ? this.filterPoliciesForSession(targetedPolicies, session)
+            : this.filterPoliciesForSession(basePolicies, session);
+
+        if (targetedPolicies.length > 0 && matchingPolicies.length === 0) {
+            throw new Error(`No matching policy allowed ${operation} on class '${targetClass}'`);
+        }
+
         let allowed = false;
-        for (const policy of policies) {
+        for (const policy of matchingPolicies) {
             const result = await this.evaluateRule(policy, document, session);
             if (result === false) {
                 throw new Error(`Policy '${policy._id}' denied ${operation} on class '${targetClass}'`);
@@ -105,7 +150,7 @@ export class PolicyEngine {
             return true;
         }
 
-        const policies = await this.loadPolicies(targetId);
+        const policies = await this.loadPolicies(targetId, this.getTargetIdentifiers(targetId, targetName));
         if (policies.length === 0) {
             return true;
         }
@@ -115,8 +160,18 @@ export class PolicyEngine {
             throw new Error("Stack is not authenticated for policy evaluation");
         }
 
+        const targetedPolicies = policies.filter((policy) => policy.userId || policy.groupId);
+        const basePolicies = policies.filter((policy) => !policy.userId && !policy.groupId);
+        const matchingPolicies = targetedPolicies.length > 0
+            ? this.filterPoliciesForSession(targetedPolicies, session)
+            : this.filterPoliciesForSession(basePolicies, session);
+
+        if (targetedPolicies.length > 0 && matchingPolicies.length === 0) {
+            return false;
+        }
+
         let permitted = false;
-        for (const policy of policies) {
+        for (const policy of matchingPolicies) {
             const result = await this.evaluateRule(policy, document, session);
             if (result === false) {
                 return false;

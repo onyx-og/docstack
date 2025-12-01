@@ -37,6 +37,8 @@ describe("enum attribute validation", () => {
             expect(runModel?.schema?.triggerType?.type).toBe("enum");
             expect(runModel?.schema?.jobId?.type).toBe("foreign_key");
             expect(policyModel?.schema?.userId?.type).toBe("foreign_key");
+            expect(policyModel?.schema?.groupId?.type).toBe("foreign_key");
+            expect(userModel?.schema?.groupId?.type).toBe("foreign_key");
             expect(userModel?.schema?.authMethod?.type).toBe("foreign_key");
         } finally {
             await cleanup();

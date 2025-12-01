@@ -189,7 +189,6 @@ class ClientStack extends Stack {
         const policyDoc: PolicyModel = {
             _id: `Policy-${targetClass._id}`,
             "~class": "~Policy",
-            userId: "system",
             rule: "return session && session.sessionStatus === 'active';",
             description: `Default policy for ${targetClass.name || targetClass._id}`,
             targetClass: [targetClass._id],
@@ -241,11 +240,17 @@ class ClientStack extends Stack {
         });
 
         const derivedKey = (run.finalMetadata as any)?.derivedKey ?? (run.initialMetadata as any)?.derivedKey;
+        const userGroups = Array.isArray((user as any).groupId)
+            ? (user as any).groupId
+            : (user as any).groupId
+                ? [(user as any).groupId]
+                : ["Group-Default"];
         const sessionId = `session-${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString("hex")}`;
         const sessionDoc: UserSessionModel = {
             _id: sessionId,
             "~class": "~UserSession",
             userId: user._id || user.username,
+            groupId: userGroups,
             username: user.username,
             sessionId,
             sessionStart: new Date().toISOString(),
@@ -1317,7 +1322,7 @@ class ClientStack extends Stack {
                     throw new Error("createDoc - Existing document type differs");
                 } else {
                     isNewDoc = true;
-                    newDocId = `${type}-${(this.lastDocId+1)}`;
+                    newDocId = docId;
                     doc = this.prepareDoc(newDocId, type, params, "~class") as Document;
                 }
             } else {
@@ -1327,7 +1332,29 @@ class ClientStack extends Stack {
                 fnLogger.info("Generated docId", {newDocId});
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
+            let doc_ = {...doc, ...params, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
+            if (type === "~User" || type === "User") {
+                const groups = (doc_ as any).groupId;
+                if (!groups || (Array.isArray(groups) && groups.length === 0)) {
+                    (doc_ as any).groupId = ["Group-Default"];
+                }
+            }
+            if (type === "~UserSession" || type === "UserSession") {
+                let sessionGroups = (doc_ as any).groupId;
+                if (!sessionGroups || (Array.isArray(sessionGroups) && sessionGroups.length === 0)) {
+                    const sessionUserId = (doc_ as any).userId;
+                    if (sessionUserId) {
+                        const relatedUser = await this.getDocument(sessionUserId).catch(() => null) as any;
+                        if (relatedUser?.groupId) {
+                            sessionGroups = relatedUser.groupId;
+                        }
+                    }
+                    if (!sessionGroups || (Array.isArray(sessionGroups) && sessionGroups.length === 0)) {
+                        sessionGroups = ["Group-Default"];
+                    }
+                    (doc_ as any).groupId = sessionGroups;
+                }
+            }
             if (doc_["~class"]?.startsWith("Account-")) {
                 console.log("Doc after merge", {doc_})
             }
