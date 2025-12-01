@@ -214,23 +214,19 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
         });
     }
 
-    let user = await stack.findDocument<UserModel>({
+    const user = await stack.findDocument<UserModel>({
         "~class": { $eq: "~User" },
         username: { $eq: username },
     });
 
-    if (!user && username === "system") {
-        user = await seedClassicUser(stack, {
-            _id: "system",
-            username: "system",
-            password: "system",
-            keyDerivationSalt: "system-salt",
-            groupId: ["Group-Admin"],
-        });
-    }
-
     if (!user) {
-        throw new Error(`Cannot create session proof: user '${username}' does not exist`);
+        const missingSystemMessage =
+            username === "system"
+                ? "System user should be seeded by system patches; verify stack initialization."
+                : undefined;
+        throw new Error(
+            `Cannot create session proof: user '${username}' does not exist${missingSystemMessage ? `. ${missingSystemMessage}` : ""}`
+        );
     }
 
     const session: UserSessionModel = {

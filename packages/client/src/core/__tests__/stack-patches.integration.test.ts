@@ -50,4 +50,23 @@ describe("DocStack patches", () => {
             await stack?.db.destroy();
         }
     });
+
+    it("seeds the system user with the admin group through system patches", async () => {
+        const stackName = `system-user-${Date.now()}`;
+        const docStack = new DocStack({ name: stackName });
+        await waitForDocStackReady(docStack);
+
+        const stack = docStack.getStack(stackName);
+        expect(stack).toBeDefined();
+
+        try {
+            const systemUser = await stack!.db.get<{ "~class": string; groupId: string[] }>("system");
+            expect(systemUser["~class"]).toBe("~User");
+            expect(Array.isArray(systemUser.groupId)).toBe(true);
+            expect(systemUser.groupId).toContain("Group-Admin");
+        } finally {
+            stack?.close();
+            await stack?.db.destroy();
+        }
+    });
 });
