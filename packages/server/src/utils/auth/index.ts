@@ -113,9 +113,8 @@ export const setupAdminUser = async () => {
         try {
             const encryptedPassword = encryptString(adminPassword);
             let userDocument = await UserClass.addCard({
-                username: adminUsername, password: encryptedPassword,
-                email: "admin@email.com", firstName: "FirstName", lastName: "LastName",
-                groupId: ["Group-Admin"]
+                username: adminUsername, password: encryptedPassword, 
+                email: "admin@email.com", firstName: "FirstName", lastName: "LastName"
             });
             logger.info("setupAdminUser - Admin user just got setup successfully", 
                 {username: userDocument.username})
