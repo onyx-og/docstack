@@ -4,6 +4,7 @@ import getLogger from "../../utils/logger/";
 // import ReferenceAttribute, { AttributeTypeReference } from "../Reference";
 import { decryptString } from "../../utils/crypto";
 import { importJsonFile } from "./datamodel";
+import { getSystemPatches } from "@docstack/client/src/core/datamodel/index.js";
 
 import Class from "./class";
 import {
@@ -152,34 +153,38 @@ class ServerStack extends Stack {
 
     // TODO Parametrize the URL in a way that during the build procedure
     // it get substituted with the correct path for the build configuration
-    private async loadPatches(): Promise<Patch[]> {
+    private async loadPatches(schemaVersion: string | undefined): Promise<Patch[]> {
         let __patchDir = "../datamodel/patch"
         if (process.env.BUILDING) __patchDir = "patch"
         // [TODO] Load patches from files located in utils/dbManager/patch
         try {
             let patchCount = Number(process.env.PATCH_COUNT);
             logger.info(`loadPatches - preparing to load ${patchCount} patches`)
-            let patches = await Promise.all(
-                Array.from({ length: patchCount }).map(
-                  (_, index) => {
-                    var _index = `${index}`.padStart(3, '0')
-                    var importFilePath = `${__patchDir}/patch-${_index}.json`
-                    logger.info("loadPatches - loading patch from path", {path: importFilePath})
-                    return importJsonFile(importFilePath)
-                    // return import(importFilePath)
-                  },
-                ),
-            )
-            patches = patches.map( (patch) => {
-                logger.info("loadPatches - Parsing patch", {patch})
-                return patch;
-            })
-            logger.info("loadPatches - Successfully loaded patches");
-            logger.info("loadPatches - patches", {patches})
-            return patches;
+            if (Number.isFinite(patchCount) && patchCount > 0) {
+                let patches = await Promise.all(
+                    Array.from({ length: patchCount }).map(
+                      (_, index) => {
+                        var _index = `${index}`.padStart(3, '0')
+                        var importFilePath = `${__patchDir}/patch-${_index}.json`
+                        logger.info("loadPatches - loading patch from path", {path: importFilePath})
+                        return importJsonFile(importFilePath)
+                        // return import(importFilePath)
+                      },
+                    ),
+                )
+                patches = patches.map( (patch) => {
+                    logger.info("loadPatches - Parsing patch", {patch})
+                    return patch;
+                })
+                logger.info("loadPatches - Successfully loaded patches");
+                logger.info("loadPatches - patches", {patches})
+                return patches;
+            }
+            logger.info("loadPatches - PATCH_COUNT not provided; using built-in system patches instead");
+            return getSystemPatches(schemaVersion || "0.0.0");
         } catch (e: any) {
             logger.error("loadPatches - something went wrong", e)
-            throw new Error(e);
+            return getSystemPatches(schemaVersion || "0.0.0");
         }
     }
 
@@ -189,7 +194,20 @@ class ServerStack extends Stack {
     private async applyPatch(patch: Patch): Promise<string> {
         try {
             logger.info("applyPatch - attempting to apply patch", {patch})
-            await this.db.bulkDocs(patch.docs);
+            const hydratedDocs = await Promise.all(patch.docs.map( async doc => {
+                if (doc._rev === "auto") {
+                    delete doc._rev;
+                    const existingDoc = await this.db.get(doc._id).catch((error: any) => {
+                        if (error?.name === "not_found") return null;
+                        throw error;
+                    });
+                    if (existingDoc) {
+                        doc._rev = existingDoc._rev;
+                    }
+                }
+                return doc;
+            }));
+            await this.db.bulkDocs(hydratedDocs);
             logger.info("applyPatch - Successfully applied patch", {version: patch.version});
             return patch.version;
         } catch (e: any) {
@@ -201,7 +219,7 @@ class ServerStack extends Stack {
     private async applyPatches(schemaVersion: string | undefined): Promise<string> {
         let _schemaVersion = schemaVersion;
         try {
-            const allPatches = await this.loadPatches();
+            const allPatches = await this.loadPatches(schemaVersion);
             // When schemaVersion is undefined uses index 0 (start from first)
             // or start from the index after the patch at which the system is at 
             const startingIndex = schemaVersion ? (allPatches.findIndex(patch => patch.version === schemaVersion)+1)
