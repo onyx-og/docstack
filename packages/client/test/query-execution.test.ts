@@ -1,6 +1,6 @@
 import { ClientStack, Class } from "../src";
 import type { ClassModel } from "@docstack/shared";
-import { createSessionProof } from "../src/core/test-utils/docstack";
+import { createSessionProof, seedClassicUser } from "../src/core/test-utils/docstack";
 
 jest.setTimeout(30000);
 
@@ -44,6 +44,7 @@ describe("ClientStack.query execution", () => {
 
     beforeAll(async () => {
         stack = await ClientStack.create(dbName);
+        await seedClassicUser(stack, { username: "query-execution", password: "password-query" });
         await createSessionProof(stack, "query-execution");
         actorClass = await Class.create(stack, "Actor", "class", "Actors for query execution", {
             name: {

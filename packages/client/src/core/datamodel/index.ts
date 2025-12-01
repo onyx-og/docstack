@@ -800,6 +800,84 @@ const sys_007: Patch = {
 
 syspatches.push(sys_007);
 
+const sys_008: Patch = {
+    "_id": "~sys-0.0.8",
+    "~class": "patch",
+    "version": "0.0.8",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
+    "docs": [
+        {
+            "_id": "~UserSession",
+            "_rev": "auto",
+            "name": "UserSession",
+            "active": true,
+            "description": "Tracks user sessions",
+            "~class": "class",
+            "schema": {
+                "userId": {
+                    "name": "userId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "targetClass": "~User",
+                        "isArray": false
+                    }
+                },
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false,
+                        "primaryKey": true,
+                        "mandatory": true
+                    }
+                },
+                "sessionId": {
+                    "name": "sessionId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "primaryKey": true,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStart": {
+                    "name": "sessionStart",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStatus": {
+                    "name": "sessionStatus",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionEnd": {
+                    "name": "sessionEnd",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": false
+                    }
+                }
+            }
+        }
+    ]
+};
+
+syspatches.push(sys_008);
+
 export function getSystemPatches(currentVersion: string) {
     return syspatches
         .filter((patch) => semver.gt(patch.version, currentVersion))

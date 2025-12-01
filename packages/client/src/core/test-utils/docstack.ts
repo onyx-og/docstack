@@ -45,7 +45,17 @@ export const createTestDocStack = async (
     }
 
     if (options?.withSession !== false) {
-        await createSessionProof(stack, options?.sessionUsername || "tester");
+        const sessionUsername = options?.sessionUsername || "tester";
+        const existingUser = await stack.findDocument<UserModel>({
+            "~class": { $eq: "~User" },
+            username: { $eq: sessionUsername },
+        });
+
+        if (!existingUser) {
+            await seedClassicUser(stack, { username: sessionUsername, password: "password-123" });
+        }
+
+        await createSessionProof(stack, sessionUsername);
     }
 
     const cleanup = async () => {
@@ -66,6 +76,25 @@ export const seedClassicUser = async (
     stack: ClientStack,
     user: Pick<UserModel, "username" | "password"> & Partial<UserModel>
 ): Promise<UserModel> => {
+    const existingAuthSession = (stack as any).authSession as AuthSessionProof | undefined;
+    const requiresTemporarySystemSession =
+        !existingAuthSession ||
+        (existingAuthSession.session.username !== "system" && existingAuthSession.session.username !== user.username);
+
+    if (requiresTemporarySystemSession) {
+        stack.setAuthSession({
+            session: {
+                _id: `sess-bootstrap-${user.username}`,
+                "~class": "~UserSession",
+                userId: "system",
+                username: "system",
+                sessionId: `sess-bootstrap-${user.username}`,
+                sessionStart: new Date().toISOString(),
+                sessionStatus: "active",
+            },
+        });
+    }
+
     const userClassModel = (await stack.getClassModel("~User")) || (await stack.getClassModel("User"));
     const schema = userClassModel?.schema || {};
 
@@ -83,16 +112,59 @@ export const seedClassicUser = async (
     };
 
     await stack.createDoc(userDoc._id, userDoc["~class"], schema, userDoc);
+
+    if (requiresTemporarySystemSession) {
+        if (existingAuthSession) {
+            stack.setAuthSession(existingAuthSession);
+        } else {
+            stack.clearAuthSession();
+        }
+    }
     return userDoc;
 };
 
 export const createSessionProof = async (stack: ClientStack, username: string): Promise<UserSessionModel> => {
-    // NOTE: PolicyEngine bypasses system classes like ~UserSession (see SYSTEM_CLASSES in policy-engine),
-    // so this helper can create a session document even when the referenced user does not exist yet.
-    // This is intended for tests that need to seed an authenticated context before creating the user document.
+    const previousAuthSession = (stack as any).authSession as AuthSessionProof | undefined;
+    const requiresSystemSession =
+        !previousAuthSession ||
+        (previousAuthSession.session.username !== "system" && previousAuthSession.session.username !== username);
+
+    if (requiresSystemSession) {
+        stack.setAuthSession({
+            session: {
+                _id: `sess-bootstrap-${username}`,
+                "~class": "~UserSession",
+                userId: "system",
+                username: "system",
+                sessionId: `sess-bootstrap-${username}`,
+                sessionStart: new Date().toISOString(),
+                sessionStatus: "active",
+            },
+        });
+    }
+
+    let user = await stack.findDocument<UserModel>({
+        "~class": { $eq: "~User" },
+        username: { $eq: username },
+    });
+
+    if (!user && username === "system") {
+        user = await seedClassicUser(stack, {
+            _id: "system",
+            username: "system",
+            password: "system",
+            keyDerivationSalt: "system-salt",
+        });
+    }
+
+    if (!user) {
+        throw new Error(`Cannot create session proof: user '${username}' does not exist`);
+    }
+
     const session: UserSessionModel = {
         _id: `sess-${username}`,
         "~class": "~UserSession",
+        userId: user._id || user.username,
         username,
         sessionId: `sess-${username}`,
         sessionStart: new Date().toISOString(),

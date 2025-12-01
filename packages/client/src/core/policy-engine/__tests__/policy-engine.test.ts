@@ -1,13 +1,15 @@
 import Class from "../../class";
 import type { PolicyModel } from "@docstack/shared";
-import { createSessionProof, createTestDocStack } from "../../test-utils/docstack";
+import { createSessionProof, createTestDocStack, seedClassicUser } from "../../test-utils/docstack";
 
 jest.setTimeout(20000);
 
 describe("PolicyEngine", () => {
     it("filters reads and denies writes based on policy rules", async () => {
-        const { stack, cleanup } = await createTestDocStack("policy-engine");
+        const { stack, cleanup } = await createTestDocStack("policy-engine", { withSession: false });
         try {
+            await createSessionProof(stack, "system");
+            await seedClassicUser(stack, { username: "alice", password: "password-alice" });
             await createSessionProof(stack, "alice");
 
             const noteClass = await Class.create(stack, "Note", "class", "Note class", {
@@ -31,6 +33,7 @@ describe("PolicyEngine", () => {
             const aliceDocs = await stack.findDocuments<{ title: string; owner: string }>({ "~class": { $eq: noteClass.name } });
             expect(aliceDocs.docs).toHaveLength(1);
 
+            await seedClassicUser(stack, { username: "bob", password: "password-bob" });
             await createSessionProof(stack, "bob");
 
             await expect(

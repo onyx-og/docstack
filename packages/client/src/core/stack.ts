@@ -245,6 +245,7 @@ class ClientStack extends Stack {
         const sessionDoc: UserSessionModel = {
             _id: sessionId,
             "~class": "~UserSession",
+            userId: user._id || user.username,
             username: user.username,
             sessionId,
             sessionStart: new Date().toISOString(),
