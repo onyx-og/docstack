@@ -225,6 +225,7 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
             username: "system",
             password: "system",
             keyDerivationSalt: "system-salt",
+            groupId: ["Group-Admin"],
         });
     }
 
