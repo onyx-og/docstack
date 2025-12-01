@@ -275,6 +275,7 @@ export interface UserModel extends Document {
 
 export interface UserSessionModel extends Document {
     "~class": "~UserSession";
+    userId: string;
     username: string;
     sessionId: string;
     sessionStart: string;

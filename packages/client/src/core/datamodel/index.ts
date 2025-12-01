@@ -771,6 +771,113 @@ const sys_006: Patch = {
 
 syspatches.push(sys_005, sys_006);
 
+const sys_007: Patch = {
+    "_id": "~sys-0.0.7",
+    "~class": "patch",
+    "version": "0.0.7",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.7\\n#### Updates: restrict ~User access to the owner and system user",
+    "docs": [
+        {
+            "_id": "Policy-System-Classes",
+            "_rev": "auto",
+            "~class": "~Policy",
+            "userId": "system",
+            "rule": "return true;",
+            "description": "Default system policy",
+            "targetClass": ["class", "~UserSession", "~Policy", "~Job", "~JobRun", "~AuthModule"]
+        },
+        {
+            "_id": "Policy-User-SelfAccess",
+            "~class": "~Policy",
+            "userId": "system",
+            "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
+            "description": "Allow users to access only their own user document or the system user",
+            "targetClass": ["~User"]
+        }
+    ]
+};
+
+syspatches.push(sys_007);
+
+const sys_008: Patch = {
+    "_id": "~sys-0.0.8",
+    "~class": "patch",
+    "version": "0.0.8",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
+    "docs": [
+        {
+            "_id": "~UserSession",
+            "_rev": "auto",
+            "name": "UserSession",
+            "active": true,
+            "description": "Tracks user sessions",
+            "~class": "class",
+            "schema": {
+                "userId": {
+                    "name": "userId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "targetClass": "~User",
+                        "isArray": false
+                    }
+                },
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false,
+                        "primaryKey": true,
+                        "mandatory": true
+                    }
+                },
+                "sessionId": {
+                    "name": "sessionId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "primaryKey": true,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStart": {
+                    "name": "sessionStart",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStatus": {
+                    "name": "sessionStatus",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionEnd": {
+                    "name": "sessionEnd",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": false
+                    }
+                }
+            }
+        }
+    ]
+};
+
+syspatches.push(sys_008);
+
 export function getSystemPatches(currentVersion: string) {
     return syspatches
         .filter((patch) => semver.gt(patch.version, currentVersion))
