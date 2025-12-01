@@ -20,7 +20,9 @@ describe("CryptoEngine", () => {
     });
 
     it("encrypts and decrypts document fields marked as encrypted", async () => {
-        const { stack, cleanup } = await createTestDocStack("crypto-engine");
+        const { stack, cleanup } = await createTestDocStack("crypto-engine", {
+            sessionUsername: "crypto-user",
+        });
         try {
             const documentKey = crypto.randomBytes(32).toString("hex");
             await stack.cryptoEngine.setDocumentKey(documentKey);
