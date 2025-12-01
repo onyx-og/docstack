@@ -6,7 +6,6 @@ const SYSTEM_CLASSES = new Set([
     "~Job",
     "~JobRun",
     "~AuthModule",
-    "~User",
     "~UserSession",
     "class",
     "domain"

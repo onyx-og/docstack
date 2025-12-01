@@ -105,7 +105,9 @@ export const createAuthenticatedStack = async (
     username = "alice",
     password = "password-123"
 ): Promise<TestStackContext & { user: UserModel; proof: AuthSessionProof }> => {
-    const context = await createTestDocStack("auth-test");
+    const context = await createTestDocStack("auth-test", { withSession: false });
+    await createSessionProof(context.stack, "system");
+
     const user = await seedClassicUser(context.stack, {
         username,
         password,
