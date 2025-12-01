@@ -224,30 +224,10 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
         });
     }
 
-    let user = await stack.findDocument<UserModel>({
+    const user = await stack.findDocument<UserModel>({
         "~class": { $eq: "~User" },
         username: { $eq: username },
     });
-
-    if (!user && username === "system") {
-        for (const patch of getAllSystemPatches()) {
-            await stack.applyPatch(patch);
-        }
-
-        user = await stack.findDocument<UserModel>({
-            "~class": { $eq: "~User" },
-            username: { $eq: username },
-        });
-
-        if (!user) {
-            const systemDoc = await stack.db.get<UserModel>("system").catch((error: any) =>
-                error?.name === "not_found" || error?.status === 404 ? null : Promise.reject(error)
-            );
-            if (systemDoc) {
-                user = systemDoc;
-            }
-        }
-    }
 
     if (!user) {
         const missingSystemMessage =
