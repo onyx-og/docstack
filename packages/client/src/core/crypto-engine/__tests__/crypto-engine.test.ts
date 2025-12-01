@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { CryptoEngine, wrapDocumentKey } from "../index.js";
-import { createTestDocStack } from "../../test-utils/docstack.js";
+import { createSessionProof, createTestDocStack, seedClassicUser } from "../../test-utils/docstack.js";
 
 jest.setTimeout(15000);
 
@@ -20,10 +20,11 @@ describe("CryptoEngine", () => {
     });
 
     it("encrypts and decrypts document fields marked as encrypted", async () => {
-        const { stack, cleanup } = await createTestDocStack("crypto-engine", {
-            sessionUsername: "crypto-user",
-        });
+        const { stack, cleanup } = await createTestDocStack("crypto-engine", { withSession: false });
         try {
+            await createSessionProof(stack, "system");
+            await seedClassicUser(stack, { username: "crypto-user", password: "top-secret" });
+
             const documentKey = crypto.randomBytes(32).toString("hex");
             await stack.cryptoEngine.setDocumentKey(documentKey);
 
