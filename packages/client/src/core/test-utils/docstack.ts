@@ -81,9 +81,9 @@ export const createTestDocStack = async (
     );
 
     if (!systemUser) {
-        for (const patch of getAllSystemPatches()) {
-            await stack.applyPatch(patch);
-        }
+        throw new Error(
+            `Cannot create Test DocStack: user 'system' does not exist`
+        );
     }
 
     const docStack = ({
