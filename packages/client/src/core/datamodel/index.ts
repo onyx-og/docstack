@@ -440,6 +440,16 @@ const sys_004: Patch = {
                 "jobId": { "name": "jobId", "type": "foreign_key", "config": { "mandatory": true, "targetClass": "~Job" } }
             }
         },
+    ]
+};
+
+const sys_005: Patch = {
+    "_id": "~sys-0.0.5",
+    "~class": "patch",
+    "version": "0.0.5",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.5\\n#### New Documents: Job-Auth-Classic, AuthMod-Classic, Policy-System-Classes",
+    "docs": [
         {
             "_id": "Job-Auth-Classic",
             "~class": "~Job",
@@ -472,14 +482,14 @@ const sys_004: Patch = {
     ]
 };
 
-syspatches.push(sys_001, sys_002, sys_003, sys_004);
+syspatches.push(sys_001, sys_002, sys_003, sys_004, sys_005);
 
-const sys_005: Patch = {
-    "_id": "~sys-0.0.5",
+const sys_006: Patch = {
+    "_id": "~sys-0.0.6",
     "~class": "patch",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.5\\n#### Updates: enforce enum/foreign key definitions for job, policy, and user auth fields",
+    "changelog": "### Schema Patch: v0.0.6\\n#### Updates: enforce enum/foreign key definitions for job, policy, and user auth fields",
     "docs": [
         {
             "_id": "~User",
@@ -659,12 +669,14 @@ const sys_005: Patch = {
     ]
 };
 
-const sys_006: Patch = {
-    "_id": "~sys-0.0.6",
+syspatches.push(sys_006);
+
+const sys_007: Patch = {
+    "_id": "~sys-0.0.7",
     "~class": "patch",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.6\\n#### Updates: support wrapped document keys and encrypted user secrets",
+    "changelog": "### Schema Patch: v0.0.7\\n#### Updates: support wrapped document keys and encrypted user secrets",
     "docs": [
         {
             "_id": "~User",
@@ -769,14 +781,15 @@ const sys_006: Patch = {
     ]
 };
 
-syspatches.push(sys_005, sys_006);
+// syspatches.push(sys_005, sys_006);
 
-const sys_007: Patch = {
-    "_id": "~sys-0.0.7",
+const sys_008: Patch = {
+    "_id": "~sys-0.0.8",
     "~class": "patch",
-    "version": "0.0.7",
+
+    "version": "0.0.8",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.7\\n#### Updates: restrict ~User access to the owner and system user",
+    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: restrict ~User access to the owner and system user",
     "docs": [
         {
             "_id": "Policy-System-Classes",
@@ -799,13 +812,14 @@ const sys_007: Patch = {
 };
 
 syspatches.push(sys_007);
+syspatches.push(sys_008);
 
-const sys_008: Patch = {
-    "_id": "~sys-0.0.8",
+const sys_009: Patch = {
+    "_id": "~sys-0.0.9",
     "~class": "patch",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
+    "changelog": "### Schema Patch: v0.0.9\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
     "docs": [
         {
             "_id": "~UserSession",
@@ -876,14 +890,14 @@ const sys_008: Patch = {
     ]
 };
 
-syspatches.push(sys_008);
+syspatches.push(sys_009);
 
-const sys_009: Patch = {
-    "_id": "~sys-0.0.9",
+const sys_010: Patch = {
+    "_id": "~sys-0.0.10",
     "~class": "patch",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.9\\n#### Updates: introduce groups, optional policy principals, and group-aware sessions",
+    "changelog": "### Schema Patch: v0.0.10\\n#### Updates: introduce groups, optional policy principals, and group-aware sessions",
     "docs": [
         {
             "_id": "~Group",
@@ -1133,12 +1147,12 @@ const sys_009: Patch = {
     ]
 };
 
-syspatches.push(sys_009);
+syspatches.push(sys_010);
 
 export function getSystemPatches(currentVersion: string) {
     return syspatches
+        .sort((a, b) => semver.compare(a.version, b.version))
         .filter((patch) => semver.gt(patch.version, currentVersion))
-        .sort((a, b) => semver.compare(a.version, b.version));
 }
 
 export function getAllSystemPatches() {

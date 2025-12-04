@@ -32,7 +32,7 @@ import { PolicyEngine } from "./policy-engine/index.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
 
-const logger = createLogger().child({module: "stack"});
+const logger = createLogger().child({ module: "stack" });
 
 export const BASE_SCHEMA: ClassModel["schema"] = {
     "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
@@ -40,40 +40,46 @@ export const BASE_SCHEMA: ClassModel["schema"] = {
     "~createTimestamp": { name: "~createTimestamp", type: "integer", config: { min: 0 } },
     "~updateTimestamp": { name: "~updateTimestamp", type: "integer", config: { min: 0 } },
     "description": { name: "description", type: "string", config: { maxLength: 1000 } },
-    "active": { name: "active", type: "boolean", config: { defaultValue: true , primaryKey: true } }
+    "active": { name: "active", type: "boolean", config: { defaultValue: true, primaryKey: true } }
 }
 export const CLASS_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    "~class": { name: "~class", type: "string", config: { defaultValue: "class"} },
-    "schema": { name: "schema", type: "object", config: { maxLength: 1000, isArray: false }},
+    "~class": { name: "~class", type: "string", config: { defaultValue: "class" } },
+    "schema": { name: "schema", type: "object", config: { maxLength: 1000, isArray: false } },
     "parentClass": { name: "parentClass", type: "foreign_key", config: { isArray: false } },
 }
 const DOMAIN_SCHEMA: ClassModel["schema"] = {
     ...BASE_SCHEMA,
-    "~class": { name: "~class", type: "string", config: { defaultValue: "domain"} },
-    "schema": { name: "schema", type: "object", config: { 
-        isArray: true,
-        defaultValue: {
-            "source": {
-                name: "source",
-                type: "foreign_key",
-                config: {
-                    isArray: false
-                }
-            },
-            "target": {
-                name: "target",
-                type: "foreign_key",
-                config: {
-                    isArray: false
+    "~class": { name: "~class", type: "string", config: { defaultValue: "domain" } },
+    "schema": {
+        name: "schema", type: "object", config: {
+            isArray: true,
+            defaultValue: {
+                "source": {
+                    name: "source",
+                    type: "foreign_key",
+                    config: {
+                        isArray: false
+                    }
+                },
+                "target": {
+                    name: "target",
+                    type: "foreign_key",
+                    config: {
+                        isArray: false
+                    }
                 }
             }
         }
-    }},
+    },
     // "parentDomain": { name: "parentDomain", type: "foreign_key", config: { isArray: false } },
-    "relation": { name: "relation", type: "enum", config: { isArray: false, values: [
-        {value: "1:1"}, {value: "1:N"}, {value: "N:1"}, {value: "N:N"}
-    ] } },
+    "relation": {
+        name: "relation", type: "enum", config: {
+            isArray: false, values: [
+                { value: "1:1" }, { value: "1:N" }, { value: "N:1" }, { value: "N:N" }
+            ]
+        }
+    },
     "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: false } },
     "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: false } },
 };
@@ -126,8 +132,8 @@ class ClientStack extends Stack {
         } else {
             this.name = conn;
         }
-        
-        let Find: typeof import('pouchdb-find') =( await import('pouchdb-find')).default;
+
+        let Find: typeof import('pouchdb-find') = (await import('pouchdb-find')).default;
 
 
         // Load default plugins
@@ -174,7 +180,7 @@ class ClientStack extends Stack {
     }
 
     public dump = async () => {
-        const all = await this.db.allDocs({include_docs: true});
+        const all = await this.db.allDocs({ include_docs: true });
         return all;
     }
 
@@ -268,18 +274,18 @@ class ClientStack extends Stack {
         await this.ensureCryptoMarkerEncryption();
         return proof;
     }
-    
+
     async getLastDocId() {
         let lastDocId = 0;
         try {
-            let doc: { value: number, [key:string]: string | number} = await this.db.get("lastDocId");
+            let doc: { value: number, [key: string]: string | number } = await this.db.get("lastDocId");
             lastDocId = doc.value;
         } catch (e: any) {
             if (e.name === 'not_found') {
                 logger.info("getLastDocId - not found. Must be first initialization.")
                 return lastDocId
             }
-            logger.error("checkdb - something went wrong", {"error": e});
+            logger.error("checkdb - something went wrong", { "error": e });
         }
         return lastDocId;
     }
@@ -293,17 +299,18 @@ class ClientStack extends Stack {
                 logger.info("get System - not found", e)
                 return null;
             }
-            logger.error("getSystem - something went wrong", {"error": e});
+            logger.error("getSystem - something went wrong", { "error": e });
             throw new Error(e);
         }
     }
 
     private async loadPatches(schemaVersion: string | undefined): Promise<Patch[]> {
-        const fnLogger = logger.child({method: "loadPatches"});
+        const fnLogger = logger.child({ method: "loadPatches" });
         try {
             fnLogger.info("loadPatches - loading patches");
             const patches = getSystemPatches(schemaVersion || "0.0.0");
-            fnLogger.info(`loadPatches - loaded ${patches.length} patches`, {patches});
+            console.log(`loadPatches - loaded ${patches.length} patches`, { patches });
+            fnLogger.warn(`loadPatches - loaded ${patches.length} patches`, { patches });
             return patches;
         } catch (e: any) {
             fnLogger.error("loadPatches - something went wrong", e)
@@ -312,10 +319,10 @@ class ClientStack extends Stack {
     }
 
     applyPatch = async (patch: Patch): Promise<string> => {
-        const fnLogger = logger.child({method: "applyPatch", args: {patch}});
+        const fnLogger = logger.child({ method: "applyPatch", args: { patch } });
         try {
-            fnLogger.info("Attempting to apply patch", {patch})
-            const hydratedDocs = await Promise.all(patch.docs.map( async doc => {
+            fnLogger.info("Attempting to apply patch", { patch })
+            const hydratedDocs = await Promise.all(patch.docs.map(async doc => {
                 if (doc._rev === "auto") {
                     delete doc._rev;
                     const existingDoc = await this.db.get(doc._id);
@@ -326,16 +333,18 @@ class ClientStack extends Stack {
                 return doc;
             }));
             await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions);
-            fnLogger.info("Successfully applied patch", {version: patch.version});
+            const originClass = await this.db.get("class");
+            console.log("Origin class", originClass);
+            fnLogger.warn("Successfully applied patch", { version: patch.version });
             return patch.version;
         } catch (e: any) {
-            fnLogger.error("Something went wrong", e)
+            fnLogger.error("Failed to apply patch", e)
             throw new Error(e);
         }
     }
 
     private async applyPatches(schemaVersion: string | undefined): Promise<string> {
-        const fnLogger = logger.child({method: "applyPatches", args: {schemaVersion}});
+        const fnLogger = logger.child({ method: "applyPatches", args: { schemaVersion } });
         let _schemaVersion = schemaVersion;
         try {
             const patches = await this.loadPatches(_schemaVersion);
@@ -343,7 +352,7 @@ class ClientStack extends Stack {
                 _schemaVersion = await this.applyPatch(patch);
             }
             if (_schemaVersion) {
-                fnLogger.info("Successfully applied patches till version", {version: _schemaVersion});
+                fnLogger.info("Successfully applied patches till version", { version: _schemaVersion });
                 this.schemaVersion = _schemaVersion;
                 return _schemaVersion!;
             } else {
@@ -363,7 +372,7 @@ class ClientStack extends Stack {
         let systemDoc = await this.getSystem();
         let _systemDoc: SystemDoc;
         const dbInfo = await this.getDbInfo();
-        logger.info("checkSystem - current system doc", {system: systemDoc})
+        logger.info("checkSystem - current system doc", { system: systemDoc })
         if (!systemDoc) {
             _systemDoc = {
                 _id: "~system",
@@ -379,7 +388,8 @@ class ClientStack extends Stack {
             logger.info("checkSystem - system doc already exists. Checking for updates", systemDoc)
             // apply patches if needed
             let schemaVersion = await this.applyPatches(systemDoc.schemaVersion);
-            _systemDoc = { ...systemDoc,
+            _systemDoc = {
+                ...systemDoc,
                 appVersion: this.appVersion,
                 dbInfo: dbInfo,
                 schemaVersion: schemaVersion,
@@ -390,15 +400,15 @@ class ClientStack extends Stack {
         try {
             await this.db.put(_systemDoc);
 
-        } catch(e: any) {
-            logger.error("checkSystem - There was a problem while updating system", {error: e})
+        } catch (e: any) {
+            logger.error("checkSystem - There was a problem while updating system", { error: e })
             throw new Error(e)
         }
-        logger.info("checkSystem - updated system", {system: _systemDoc})
+        logger.info("checkSystem - updated system", { system: _systemDoc })
     }
 
     setListeners = () => {
-        const fnLogger = logger.child({method: "setListeners"});
+        const fnLogger = logger.child({ method: "setListeners" });
 
         // Listening for class model propagation
         this.addEventListener('class-model-propagation-pending', this.onClassModelPropagationStart as EventListener);
@@ -456,7 +466,7 @@ class ClientStack extends Stack {
      */
     onClassModelPropagationStart = (event: CustomEvent<ClassModelPropagationStart>) => {
         const className = event.detail.className;
-        const fnLogger = logger.child({method: "onClassModelPropagationStart", className});
+        const fnLogger = logger.child({ method: "onClassModelPropagationStart", className });
         this.addClassLock(className).then(() => {
             fnLogger.info(`Lock created successfully for class: '${className}'`);
         }).catch(error => {
@@ -470,7 +480,7 @@ class ClientStack extends Stack {
      * @param event 
      */
     onClassModelPropagationComplete = (event: CustomEvent<ClassModelPropagationComplete>) => {
-        const fnLogger = logger.child({method: "onClassModelPropagationComplete", args: {event}});
+        const fnLogger = logger.child({ method: "onClassModelPropagationComplete", args: { event } });
         const className = event.detail.className;
         this.clearClassLock(className).then(() => {
             fnLogger.info(`Lock removed successfully for class: '${className}'`);
@@ -483,7 +493,7 @@ class ClientStack extends Stack {
      * @returns PouchDB.Core.Changes<{}>
      */
     onClassModelChanges = () => {
-        const fnLogger = logger.child({listener: "classModelChanges"});
+        const fnLogger = logger.child({ listener: "classModelChanges" });
 
         const classModelChanges = this.db.changes({
             since: 'now',
@@ -523,7 +533,7 @@ class ClientStack extends Stack {
     }
 
     addClassLock = async (className: string) => {
-        const fnLogger = logger.child({method: "addClassLock", args: {className}});
+        const fnLogger = logger.child({ method: "addClassLock", args: { className } });
         try {
             const existing = await this.db.get(`~lock-propagation-${className}`);
             let _rev: string | undefined = undefined;
@@ -535,7 +545,7 @@ class ClientStack extends Stack {
                 "~class": `~Lock`,
                 _rev
             });
-            fnLogger.info(`Adding class lock response`, {response});
+            fnLogger.info(`Adding class lock response`, { response });
             return response.ok;
         } catch (e: any) {
             fnLogger.error(`Error while adding class lock: ${e}`);
@@ -544,12 +554,12 @@ class ClientStack extends Stack {
     }
 
     clearClassLock = async (className: string) => {
-        const fnLogger = logger.child({method: "clearClassLock", args: {className}});
+        const fnLogger = logger.child({ method: "clearClassLock", args: { className } });
         try {
             const doc = await this.db.get(`~lock-propagation-${className}`);
-            fnLogger.info(`Fetched class lock`, {document: doc});
+            fnLogger.info(`Fetched class lock`, { document: doc });
             const response = await this.db.remove(doc);
-            fnLogger.info(`Removing class lock response`, {response});
+            fnLogger.info(`Removing class lock response`, { response });
             return response.ok;
         } catch (e: any) {
             fnLogger.error(`Error while adding class lock: ${e}`);
@@ -573,7 +583,7 @@ class ClientStack extends Stack {
     // Database initialization should be about making sure that all the documents
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
-    async initdb () {
+    async initdb() {
         await this.ensureCryptoConfigDocument();
         await this.initIndex();
         await this.checkSystem();
@@ -663,16 +673,16 @@ class ClientStack extends Stack {
     }
 
     // TODO: Make the caching time configurable, and implement regular cleaning of cache
-    getClass = async (className: string, fresh =  false): Promise<Class | null> => {
-        const fnLogger = logger.child({method: "getClass", args: {className, fresh}});
+    getClass = async (className: string, fresh = false): Promise<Class | null> => {
+        const fnLogger = logger.child({ method: "getClass", args: { className, fresh } });
         if (!fresh) {
             // Check if class is in cache and not expired
             if (this.cache[className] && Date.now() < this.cache[className].ttl) {
-                fnLogger.info("Retrieving class from cache", {ttl: this.cache[className].ttl})
+                fnLogger.info("Retrieving class from cache", { ttl: this.cache[className].ttl })
                 return this.cache[className] as Class;
             }
         }
-        
+
         const classObj = await Class.fetch(this, className);
         if (classObj) {
             (classObj as CachedClass).ttl = Date.now() + 60000 * 15; // 15 minutes expiration
@@ -681,11 +691,11 @@ class ClientStack extends Stack {
         return classObj;
     }
 
-    getDomain = async (domainName: string, fresh =  false): Promise<Domain | null> => {
-        const fnLogger = logger.child({method: "getDomain", args: {domainName, fresh}});
+    getDomain = async (domainName: string, fresh = false): Promise<Domain | null> => {
+        const fnLogger = logger.child({ method: "getDomain", args: { domainName, fresh } });
         if (!fresh) {
             if (this.cache[domainName] && Date.now() < this.cache[domainName].ttl) {
-                fnLogger.info("Retrieving domain from cache", {ttl: this.cache[domainName].ttl});
+                fnLogger.info("Retrieving domain from cache", { ttl: this.cache[domainName].ttl });
                 return this.cache[domainName] as Domain;
             }
         }
@@ -698,7 +708,7 @@ class ClientStack extends Stack {
         return domainObj;
     }
 
-    async initIndex () {
+    async initIndex() {
         try {
             let lastDocId: number = await this.getLastDocId();
             // logger.info("initdb - res", res)
@@ -711,7 +721,7 @@ class ClientStack extends Stack {
                         value: ++lastDocId
                     });
                     if (response.ok) this.lastDocId = lastDocId;
-                    else throw new Error("Got problem while putting doc"+ response);
+                    else throw new Error("Got problem while putting doc" + response);
                 } catch (error: any) {
                     if (error?.status === 409 || error?.name === "conflict") {
                         const existing = await this.db.get<{ value: number }>("lastDocId");
@@ -764,8 +774,8 @@ class ClientStack extends Stack {
     }
 
     // Expects a selector like { "~class": { $eq: "class" } }
-    findDocuments = async <T extends Document | RelationDocument = Document>( selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => {
-        const fnLogger = logger.child({method: "findDocuments", args: {selector, fields, skip, limit}});
+    findDocuments = async <T extends Document | RelationDocument = Document>(selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => {
+        const fnLogger = logger.child({ method: "findDocuments", args: { selector, fields, skip, limit } });
 
         // By default request for only active documents
         if (!selector.hasOwnProperty("active")) {
@@ -773,7 +783,7 @@ class ClientStack extends Stack {
         }
 
         let indexFields = Object.keys(selector);
-        fnLogger.info("Produced index fields from selector", {indexFields});
+        fnLogger.info("Produced index fields from selector", { indexFields });
 
         let result: {
             docs: T[],
@@ -788,7 +798,7 @@ class ClientStack extends Stack {
             //     index: { fields: indexFields }
             // });
             // fnLogger.info("Index result", indexResult);
-    
+
             let foundResult = await this.db.find({
                 selector: selector,
                 fields: fields,
@@ -819,7 +829,7 @@ class ClientStack extends Stack {
             result = { docs: readableDocs, selector, skip, limit };
             return result;
         } catch (e: any) {
-            fnLogger.error("findDocument - error",e);
+            fnLogger.error("findDocument - error", e);
             throw e;
         }
     }
@@ -872,12 +882,12 @@ class ClientStack extends Stack {
         return clone;
     }
 
-    async findDocument<T extends Document | RelationDocument = Document>( selector: any, fields = undefined, skip = undefined, limit = undefined ) {
+    async findDocument<T extends Document | RelationDocument = Document>(selector: any, fields = undefined, skip = undefined, limit = undefined) {
         let result = await this.findDocuments<T>(selector, fields, skip, limit);
         return result.docs.length > 0 ? result.docs[0] : null;
     }
 
-    getClassModel = async ( className: string ) => {
+    getClassModel = async (className: string) => {
         // TODO: understand whether to use name of _id field
         let selector = {
             $or: [
@@ -891,15 +901,15 @@ class ClientStack extends Stack {
             let response = await this.findDocument(selector);
             if (response == null) return null;
             let result: ClassModel = response as ClassModel
-            logger.info("getClassModel - result", {result: result})
+            logger.info("getClassModel - result", { result: result })
             return result;
-        } catch(e: any) {
+        } catch (e: any) {
             logger.info("getClassModel - error", e)
             throw new Error(e)
         }
     }
 
-    getDomainModel = async ( domainName: string ) => {
+    getDomainModel = async (domainName: string) => {
         let selector = {
             "~class": { $eq: "domain" },
             name: { $eq: domainName }
@@ -909,9 +919,9 @@ class ClientStack extends Stack {
             let response = await this.findDocument(selector);
             if (response == null) return null;
             let result: DomainModel = response as DomainModel
-            logger.info("getDomainModel - result", {result: result})
+            logger.info("getDomainModel - result", { result: result })
             return result;
-        } catch(e: any) {
+        } catch (e: any) {
             logger.info("getDomainModel - error", e)
             throw new Error(e)
         }
@@ -920,8 +930,8 @@ class ClientStack extends Stack {
     // TODO: move listener to stack field, for easier un-registering
     // TODO: Change into getClass("Class").getCards()
     getClassModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
-        const {listen, filter, search} = conf;
-        const selector: {[field: string]: object} = { "~class": { $eq: "class" } };
+        const { listen, filter, search } = conf;
+        const selector: { [field: string]: object } = { "~class": { $eq: "class" } };
         if (Array.isArray(filter) && filter.length > 0) {
             // TODO: Consider checking against name field instead of _id
             selector._id = { $in: filter };
@@ -961,7 +971,7 @@ class ClientStack extends Stack {
         };
     }
 
-    getClasses = async (conf: {filter?: string[], search?: string}) => {
+    getClasses = async (conf: { filter?: string[], search?: string }) => {
         const classNames = conf.filter;
         const searchFilter = conf.search;
         const fnLogger = logger.child({ method: "getClasses" });
@@ -994,14 +1004,14 @@ class ClientStack extends Stack {
                     } else {
                         classList[existingIndex] = classObj;
                     }
-                    const evt = new CustomEvent("classListChange", {detail: classList});
+                    const evt = new CustomEvent("classListChange", { detail: classList });
                     this.dispatchEvent(evt);
                 } else {
                     // remove from classList without altering the array reference
                     const idx = classList.findIndex(c => c.model._id === change.id);
                     if (idx !== -1) {
                         classList.splice(idx, 1);
-                        const evt = new CustomEvent("classListChange", {detail: classList});
+                        const evt = new CustomEvent("classListChange", { detail: classList });
                         this.dispatchEvent(evt);
                     }
                 }
@@ -1014,8 +1024,8 @@ class ClientStack extends Stack {
     };
 
     getDomainModels = async (conf: { listen?: boolean, filter?: string[], search?: string } = {}) => {
-        const {listen, filter, search} = conf;
-        const selector: {[field: string]: object} = { "~class": { $eq: "domain" } };
+        const { listen, filter, search } = conf;
+        const selector: { [field: string]: object } = { "~class": { $eq: "domain" } };
         if (Array.isArray(filter) && filter.length > 0) {
             // TODO: Consider checking against name field instead of _id
             selector._id = { $in: filter };
@@ -1052,8 +1062,8 @@ class ClientStack extends Stack {
             listener
         };
     }
-    
-    getDomains = async (conf: {filter?: string[], search?: string}) => {
+
+    getDomains = async (conf: { filter?: string[], search?: string }) => {
         const classNames = conf.filter;
         const searchFilter = conf.search;
         const fnLogger = logger.child({ method: "getDomains" });
@@ -1086,14 +1096,14 @@ class ClientStack extends Stack {
                     } else {
                         domainList[existingIndex] = domain;
                     }
-                    const evt = new CustomEvent("domainListChange", {detail: domainList});
+                    const evt = new CustomEvent("domainListChange", { detail: domainList });
                     this.dispatchEvent(evt);
                 } else {
                     // remove from classList without altering the array reference
                     const idx = domainList.findIndex(c => c.model._id === change.id);
                     if (idx !== -1) {
                         domainList.splice(idx, 1);
-                        const evt = new CustomEvent("domainListChange", {detail: domainList});
+                        const evt = new CustomEvent("domainListChange", { detail: domainList });
                         this.dispatchEvent(evt);
                     }
                 }
@@ -1118,7 +1128,7 @@ class ClientStack extends Stack {
             return this.lastDocId;
         }
         // throw new Error
-        
+
     }
 
     // The idea of this method is to be called from within the server (like CLI command)
@@ -1135,7 +1145,7 @@ class ClientStack extends Stack {
     }
 
     async destroyDb() {
-        const fnLogger = logger.child({method: "destroyDb"});
+        const fnLogger = logger.child({ method: "destroyDb" });
         try {
             this.db.destroy(null, () => {
                 fnLogger.info("Destroyed db");
@@ -1150,8 +1160,8 @@ class ClientStack extends Stack {
     // This method is similar to destroyDb, but intended to be called from the client (not to destroy the main db)
     // TODO: Right now this allows to clear any db
     // there should be more restrictions
-    static async clear (conn: string) {
-        return new Promise ( (resolve, reject) => {
+    static async clear(conn: string) {
+        return new Promise((resolve, reject) => {
             try {
                 let db = new PouchDB(conn)
                 db.destroy(null, () => {
@@ -1159,28 +1169,28 @@ class ClientStack extends Stack {
                     resolve(true);
                 });
             } catch (e: any) {
-                logger.error("clear - Error while destroying db"+e)
+                logger.error("clear - Error while destroying db" + e)
                 reject(false)
             }
         })
     }
 
-    addClass = async ( classObj: Class ) => {
-        const fnLogger = logger.child({method: "addClass", args: {class: classObj.name}});
+    addClass = async (classObj: Class) => {
+        const fnLogger = logger.child({ method: "addClass", args: { class: classObj.name } });
         const classOrigin = await this.getClass(classObj.type);
         if (classOrigin == null) {
-            fnLogger.error("Class originator not found", {classType: classObj.type});
+            fnLogger.error("Class originator not found", { classType: classObj.type });
             throw new Error(`Class originator ${classObj.type} not found in stack`);
         }
         let classModel = classObj.getModel();
-        fnLogger.info("Got class model", {classModel})
+        fnLogger.info("Got class model", { classModel })
         try {
             const result = await classOrigin.addCard(classModel) as ClassModel;
-            fnLogger.info("Added class card", {result});
+            fnLogger.info("Added class card", { result });
             await this.ensureDefaultPolicyForClass(result);
             return result;
         } catch (e) {
-            fnLogger.error("Error adding class card", {error: e})
+            fnLogger.error("Error adding class card", { error: e })
             const message = (e as Error)?.message || "Failed to add class card";
             throw new Error(message)
         }
@@ -1195,31 +1205,31 @@ class ClientStack extends Stack {
         // } 
     }
 
-    addDomain = async ( domainObj: Domain ) => {
-        const fnLogger = logger.child({method: "addDomain", args: {domain: domainObj.name}});
+    addDomain = async (domainObj: Domain) => {
+        const fnLogger = logger.child({ method: "addDomain", args: { domain: domainObj.name } });
         let domainModel = domainObj.getModel();
-        fnLogger.info("Got domain model", {domainModel})
+        fnLogger.info("Got domain model", { domainModel })
         let existingDoc = await this.getDomainModel(domainModel.name);
-        if ( existingDoc == null ) {
+        if (existingDoc == null) {
             let resultDoc = await this.createDoc(domainModel.name, 'domain', DOMAIN_SCHEMA, domainModel);
-            fnLogger.info("Result", {result: resultDoc});
+            fnLogger.info("Result", { result: resultDoc });
             // TODO: Consider creating a design doc for easier filtering
             return resultDoc as DomainModel;
         } else {
             return existingDoc;
-        } 
+        }
     }
 
     updateClass = async (classObj: Class) => {
-        const fnLogger = logger.child({method: "updateClass", args: {class: classObj.name}});
+        const fnLogger = logger.child({ method: "updateClass", args: { class: classObj.name } });
         let result = await this.createDoc(classObj.getId()!, 'class', classObj, classObj.getModel());
         fnLogger.info("Result", result)
         return result
     }
 
     addDesignDocumentPKs = async (className: string, pKs: string[], temp = false) => {
-        const fnLogger = logger.child({method: 'addDesignDocumentPKs', args: {className, pKs}});
-         // Construct the compound key string dynamically
+        const fnLogger = logger.child({ method: 'addDesignDocumentPKs', args: { className, pKs } });
+        // Construct the compound key string dynamically
         const keyString = pKs.map(key => `doc.${key}`).join(', ');
 
         // The 'map' function as a string
@@ -1229,7 +1239,7 @@ class ClientStack extends Stack {
             emit([${keyString}], doc._id);
             }
         }`;
-        fnLogger.info("Generated map code", {code: mapCode});
+        fnLogger.info("Generated map code", { code: mapCode });
 
         let designDocId = `_design/${className}-group`;
         if (temp) designDocId = `_design/${className}-group-temp`;
@@ -1246,7 +1256,7 @@ class ClientStack extends Stack {
             },
             _rev: undefined,
         };
-        fnLogger.info("Prepared design document", {ddoc});
+        fnLogger.info("Prepared design document", { ddoc });
 
         try {
             // Use 'get' to check if the design doc already exists
@@ -1269,35 +1279,35 @@ class ClientStack extends Stack {
 
     // TODO: consider refactoring to use ~class (before, create) triggers
     // and (before, update) triggers
-    prepareDoc (
+    prepareDoc(
         _id: string,
         type: string,
-        params: {[key: string] : string | number | boolean},
+        params: { [key: string]: string | number | boolean },
         metaKey: "~class"
     ): Document;
-    prepareDoc (
+    prepareDoc(
         _id: string,
         type: string,
-        params: {[key: string] : string | number | boolean},
+        params: { [key: string]: string | number | boolean },
         metaKey: "~domain"
     ): RelationDocument;
-    prepareDoc (
+    prepareDoc(
         _id: string,
         type: string,
-        params: {[key: string] : string | number | boolean},
+        params: { [key: string]: string | number | boolean },
         metaKey: "~class" | "~domain" = "~class"
     ): Document | RelationDocument {
-        logger.info("prepareDoc - given args", {_id: _id, type: type, params: params});
+        logger.info("prepareDoc - given args", { _id: _id, type: type, params: params });
         params["_id"] = _id;
         params[metaKey] = type;
         params["~createTimestamp"] = new Date().getTime();
         params["active"] = true;
-        logger.info("prepareDoc - after elaborations", {params} );
+        logger.info("prepareDoc - after elaborations", { params });
         return params as unknown as Document | RelationDocument;
     }
 
     createDoc = async (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}) => {
-        const fnLogger = logger.child({method: "createDoc", args: {docId, type, params}});
+        const fnLogger = logger.child({ method: "createDoc", args: { docId, type, params } });
         fnLogger.info("Creating document");
         let schema: ClassModel["schema"] = {};
         if (classObj instanceof Class) {
@@ -1312,11 +1322,11 @@ class ClientStack extends Stack {
         try {
             if (docId) {
                 const existingDoc = await this.getDocument(docId) as unknown as Document;
-                fnLogger.info("Retrieved doc", {existingDoc})
+                fnLogger.info("Retrieved doc", { existingDoc })
                 // console.log("Existing doc", {existingDoc, params})
                 if (existingDoc && existingDoc["~class"] === type) {
-                    fnLogger.info("Assigning existing doc", {doc: existingDoc});
-                    doc = {...existingDoc};
+                    fnLogger.info("Assigning existing doc", { doc: existingDoc });
+                    doc = { ...existingDoc };
                 } else if (existingDoc && existingDoc["~class"] !== type) {
                     fnLogger.error("Existing document type differs");
                     throw new Error("createDoc - Existing document type differs");
@@ -1327,12 +1337,12 @@ class ClientStack extends Stack {
                 }
             } else {
                 isNewDoc = true;
-                newDocId = `${type}-${(this.lastDocId+1)}`;
+                newDocId = `${type}-${(this.lastDocId + 1)}`;
                 doc = this.prepareDoc(newDocId, type, params, "~class") as Document;
-                fnLogger.info("Generated docId", {newDocId});
+                fnLogger.info("Generated docId", { newDocId });
             }
-            fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            let doc_ = {...doc, ...params, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
+            fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
+            let doc_ = { ...doc, ...params, _rev: doc._rev, "~updateTimestamp": new Date().getTime() };
             if (type === "~User" || type === "User") {
                 const groups = (doc_ as any).groupId;
                 if (!groups || (Array.isArray(groups) && groups.length === 0)) {
@@ -1356,13 +1366,13 @@ class ClientStack extends Stack {
                 }
             }
             if (doc_["~class"]?.startsWith("Account-")) {
-                console.log("Doc after merge", {doc_})
+                // console.log("Doc after merge", { doc_ })
             }
-            fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
+            fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
             await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
             let response = await db.put(doc_);
             // Find me
-            fnLogger.info("Response after put", {"response": response});
+            fnLogger.info("Response after put", { "response": response });
             if (response.ok && isNewDoc) {
                 await this.incrementLastDocId();
                 docId = response.id;
@@ -1371,7 +1381,7 @@ class ClientStack extends Stack {
                 docId = response.id;
             }
             else {
-                fnLogger.error("Error, check logs", {"response": response});
+                fnLogger.error("Error, check logs", { "response": response });
                 throw new Error("createDoc - Error, check logs");
             }
         } catch (e: any) {
@@ -1383,14 +1393,14 @@ class ClientStack extends Stack {
                     "error": e,
                     "document": doc
                 })
-                throw new Error("createDoc - Problem while putting doc"+e);
+                throw new Error("createDoc - Problem while putting doc" + e);
             }
         }
         return doc;
     }
 
-    createDocs = async ( docs: {docId: string | null, params: {}}[], type: string, classObj: Class | ClassModel["schema"] ) => {
-        const fnLogger = logger.child({method: "createDocs", args: {docs}});
+    createDocs = async (docs: { docId: string | null, params: {} }[], type: string, classObj: Class | ClassModel["schema"]) => {
+        const fnLogger = logger.child({ method: "createDocs", args: { docs } });
 
         let schema: ClassModel["schema"] = {};
         if (classObj instanceof Class) {
@@ -1398,23 +1408,23 @@ class ClientStack extends Stack {
         } else {
             schema = classObj;
         }
-        fnLogger.info("Determined schema", {schema});
+        fnLogger.info("Determined schema", { schema });
 
         let db = this.db;
         const documents: Document[] = [];
         let newDocsIds: string[] = [];
 
         for (const draft of docs) {
-            let {docId, params} = draft;
+            let { docId, params } = draft;
             let doc: Document | null = null;
             let isNewDoc = false;
             try {
                 if (docId) {
                     const existingDoc = await this.getDocument(docId) as unknown as Document;
-                    fnLogger.info("retrieved doc", {existingDoc})
+                    fnLogger.info("retrieved doc", { existingDoc })
                     if (existingDoc && existingDoc["~class"] === type) {
-                        fnLogger.info("createDocs - assigning existing doc", {doc: existingDoc});
-                        doc = {...existingDoc};
+                        fnLogger.info("createDocs - assigning existing doc", { doc: existingDoc });
+                        doc = { ...existingDoc };
                     } else if (existingDoc && existingDoc["~class"] !== type) {
                         throw new Error("createDocs - Existing document type differs");
                     } else {
@@ -1422,14 +1432,14 @@ class ClientStack extends Stack {
                         doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     }
                 } else {
-                    docId = `${type}-${(this.lastDocId+1)}`;
+                    docId = `${type}-${(this.lastDocId + 1)}`;
                     doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
                 }
-                fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-                const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
-                fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
+                fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
+                const doc_ = { ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() };
+                fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
                 await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
                 documents.push(doc_);
                 if (isNewDoc) newDocsIds.push(docId);
@@ -1438,16 +1448,16 @@ class ClientStack extends Stack {
                     "error": e,
                     "document": doc
                 });
-                throw new Error("createDocs - Problem while preparing doc"+e);
+                throw new Error("createDocs - Problem while preparing doc" + e);
             }
         }
         try {
             const response = await db.bulkDocs(documents);
-            fnLogger.info("Response after bulkDocs",{"response": response});
+            fnLogger.info("Response after bulkDocs", { "response": response });
             // Increment lastDocId based on number of new docs created
             const newDocsCount = response.filter(res => res.id != null && newDocsIds.includes(res.id)).length;
             fnLogger.info(`Successfully created ${newDocsCount} new documents.`);
-            for (let i = 0; i < newDocsCount;i++) {
+            for (let i = 0; i < newDocsCount; i++) {
                 await this.incrementLastDocId();
             }
         } catch (e: any) {
@@ -1455,7 +1465,7 @@ class ClientStack extends Stack {
                 "error": e,
                 "documents": documents
             });
-            throw new Error("createDocs - Problem while putting docs"+e);
+            throw new Error("createDocs - Problem while putting docs" + e);
         }
         return documents;
     }
@@ -1470,7 +1480,7 @@ class ClientStack extends Stack {
             sourceId: string,
             targetId: string
         }): Promise<RelationDocument | null> => {
-        const fnLogger = logger.child({method: "createRelationDoc", args: {docId, relationName, params}});
+        const fnLogger = logger.child({ method: "createRelationDoc", args: { docId, relationName, params } });
         fnLogger.info("Creating relation document");
         let db = this.db,
             doc: RelationDocument | null = null,
@@ -1478,10 +1488,10 @@ class ClientStack extends Stack {
         try {
             if (docId) {
                 const existingDoc = await this.db.get(docId) as RelationDocument;
-                fnLogger.info("retrieved doc", {existingDoc})
+                fnLogger.info("retrieved doc", { existingDoc })
                 if (existingDoc && existingDoc["~domain"] === domainObj.name) {
-                    fnLogger.info("Assigning existing doc", {doc: existingDoc});
-                    doc = {...existingDoc};
+                    fnLogger.info("Assigning existing doc", { doc: existingDoc });
+                    doc = { ...existingDoc };
                 } else if (existingDoc && existingDoc["~domain"] !== domainObj.name) {
                     fnLogger.error("Existing document type differs");
                     throw new Error("createDoc - Existing document type differs");
@@ -1491,16 +1501,16 @@ class ClientStack extends Stack {
                     doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                 }
             } else {
-                docId = `${domainObj.name}-${(this.lastDocId+1)}`;
+                docId = `${domainObj.name}-${(this.lastDocId + 1)}`;
                 doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                 isNewDoc = true;
                 fnLogger.info("Generated docId", docId);
             }
-            fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
-            const doc_ = {...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime()};
-            fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
+            fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
+            const doc_ = { ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() };
+            fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
             let response = await db.put(doc_);
-            fnLogger.info("Response after put", {"response": response});
+            fnLogger.info("Response after put", { "response": response });
             if (response.ok && isNewDoc) {
                 await this.incrementLastDocId();
                 docId = response.id;
@@ -1509,38 +1519,40 @@ class ClientStack extends Stack {
                 docId = response.id;
             }
             else {
-                fnLogger.error("Error, check logs", {"response": response});
+                fnLogger.error("Error, check logs", { "response": response });
                 throw new Error("createDoc - Error, check logs");
             }
         } catch (e) {
-            fnLogger.error("Error while creating relation document", {error: e});
+            fnLogger.error("Error while creating relation document", { error: e });
         }
         return doc;
     }
 
-    createRelationDocs = async (docs: { docId: string | null; params: {
-        sourceClass: string;
-        targetClass: string;
-        sourceId: string;
-        targetId: string;
-    }; }[], relationName: string, domainObj: Domain): Promise<RelationDocument[]> => {
-        const fnLogger = logger.child({method: "createRelationDocs", args: {docs, relationName}});
+    createRelationDocs = async (docs: {
+        docId: string | null; params: {
+            sourceClass: string;
+            targetClass: string;
+            sourceId: string;
+            targetId: string;
+        };
+    }[], relationName: string, domainObj: Domain): Promise<RelationDocument[]> => {
+        const fnLogger = logger.child({ method: "createRelationDocs", args: { docs, relationName } });
 
         let db = this.db;
         const documents: RelationDocument[] = [];
         let newDocsIds: string[] = [];
-        
+
         for (const draft of docs) {
-            let {docId, params} = draft;
+            let { docId, params } = draft;
             let doc: RelationDocument | null = null;
             let isNewDoc = false;
             try {
                 if (docId) {
                     const existingDoc = await db.get(docId) as RelationDocument;
-                    fnLogger.info("retrieved doc", {existingDoc})
+                    fnLogger.info("retrieved doc", { existingDoc })
                     if (existingDoc && existingDoc["~domain"] === domainObj.name) {
-                        fnLogger.info("createRelationDocs - assigning existing doc", {doc: existingDoc});
-                        doc = {...existingDoc};
+                        fnLogger.info("createRelationDocs - assigning existing doc", { doc: existingDoc });
+                        doc = { ...existingDoc };
                     } else if (existingDoc && existingDoc["~domain"] !== domainObj.name) {
                         throw new Error("createRelationDocs - Existing document type differs");
                     } else {
@@ -1548,20 +1560,20 @@ class ClientStack extends Stack {
                         doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     }
                 } else {
-                    docId = `${domainObj.name}-${(this.lastDocId+1)}`;
+                    docId = `${domainObj.name}-${(this.lastDocId + 1)}`;
                     doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
                 }
-                fnLogger.info("Doc BEFORE elaboration (i.e. merge)", {doc, params});
+                fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
                 const doc_ = {
-                    ...doc, 
+                    ...doc,
                     ...params,
-                    _id: docId, 
-                    _rev: doc._rev, 
+                    _id: docId,
+                    _rev: doc._rev,
                     "~updateTimestamp": new Date().getTime()
                 };
-                fnLogger.info("Doc AFTER elaboration (i.e. merge)", {doc_});
+                fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
                 documents.push(doc_);
                 if (isNewDoc) newDocsIds.push(docId);
             } catch (e: any) {
@@ -1569,16 +1581,17 @@ class ClientStack extends Stack {
                     "error": e,
                     "document": doc
                 });
-                throw new Error("createRelationDocs - Problem while preparing doc"+e);
+                throw new Error("createRelationDocs - Problem while preparing doc" + e);
             }
         }
-        try {console.log("Documents to be created", {documents});
+        try {
+            // console.log("Documents to be created", {documents});
             const response = await db.bulkDocs(documents);
-            fnLogger.info("Response after bulkDocs",{"response": response});
+            fnLogger.info("Response after bulkDocs", { "response": response });
             // Increment lastDocId based on number of new docs created
             const newDocsCount = response.filter(res => res.id != null && newDocsIds.includes(res.id)).length;
             fnLogger.info(`Successfully created ${newDocsCount} new documents.`);
-            for (let i = 0; i < newDocsCount;i++) {
+            for (let i = 0; i < newDocsCount; i++) {
                 await this.incrementLastDocId();
             }
         } catch (e: any) {
@@ -1586,7 +1599,7 @@ class ClientStack extends Stack {
                 "error": e,
                 "documents": documents
             });
-            throw new Error("createRelationDocs - Problem while putting docs"+e);
+            throw new Error("createRelationDocs - Problem while putting docs" + e);
         }
         return documents;
     }
@@ -1597,16 +1610,16 @@ class ClientStack extends Stack {
      * @returns Promise<boolean>
      */
     deleteDocument = async (_id: string): Promise<boolean> => {
-        const fnLogger = logger.child({method: "deleteDocument", args: {_id}});
+        const fnLogger = logger.child({ method: "deleteDocument", args: { _id } });
         const doc = await this.db.get(_id);
         if (doc) {
             try {
                 const targetClass = (doc as any)["~class"] as string;
                 await this.policyEngine.ensureWriteAllowed(targetClass, doc as Document);
-                await this.db.put({...doc, active: false});
+                await this.db.put({ ...doc, active: false });
                 return true;
             } catch (e: any) {
-                fnLogger.error(`Error while deleting document: ${e}`,{document: doc});
+                fnLogger.error(`Error while deleting document: ${e}`, { document: doc });
                 return false;
             }
         } else {
@@ -1616,34 +1629,34 @@ class ClientStack extends Stack {
     }
 
     query = async (sql: string, ...params: any[]) => {
-        const fnLogger = logger.child({method: "query", args: {sql, params}});
+        const fnLogger = logger.child({ method: "query", args: { sql, params } });
         fnLogger.info("Executing query");
-            let astList: (SelectAST | UnionAST)[] = [];
+        let astList: (SelectAST | UnionAST)[] = [];
+        try {
+            astList = parse(sql);
+            fnLogger.info("Produced AST", { astList });
+        } catch (error: any) {
+            error.ast = astList.length > 0 ? astList[0] : null;
+            throw error;
+        }
+
+        // A UNION query is treated as a single execution, not a loop over ASTs.
+        if (astList.length > 0) {
             try {
-                astList = parse(sql);
-                fnLogger.info("Produced AST", {astList});
+                const plan = createPlan(astList);
+                const rows = await executePlan(this, plan, params);
+                // The AST for the whole query (including unions) is the list
+                fnLogger.info("Query executed successfully", { rows, astList });
+                return { rows, ast: astList };
             } catch (error: any) {
-                error.ast = astList.length > 0 ? astList[0] : null;
+                error.ast = astList; // Attach full AST list to error for debugging
                 throw error;
             }
-    
-            // A UNION query is treated as a single execution, not a loop over ASTs.
-            if (astList.length > 0) {
-                    try {
-                    const plan = createPlan(astList);
-                    const rows = await executePlan(this, plan, params);
-                    // The AST for the whole query (including unions) is the list
-                    fnLogger.info("Query executed successfully", { rows, astList });
-                    return { rows, ast: astList };
-                } catch (error: any) {
-                    error.ast = astList; // Attach full AST list to error for debugging
-                    throw error;
-                }
-            }
-            
-            // Handle case where query is empty or only comments
-            return { rows: [], ast: null };
         }
+
+        // Handle case where query is empty or only comments
+        return { rows: [], ast: null };
+    }
 }
 
 
