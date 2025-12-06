@@ -1,7 +1,7 @@
 import Attribute from '../attribute'
-import {z} from "zod";
+import { z } from "zod";
 // import ReferenceAttribute from '../Reference';
-import {ClassModel, AttributeModel, Document, TriggerModel} from "../../../types";
+import { ClassModel, AttributeModel, Document, TriggerModel } from "../../../types";
 import Stack from '..';
 import { Logger } from 'winston';
 import Trigger from '../trigger';
@@ -17,7 +17,7 @@ abstract class Class extends EventTarget {
     /* Populated in init() */
     abstract type: ClassModel["type"];
     description?: string;
-    attributes: {[name: string]: Attribute} = {};
+    attributes: { [name: string]: Attribute } = {};
     schema: ClassModel["schema"] = {};
     schemaZOD: z.ZodObject = z.object({});
     id?: string;
@@ -34,7 +34,7 @@ abstract class Class extends EventTarget {
     constructor() {
         super();
     }
-    
+
     abstract build: () => Promise<Class>;
 
     abstract init: (
@@ -68,12 +68,12 @@ abstract class Class extends EventTarget {
 
     static buildFromModel: (stack: Stack, classModel: ClassModel) => Promise<Class>;
 
-    static fetchById: ( stack: Stack, classId: string ) => Promise<Class>;
+    static fetchById: (stack: Stack, classId: string) => Promise<Class>;
 
-    static fetch: ( stack: Stack, className: string ) => Promise<Class>;
+    static fetch: (stack: Stack, className: string) => Promise<Class | null>;
 
     // TODO Turn into method (after factory method instantiation refactory is done)
-    abstract setId: ( id: string ) => void;
+    abstract setId: (id: string) => void;
 
     abstract getName: () => string;
 
@@ -85,9 +85,9 @@ abstract class Class extends EventTarget {
 
     abstract getId: () => string | undefined;
 
-    abstract getByPrimaryKeys: (params: {[key: string]: any}) => Promise<Document | null>;
+    abstract getByPrimaryKeys: (params: { [key: string]: any }) => Promise<Document | null>;
 
-    abstract validate: (data: {[key: string]: any}) => Promise<boolean>;
+    abstract validate: (data: { [key: string]: any }) => Promise<boolean>;
 
     abstract uniqueCheck: (doc: Document) => Promise<boolean>;
 
@@ -98,16 +98,16 @@ abstract class Class extends EventTarget {
     abstract getModel: () => ClassModel;
 
     // Set model should be called only after fetching the latest model from db
-    abstract setModel: ( model?: ClassModel ) => void;
+    abstract setModel: (model?: ClassModel) => void;
 
-    abstract getAttributes: ( ...names: string[] ) => {[name: string]: Attribute};
+    abstract getAttributes: (...names: string[]) => { [name: string]: Attribute };
 
-    abstract hasAllAttributes: ( ...names: string[] ) => boolean;
+    abstract hasAllAttributes: (...names: string[]) => boolean;
 
-    abstract hasAnyAttributes: ( ...names: string[] ) => boolean;
+    abstract hasAnyAttributes: (...names: string[]) => boolean;
 
     // interface of hasAnyAttributes
-    abstract hasAttribute: ( name: string ) => boolean;
+    abstract hasAttribute: (name: string) => boolean;
 
 
     abstract addAttribute: (attribute: Attribute | AttributeModel) => Promise<Class>;
@@ -116,17 +116,19 @@ abstract class Class extends EventTarget {
 
     abstract removeAttribute: (name: string) => Promise<Class>;
 
+    abstract getEncryptedAttributes: () => Attribute[];
+
     // TODO: modify to pass also the current class model
     // consider first fetching/updating the local class model
-    abstract addCard: (params: {[key:string]: any}) => Promise<Document | null>;
+    abstract addCard: (params: { [key: string]: any }) => Promise<Document | null>;
 
-    abstract addCards: (paramsArray: {[key:string]: any}[]) => Promise<Document[]>;
+    abstract addCards: (paramsArray: { [key: string]: any }[]) => Promise<Document[]>;
 
-    abstract addOrUpdateCard: (params: {[key:string]: any}, cardId?: string) => Promise<Document | null>;
+    abstract addOrUpdateCard: (params: { [key: string]: any }, cardId?: string) => Promise<Document | null>;
 
-    abstract updateCard: (cardId: string, params: {[key:string]: any}) => Promise<Document | null>;
+    abstract updateCard: (cardId: string, params: { [key: string]: any }) => Promise<Document | null>;
 
-    abstract getCards: (selector?: {[key: string]: any}, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
+    abstract getCards: (selector?: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
 
     abstract deleteCard: (cardId: string) => Promise<boolean>;
 

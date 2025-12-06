@@ -44,8 +44,8 @@ describe("ClientStack.query execution", () => {
 
     beforeAll(async () => {
         stack = await ClientStack.create(dbName);
-        await seedClassicUser(stack, { username: "query-execution", password: "password-query" });
-        await createSessionProof(stack, "query-execution");
+        await seedClassicUser(stack, { username: "db-query-execution", password: "password-query" });
+        await createSessionProof(stack, "db-query-execution");
         actorClass = await Class.create(stack, "Actor", "class", "Actors for query execution", {
             name: {
                 name: "name",

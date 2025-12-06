@@ -380,7 +380,7 @@ class Class extends Class_ {
         return result;
     }
 
-    getEncryptedAttributes() {
+    getEncryptedAttributes = () => {
         return Object.values(this.attributes).filter((attribute) => {
             const config = attribute.model.config;
             return config?.encrypted === true && config?.primaryKey !== true;

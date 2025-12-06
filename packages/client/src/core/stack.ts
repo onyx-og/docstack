@@ -186,9 +186,11 @@ class ClientStack extends Stack {
 
     private async ensureDefaultPolicyForClass(targetClass: ClassModel) {
         const fnLogger = logger.child({ method: "ensureDefaultPolicyForClass", targetClass: targetClass._id });
-        const result = await this.db.allDocs<{ doc: PolicyModel }>({ include_docs: true });
-        const existing = result.rows.find((row) => row.doc?.targetClass?.includes(targetClass._id));
-        if (existing) {
+        const existingPolicy = await this.findDocument<PolicyModel>({
+            "~class": { $eq: "~Policy" },
+            targetClass: { $elemMatch: { $eq: targetClass._id } }
+        });
+        if (existingPolicy) {
             return;
         }
 
@@ -273,7 +275,7 @@ class ClientStack extends Stack {
 
         const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey);
 
-        const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey };
+        const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey: documentKey ?? undefined };
         this.setAuthSession(proof);
         await this.ensureCryptoMarkerEncryption();
         return proof;
@@ -827,8 +829,8 @@ class ClientStack extends Stack {
 
                 const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc as Document);
                 const classObj = encryptedKeys.length || (fields && fields.length)
-                    ? await this.getClass(doc["~class"], true).catch(() => null)
-                    : null;
+                    ? (await this.getClass(doc["~class"], true)) ?? undefined
+                    : undefined;
 
                 const processedDoc = await this.processReadableDocument(doc as Document, classObj, fields, encryptedKeys);
                 if (processedDoc) {
@@ -844,7 +846,7 @@ class ClientStack extends Stack {
         }
     }
 
-    private async processReadableDocument(doc: Document, classObj: Class | null, fields?: string[], precomputedEncryptedKeys?: string[]) {
+    private async processReadableDocument(doc: Document, classObj?: Class, fields?: string[], precomputedEncryptedKeys?: string[]) {
         if (!this.cryptoEngine.isEnabled()) {
             return doc;
         }
@@ -1621,11 +1623,11 @@ class ClientStack extends Stack {
      */
     deleteDocument = async (_id: string): Promise<boolean> => {
         const fnLogger = logger.child({ method: "deleteDocument", args: { _id } });
-        const doc = await this.db.get(_id);
+        const doc = await this.db.get<Document>(_id);
         if (doc) {
             try {
                 const targetClass = (doc as any)["~class"] as string;
-                await this.policyEngine.ensureWriteAllowed(targetClass, doc as Document);
+                await this.policyEngine.ensureWriteAllowed(targetClass, doc);
                 await this.db.put({ ...doc, active: false });
                 return true;
             } catch (e: any) {
