@@ -294,7 +294,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         const validationResult = await classObj.validate(doc);
                         if (!validationResult) {
                             fnLogger.error("Validation failed for document", { id: doc._id, className, doc });
-                            throw new Error("Discarded object because object not valid for its Class schema");
+                            throw new Error(`Discarded document ${JSON.stringify(doc)} because object not valid for its Class schema: ${JSON.stringify(classObj.buildSchema())}`);
                         }
                     } catch (error) {
                         return Promise.reject(error);
@@ -355,7 +355,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             }
             return exec();
         },
-
+        /*
         put: async function (doc, options?: PouchDB.Core.PutOptions | null, callback?) {
             if (typeof options === "function") {
                 callback = options;
@@ -379,6 +379,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             }
             return exec();
         },
+        */
 
     };
 };

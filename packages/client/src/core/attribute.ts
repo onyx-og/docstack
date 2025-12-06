@@ -9,8 +9,8 @@ class Attribute extends Attribute_ {
     field: ZodType = z.any();
     class: Class | null;
     defaultValue?: any;
-    
-    constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], description?: string, config?: AttributeType["config"] ) {
+
+    constructor(classObj: Class | null = null, name: string, type: AttributeType["type"], description?: string, config?: AttributeType["config"]) {
         super(classObj, name, type, config);
         this.name = name;
         this.description = description;
@@ -23,8 +23,8 @@ class Attribute extends Attribute_ {
         this.setField();
         // if it's given a class
         // if ( classObj ) {
-            // attempt to add attribute
-            this.class = classObj;
+        // attempt to add attribute
+        this.class = classObj;
         // }
     }
 
@@ -76,7 +76,7 @@ class Attribute extends Attribute_ {
     }
 
     public setField = () => {
-        const {name, type, config} = this.model;
+        const { name, type, config } = this.model;
         let field: z.ZodType;
 
         switch (type) {
@@ -104,8 +104,8 @@ class Attribute extends Attribute_ {
 
 
             //     break;
-            
-            case 'decimal': 
+
+            case 'decimal':
                 field = z.number();
 
                 // min and max validation
@@ -119,8 +119,8 @@ class Attribute extends Attribute_ {
                 // decimal precision validation (with refinement)
                 if (typeof config.precision === 'number' && config.precision >= 0) {
                     const isPrecise = (value: any) => {
-                    if (typeof value !== 'number') 
-                        return true;
+                        if (typeof value !== 'number')
+                            return true;
                         const valueAsString = value.toString();
                         const decimalPart = valueAsString.split('.')[1];
                         const decimalPlaces = decimalPart ? decimalPart.length : 0;
@@ -141,7 +141,7 @@ class Attribute extends Attribute_ {
             case "object":
                 field = z.object({});
                 break;
-            
+
             case 'enum':
                 if (!config.values || !Array.isArray(config.values) || config.values.length === 0) {
                     throw new Error(
@@ -180,7 +180,7 @@ class Attribute extends Attribute_ {
                             } else throw new Error("Missing class parentship");
                         } catch (error: any) {
                             if (error.status === 404) {
-                                console.error(`Foreign key validation failed: document not found in class '${foreignClass}'. ${this.class?.getName()}`, {error});
+                                console.error(`Foreign key validation failed: document not found in class '${foreignClass}'. ${this.class?.getName()}`, { error });
                                 return false;
                             }
                             throw error;
@@ -244,15 +244,15 @@ class Attribute extends Attribute_ {
         if (this.class) return this.class
         else throw Error("Missing class configuration for this attribute");
     }
-    
+
     public validate = async (data: any): Promise<z.ZodSafeParseResult<unknown>> => {
         return this.field.safeParseAsync(data);
-    } 
+    }
 
-    static build = async ( attributeObj: Attribute ) => {
+    static build = async (attributeObj: Attribute) => {
         let classObj = attributeObj.getClass();
         let stack = classObj.getStack();
-        if ( stack ) {
+        if (stack) {
             await classObj.addAttribute(attributeObj);
             return attributeObj;
         } else {
@@ -260,18 +260,18 @@ class Attribute extends Attribute_ {
         }
     }
 
-    setModel = ( model: AttributeModel ) => {
+    setModel = (model: AttributeModel) => {
         let currentModel = this.getModel();
         model = Object.assign(currentModel || {}, model);
         this.model = model;
         this.defaultValue = model.config.defaultValue;
     }
-    
+
     // TODO: Better define config
-    getType = ( type: AttributeType["type"]) => {
-        if ( this.checkTypeValidity(type) ) {
+    getType = (type: AttributeType["type"]) => {
+        if (this.checkTypeValidity(type)) {
             return type
-        } else throw Error("Invalid attribute type: "+type)
+        } else throw Error("Invalid attribute type: " + type)
         // return this?
     }
 
@@ -292,7 +292,7 @@ class Attribute extends Attribute_ {
 
     checkTypeValidity = (type: string) => {
         let validity = false;
-        if ( ATTRIBUTE_TYPES.includes(type) ) {
+        if (ATTRIBUTE_TYPES.includes(type)) {
             validity = true;
         }
         return validity;
@@ -303,39 +303,39 @@ class Attribute extends Attribute_ {
     // TODO: since config depends on attribute's type, 
     // find a way to check if given configs are correct
     // find a way to add default configs base on type
-    getTypeConf = ( type: AttributeType["type"], config: AttributeType["config"] | undefined ) => {
-        switch( type ) {
+    getTypeConf = (type: AttributeType["type"], config: AttributeType["config"] | undefined) => {
+        switch (type) {
             // TODO: add missing cases and change values to imported const 
             case "decimal":
-                config = Object.assign({ max: null, min: null, precision: null, isArray: false}, config) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ max: null, min: null, precision: null, isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "integer":
-                config = Object.assign({ max: null, min: null, isArray: false}, config) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ max: null, min: null, isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "string":
-                config = Object.assign({ isArray: false }, config ) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "object":
-                config = Object.assign({ isArray: false }, config ) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "date":
-                config = Object.assign({ format: "iso", max: null, min: null, isArray: false}, config) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ format: "iso", max: null, min: null, isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "boolean":
-                config = Object.assign({ defaultValue: false, isArray: false}, config) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ defaultValue: false, isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "foreign_key":
-                config = Object.assign({ targetClass: null, isArray: false}, config) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ targetClass: null, isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "enum":
-                config = Object.assign({ values: [], isArray: false}, config) as AttributeTypeConfig;
-            break;
+                config = Object.assign({ values: [], isArray: false }, config) as AttributeTypeConfig;
+                break;
             case "reference":
                 config = Object.assign({ isArray: false }, config) as AttributeTypeReference["config"];
-            break;
+                break;
             default:
-                throw new Error("Unexpected type: "+type);
-                // return "^[a-zA-Z0-9_\\s]".concat("{0,"+config.maxLength+"}$");
+                throw new Error("Unexpected type: " + type);
+            // return "^[a-zA-Z0-9_\\s]".concat("{0,"+config.maxLength+"}$");
         }
         return config
     }

@@ -8,6 +8,12 @@ describe("System Patches Integration", () => {
         const { stack, cleanup } = await createTestDocStack("system-patches-test", { withSession: false });
 
         try {
+            const sessionproof = await stack.authenticate({
+                username: "system",
+                password: "system"
+            });
+            console.log("Got session proof", { sessionproof })
+            expect(stack.authSession).not.toBeNull();
             // 1. Verify System Classes
             const systemClasses = ["~User", "~Job", "~Policy", "~AuthModule", "~UserSession", "~Group"];
             for (const className of systemClasses) {
@@ -16,26 +22,39 @@ describe("System Patches Integration", () => {
                 expect(classModel!._id).toBe(className);
             }
 
+            const userClass = await stack.getClass("~User");
+            const users = await userClass?.getCards();
+            console.log("Got user list", users)
             // 2. Verify System User
             const systemUser = await stack.findDocument({
                 "~class": { $eq: "~User" },
                 username: { $eq: "system" }
             });
-            expect(systemUser).toBeDefined();
+            // const systemUser = await stack.db.get("system");
+            console.log("Got system user", systemUser);
+            expect(systemUser).not.toBeNull();
             expect(systemUser!.username).toBe("system");
 
+            // const allDocs = await stack.db.allDocs({
+            //     include_docs: true
+            // });
+            // console.log("Got all docs", allDocs);
+
+            // const groupClass = await stack.getClass("~Group");
+            // const groups = await groupClass?.getCards();
+            // console.log("Got group list", groups)
             // 3. Verify System Groups
             const adminGroup = await stack.findDocument({
                 "~class": { $eq: "~Group" },
                 name: { $eq: "Admin" }
             });
-            expect(adminGroup).toBeDefined();
+            expect(adminGroup).not.toBeNull();
 
             const defaultGroup = await stack.findDocument({
                 "~class": { $eq: "~Group" },
                 name: { $eq: "Default" }
             });
-            expect(defaultGroup).toBeDefined();
+            expect(defaultGroup).not.toBeNull();
 
             // 4. Verify Schema Version
             const allPatches = getAllSystemPatches();

@@ -453,6 +453,7 @@ const sys_005: Patch = {
         {
             "_id": "Job-Auth-Classic",
             "~class": "~Job",
+            "active": true,
             "name": "Classic authentication",
             "description": "Derive key material from password and salt",
             "type": "user",
@@ -464,9 +465,20 @@ const sys_005: Patch = {
             "defaultParams": {},
             "metadata": {}
         },
+    ]
+};
+
+const sys_006: Patch = {
+    "_id": "~sys-00.6",
+    "~class": "patch",
+    "version": "0.0.6",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.6\\n#### New Documents: AuthMod-Classic, Policy-System-Classes",
+    "docs": [
         {
             "_id": "AuthMod-Classic",
             "~class": "~AuthModule",
+            "active": true,
             "name": "Classic Email/Password",
             "config": { "mode": "password" },
             "jobId": "Job-Auth-Classic"
@@ -474,6 +486,7 @@ const sys_005: Patch = {
         {
             "_id": "Policy-System-Classes",
             "~class": "~Policy",
+            "active": true,
             "userId": "system",
             "rule": "return true;",
             "description": "Default system policy",
@@ -482,14 +495,12 @@ const sys_005: Patch = {
     ]
 };
 
-syspatches.push(sys_001, sys_002, sys_003, sys_004, sys_005);
-
-const sys_006: Patch = {
-    "_id": "~sys-0.0.6",
+const sys_007: Patch = {
+    "_id": "~sys-0.0.7",
     "~class": "patch",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.6\\n#### Updates: enforce enum/foreign key definitions for job, policy, and user auth fields",
+    "changelog": "### Schema Patch: v0.0.7\\n#### Updates: enforce enum/foreign key definitions for job, policy, and user auth fields",
     "docs": [
         {
             "_id": "~User",
@@ -657,6 +668,7 @@ const sys_006: Patch = {
         {
             "_id": "system",
             "~class": "~User",
+            "active": true,
             "username": "system",
             "password": "system",
             "email": "",
@@ -669,14 +681,12 @@ const sys_006: Patch = {
     ]
 };
 
-syspatches.push(sys_006);
-
-const sys_007: Patch = {
-    "_id": "~sys-0.0.7",
+const sys_008: Patch = {
+    "_id": "~sys-0.0.8",
     "~class": "patch",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.7\\n#### Updates: support wrapped document keys and encrypted user secrets",
+    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: support wrapped document keys and encrypted user secrets",
     "docs": [
         {
             "_id": "~User",
@@ -768,6 +778,7 @@ const sys_007: Patch = {
             "_id": "system",
             "_rev": "auto",
             "~class": "~User",
+            "active": true,
             "username": "system",
             "password": "system",
             "email": "",
@@ -781,20 +792,19 @@ const sys_007: Patch = {
     ]
 };
 
-// syspatches.push(sys_005, sys_006);
-
-const sys_008: Patch = {
-    "_id": "~sys-0.0.8",
+const sys_009: Patch = {
+    "_id": "~sys-0.0.9",
     "~class": "patch",
 
-    "version": "0.0.8",
+    "version": "0.0.9",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: restrict ~User access to the owner and system user",
+    "changelog": "### Schema Patch: v0.0.9\\n#### Updates: restrict ~User access to the owner and system user",
     "docs": [
         {
             "_id": "Policy-System-Classes",
             "_rev": "auto",
             "~class": "~Policy",
+            "active": true,
             "userId": "system",
             "rule": "return true;",
             "description": "Default system policy",
@@ -803,6 +813,7 @@ const sys_008: Patch = {
         {
             "_id": "Policy-User-SelfAccess",
             "~class": "~Policy",
+            "active": true,
             "userId": "system",
             "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
             "description": "Allow users to access only their own user document or the system user",
@@ -811,15 +822,12 @@ const sys_008: Patch = {
     ]
 };
 
-syspatches.push(sys_007);
-syspatches.push(sys_008);
-
-const sys_009: Patch = {
-    "_id": "~sys-0.0.9",
+const sys_010: Patch = {
+    "_id": "~sys-0.0.10",
     "~class": "patch",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.9\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
+    "changelog": "### Schema Patch: v0.0.10\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
     "docs": [
         {
             "_id": "~UserSession",
@@ -890,14 +898,14 @@ const sys_009: Patch = {
     ]
 };
 
-syspatches.push(sys_009);
+syspatches.push(sys_001, sys_002, sys_003, sys_004, sys_005, sys_006, sys_007, sys_008, sys_009, sys_010);
 
-const sys_010: Patch = {
-    "_id": "~sys-0.0.10",
+const sys_011: Patch = {
+    "_id": "~sys-0.0.11",
     "~class": "patch",
-    "version": "0.0.10",
+    "version": "0.0.11",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.10\\n#### Updates: introduce groups, optional policy principals, and group-aware sessions",
+    "changelog": "### Schema Patch: v0.0.11\\n#### New Class: ~Group",
     "docs": [
         {
             "_id": "~Group",
@@ -906,28 +914,19 @@ const sys_010: Patch = {
             "description": "Represents a user group",
             "~class": "class",
             "schema": {
-                "name": {
-                    "name": "name",
-                    "type": "string",
-                    "config": {
-                        "primaryKey": true,
-                        "mandatory": true,
-                        "maxLength": 100,
-                        "isArray": false
-                    }
-                }
+                "name": { "name": "name", "type": "string", "config": { "primaryKey": true, "mandatory": true, "maxLength": 100, "isArray": false } }
             }
-        },
-        {
-            "_id": "Group-Admin",
-            "~class": "~Group",
-            "name": "Admin"
-        },
-        {
-            "_id": "Group-Default",
-            "~class": "~Group",
-            "name": "Default"
-        },
+        }
+    ]
+};
+
+const sys_012: Patch = {
+    "_id": "~sys-0.0.12",
+    "~class": "patch",
+    "version": "0.0.12",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.12\\n#### Updates: introduce groups, optional policy principals, and group-aware sessions",
+    "docs": [
         {
             "_id": "~User",
             "_rev": "auto",
@@ -1112,11 +1111,44 @@ const sys_010: Patch = {
                 "description": { "name": "description", "type": "string", "config": { "mandatory": false } },
                 "targetClass": { "name": "targetClass", "type": "foreign_key", "config": { "mandatory": true, "isArray": true, "targetClass": "class" } }
             }
+        }
+    ]
+};
+
+const sys_013: Patch = {
+    "_id": "~sys-0.0.13",
+    "~class": "patch",
+    "version": "0.0.13",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.13\\n#### New Documents: Group-Admin, Group-Default",
+    "docs": [
+        {
+            "_id": "Group-Admin",
+            "~class": "~Group",
+            "active": true,
+            "name": "Admin"
         },
+        {
+            "_id": "Group-Default",
+            "~class": "~Group",
+            "active": true,
+            "name": "Default"
+        }
+    ]
+};
+
+const sys_014: Patch = {
+    "_id": "~sys-0.0.14",
+    "~class": "patch",
+    "version": "0.0.14",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.14\\n#### New Documents: Policy-Admin, Policy-User-SelfAccess\\n#### Updates: system user with groupId",
+    "docs": [
         {
             "_id": "system",
             "_rev": "auto",
             "~class": "~User",
+            "active": true,
             "username": "system",
             "password": "system",
             "groupId": ["Group-Admin"],
@@ -1131,6 +1163,7 @@ const sys_010: Patch = {
         {
             "_id": "Policy-Admin",
             "~class": "~Policy",
+            "active": true,
             "groupId": "Group-Admin",
             "rule": "return true;",
             "description": "Default admin policy",
@@ -1140,6 +1173,8 @@ const sys_010: Patch = {
             "_id": "Policy-User-SelfAccess",
             "_rev": "auto",
             "~class": "~Policy",
+            "active": true,
+            "userId": "system",
             "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
             "description": "Allow users to access only their own user document or the system user",
             "targetClass": ["~User"]
@@ -1147,7 +1182,7 @@ const sys_010: Patch = {
     ]
 };
 
-syspatches.push(sys_010);
+syspatches.push(sys_011, sys_012, sys_013, sys_014);
 
 export function getSystemPatches(currentVersion: string) {
     return syspatches

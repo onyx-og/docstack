@@ -227,10 +227,14 @@ class ClientStack extends Stack {
 
     public async authenticate(credentials: ClientCredentials) {
         const { username, password } = credentials;
-        const user = await this.findDocument<UserModel>({
-            "~class": { $eq: "~User" },
-            username: { $eq: username },
+        const userQuery = await this.db.find({
+            selector: {
+                "~class": { $eq: "~User" },
+                username: { $eq: username },
+                active: { $eq: true }
+            }
         });
+        const user = userQuery.docs.length ? userQuery.docs[0] as unknown as UserModel : null;
 
         if (!user) {
             throw new Error(`User '${username}' not found`);
@@ -333,8 +337,7 @@ class ClientStack extends Stack {
                 return doc;
             }));
             await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions);
-            const originClass = await this.db.get("class");
-            console.log("Origin class", originClass);
+
             fnLogger.warn("Successfully applied patch", { version: patch.version });
             return patch.version;
         } catch (e: any) {
@@ -805,6 +808,9 @@ class ClientStack extends Stack {
                 skip: skip,
                 limit: limit
             });
+            if (selector.hasOwnProperty("username")) {
+                console.log("Found result", { result: foundResult, selector })
+            }
 
             fnLogger.info("Found", {
                 result: foundResult,
@@ -813,7 +819,11 @@ class ClientStack extends Stack {
             const readableDocs: T[] = [];
             for (const doc of foundResult.docs as unknown as Document[]) {
                 const canRead = await this.policyEngine.isReadableDocument(doc);
-                if (!canRead) continue;
+                if (!canRead) {
+                    fnLogger.info("Based on policies, document is not readable", { docId: doc._id, docClass: doc["~class"] });
+                    console.log("Based on policies, document is not readable", { docId: doc._id, docClass: doc["~class"] });
+                    continue;
+                }
 
                 const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc as Document);
                 const classObj = encryptedKeys.length || (fields && fields.length)

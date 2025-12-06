@@ -22,14 +22,17 @@
     "emitDecoratorMetadata": true,
     "composite": true,
     "paths": {
-      "@docstack/shared": ["../../shared"]
+      "@docstack/shared": [
+        "../../shared"
+      ]
     }
   },
   "include": [
     "src/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "*.test.ts"
   ],
   "references": [
     {

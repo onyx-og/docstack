@@ -1,7 +1,6 @@
 import crypto from "crypto";
-import type { DocStack } from "../index.js";
-import ClientStack from "../stack.js";
-import { getAllSystemPatches } from "../datamodel/index.js";
+import { DocStack } from "../index.js";
+import type ClientStack from "../stack.js";
 import type { AuthSessionProof, UserModel, UserSessionModel } from "@docstack/shared";
 
 export type TestStackContext = {
@@ -74,22 +73,13 @@ export const createTestDocStack = async (
     options?: { withSession?: boolean; sessionUsername?: string }
 ): Promise<TestStackContext> => {
     const stackName = `${namePrefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const stack = await ClientStack.create(`db-${stackName}`);
-    await stack.checkSystem();
-    const systemUser = await stack.db.get<UserModel>("system").catch((error: any) =>
-        error?.name === "not_found" || error?.status === 404 ? null : Promise.reject(error)
-    );
+    const docStack = new DocStack({ name: stackName });
+    await waitForDocStackReady(docStack);
 
-    if (!systemUser) {
-        throw new Error(
-            `Cannot create Test DocStack: user 'system' does not exist`
-        );
+    const stack = docStack.getStack(stackName);
+    if (!stack) {
+        throw new Error(`Failed to resolve stack '${stackName}'`);
     }
-
-    const docStack = ({
-        getReadyState: () => true,
-        getStack: () => stack,
-    } as unknown) as DocStack;
 
     if (typeof (stack.db as any).setMaxListeners === "function") {
         (stack.db as any).setMaxListeners(0);
@@ -224,19 +214,13 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
         });
     }
 
-    const user = await stack.findDocument<UserModel>({
+    let user = await stack.findDocument<UserModel>({
         "~class": { $eq: "~User" },
         username: { $eq: username },
     });
 
     if (!user) {
-        const missingSystemMessage =
-            username === "system"
-                ? "System user should be seeded by system patches; verify stack initialization."
-                : undefined;
-        throw new Error(
-            `Cannot create session proof: user '${username}' does not exist${missingSystemMessage ? `. ${missingSystemMessage}` : ""}`
-        );
+        throw new Error(`Cannot create session proof: user '${username}' does not exist`);
     }
 
     const session: UserSessionModel = {
