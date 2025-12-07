@@ -1,5 +1,5 @@
-import { Class, Attribute, Domain } from "../index.js";
-import { getAllSystemPatches } from "../core/datamodel/index.js";
+import { Class, Attribute, Domain } from "../";
+import { getAllSystemPatches } from "../core/datamodel";
 import { createTestDocStack } from "../core/test-utils/docstack";
 import type { ClassModel, Document } from "@docstack/shared";
 

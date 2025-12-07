@@ -53,8 +53,8 @@ export const importAesKeyFromHex = async (hexKey: string, usages: KeyUsage[] = [
     const cryptoObj = getCrypto();
     return cryptoObj.subtle.importKey(
         "raw",
-        hexToBytes(hexKey),
-        { name: "AES-GCM", length: 256 },
+        hexToBytes(hexKey) as BufferSource,
+        { name: "AES-GCM" } as any,
         false,
         usages,
     );
@@ -68,8 +68,10 @@ export const isEncryptedPayload = (value: unknown): value is EncryptedPayload =>
 
 export const encryptWithAesGcm = async (plaintext: string, key: CryptoKey): Promise<EncryptedPayload> => {
     const cryptoObj = getCrypto();
-    const iv = cryptoObj.getRandomValues(new Uint8Array(12));
-    const ciphertext = await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(plaintext));
+    const iv = new Uint8Array(12);
+    (cryptoObj as any).getRandomValues(iv);
+    const ivBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength);
+    const ciphertext = await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv: ivBuffer } as any, key, encoder.encode(plaintext));
     return {
         __enc: true,
         iv: toBase64(iv),
@@ -80,10 +82,14 @@ export const encryptWithAesGcm = async (plaintext: string, key: CryptoKey): Prom
 
 export const decryptWithAesGcm = async (payload: EncryptedPayload, key: CryptoKey): Promise<string> => {
     const cryptoObj = getCrypto();
+    const ivBytes = fromBase64(payload.iv);
+    const dataBytes = fromBase64(payload.data);
+    const ivBuffer = ivBytes.buffer.slice(ivBytes.byteOffset, ivBytes.byteOffset + ivBytes.byteLength);
+    const dataBuffer = dataBytes.buffer.slice(dataBytes.byteOffset, dataBytes.byteOffset + dataBytes.byteLength);
     const decrypted = await cryptoObj.subtle.decrypt(
-        { name: "AES-GCM", iv: fromBase64(payload.iv) },
+        { name: "AES-GCM", iv: ivBuffer } as any,
         key,
-        fromBase64(payload.data),
+        dataBuffer as BufferSource,
     );
     return decoder.decode(decrypted);
 };

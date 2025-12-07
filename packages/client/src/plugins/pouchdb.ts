@@ -1,6 +1,7 @@
-import { isClassModel, isDocument, isRelation, Stack, Domain } from "@docstack/shared";
+import { isClassModel, isDocument, isRelation, Domain } from "@docstack/shared";
 import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
+import Stack from "../core/stack"
 import PouchDB from "pouchdb-browser";
 import { Trigger } from "../core/trigger/index.js";
 import createLogger from "../utils/logger/index.js";
@@ -88,7 +89,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     for (const docRes of result) {
                         if (docRes.id) {
                             // const doc = await stack.db.get(docRes.id, { rev: (docRes as any).rev }) as Document;
-                            const doc = documentsToProcess.find(d => d._id === docRes.id) as Document | undefined;
+                            const doc = documentsToProcess.find(d => d._id === docRes.id) as unknown as Document | undefined;
                             if (doc) {
                                 const updatedRev = (docRes as any).rev;
                                 if (updatedRev) {
@@ -303,7 +304,11 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             }
 
             if (!stack.cryptoEngine.isEnabled()) {
+                console.log("Crypto engine not enabled, skipping encryption.");
+                console.log("Docs:", docs);
                 return pouchBulkDocs.call(this, docs as any, options, postExec);
+            } else {
+                console.log("Crypto engine enabled, processing encryption.");
             }
 
             const originalDocs = Array.isArray(docs) ? documentsToProcess : (docs as any).docs;
@@ -350,7 +355,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             };
 
             if (callback) {
-                exec().then((res) => callback(null, res)).catch((err) => callback(err));
+                exec().then((res) => callback(null, res)).catch((err) => callback(err, undefined));
                 return;
             }
             return exec();

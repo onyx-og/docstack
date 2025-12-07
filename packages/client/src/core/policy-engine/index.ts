@@ -31,14 +31,14 @@ export class PolicyEngine {
     }
 
     private async loadPolicies(targetClass: string, aliases: string[] = []): Promise<PolicyModel[]> {
-        const result = await this.stack.db.allDocs<{ doc: PolicyModel }>({ include_docs: true });
         const identifiers = new Set([targetClass, ...aliases]);
-        return result.rows
-            .map((row) => row.doc)
-            .filter((doc): doc is PolicyModel => {
-                if (!doc || doc["~class"] !== "~Policy" || !Array.isArray(doc.targetClass)) return false;
-                return doc.targetClass.some((entry) => identifiers.has(entry));
-            });
+        const result = await this.stack.findDocuments<PolicyModel>(
+            { "~class": "~Policy" }
+        );
+        return result.docs.filter((doc) => {
+            if (!Array.isArray(doc.targetClass)) return false;
+            return doc.targetClass.some((entry) => identifiers.has(entry));
+        });
     }
 
     private getTargetIdentifiers(targetId: string, targetName: string) {
@@ -69,7 +69,7 @@ export class PolicyEngine {
             "session",
             "groupId",
             `"use strict"; ${policy.rule}`
-        ) as (doc: Document, sess: AuthSessionProof["session"], groupId: string | string[]) => any;
+        ) as (doc: Document | object, sess: AuthSessionProof["session"], groupId: string | string[]) => any;
 
         const result = executor(document || {}, session.session, session.session.groupId);
         if (result instanceof Promise) {

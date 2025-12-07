@@ -121,15 +121,17 @@ export const createTestDocStack = async (
         await createSessionProof(stack, sessionUsername);
     }
 
-    const cleanup = async () => {
-        const listeners = [...stack.listeners];
-        for (const listener of listeners) {
-            if (typeof listener.cancel === "function") {
-                listener.cancel();
-            }
+    const cleanup = async () => {        
+        
+        // Remove all event listeners from the database to prevent MaxListenersExceeded warnings
+        if (typeof (stack.db as any).removeAllListeners === "function") {
+            (stack.db as any).removeAllListeners();
         }
+
+        // Close the stack first (this calls removeAllListeners internally)
         stack.close();
-        await stack.db.destroy();
+        
+        delete docStack.stacks[stackName];
     };
 
     return { docStack, stack, stackName, cleanup };

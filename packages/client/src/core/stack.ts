@@ -1,4 +1,4 @@
-import PouchDB from "pouchdb";
+import PouchDB from "pouchdb-browser";
 import crypto from "crypto";
 import createLogger from "../utils/logger/index.js";
 import Class from "./class.js";
@@ -134,6 +134,7 @@ class ClientStack extends Stack {
         }
 
         let Find: typeof import('pouchdb-find') = (await import('pouchdb-find')).default;
+        PouchDB.plugin((await import('pouchdb-adapter-node-websql')).default);
 
 
         // Load default plugins
@@ -145,7 +146,12 @@ class ClientStack extends Stack {
                 PouchDB.plugin(plugin);
             }
         }
-        this.db = new PouchDB(conn);
+        this.db = new PouchDB(
+            conn,
+            {
+                adapter: "websql"
+            }
+        );
         this.cache = {
             // empty at init
         }
@@ -902,17 +908,18 @@ class ClientStack extends Stack {
     getClassModel = async (className: string) => {
         // TODO: understand whether to use name of _id field
         let selector = {
-            $or: [
-                { name: { $eq: className } },
+            /*$or: [
+                // { name: { $eq: className } },
                 { _id: { $eq: className } }
-            ],
+            ], */
+            _id: { $eq: className },
             "~class": { $in: ["class", "~self"] }
         };
 
         try {
-            let response = await this.findDocument(selector);
+            let response = await this.db.find({selector});
             if (response == null) return null;
-            let result: ClassModel = response as ClassModel
+            let result: ClassModel = response.docs[0] as unknown as ClassModel
             logger.info("getClassModel - result", { result: result })
             return result;
         } catch (e: any) {

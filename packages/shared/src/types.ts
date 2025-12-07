@@ -326,11 +326,11 @@ export type StackPluginType = (stackInstance: Stack) => {
         options: PouchDB.Core.BulkDocsOptions | null,
         callback: PouchDB.Core.Callback<Array<PouchDB.Core.Response | PouchDB.Core.Error>>,
     ): void;
-    put<Model>(
-        doc: PouchDB.Core.PutDocument<{} & Model>,
-        options?: PouchDB.Core.PutOptions | null,
-        callback?: PouchDB.Core.Callback<PouchDB.Core.Response>,
-    ): void;
+    // put<Model>(
+    //     doc: PouchDB.Core.PutDocument<{} & Model>,
+    //     options?: PouchDB.Core.PutOptions | null,
+    //     callback?: PouchDB.Core.Callback<PouchDB.Core.Response>,
+    // ): void;
     get<Model>(
         docId: PouchDB.Core.DocumentId,
         options?: PouchDB.Core.GetOptions | null,

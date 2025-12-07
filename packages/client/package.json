@@ -29,17 +29,18 @@
   "description": "",
   "dependencies": {
     "@docstack/shared": "file:../shared",
+    "pouchdb-adapter-node-websql": "^7.0.0",
     "semver": "^7.7.3"
   },
   "devDependencies": {
-    "rollup": "^4.53.1",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-replace": "^5.0.7",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/semver": "^7.7.1",
     "cpy-cli": "^6.0.0",
     "eslint": "^9.38.0",
-    "eslint-webpack-plugin": "^5.0.2"
+    "eslint-webpack-plugin": "^5.0.2",
+    "rollup": "^4.53.1"
   },
   "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "*"

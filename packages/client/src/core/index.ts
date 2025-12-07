@@ -41,7 +41,7 @@ class DocStack extends EventTarget {
     private config: StackConfig[] = [];
     private readyState: boolean; 
     private store!: ClientStack;
-    private stacks: ClientStack[] = [];
+    stacks: ClientStack[] = [];
     private logger: Logger = createlogger().child({module: "client"});
 
     private async addStack(config: StackConfig) {
@@ -70,12 +70,12 @@ class DocStack extends EventTarget {
         }
         if (stack) {
             this.stacks.push(stack);
-            let window_ = window as Window & typeof globalThis & {
-                stacks: ClientStack[]
-            }
-            if (window_.stacks) {
-                window_.stacks.push(stack)
-            } 
+            // let window_ = window as Window & typeof globalThis & {
+            //     stacks: ClientStack[]
+            // }
+            // if (window_.stacks) {
+            //     window_.stacks.push(stack)
+            // } 
             return stack;
         }
         // await setupAdminUser();

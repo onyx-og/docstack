@@ -91,31 +91,31 @@ const sys_001: Patch = {
     ]
 }
 
-const sys_002: Patch = {
-    "_id": "~sys-0.0.2",
-    "~class": "patch",
-    "version": "0.0.2",
-    "target": "system",
-    "changelog": "### Initial patch with system classes and domains",
-    "docs": [
-        {
-            "_id": "log",
-            "active": true,
-            "name": "log",
-            "description": "Contains the system logs",
-            "~class": "class",
-            "schema": {
-                "log": {
-                    "name": "log",
-                    "type": "object",
-                    "config": {
-                        "isArray": false
-                    }
-                }
-            }
-        }
-    ]
-}
+// const sys_002: Patch = {
+//     "_id": "~sys-0.0.2",
+//     "~class": "patch",
+//     "version": "0.0.2",
+//     "target": "system",
+//     "changelog": "### Initial patch with system classes and domains",
+//     "docs": [
+//         {
+//             "_id": "log",
+//             "active": true,
+//             "name": "log",
+//             "description": "Contains the system logs",
+//             "~class": "class",
+//             "schema": {
+//                 "log": {
+//                     "name": "log",
+//                     "type": "object",
+//                     "config": {
+//                         "isArray": false
+//                     }
+//                 }
+//             }
+//         }
+//     ]
+// }
 
 const sys_003: Patch = {
     "_id": "~sys-0.0.3",
@@ -898,7 +898,7 @@ const sys_010: Patch = {
     ]
 };
 
-syspatches.push(sys_001, sys_002, sys_003, sys_004, sys_005, sys_006, sys_007, sys_008, sys_009, sys_010);
+syspatches.push(sys_001, /* sys_002 ,*/ sys_003, sys_004, sys_005, sys_006, sys_007, sys_008, sys_009, sys_010);
 
 const sys_011: Patch = {
     "_id": "~sys-0.0.11",

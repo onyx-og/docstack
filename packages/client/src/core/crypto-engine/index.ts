@@ -37,7 +37,7 @@ export class CryptoEngine {
         if (!this.enabled) return null;
         const key = await this.getCryptoKey();
         if (!key) return null;
-        return this.encryptValue(value, key) as EncryptedPayload;
+        return await this.encryptValue(value, key) as EncryptedPayload;
     }
 
     public isEnabled() {
