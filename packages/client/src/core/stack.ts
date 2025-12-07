@@ -1,4 +1,4 @@
-import PouchDB from "pouchdb-browser";
+import PouchDB from "pouchdb";
 import crypto from "crypto";
 import createLogger from "../utils/logger/index.js";
 import Class from "./class.js";
@@ -134,7 +134,8 @@ class ClientStack extends Stack {
         }
 
         let Find: typeof import('pouchdb-find') = (await import('pouchdb-find')).default;
-        PouchDB.plugin((await import('pouchdb-adapter-node-websql')).default);
+        // PouchDB.plugin((await import('pouchdb-adapter-node-websql')).default);
+        // PouchDB.plugin((await import('pouchdb-adapter-websql')).default);
 
 
         // Load default plugins
@@ -148,9 +149,6 @@ class ClientStack extends Stack {
         }
         this.db = new PouchDB(
             conn,
-            {
-                adapter: "websql"
-            }
         );
         this.cache = {
             // empty at init
