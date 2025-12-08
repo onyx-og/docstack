@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { DocStack } from "../index.js";
-import type ClientStack from "../stack.js";
-import type { AuthSessionProof, UserModel, UserSessionModel } from "@docstack/shared";
+import ClientStack from "../stack.js";
+import { Stack, type AuthSessionProof, type UserModel, type UserSessionModel } from "@docstack/shared";
 
 export type TestStackContext = {
     docStack: DocStack;
@@ -14,6 +14,7 @@ export const waitForDocStackReady = (docStack: DocStack, timeout = 10000): Promi
     return new Promise((resolve, reject) => {
         const onReady = (event: Event) => {
             clearTimeout(timer);
+            console.log("DocStack is ready");
             docStack.removeEventListener("ready", onReady as EventListener);
             resolve();
         };
@@ -98,7 +99,7 @@ export const createTestDocStack = async (
             sessionStatus: "active",
         },
     });
-
+    
     await ensureGroup(stack, "Group-Tester", "Tester");
 
     if (originalSession) {
@@ -121,17 +122,31 @@ export const createTestDocStack = async (
         await createSessionProof(stack, sessionUsername);
     }
 
-    const cleanup = async () => {        
+    const cleanup = async () => {
+        // Clear the stack's class/domain cache to prevent references to destroyed databases
+        (stack as any).cache = {};
+        stack.close();
+        
+        // Close the stack first (this calls removeAllListeners internally)
+        await ClientStack.clear(stackName);
         
         // Remove all event listeners from the database to prevent MaxListenersExceeded warnings
         if (typeof (stack.db as any).removeAllListeners === "function") {
             (stack.db as any).removeAllListeners();
         }
-
-        // Close the stack first (this calls removeAllListeners internally)
-        stack.close();
         
-        delete docStack.stacks[stackName];
+        // Destroy the database
+        try {
+            await stack.db.destroy();
+        } catch (e) {
+            // Database might already be destroyed
+        }
+        
+        // Remove stack from docStack instance's stacks array
+        const stackIndex = docStack.getStacks().indexOf(stack);
+        if (stackIndex > -1) {
+            docStack.getStacks().splice(stackIndex, 1);
+        }
     };
 
     return { docStack, stack, stackName, cleanup };
@@ -241,11 +256,13 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
     return session;
 };
 
-export const createAuthenticatedStack = async (
+export const createAuthenticatedStack = async ({
     username = "alice",
-    password = "password-123"
+    password = "password-123",
+    stack = "auth-test",
+}: {username?: string; password?: string; stack?: string}
 ): Promise<TestStackContext & { user: UserModel; proof: AuthSessionProof }> => {
-    const context = await createTestDocStack("auth-test", { withSession: false });
+    const context = await createTestDocStack(stack, { withSession: false });
     await createSessionProof(context.stack, "system");
 
     const user = await seedClassicUser(context.stack, {

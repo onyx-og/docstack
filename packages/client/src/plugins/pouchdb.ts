@@ -2,7 +2,7 @@ import { isClassModel, isDocument, isRelation, Domain } from "@docstack/shared";
 import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
 import Stack from "../core/stack"
-import PouchDB from "pouchdb-browser";
+import PouchDB from "pouchdb";
 import { Trigger } from "../core/trigger/index.js";
 import createLogger from "../utils/logger/index.js";
 import * as jsondiff from 'jsondiffpatch';
@@ -17,10 +17,15 @@ const logger = createLogger().child({ module: "pouchdb" });
  * @param stack 
  * @returns 
  */
-export const StackPlugin: StackPluginType = (stack: Stack) => {
+export const StackPlugin: StackPluginType = (pouch: PouchDB.Static,stack: Stack, conn: string) => {
     const pouchBulkDocs = PouchDB.prototype.bulkDocs;
     const pouchGet = PouchDB.prototype.get;
-    const pouchPut = PouchDB.prototype.put;
+    // const pouchPut = PouchDB.prototype.put;
+    // const parallelPouch = new PouchDB(conn);
+    // const pouchBulkDocs = parallelPouch.bulkDocs;
+    // const pouchGet = parallelPouch.get;
+    //.bulkDocs;
+    // const pouchPut = pouch.prototype.put;
     return {
         bulkDocs: async function (docs, options: PouchDB.Core.BulkDocsOptions & {
             isPostOp?: boolean
@@ -45,7 +50,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 }
             }
 
-            // if (skipPatchValidation) {
+            // if (skipPatchValidation && process.env.NODE_ENV === 'test') {
             //     return originalFn();
             // }
 
@@ -128,19 +133,26 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 return { error, result }
             }
 
-            const postExec: typeof callback = async (error, result) => {
+            const postExec = async (error, result) => {
                 if (!options?.isPostOp) {
                     const { error: err, result: res } = await postOperations(error, result);
-                    if (callback) callback(err, res);
+                    if (callback) return callback(err, res);
                 } else if (callback) {
-                    callback(error, result);
+                    return callback(error, result);
                 }
             }
 
-            for (const doc of documentsToProcess) {
+            await Promise.all(documentsToProcess.map(async (doc) => {
                 if (isClassModel(doc)) {
                     // Validate against parent class
                     if (doc["~class"] !== "~self") {
+                        if (doc._id == "~User") {
+                            const test = await stack.getClass("class");
+                            if (!test) {
+                                const batch = await stack.db.allDocs();
+                                console.log("Docs in DB:", batch.rows);
+                            }
+                        }
                         const parentClass = await stack.getClass(doc["~class"]);
                         if (parentClass) {
                             fnLogger.info("Validating class model against parent class", { doc, parentClass: parentClass.name });
@@ -168,48 +180,46 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         const revisionIDList = docWithRevs._revisions!.ids;
                         if (revisionIDList.length == 1) {
                             fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
-                            continue;
-                            return pouchBulkDocs.call(this, docs, options, postExec);
+                            return;
                         }
                     } catch (e: any) {
                         if (e.name === 'not_found') {
                             fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
-                            continue;
-                            return pouchBulkDocs.call(this, docs, options, postExec);
+                            return;
                         }
                     }
                     // Fetch the current (next old) version of the class document.
-                    const previousClassDoc = await stack.db.get<ClassModel>(classDocId);
-                    const classObj = await Class.buildFromModel(stack, previousClassDoc);
-                    // const classObj = await stack.getClass(className, true);
-                    // if (classObj == null) {
-                    //     throw new Error(`Unexpected, can't retrieve class '${className}' (doc '${classDocId}')`);
-                    // }
-                    // const previousClassDoc = classObj.model;
-                    fnLogger.info("Retrieved documents", { doc, previousClassDoc });
-                    const schemaDelta = jsondiff.diff(previousClassDoc.schema, doc.schema);
+                    try {
+                        const previousClassDoc = await stack.db.get<ClassModel>(classDocId);
+                        const classObj = await Class.buildFromModel(stack, previousClassDoc);
+                        fnLogger.info("Retrieved documents", { doc, previousClassDoc });
+                        const schemaDelta = jsondiff.diff(previousClassDoc.schema, doc.schema);
 
-                    if (!schemaDelta) {
-                        fnLogger.info(`Class '${className}' has no changes on schema.`);
-                        continue;
-                        return pouchBulkDocs.call(this, docs, options, postExec);
+                        if (!schemaDelta) {
+                            fnLogger.info(`Class '${className}' has no changes on schema.`);
+                            return;
+                        }
+
+                        const documents = await classObj.getCards();
+
+                        if (documents.length === 0) {
+                            fnLogger.info(`No documents found for class '${className}' after its update.`);
+                            return;
+                        }
+
+                        const updates = await Promise.all(documents.map(async doc => {
+                            const updatedDoc = await applySchemaDelta(doc, schemaDelta, classObj);
+                            return updatedDoc;
+                        }));
+
+                        const result = await stack.db.bulkDocs(updates);
+                        fnLogger.info('Propagated updates');
+                    } catch (e) {
+                        fnLogger.error(`Failed to propagate class model updates for class '${className}' (doc '${classDocId}').`, { error: e });
+                        throw new Error(`Failed to propagate class model updates for class '${stack.db.name}'.'${className}' (doc '${classDocId}'). ${e}`);
+                    } finally {
+                        fnLogger.info(`Finished propagating class model updates for class '${className}' (doc '${classDocId}').`);
                     }
-
-                    const documents = await classObj.getCards();
-
-                    if (documents.length === 0) {
-                        fnLogger.info(`No documents found for class '${className}' after its update.`);
-                        continue;
-                        return pouchBulkDocs.call(this, docs, options, postExec);
-                    }
-
-                    const updates = await Promise.all(documents.map(async doc => {
-                        const updatedDoc = await applySchemaDelta(doc, schemaDelta, classObj);
-                        return updatedDoc;
-                    }));
-
-                    const result = await stack.db.bulkDocs(updates);
-                    fnLogger.info('Propagated updates');
                 } else if (isRelation(doc)) {
                     const domain = await stack.getDomain(doc["~domain"]);
                     if (!domain) {
@@ -231,17 +241,25 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     if (!targetDoc) {
                         throw new Error(`Target document '${doc.targetId}' does not exist for domain '${domain.name}'.`);
                     }
-
-                    continue;
                 } else if (isDocument(doc)) {
                     const className = doc["~class"];
 
                     try {
                         let classObj: Class | null;
                         try {
-                            classObj = classCache.get(className) || await stack.getClass(className, true);
+                            classObj = await stack.getClass(className, true);
                         } catch (error) {
-                            throw new Error(`Class '${className}' not found for document '${doc._id}'.`);
+                            try {
+                                throw new Error(`Class '${
+                                    stack.db.name === stack.connection 
+                                    ? stack.db.name 
+                                    : `${stack.db.name}/${stack.connection}`
+                                }'.'${className}' not found for document '${doc._id}'.
+                                Database info '${JSON.stringify(await stack.db.info())}' Error: ${error}`);
+                            } catch (error2) {
+                                throw new Error(`Class '${stack.connection}'.'${className}' not found for document '${doc._id}'. Database info could not be retrieved: ${error2}. ${error}`);
+                            }
+                            
                         }
 
                         if (!classObj) {
@@ -298,15 +316,35 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             throw new Error(`Discarded document ${JSON.stringify(doc)} because object not valid for its Class schema: ${JSON.stringify(classObj.buildSchema())}`);
                         }
                     } catch (error) {
-                        return Promise.reject(error);
+                        throw error;
                     }
                 }
-            }
+            }))
 
-            if (!stack.cryptoEngine.isEnabled()) {
-                console.log("Crypto engine not enabled, skipping encryption.");
-                console.log("Docs:", docs);
-                return pouchBulkDocs.call(this, docs as any, options, postExec);
+            if (true) {
+            // if (!stack.cryptoEngine.isEnabled()) {
+                if (skipPatchValidation) {
+                    console.log("Crypto engine not enabled, skipping encryption.");
+                    console.log("Docs:", docs);
+                }
+               
+                await new Promise<void>((resolve, reject) => {
+                    pouchBulkDocs.call(this, docs as any, options, async (error: any, result: any) => {
+                        try {
+                            postExec(error, result).then(() => {
+                                resolve();
+                            }).catch((e) => {
+                                reject(e);
+                            });
+                        } catch (e) {
+                            reject(e);
+                        }
+                    });
+                });
+                if (skipPatchValidation) {
+                    console.log("Bulk docs operation completed without encryption.");
+                }
+                return;
             } else {
                 console.log("Crypto engine enabled, processing encryption.");
             }
@@ -337,6 +375,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             return pouchBulkDocs.call(this, payload as any, options, postExec);
         },
 
+        /*
         get: async function (docId, options?: PouchDB.Core.GetOptions | null, callback?) {
             if (typeof options === "function") {
                 callback = options;
@@ -359,7 +398,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 return;
             }
             return exec();
-        },
+        }, */
         /*
         put: async function (doc, options?: PouchDB.Core.PutOptions | null, callback?) {
             if (typeof options === "function") {

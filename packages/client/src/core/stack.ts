@@ -137,10 +137,9 @@ class ClientStack extends Stack {
         // PouchDB.plugin((await import('pouchdb-adapter-node-websql')).default);
         // PouchDB.plugin((await import('pouchdb-adapter-websql')).default);
 
-
         // Load default plugins
         PouchDB.plugin(Find);
-        PouchDB.plugin(StackPlugin(this));
+        PouchDB.plugin(StackPlugin(PouchDB, this, conn));
         // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
@@ -319,8 +318,7 @@ class ClientStack extends Stack {
         try {
             fnLogger.info("loadPatches - loading patches");
             const patches = getSystemPatches(schemaVersion || "0.0.0");
-            console.log(`loadPatches - loaded ${patches.length} patches`, { patches });
-            fnLogger.warn(`loadPatches - loaded ${patches.length} patches`, { patches });
+            fnLogger.warn(`loadPatches - loaded ${patches.length} patches`);
             return patches;
         } catch (e: any) {
             fnLogger.error("loadPatches - something went wrong", e)
@@ -330,26 +328,35 @@ class ClientStack extends Stack {
 
     applyPatch = async (patch: Patch): Promise<string> => {
         const fnLogger = logger.child({ method: "applyPatch", args: { patch } });
-        try {
-            fnLogger.info("Attempting to apply patch", { patch })
-            const hydratedDocs = await Promise.all(patch.docs.map(async doc => {
-                if (doc._rev === "auto") {
-                    delete doc._rev;
-                    const existingDoc = await this.db.get(doc._id);
-                    if (existingDoc) {
-                        doc._rev = existingDoc._rev;
+        return new Promise<string>(async (resolve, reject) => {
+            try {
+                fnLogger.info("Attempting to apply patch", { patch })
+                fnLogger.info("applyPatch - starting to hydrate patch docs", { docCount: patch.docs.length });
+                const hydratedDocs = await Promise.all(patch.docs.map(async doc => {
+                    if (doc._rev === "auto") {
+                        delete doc._rev;
+                        const existingDoc = await this.db.get(doc._id);
+                        if (existingDoc) {
+                            doc._rev = existingDoc._rev;
+                        }
                     }
-                }
-                return doc;
-            }));
-            await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions);
+                    return doc;
+                }));
+                fnLogger.info("applyPatch - hydration complete, calling bulkDocs", { docCount: hydratedDocs.length });
+                await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions).then((result) => {
+                    fnLogger.warn("applyPatch - bulkDocs completed with result", { result });
+                    fnLogger.warn("Successfully applied patch", { version: patch.version });
+                    resolve(patch.version);
+                }).catch((error) => {
+                    fnLogger.error("applyPatch - bulkDocs error", { error });
+                    reject(error);
+                });
 
-            fnLogger.warn("Successfully applied patch", { version: patch.version });
-            return patch.version;
-        } catch (e: any) {
-            fnLogger.error("Failed to apply patch", e)
-            throw new Error(e);
-        }
+            } catch (e: any) {
+                fnLogger.error("Failed to apply patch", e)
+                reject(new Error(e));
+            }
+        });
     }
 
     private async applyPatches(schemaVersion: string | undefined): Promise<string> {
@@ -361,7 +368,7 @@ class ClientStack extends Stack {
                 _schemaVersion = await this.applyPatch(patch);
             }
             if (_schemaVersion) {
-                fnLogger.info("Successfully applied patches till version", { version: _schemaVersion });
+                fnLogger.warn("Successfully applied patches till version", { version: _schemaVersion });
                 this.schemaVersion = _schemaVersion;
                 return _schemaVersion!;
             } else {
@@ -392,6 +399,7 @@ class ClientStack extends Stack {
             }
             // schemaVersion will be added after applying patches
             let schemaVersion = await this.applyPatches(_systemDoc.schemaVersion);
+            console.log("Applied patches, new schema version:", schemaVersion);
             _systemDoc.schemaVersion = schemaVersion;
         } else {
             logger.info("checkSystem - system doc already exists. Checking for updates", systemDoc)
@@ -593,10 +601,15 @@ class ClientStack extends Stack {
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
     async initdb() {
+        logger.warn("initdb - starting initialization", {"stackName": this.name});
         await this.ensureCryptoConfigDocument();
+        logger.warn("initdb - crypto config ensured", {"stackName": this.name});
         await this.initIndex();
+        logger.warn("initdb - index initialized", {"stackName": this.name});
         await this.checkSystem();
+        logger.warn("initdb - system checked", {"stackName": this.name});
         this.setListeners();
+        logger.warn("initdb - listeners set, initialization complete", {"stackName": this.name});
         return this;
     }
 

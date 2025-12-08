@@ -320,7 +320,7 @@ export const isClassModel = (object: {[key: string]: any}): object is ClassModel
     return false;
 }
 
-export type StackPluginType = (stackInstance: Stack) => {
+export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack, conn: string) => {
     bulkDocs<Model>(
         docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
         options: PouchDB.Core.BulkDocsOptions | null,
@@ -331,7 +331,7 @@ export type StackPluginType = (stackInstance: Stack) => {
     //     options?: PouchDB.Core.PutOptions | null,
     //     callback?: PouchDB.Core.Callback<PouchDB.Core.Response>,
     // ): void;
-    get<Model>(
+    get?<Model>(
         docId: PouchDB.Core.DocumentId,
         options?: PouchDB.Core.GetOptions | null,
         callback?: PouchDB.Core.Callback<PouchDB.Core.Document<{} & Model>>,
