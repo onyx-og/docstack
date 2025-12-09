@@ -1,0 +1,7 @@
+{
+  "testDir": "./e2e",
+  "testMatch": "**/*.e2e.ts",
+  "use": {
+    "baseURL": "http://127.0.0.1:3000"
+  }
+}

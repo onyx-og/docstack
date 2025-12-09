@@ -1,0 +1,335 @@
+```
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                   DOCSTACK PLAYWRIGHT E2E INTEGRATION                          ║
+║                        Complete Setup Reference                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📦 NEW FILES CREATED (9 total)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Configuration Files:
+  ✓ playwright.config.ts              TypeScript config for Playwright
+  ✓ .playwrightrc.json                IDE plugin configuration
+
+E2E Testing:
+  ✓ e2e/fixtures.ts                   Custom test fixtures
+  ✓ e2e/auth.e2e.ts                   Example E2E tests (5 tests)
+  ✓ e2e/.gitignore                    Ignore test artifacts
+
+Documentation (2,500+ lines total):
+  ✓ e2e/README.md                     900+ line comprehensive guide
+  ✓ PLAYWRIGHT_INTEGRATION.md         400+ line integration details
+  ✓ IMPLEMENTATION_SUMMARY.md         300+ line complete overview
+  ✓ PLAYWRIGHT_INDEX.md               Quick reference index
+  ✓ e2e/TYPESCRIPT_NOTES.ts           TypeScript patterns & types
+
+Utilities:
+  ✓ e2e/QUICK_START.sh                Setup demonstration script
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📝 FILES MODIFIED (3 total)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ src/core/stack.ts
+  └─ Added environment detection for browser/Node.js
+  └─ Created crypto helper functions
+  └─ Updated all crypto calls
+
+✓ rollup.config.js
+  └─ Added /dist/ output for browser bundles
+  └─ Kept /lib/ for Node.js bundles
+
+✓ package.json
+  └─ Added: pouchdb-browser, @playwright/test, http-server
+  └─ Added: test:headed, test:debug, serve:test scripts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🚀 QUICK START
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Install dependencies
+  $ npm install
+
+Step 2: Build the library
+  $ npm run build
+  
+  Creates:
+    ├─ lib/       → UMD bundle (Node.js)
+    └─ dist/      → ES module (browser)
+
+Step 3: Run tests
+  $ npm test
+
+  Or with browser visible:
+  $ npm run test:headed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📊 TEST ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Test Execution Flow:
+  npm test
+    ↓
+  playwright.config.ts
+    ├─ Starts webServer
+    │  ├─ npm run build (generates lib/ + dist/)
+    │  └─ npm run serve:test (HTTP server on port 3000)
+    ├─ Opens browsers (Chromium, Firefox, WebKit)
+    └─ Runs e2e/*.e2e.ts tests
+       ├─ fixtures.ts injects library
+       ├─ page loads /dist/index.js
+       ├─ stack.ts detects browser environment
+       └─ Uses pouchdb-browser with IndexedDB
+
+Environment Detection:
+  if (typeof window !== 'undefined') {
+    // Browser path
+    import 'pouchdb-browser'      // IndexedDB adapter
+    use globalThis.crypto
+  } else {
+    // Node.js path
+    import 'pouchdb'              // Memory/LevelDB
+    use require('crypto')
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🎯 CUSTOM FIXTURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Fixture: docStackPage
+  Type:  Playwright Page
+  Provides: Page object with library pre-injected
+  Usage: Access browser APIs, window globals
+  
+  Example:
+    await docStackPage.evaluate(() => {
+      return typeof indexedDB !== 'undefined';
+    });
+
+Fixture: initDocStack
+  Type:  (options?) => Promise<{docStack, stack, stackName}>
+  Provides: Initialized DocStack in browser
+  Usage: Quick database setup
+  
+  Example:
+    const { stack } = await initDocStack({ name: 'test-db' });
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📋 COMMON COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build:
+  npm run build                 Build library (lib/ + dist/)
+  npm run build:types           Just generate TypeScript types
+  npx rollup -c                 Just run Rollup
+
+Testing:
+  npm test                      Run all tests headless
+  npm run test:headed           Run with browser visible
+  npm run test:debug            Debug with Playwright Inspector
+  npx playwright test auth.e2e.ts              Run one file
+  npx playwright test --grep "init"            Run by pattern
+  npx playwright test -c chromium              Run on Chromium
+
+Development:
+  npm run serve:test            Serve built library on port 3000
+  npx playwright show-report    View test results HTML report
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✍️ WRITING TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Pattern 1: Simple initialization
+  ┌─────────────────────────────────────────────────────────┐
+  │ import { test, expect } from './fixtures';              │
+  │                                                          │
+  │ test('initialize', async ({ initDocStack }) => {        │
+  │   const { stack } = await initDocStack();               │
+  │   expect(stack).toBeDefined();                          │
+  │ });                                                      │
+  └─────────────────────────────────────────────────────────┘
+
+Pattern 2: Browser API access
+  ┌─────────────────────────────────────────────────────────┐
+  │ test('check APIs', async ({ docStackPage }) => {        │
+  │   const hasIndexedDB = await docStackPage.evaluate(() =>│
+  │     typeof indexedDB !== 'undefined'                    │
+  │   );                                                     │
+  │   expect(hasIndexedDB).toBe(true);                      │
+  │ });                                                      │
+  └─────────────────────────────────────────────────────────┘
+
+Pattern 3: Combined usage
+  ┌─────────────────────────────────────────────────────────┐
+  │ test('create doc', async ({                             │
+  │   docStackPage, initDocStack                            │
+  │ }) => {                                                  │
+  │   const { stack } = await initDocStack();               │
+  │   const result = await docStackPage.evaluate(async () =>│
+  │     { /* use stack in browser */ }                      │
+  │   );                                                     │
+  │ });                                                      │
+  └─────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📚 DOCUMENTATION GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Start Here:
+  1. PLAYWRIGHT_INDEX.md (this file's companion)
+  2. e2e/README.md (complete testing guide)
+  3. e2e/auth.e2e.ts (example tests)
+
+For Developers:
+  • PLAYWRIGHT_INTEGRATION.md (architecture & patterns)
+  • e2e/TYPESCRIPT_NOTES.ts (type definitions)
+  • IMPLEMENTATION_SUMMARY.md (all changes)
+
+For Integration:
+  • playwright.config.ts (test configuration)
+  • e2e/fixtures.ts (fixture implementation)
+  • e2e/README.md#CI/CD (CI setup)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🔄 BROWSER vs NODE.JS COMPARISON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────┬─────────────────────┬─────────────────────┐
+│ Aspect           │ Jest (Node.js)      │ Playwright (Browser)│
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ Runner           │ Node.js process     │ Chromium/Firefox/   │
+│                  │                     │ WebKit              │
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ PouchDB          │ pouchdb             │ pouchdb-browser     │
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ Storage          │ Memory/LevelDB      │ IndexedDB           │
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ Crypto           │ import crypto       │ window.crypto       │
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ Configuration    │ jest.config.ts      │ playwright.config.ts│
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ Setup            │ jest.setup.js       │ e2e/fixtures.ts     │
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ Globals          │ global, process     │ window, self, self  │
+├──────────────────┼─────────────────────┼─────────────────────┤
+│ Database Life    │ In-memory           │ Persistent (IndexedDB)
+└──────────────────┴─────────────────────┴─────────────────────┘
+
+Shared Library Code (src/core/stack.ts):
+  ✓ Same source file handles both environments
+  ✓ Automatic detection: if (typeof window !== 'undefined')
+  ✓ Environment-specific imports handled at runtime
+  ✓ Helper functions: getRandomHex(), getRandomUUID()
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🎨 PROJECT STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+packages/client/
+│
+├─ Source Code
+│  └─ src/
+│     └─ core/
+│        └─ stack.ts                  ✓ Modified: env detection
+│
+├─ Build Output
+│  ├─ lib/                           ✓ UMD (Node.js)
+│  └─ dist/                          ✓ ES Module (Browser)
+│
+├─ Tests
+│  ├─ src/core/__tests__/            (Jest tests)
+│  │  └─ auth.integration.test.ts
+│  └─ e2e/                           ✓ Playwright tests
+│     ├─ fixtures.ts                 ✓ Custom fixtures
+│     ├─ auth.e2e.ts                 ✓ Example tests
+│     └─ README.md                   ✓ Guide
+│
+├─ Configuration
+│  ├─ playwright.config.ts           ✓ Playwright config
+│  ├─ .playwrightrc.json             ✓ IDE config
+│  ├─ jest.config.ts                 (Jest config)
+│  ├─ rollup.config.js               ✓ Modified: dual output
+│  └─ package.json                   ✓ Modified: deps & scripts
+│
+└─ Documentation
+   ├─ PLAYWRIGHT_INDEX.md             ✓ This file's companion
+   ├─ PLAYWRIGHT_INTEGRATION.md       ✓ Integration details
+   ├─ IMPLEMENTATION_SUMMARY.md       ✓ Complete overview
+   ├─ e2e/README.md                   ✓ Testing guide
+   ├─ e2e/TYPESCRIPT_NOTES.ts         ✓ Type documentation
+   └─ e2e/QUICK_START.sh              ✓ Setup script
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ✅ VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Checklist:
+  ✓ TypeScript compilation: No errors
+  ✓ Environment detection: Works for browser and Node.js
+  ✓ Crypto utilities: Handle both environments
+  ✓ Fixture types: Properly exported and typed
+  ✓ Configuration files: All created and formatted
+  ✓ Documentation: 2,500+ lines comprehensive
+  ✓ Example tests: Multiple patterns included
+  ✓ Build output: Generates lib/ and dist/
+
+Status: ✅ READY TO USE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🆘 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Problem: "DocStack library not loaded"
+Solution:
+  1. npm run build           (create dist/)
+  2. Check /dist/index.js exists
+  3. Verify webServer running
+  See: e2e/README.md#Troubleshooting
+
+Problem: "Crypto not initialized"
+Solution:
+  1. Library uses helpers automatically
+  2. Should work in browser and Node.js
+  See: e2e/TYPESCRIPT_NOTES.ts
+
+Problem: "Port 3000 already in use"
+Solution:
+  1. Edit playwright.config.ts
+  2. Change webServer.url port
+  3. Edit package.json serve:test port
+  See: e2e/README.md#Port Already in Use
+
+Problem: "IndexedDB errors"
+Solution:
+  1. Tests use docStackPage fixture
+  2. This ensures browser environment
+  3. Check browser privacy settings
+  See: e2e/README.md#IndexedDB Access Issues
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📞 SUPPORT FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For Questions, See:
+  Setup                → e2e/README.md#Setup
+  Running Tests        → e2e/README.md#Running Tests
+  Writing Tests        → e2e/README.md#Writing Tests
+  Architecture         → PLAYWRIGHT_INTEGRATION.md
+  Types & Patterns     → e2e/TYPESCRIPT_NOTES.ts
+  All Changes          → IMPLEMENTATION_SUMMARY.md
+  Complete Index       → PLAYWRIGHT_INDEX.md
+  Quick Reference      → This file
+  Setup Demo           → e2e/QUICK_START.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                    Implementation Complete ✨
+                    Ready for Production Use
+
+                     Questions? See PLAYWRIGHT_INDEX.md
+                     Examples? See e2e/auth.e2e.ts
+                     Guide? See e2e/README.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```

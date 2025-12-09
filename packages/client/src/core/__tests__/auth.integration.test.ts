@@ -1,7 +1,7 @@
 import type { UserSessionModel } from "@docstack/shared";
 import { createAuthenticatedStack, createTestDocStack } from "../test-utils/docstack";
 import { DocStack } from "..";
-// import { test as it, expect } from '../../fixtures';
+import { test as it, expect } from '../../../e2e/fixtures';
 // const describe = test.describe;
 
 

@@ -1,0 +1,8 @@
+# Playwright
+test-results/
+playwright-report/
+.auth/
+
+# Test artifacts
+*.db
+db-*

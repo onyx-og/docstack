@@ -8,7 +8,11 @@
     "build:types": "npx tsc -build --force ./tsconfig.json",
     "build": "rollup --config ./rollup.config.js && npm run build:types",
     "lint": "eslint ./src --ext .ts,.tsx",
-    "test": "jest --config jest.config.ts"
+    "test:node": "jest --config jest.config.ts",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "serve:test": "npx http-server dist -p 3000 -c-1"
   },
   "repository": {
     "type": "git",
@@ -31,9 +35,11 @@
     "@docstack/shared": "file:../shared",
     "pouchdb-adapter-node-websql": "^7.0.0",
     "pouchdb-adapter-websql": "^7.0.0",
+    "pouchdb-browser": "^9.0.0",
     "semver": "^7.7.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-replace": "^5.0.7",
     "@rollup/plugin-typescript": "^12.3.0",
@@ -41,6 +47,7 @@
     "cpy-cli": "^6.0.0",
     "eslint": "^9.38.0",
     "eslint-webpack-plugin": "^5.0.2",
+    "http-server": "^14.1.1",
     "rollup": "^4.53.1"
   },
   "optionalDependencies": {

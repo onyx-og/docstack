@@ -1,5 +1,3 @@
-import PouchDB from "pouchdb";
-import crypto from "crypto";
 import createLogger from "../utils/logger/index.js";
 import Class from "./class.js";
 import Domain from "./domain.js";
@@ -31,6 +29,65 @@ import { JobEngine } from "./job-engine/index.js";
 import { PolicyEngine } from "./policy-engine/index.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
+
+// Dynamic PouchDB and Crypto imports for browser/Node compatibility
+// Browser: uses pouchdb-browser (with IndexedDB adapter)
+// Node.js: uses pouchdb with appropriate adapters
+let PouchDB: any;
+let crypto: any;
+
+// Detect environment and import accordingly
+const isBrowserEnv = typeof window !== 'undefined' && typeof self !== 'undefined';
+
+if (isBrowserEnv) {
+  // Browser environment - pouchdb-browser is already bundled with IndexedDB support
+  // This will be properly imported in the initialize method
+  PouchDB = null; // Will be set during initialization
+  // Use browser's native crypto API
+  crypto = globalThis.crypto;
+} else {
+  // Node.js environment - import crypto module normally
+  // This will be set during initialization
+  PouchDB = null; // Will be set during initialization
+}
+
+/**
+ * Generate random bytes as hex string in a cross-environment way
+ * 
+ * @param size - Number of bytes to generate
+ * @returns Hex string representation of random bytes
+ */
+function getRandomHex(size: number): string {
+  if (isBrowserEnv) {
+    // Browser: use crypto.getRandomValues
+    const bytes = crypto.getRandomValues(new Uint8Array(size));
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = bytes[i].toString(16);
+      hex += byte.length === 1 ? '0' + byte : byte;
+    }
+    return hex;
+  } else {
+    // Node.js: use crypto.randomBytes (will be available after async import)
+    if (crypto && crypto.randomBytes) {
+      return crypto.randomBytes(size).toString('hex');
+    }
+    throw new Error('Crypto not initialized');
+  }
+}
+
+/**
+ * Generate a random UUID or fallback to random hex string
+ * 
+ * @returns UUID string or random hex identifier
+ */
+function getRandomUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments without randomUUID
+  return `${getRandomHex(4)}-${getRandomHex(2)}-${getRandomHex(2)}-${getRandomHex(2)}-${getRandomHex(6)}`;
+}
 
 const logger = createLogger().child({ module: "stack" });
 
@@ -131,6 +188,19 @@ class ClientStack extends Stack {
             this.name = match[0];
         } else {
             this.name = conn;
+        }
+
+        // Load PouchDB dynamically based on environment
+        if (!PouchDB) {
+          if (isBrowserEnv) {
+            // Browser environment - use pouchdb-browser
+            PouchDB = (await import('pouchdb-browser')).default;
+          } else {
+            // Node.js environment - use pouchdb
+            PouchDB = (await import('pouchdb')).default;
+            // Load crypto module for Node.js
+            crypto = (await import('crypto')).default;
+          }
         }
 
         let Find: typeof import('pouchdb-find') = (await import('pouchdb-find')).default;
@@ -260,7 +330,7 @@ class ClientStack extends Stack {
             : (user as any).groupId
                 ? [(user as any).groupId]
                 : ["Group-Default"];
-        const sessionId = `session-${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString("hex")}`;
+        const sessionId = `session-${getRandomUUID()}`;
         const sessionDoc: UserSessionModel = {
             _id: sessionId,
             "~class": "~UserSession",
@@ -633,7 +703,7 @@ class ClientStack extends Stack {
 
         if (!this.cryptoEngineDisabled) {
             const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({
-                nonce: crypto.randomBytes(12).toString("hex"),
+                nonce: getRandomHex(12),
             });
             if (encryptedMarker) {
                 (markerDoc as any).encryptedMarker = encryptedMarker;
@@ -665,7 +735,7 @@ class ClientStack extends Stack {
         if (!markerDoc || isEncryptedPayload((markerDoc as any).encryptedMarker)) return;
 
         const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({
-            nonce: crypto.randomBytes(12).toString("hex"),
+            nonce: getRandomHex(12),
         });
 
         if (!encryptedMarker) return;
