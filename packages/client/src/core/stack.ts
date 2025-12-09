@@ -1,4 +1,4 @@
-import PouchDB from "pouchdb";
+import PouchDB from "pouchdb-browser";
 import crypto from "crypto";
 import createLogger from "../utils/logger/index.js";
 import Class from "./class.js";

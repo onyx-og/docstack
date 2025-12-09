@@ -1,11 +1,11 @@
 import type { UserSessionModel } from "@docstack/shared";
-import { createAuthenticatedStack, createTestDocStack } from "../test-utils/docstack";
+// import { createAuthenticatedStack, createTestDocStack } from "../test-utils/docstack";
 import { DocStack } from "..";
-// import { test as it, expect } from '../../fixtures';
+import { test as it, expect } from '../../fixtures';
 // const describe = test.describe;
 
 
-describe("ClientStack authentication", () => {
+it.describe("ClientStack authentication", () => {
     it("creates and stores a user session proof", async () => {
         const { stack, cleanup, proof, user } = await createAuthenticatedStack({"stack": "auth-session-proof"});
         try {

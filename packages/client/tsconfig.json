@@ -31,8 +31,11 @@
     "src/**/*.ts"
   ],
   "exclude": [
+    "lib",
     "node_modules",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "e2e",
+    "src/fixtures.ts"
   ],
   "references": [
     {
