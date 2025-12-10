@@ -3,12 +3,32 @@ import json from '@rollup/plugin-json';
 
 export default {
   input: './src/index.ts',
-  output: {
-    dir: 'lib',
-    format: 'umd',
-    name: 'docstack'
-  },
+  // Externalize all dependencies - they'll be loaded from node_modules in HTML
+  external: ['crypto', 'stream', 'path', 'fs', 'util', 'setimmediate', 'winston', 'winston-transport', '@docstack/shared', 'pouchdb', 'pouchdb-browser', 'pouchdb-find', 'zod', 'semver', 'jsondiffpatch'],
+  output: [
+    {
+      // UMD bundle for CommonJS/browser environments
+      dir: 'lib',
+      format: 'umd',
+      name: 'docstack',
+      entryFileNames: 'index.js',
+      chunkFileNames: '[name].js',
+    },
+    {
+      // Browser-ready ES module for direct import
+      dir: 'dist',
+      format: 'es',
+      entryFileNames: 'index.js',
+      chunkFileNames: '[name].js',
+    }
+  ],
   plugins: [
-    json(), typescript()
+    json(),
+    typescript({
+      // Don't generate declarations here - use separate build:types script
+      declaration: false,
+      // Don't emit anything - Rollup handles output
+      tsconfig: false,
+    })
   ]
 };

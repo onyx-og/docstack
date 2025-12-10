@@ -7,6 +7,7 @@
   "scripts": {
     "build:types": "npx tsc -build --force ./tsconfig.json",
     "build": "rollup --config ./rollup.config.js",
+    "build:vendor": "rollup --config ./rollup.vendor.js",
     "lint": "eslint ./src --ext .ts,.tsx",
     "test": "jest --config jest.config.ts"
   },
@@ -34,14 +35,15 @@
     "semver": "^7.7.3"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-replace": "^5.0.7",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/semver": "^7.7.1",
-    "cpy-cli": "^6.0.0",
-    "eslint": "^9.38.0",
-    "eslint-webpack-plugin": "^5.0.2",
-    "rollup": "^4.53.1"
+    "http-server": "^14.1.1",
+    "rollup": "^4.53.1",
+    "rollup-plugin-polyfill-node": "^0.13.0"
   },
   "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "*"

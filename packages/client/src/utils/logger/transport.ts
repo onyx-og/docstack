@@ -1,7 +1,5 @@
 import Transport, { TransportStreamOptions } from "winston-transport";
-import PouchDB from "pouchdb"
 import 'setimmediate';
-import * as stream from 'stream';
 import { Stack } from "@docstack/shared";
 //
 // Inherit from `winston-transport` so you can take advantage

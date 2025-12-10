@@ -1,0 +1,29 @@
+<html>
+    <head>
+        <title>DocStack Client Tests</title>
+        <!-- Load vendor bundle with all external dependencies -->
+        <script src="../test/vendor-bundle.js"></script>
+        <!-- Load the DocStack UMD bundle -->
+        <script src="../lib/index.js"></script>
+    </head>
+    <body>
+        <h1>DocStack Client Tests</h1>
+        <p>UMD Bundle loaded. Check console for DocStack library.</p>
+        <p>DocStack Library (UMD): <code id="umd-result">Loading...</code></p>
+        <p>DocStack Library (ES Module): <code id="esm-result">Loading...</code></p>
+    </body>
+    <script>
+        // Test UMD bundle
+        console.log("DocStack (UMD):", window.docstack || typeof docstack);
+        document.getElementById('umd-result').textContent = typeof docstack !== 'undefined' ? 'Loaded ✓' : 'Failed ✗';
+
+        // Test ES module bundle
+        import('../dist/index.js').then((esm) => {
+            console.log("DocStack (ES Module):", esm);
+            document.getElementById('esm-result').textContent = 'Loaded ✓';
+        }).catch(err => {
+            console.error("Failed to load ES module:", err);
+            document.getElementById('esm-result').textContent = 'Failed ✗';
+        });
+    </script>
+</html>

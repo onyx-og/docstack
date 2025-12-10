@@ -33,7 +33,8 @@ export const test = base.extend<DocStackFixture>({
     await page.addInitScript(async () => {
       // Make the compiled library available globally
       if (typeof window !== 'undefined') {
-        (window as any).docstackLibrary = await import('../lib/index.js');
+        (window as any).docstackLibrary = await import('../dist/index.js');
+        console.log("DocStack library injected into browser context", {window: (window as any).docstackLibrary});
       }
     });
 
