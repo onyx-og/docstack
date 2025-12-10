@@ -1,9 +1,12 @@
 import { Patch } from "@docstack/shared";
 import semver from "semver";
-import crypto from "crypto";
 
 const syspatches: Patch[] = [];
-const hashContent = (content: string) => crypto.createHash("sha256").update(content).digest("hex");
+const hashContent = async (content: string) => {
+    const data = new TextEncoder().encode(content);
+    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
 
 // TODO: implement _rev auto handler:
 // If patches include updates to existing documents, 
@@ -459,7 +462,7 @@ const sys_005: Patch = {
             "type": "user",
             "workerPlatform": "client",
             "content": classicAuthJobContent,
-            "hash": hashContent(classicAuthJobContent),
+            "hash": "e63887145113429477843420c388d35116e255403148163f4c4a436f0b8338b1", // Pre-calculated hash
             "isEnabled": true,
             "isSingleton": true,
             "defaultParams": {},
@@ -1184,12 +1187,21 @@ const sys_014: Patch = {
 
 syspatches.push(sys_011, sys_012, sys_013, sys_014);
 
-export function getSystemPatches(currentVersion: string) {
+export async function getSystemPatches(currentVersion: string) {
+    const classicAuthJobHash = await hashContent(classicAuthJobContent);
+    const jobAuthClassic = sys_005.docs.find(d => d._id === 'Job-Auth-Classic');
+    if (jobAuthClassic) {
+        (jobAuthClassic as any).hash = classicAuthJobHash;
+    }
+
     return syspatches
         .sort((a, b) => semver.compare(a.version, b.version))
         .filter((patch) => semver.gt(patch.version, currentVersion))
 }
 
-export function getAllSystemPatches() {
+export async function getAllSystemPatches() {
+    const classicAuthJobHash = await hashContent(classicAuthJobContent);
+    const jobAuthClassic = sys_005.docs.find(d => d._id === 'Job-Auth-Classic');
+    if (jobAuthClassic) { (jobAuthClassic as any).hash = classicAuthJobHash; }
     return syspatches.sort((a, b) => semver.compare(a.version, b.version));
 }

@@ -1,4 +1,4 @@
-import { webcrypto } from "crypto";
+
 
 export type EncryptedPayload = {
     __enc: true;
@@ -10,7 +10,7 @@ export type EncryptedPayload = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-const getCrypto = () => globalThis.crypto || webcrypto;
+const getCrypto = () => globalThis.crypto;
 
 export const hexToBytes = (hex: string): Uint8Array => {
     if (hex.length % 2 !== 0) {
@@ -26,10 +26,7 @@ export const hexToBytes = (hex: string): Uint8Array => {
 const toUint8Array = (data: ArrayBuffer | Uint8Array) => data instanceof ArrayBuffer ? new Uint8Array(data) : data;
 
 export const toBase64 = (data: ArrayBuffer | Uint8Array): string => {
-    const bytes = toUint8Array(data);
-    if (typeof Buffer !== "undefined") {
-        return Buffer.from(bytes).toString("base64");
-    }
+    const bytes = toUint8Array(data);    
     let binary = "";
     bytes.forEach((byte) => {
         binary += String.fromCharCode(byte);
@@ -37,10 +34,7 @@ export const toBase64 = (data: ArrayBuffer | Uint8Array): string => {
     return btoa(binary);
 };
 
-export const fromBase64 = (value: string): Uint8Array => {
-    if (typeof Buffer !== "undefined") {
-        return new Uint8Array(Buffer.from(value, "base64"));
-    }
+export const fromBase64 = (value: string): Uint8Array => {    
     const binary = atob(value);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {

@@ -1,5 +1,4 @@
 import PouchDB from "pouchdb-browser";
-import crypto from "crypto";
 import createLogger from "../utils/logger/index.js";
 import Class from "./class.js";
 import Domain from "./domain.js";
@@ -98,7 +97,6 @@ class ClientStack extends Stack {
     cache: {
         [className: string]: CachedClass | CachedDomain
     }
-    patches: Patch[] = getAllSystemPatches();
     patchCount!: number;
 
     listeners: PouchDB.Core.Changes<{}>[] = [];
@@ -260,7 +258,10 @@ class ClientStack extends Stack {
             : (user as any).groupId
                 ? [(user as any).groupId]
                 : ["Group-Default"];
-        const sessionId = `session-${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString("hex")}`;
+        const randomBytes = new Uint8Array(8);
+        globalThis.crypto.getRandomValues(randomBytes);
+        const hexId = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        const sessionId = `session-${globalThis.crypto.randomUUID ? globalThis.crypto.randomUUID() : hexId}`;
         const sessionDoc: UserSessionModel = {
             _id: sessionId,
             "~class": "~UserSession",
@@ -317,7 +318,7 @@ class ClientStack extends Stack {
         const fnLogger = logger.child({ method: "loadPatches" });
         try {
             fnLogger.info("loadPatches - loading patches");
-            const patches = getSystemPatches(schemaVersion || "0.0.0");
+            const patches = await getSystemPatches(schemaVersion || "0.0.0");
             fnLogger.warn(`loadPatches - loaded ${patches.length} patches`);
             return patches;
         } catch (e: any) {
@@ -632,8 +633,10 @@ class ClientStack extends Stack {
         };
 
         if (!this.cryptoEngineDisabled) {
-            const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({
-                nonce: crypto.randomBytes(12).toString("hex"),
+            const randomBytes = new Uint8Array(12);
+            globalThis.crypto.getRandomValues(randomBytes);
+            const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({                
+                nonce: Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
             });
             if (encryptedMarker) {
                 (markerDoc as any).encryptedMarker = encryptedMarker;
@@ -664,8 +667,10 @@ class ClientStack extends Stack {
 
         if (!markerDoc || isEncryptedPayload((markerDoc as any).encryptedMarker)) return;
 
+        const randomBytes = new Uint8Array(12);
+        globalThis.crypto.getRandomValues(randomBytes);
         const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({
-            nonce: crypto.randomBytes(12).toString("hex"),
+            nonce: Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
         });
 
         if (!encryptedMarker) return;

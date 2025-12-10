@@ -14,13 +14,13 @@ export default {
       entryFileNames: 'index.js',
       chunkFileNames: '[name].js',
     },
-    {
-      // Browser-ready ES module for direct import
-      dir: 'dist',
-      format: 'es',
-      entryFileNames: 'index.js',
-      chunkFileNames: '[name].js',
-    }
+    // {
+    //   // Browser-ready ES module for direct import
+    //   dir: 'dist',
+    //   format: 'es',
+    //   entryFileNames: 'index.js',
+    //   chunkFileNames: '[name].js',
+    // }
   ],
   plugins: [
     json(),

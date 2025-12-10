@@ -10,20 +10,28 @@
         <h1>DocStack Client Tests</h1>
         <p>UMD Bundle loaded. Check console for DocStack library.</p>
         <p>DocStack Library (UMD): <code id="umd-result">Loading...</code></p>
-        <p>DocStack Library (ES Module): <code id="esm-result">Loading...</code></p>
     </body>
     <script>
         // Test UMD bundle
         console.log("DocStack (UMD):", window.docstack || typeof docstack);
         document.getElementById('umd-result').textContent = typeof docstack !== 'undefined' ? 'Loaded ✓' : 'Failed ✗';
-
-        // Test ES module bundle
-        import('../dist/index.js').then((esm) => {
-            console.log("DocStack (ES Module):", esm);
-            document.getElementById('esm-result').textContent = 'Loaded ✓';
-        }).catch(err => {
-            console.error("Failed to load ES module:", err);
-            document.getElementById('esm-result').textContent = 'Failed ✗';
-        });
+    </script>
+    <script>
+        // Initialize DocStack with a stack instance and log the result
+        (async () => {
+            try {
+                const DocStack = window.docstack.DocStack;
+                const docStack = new DocStack({
+                    name: "TestStack",
+                })
+                const onReady = () => {
+                    console.log("DocStack is ready:", docStack);
+                    docStack.removeEventListener("ready", onReady);
+                };
+                docStack.addEventListener("ready", onReady);
+            } catch (error) {
+                console.error("Error initializing DocStack:", error);
+            }
+        })();
     </script>
 </html>
