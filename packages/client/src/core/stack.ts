@@ -2,6 +2,9 @@ import PouchDB from "pouchdb-browser";
 import createLogger from "../utils/logger/index.js";
 import Class from "./class.js";
 import Domain from "./domain.js";
+import PouchDBFind from 'pouchdb-find';
+
+// Verify why is not being called
 import { decryptString } from "../utils/crypto/index.js";
 import { getAllSystemPatches, getSystemPatches } from "./datamodel/index.js";
 import {
@@ -131,12 +134,11 @@ class ClientStack extends Stack {
             this.name = conn;
         }
 
-        let Find: typeof import('pouchdb-find') = (await import('pouchdb-find')).default;
         // PouchDB.plugin((await import('pouchdb-adapter-node-websql')).default);
         // PouchDB.plugin((await import('pouchdb-adapter-websql')).default);
 
         // Load default plugins
-        PouchDB.plugin(Find);
+        PouchDB.plugin(PouchDBFind);
         PouchDB.plugin(StackPlugin(PouchDB, this, conn));
         // Validation plugin
         if (options?.plugins) {

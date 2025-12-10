@@ -22,10 +22,10 @@ globalThis._nextTick = function(...args) {
 
 globalThis.winston = winston;
 globalThis.Transport = Transport;
-globalThis.PouchDBBrowser = PouchDBBrowser;
+globalThis.PouchDB = PouchDBBrowser;
 globalThis.PouchDBFind = PouchDBFind;
 globalThis.shared = shared;
-globalThis.zod = zod;
+globalThis.z = zod;
 globalThis.semver = semver;
 globalThis.jsondiffpatch = jsondiffpatch;
 

@@ -26,9 +26,8 @@ export default {
     json(),
     typescript({
       // Don't generate declarations here - use separate build:types script
-      declaration: false,
-      // Don't emit anything - Rollup handles output
-      tsconfig: false,
+      declaration: false
+      // By removing `tsconfig: false`, the plugin will now use your tsconfig.json
     })
   ]
 };

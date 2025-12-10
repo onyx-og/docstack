@@ -2,10 +2,10 @@ import { isClassModel, isDocument, isRelation, Domain } from "@docstack/shared";
 import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
 import Stack from "../core/stack"
-import PouchDB from "pouchdb";
+import PouchDB from "pouchdb-browser";
 import { Trigger } from "../core/trigger/index.js";
 import createLogger from "../utils/logger/index.js";
-import * as jsondiff from 'jsondiffpatch';
+import {diff} from 'jsondiffpatch';
 import { applySchemaDelta } from "../utils/index.js";
 import Class from "../core/class.js";
 
@@ -193,7 +193,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static,stack: Stack,
                         const previousClassDoc = await stack.db.get<ClassModel>(classDocId);
                         const classObj = await Class.buildFromModel(stack, previousClassDoc);
                         fnLogger.info("Retrieved documents", { doc, previousClassDoc });
-                        const schemaDelta = jsondiff.diff(previousClassDoc.schema, doc.schema);
+                        const schemaDelta = diff(previousClassDoc.schema, doc.schema);
 
                         if (!schemaDelta) {
                             fnLogger.info(`Class '${className}' has no changes on schema.`);

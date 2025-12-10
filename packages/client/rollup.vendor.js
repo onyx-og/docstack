@@ -32,6 +32,7 @@ export default {
       'process.env.NODE_ENV': '"production"',
       'process.nextTick': '_nextTick',
       'process.browser': 'true',
+      'setImmediate(': 'queueMicrotask(',
     }),
     json(),
     commonjs(),
