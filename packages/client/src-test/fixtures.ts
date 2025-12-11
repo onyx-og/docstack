@@ -34,6 +34,15 @@ export const test = base.extend<DocStackFixture>({
     await page.goto('/test/index.html');
     await use(page);
   },
+  /**
+   * Initialize the DocStack client library in the browser.
+   * the ClientStack instance is being serialized 
+   * when it's passed from the browser context back to your Node.js test runner.
+   *  The page.evaluate function in Playwright returns a JSON-serializable representation of the object,
+   * which means all the methods (functions) are stripped away, leaving you with just the data properties.
+   * To fix this, you need to work with the ClientStack instance inside the browser context
+   *  where it's "alive" and has all its methods
+   **/ 
   initDocStack: async ({ docStackPage }, use) => {
     const initDocStack = async (options?: { name?: string }) => {
       return await docStackPage.evaluate(async (opts) => {
