@@ -137,6 +137,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 }
             }
 
+            // TODO: use promise.all for concurrency
             for (const doc of documentsToProcess) {
                 if (isClassModel(doc)) {
                     // Validate against parent class

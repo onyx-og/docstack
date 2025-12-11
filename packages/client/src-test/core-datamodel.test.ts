@@ -66,7 +66,7 @@ describe("@docstack/core-datamodel integration", () => {
 
         expect(test.schema).toHaveProperty("title");
         expect(test.schema).not.toHaveProperty("pages");
-        // expect(test.doc).not.toHaveProperty("pages"); TODO: re-enable when attribute removal is fixed
+        // expect(test.doc).not.toHaveProperty("pages"); // TODO: re-enable when attribute removal is fixed
     });
 
     it("matches the system class schema with patch definitions", async ({ useDocStack }) => {
