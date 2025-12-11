@@ -140,3 +140,4 @@ lib/
 package-lock.json
 
 packages/client/test/vendor-bundle.js
+packages/client/test-results/.last-run.json
