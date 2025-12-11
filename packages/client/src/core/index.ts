@@ -82,6 +82,7 @@ class DocStack extends EventTarget {
     }
 
     private initStacks = async (configs: StackConfig[]) => {
+        // TODO: Consider changing to Promise.all for concurrency
         for (const config of configs) {
             const stack = await this.addStack(config);
         }

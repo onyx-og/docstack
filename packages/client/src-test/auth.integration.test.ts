@@ -1,7 +1,7 @@
 import type { UserSessionModel } from "@docstack/shared";
 // import { createAuthenticatedStack, createTestDocStack } from "../test-utils/docstack";
-import { DocStack } from "..";
-import { test as it, expect } from '../../fixtures';
+import { DocStack, ClientStack, Class } from "../lib";
+import { test as it, expect } from './fixtures';
 // const describe = test.describe;
 
 /**
@@ -22,28 +22,20 @@ it.describe('DocStack Browser E2E Tests', () => {
     expect(result.stackName).toContain('browser-init-test');
   });
 
-  it('should create and retrieve documents', async ({ docStackPage, initDocStack }) => {
+  it('docstack should containt one stack', async ({ docStackPage, initDocStack }) => {
     const result = await initDocStack({ name: 'doc-test' });
-    const { stack } = result;
+    const { stack, docStack } = result;
 
-    // Create a test document
-    const docId = 'test-doc-1';
-    const doc = {
-      _id: docId,
-      '~class': 'TestClass',
-      name: 'Test Document',
-      active: true,
-    };
+    expect(docStack.stacks.length).toBeGreaterThan(0)
+  });
 
-    // Use page.evaluate to interact with DocStack in browser context
-    const created = await docStackPage.evaluate(async ({ docId: id, doc: testDoc }) => {
-      const { DocStack } = (window as any).docstackLibrary;
-      // Note: You may need to access the stack instance differently
-      // This is a simplified example
-      return { id, created: true };
-    }, { docId, doc });
+  it('stack should provide db infos', async ({ docStackPage, initDocStack }) => {
+    const result = await initDocStack({ name: 'doc-test' });
+    const { docStack } = result;
 
-    expect(created).toBeDefined();
+    const stack = docStack.stacks[0];
+    const dbInfo = await stack.getDbInfo()
+    expect(dbInfo).toHaveProperty('db_name')
   });
 
   it('should verify browser environment has IndexedDB', async ({ docStackPage }) => {

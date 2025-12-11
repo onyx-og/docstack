@@ -1,4 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test';
+import { ClientStack, DocStack } from '../lib';
 
 /**
  * Fixture for initializing the DocStack client library in the browser.
@@ -7,7 +8,7 @@ import { test as base, expect, type Page } from '@playwright/test';
  * helper methods to interact with the DocStack API.
  */
 export type DocStackFixture = {
-  initDocStack: (options?: { name?: string }) => Promise<any>;
+  initDocStack: (options?: { name?: string }) => Promise<{docStack: DocStack; stackName: string; stack: ClientStack;}>;
   docStackPage: Page;
 };
 
@@ -29,26 +30,19 @@ export type DocStackFixture = {
  */
 export const test = base.extend<DocStackFixture>({
   docStackPage: async ({ page }, use) => {
-    // Inject the compiled DocStack library into the page context
-    await page.addInitScript(async () => {
-      // Make the compiled library available globally
-      if (typeof window !== 'undefined') {
-        (window as any).docstackLibrary = await import('../dist/index.js');
-        console.log("DocStack library injected into browser context", {window: (window as any).docstackLibrary});
-      }
-    });
-
+    // Navigate to the test page where the DocStack library is already loaded.
+    await page.goto('/test/index.html');
     await use(page);
   },
-
   initDocStack: async ({ docStackPage }, use) => {
     const initDocStack = async (options?: { name?: string }) => {
       return await docStackPage.evaluate(async (opts) => {
         // Access the compiled library that was injected
-        const docStackLib = (window as any).docstackLibrary;
+        const docStackLib = (window as any).docstack;
         if (!docStackLib) {
-          throw new Error('DocStack library not loaded. Make sure the library is built and served at /dist/index.js');
+          throw new Error('DocStack library not found on window.docstack. Make sure it is loaded by the test page.');
         }
+        console.log('Initializing DocStack in browser fixture...', {docstackLib: (window as any).docstack});
 
         // Initialize DocStack with the provided options
         const { DocStack } = docStackLib;
@@ -64,14 +58,21 @@ export const test = base.extend<DocStackFixture>({
           });
         });
 
+        const stack = docStack.getStack(stackName);
+        if (!stack) {
+            throw new Error(`Failed to resolve stack '${stackName}'`);
+        }if (stack.getClasses === undefined) {
+            throw new Error(`Stack '${stackName}' does not have getClasses method`);
+        }
+
         return {
           docStack,
           stackName,
-          stack: docStack.getStack(stackName),
+          stack
         };
       }, options);
     };
-
+    
     await use(initDocStack);
   },
 });
