@@ -57,7 +57,7 @@ describe("System Patches Integration", () => {
             expect(defaultGroup).not.toBeNull();
 
             // 4. Verify Schema Version
-            const allPatches = getAllSystemPatches();
+            const allPatches = await getAllSystemPatches();
             const latestPatch = allPatches[allPatches.length - 1];
 
             const systemDoc = await stack.getSystem();

@@ -319,30 +319,30 @@ describe("@docstack/core-datamodel integration", () => {
 
                 const customer = await customerClass.addCard({ name: "Alice" }) as Document;
                 // TODO: Re-enable when relation creation via reference attribute is functional (currently timing out)
-                // const account = await accountClass.addCard({ name: "Primary", customer: customer._id }) as Document;
+                const account = await accountClass.addCard({ name: "Primary", customer: customer._id }) as Document;
 
-                // const relations = await domain.getRelations();
+                const relations = await domain.getRelations();
 
-                // const deleted = await domain.deleteRelation(customer._id as string, account._id as string);
-                // const remaining = await domain.getRelations();
+                const deleted = await domain.deleteRelation(customer._id as string, account._id as string);
+                const remaining = await domain.getRelations();
 
                 return {
-                    // account,
+                    account,
                     customer,
-                    // relations,
-                    // deleted,
-                    // remaining,
+                    relations,
+                    deleted,
+                    remaining,
                 };
             }
         });
 
-        // expect(test.account).toHaveProperty("_id");
+        expect(test.account).toHaveProperty("_id");
         expect(test.customer).toHaveProperty("_id");
-        // expect(test.relations).toHaveLength(1);
-        // expect(test.relations[0].sourceId).toBe(test.customer._id);
-        // expect(test.relations[0].targetId).toBe(test.account._id);
+        expect(test.relations).toHaveLength(1);
+        expect(test.relations[0].sourceId).toBe(test.customer._id);
+        expect(test.relations[0].targetId).toBe(test.account._id);
 
-        // expect(test.deleted).toBe(true);
-        // expect(test.remaining.length).toBe(0);
+        expect(test.deleted).toBe(true);
+        expect(test.remaining.length).toBe(0);
     });
 });
