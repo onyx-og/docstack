@@ -138,3 +138,5 @@ lib/
 .rollup.cache
 
 package-lock.json
+
+packages/client/test/vendor-bundle.js

@@ -24,10 +24,6 @@ export default {
   ],
   plugins: [
     json(),
-    typescript({
-      // Don't generate declarations here - use separate build:types script
-      declaration: false
-      // By removing `tsconfig: false`, the plugin will now use your tsconfig.json
-    })
+    typescript()
   ]
 };

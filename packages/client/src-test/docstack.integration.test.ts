@@ -1,4 +1,5 @@
 import { test as it, expect } from './fixtures';
+import {Document} from '@docstack/shared';
 
 const describe = it.describe
 
@@ -80,7 +81,7 @@ describe("@docstack/client integration", () => {
                 const docId = createdDoc._id;
 
                 await classObj.updateCard(docId, { title: "Document 1", pages: 25 });
-                const storedDoc = await stack.getDocument(docId);
+                const storedDoc = await stack.getDocument<Document &{title: string, pages: number}>(docId);
 
                 const valid = await classObj.validate({ title: "Valid", pages: 2 });
                 const invalid = await classObj.validate({ title: "Invalid", pages: "two" });

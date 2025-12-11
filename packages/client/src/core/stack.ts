@@ -775,10 +775,10 @@ class ClientStack extends Stack {
     // }
 
     // TODO: Consider filtering returned properties
-    async getDocument(docId: string) {
-        let doc: PouchDB.Core.ExistingDocument<{}> | undefined = undefined;
+    async getDocument<T extends Document>(docId: string) {
+        let doc: PouchDB.Core.ExistingDocument<T> | undefined = undefined;
         try {
-            doc = await this.db.get(docId);
+            doc = await this.db.get<T>(docId);
         } catch (e: any) {
             if (e.name === 'not_found') {
                 logger.info("getDocument - not found", e)
