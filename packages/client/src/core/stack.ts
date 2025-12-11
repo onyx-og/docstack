@@ -926,11 +926,11 @@ class ClientStack extends Stack {
     getClassModel = async (className: string) => {
         // TODO: understand whether to use name of _id field
         let selector = {
-            /*$or: [
-                // { name: { $eq: className } },
+            $or: [
+                { name: { $eq: className } },
                 { _id: { $eq: className } }
-            ], */
-            _id: { $eq: className },
+            ],
+            // _id: { $eq: className },
             "~class": { $in: ["class", "~self"] }
         };
 

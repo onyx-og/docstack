@@ -11,35 +11,34 @@ import { test as it, expect } from './fixtures';
  */
 
 it.describe('DocStack Basics', () => {
-  it('should initialize DocStack in browser environment', async ({ initDocStack }) => {
-    const result = await initDocStack({ name: 'browser-init-test' });
-    
+  it('should initialize DocStack in browser environment', async ({ useDocStack }) => {
+    const result = await useDocStack({
+      name: 'browser-init-test',
+      evaluate: ({ docStack, stack, stackName }) => ({
+        isDocStack: !!docStack,
+        isStack: !!stack,
+        stackName,
+      }),
+    });
+
     expect(result).toBeDefined();
-    expect(result.docStack).toBeDefined();
-    expect(result.stack).toBeDefined();
+    expect(result.isDocStack).toBe(true);
+    expect(result.isStack).toBe(true);
     expect(result.stackName).toContain('browser-init-test');
   });
 
-  it('docstack should containt one stack', async ({ docStackPage, initDocStack }) => {
-    const result = await initDocStack({ name: 'doc-test' });
-    const { stack, docStack } = result;
-
-    expect(docStack.stacks.length).toBeGreaterThan(0)
+  it('docstack should contain one stack', async ({ useDocStack }) => {
+    const stackCount = await useDocStack({ name: 'doc-test', evaluate: ({ docStack }) => docStack.stacks.length });
+    expect(stackCount).toBeGreaterThan(0);
   });
 
-  it('stack should provide db infos', async ({ docStackPage }) => {
-    const dbInfo = await docStackPage.evaluate(async () => {
-      const docStackLib = (window as any).docstack;
-      const { DocStack } = docStackLib;
-      const stackName = 'db-info-test';
-      const docStack = new DocStack({ name: stackName });
-      await new Promise<void>((resolve) => docStack.addEventListener('ready', () => resolve()));
-      
-      const stack = docStack.getStack(stackName);
-      if (!stack) throw new Error('Stack not found');
-      
-      const info = await stack.getDbInfo();
-      return { ...info, expectedName: stack.getDbName() };
+  it('stack should provide db infos', async ({ useDocStack }) => {
+    const dbInfo = await useDocStack({
+      name: 'db-info-test',
+      evaluate: async ({ stack }) => {
+        const info = await stack.getDbInfo();
+        return { ...info, expectedName: stack.getDbName() };
+      },
     });
     expect(dbInfo.db_name).toBe(dbInfo.expectedName);
   });

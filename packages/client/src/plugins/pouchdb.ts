@@ -102,7 +102,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static,stack: Stack,
                                 }
                                 const afterTriggers = triggerQueue[docRes.id]
                                 if (afterTriggers && afterTriggers.length) {
-                                    debugger;
+                                    // debugger;
                                     for (const afterTrigger of afterTriggers) {
                                         const updatedDoc = await afterTrigger.execute(doc);
                                         Object.assign(doc, updatedDoc);
@@ -263,6 +263,8 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static,stack: Stack,
                         }
 
                         if (!classObj) {
+                            const stackTrace = await stack.getClasses({});
+                            console.log("Find me", stackTrace)
                             throw new Error(`Class '${className}' not found for document '${doc._id}'.`);
                         }
 

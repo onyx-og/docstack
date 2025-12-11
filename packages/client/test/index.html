@@ -16,7 +16,8 @@
         console.log("DocStack (UMD):", window.docstack || typeof docstack);
         document.getElementById('umd-result').textContent = typeof docstack !== 'undefined' ? 'Loaded ✓' : 'Failed ✗';
     </script>
-    <!-- 
+    
+    <!--
     <script>
         // Initialize DocStack with a stack instance and log the result
         (async () => {
@@ -25,9 +26,18 @@
                 const docStack = new DocStack({
                     name: "TestStack",
                 })
-                const onReady = () => {
+                const onReady = async () => {
                     console.log("DocStack is ready:", docStack);
                     docStack.removeEventListener("ready", onReady);
+                    const stack = docStack.stacks[0]
+                    const { Class, Attribute } = (window).docstack;
+                    const className = `Book-${Math.random().toString(16).slice(2)}`;
+                    const classObj = await Class.create(stack, className, "class", "Books catalog");
+
+                    await Attribute.create(classObj, "title", "string", "Title", { mandatory: true });
+                    await Attribute.create(classObj, "pages", "integer", "Pages", { mandatory: true, min: 1 });
+                    
+                    const createdDoc = await classObj.addCard({ title: "Document 1", pages: 10 });
                 };
                 docStack.addEventListener("ready", onReady);
             } catch (error) {

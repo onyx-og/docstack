@@ -421,7 +421,7 @@ class Class extends Class_ {
                 // update class on db
                 fnLogger.info("Checking for requirements before updating class on db", { stack: (this.stack != null), id: this.id })
                 if (this.stack && this.id) {
-                    debugger;
+                    // debugger;
                     fnLogger.info("Updating class on db")
                     let res = await this.stack.updateClass(this);
                     return this;

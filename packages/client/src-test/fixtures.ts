@@ -1,6 +1,11 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import { ClientStack, DocStack } from '../lib';
 
+type EvaluateInBrowser<T> = (args: {
+  docStack: DocStack;
+  stack: ClientStack;
+  stackName: string;
+}) => T | Promise<T>;
 /**
  * Fixture for initializing the DocStack client library in the browser.
  * 
@@ -8,7 +13,7 @@ import { ClientStack, DocStack } from '../lib';
  * helper methods to interact with the DocStack API.
  */
 export type DocStackFixture = {
-  initDocStack: (options?: { name?: string }) => Promise<{docStack: DocStack; stackName: string; stack: ClientStack;}>;
+  useDocStack: <T>(options: { name?: string; evaluate: EvaluateInBrowser<T> }) => Promise<T>;
   docStackPage: Page;
 };
 
@@ -31,7 +36,7 @@ export type DocStackFixture = {
 export const test = base.extend<DocStackFixture>({
   docStackPage: async ({ page }, use) => {
     // Navigate to the test page where the DocStack library is already loaded.
-    await page.goto('/test/index.html');
+    await page.goto('/test/index.html', { waitUntil: 'load' });
     await use(page);
   },
   /**
@@ -43,43 +48,36 @@ export const test = base.extend<DocStackFixture>({
    * To fix this, you need to work with the ClientStack instance inside the browser context
    *  where it's "alive" and has all its methods
    **/ 
-  initDocStack: async ({ docStackPage }, use) => {
-    const initDocStack = async (options?: { name?: string }) => {
-      return await docStackPage.evaluate(async (opts) => {
+  useDocStack: async ({ docStackPage }, use) => {
+    const initDocStack = async <T>(options: { name?: string; evaluate: EvaluateInBrowser<T> }) => {
+      // The 'evaluate' function is passed as a string to the browser context.
+      return await docStackPage.evaluate(async ({ name, evaluate }) => {
         // Access the compiled library that was injected
         const docStackLib = (window as any).docstack;
         if (!docStackLib) {
           throw new Error('DocStack library not found on window.docstack. Make sure it is loaded by the test page.');
         }
-        console.log('Initializing DocStack in browser fixture...', {docstackLib: (window as any).docstack});
 
         // Initialize DocStack with the provided options
         const { DocStack } = docStackLib;
-        const stackName = opts?.name || `docstack-test-${Date.now()}`;
+        const stackName = name || `docstack-test-${Date.now()}`;
         const docStack = new DocStack({ name: stackName });
 
         // Wait for the ready event
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('DocStack initialization timeout')), 10000);
-          docStack.addEventListener('ready', () => {
-            clearTimeout(timeout);
-            resolve();
-          });
+          docStack.addEventListener('ready', () => { clearTimeout(timeout); resolve(); });
         });
 
         const stack = docStack.getStack(stackName);
         if (!stack) {
             throw new Error(`Failed to resolve stack '${stackName}'`);
-        }if (stack.getClasses === undefined) {
-            throw new Error(`Stack '${stackName}' does not have getClasses method`);
         }
 
-        return {
-          docStack,
-          stackName,
-          stack
-        };
-      }, options);
+        // Reconstruct and execute the evaluate function in the browser
+        const evaluateFunc = new Function('return ' + evaluate)();
+        return await evaluateFunc({ docStack, stack, stackName });
+      }, { name: options.name, evaluate: options.evaluate.toString() });
     };
     
     await use(initDocStack);
