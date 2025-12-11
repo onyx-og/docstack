@@ -68,13 +68,4 @@ describe("System Patches Integration", () => {
             await cleanup();
         }
     });
-
-    it("should load all system patches and populate the stack correctly", async () => {
-        const { stack, cleanup } = await createTestDocStack("system-patches-t", { withSession: false });
-
-        try {
-        } finally {
-            await cleanup();
-        }
-    });
 });
