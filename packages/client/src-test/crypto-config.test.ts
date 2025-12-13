@@ -86,9 +86,8 @@ describe("crypto engine configuration", () => {
 
                 // Check if the encryptedMarker looks like an encrypted payload
                 const isEncrypted = typeof encryptedMarker === "object" &&
-                    encryptedMarker !== null &&
-                    "iv" in encryptedMarker &&
-                    "ciphertext" in encryptedMarker;
+                    encryptedMarker !== null && (encryptedMarker as any).__enc === true &&
+                    "iv" in encryptedMarker && "data" in encryptedMarker;
 
                 return { isEncrypted };
             },

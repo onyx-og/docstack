@@ -1,9 +1,13 @@
-import crypto from "crypto";
 import type ClientStack from "../stack.js";
 import type { JobModel, JobRunModel, JobStatus, JobTriggerType } from "@docstack/shared";
 
-const calculateHash = (content: string): string => {
-    return crypto.createHash("sha256").update(content).digest("hex");
+const calculateHash = async (content: string): Promise<string> => {
+    const getCrypto = () => globalThis.crypto;
+    const crypto = getCrypto();
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const buffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
 const now = () => Date.now();
@@ -12,14 +16,17 @@ export class Job {
     public readonly model: JobModel;
     private readonly stack: ClientStack;
 
-    constructor(model: JobModel, stack: ClientStack) {
+    private constructor(model: JobModel, stack: ClientStack) {
         this.model = model;
         this.stack = stack;
+    }
 
-        const computed = calculateHash(model.content);
+    public static async create(model: JobModel, stack: ClientStack): Promise<Job> {
+        const computed = await calculateHash(model.content);
         if (computed !== model.hash) {
             throw new Error(`Job content hash mismatch for ${model._id}`);
         }
+        return new Job(model, stack);
     }
 
     private hydrate() {
@@ -40,7 +47,12 @@ export class Job {
     }
 
     private buildRun(triggerType: JobTriggerType, runtimeArgs?: Record<string, any>): JobRunModel {
-        const id = `JobRun-${crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex")}`;
+        const getCrypto = () => globalThis.crypto;
+        const crypto = getCrypto();
+        const id = `JobRun-${
+            crypto.randomUUID ? crypto.randomUUID() : 
+            Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('')
+        }`;
         const base: JobRunModel = {
             _id: id,
             "~class": "~JobRun",
@@ -134,7 +146,7 @@ export class JobEngine {
 
     public async executeJob(jobId: string, runtimeArgs?: Record<string, any>, triggerType: JobTriggerType = "manual") {
         const jobDoc = await this.stack.db.get<JobModel>(jobId);
-        const job = new Job(jobDoc, this.stack);
+        const job = await Job.create(jobDoc, this.stack);
         return job.execute(runtimeArgs, triggerType);
     }
 }
