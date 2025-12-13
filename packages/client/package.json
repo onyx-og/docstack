@@ -9,7 +9,7 @@
     "build": "rollup --config ./rollup.config.js",
     "build:vendor": "rollup --config ./rollup.vendor.js",
     "lint": "eslint ./src --ext .ts,.tsx",
-    "test": "jest --config jest.config.ts"
+    "test": "playwright test"
   },
   "repository": {
     "type": "git",

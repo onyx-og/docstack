@@ -1,3 +1,4 @@
+import { ClientStack } from '../lib';
 import { test as it, expect } from './fixtures';
 
 const describe = it.describe;
@@ -11,41 +12,47 @@ describe("DocStack patches", () => {
             const patchDocId = `patched-doc-${Date.now()}`;
             const patchTargetClassId = "~PatchTarget";
 
-            const customPatch = {
+            const classPatch = {
                 "~class": "patch",
-                version: "9.9.9",
-                changelog: "Custom patch for configuration-driven stacks",
+                version: "9.9.8",
+                changelog: "Patch for the class document",
                 docs: [
                     {
                         _id: patchTargetClassId,
                         "~class": "class",
                         active: true,
                         name: "PatchTarget",
-                        description: "A minimal class to validate config patch inserts",
+                        description: "A minimal class to validate config patch inserts for classes",
                         schema: {
                             description: {
                                 name: "description",
                                 type: "string",
                                 config: { mandatory: true },
                             },
-                        },
+                        }
                     },
-                    {
-                        _id: patchDocId,
-                        "~class": patchTargetClassId,
-                        description: "created from stack configuration patch",
-                    },
-                ],
+                ]
             };
 
-            const docStack = new DocStack({ name: stackName, patches: [customPatch] });
+            const docPatch = {
+                "~class": "patch",
+                version: "9.9.9",
+                changelog: "Patch for the actual document",
+                docs: [{
+                    _id: patchDocId,
+                    "~class": patchTargetClassId,
+                    description: "created from stack configuration patch",
+                }]
+            };
+
+            const docStack = new DocStack({ name: stackName, patches: [classPatch, docPatch] });
 
             await new Promise<void>((resolve, reject) => {
                 const timeout = setTimeout(() => reject(new Error("DocStack initialization timeout")), 10000);
                 docStack.addEventListener("ready", () => { clearTimeout(timeout); resolve(); });
             });
 
-            const stack = docStack.getStack(stackName);
+            const stack = docStack.getStack(stackName) as ClientStack;
             if (!stack) throw new Error(`Failed to resolve stack '${stackName}'`);
 
             try {
@@ -77,7 +84,7 @@ describe("DocStack patches", () => {
                 docStack.addEventListener("ready", () => { clearTimeout(timeout); resolve(); });
             });
 
-            const stack = docStack.getStack(stackName);
+            const stack = docStack.getStack(stackName) as ClientStack;
             if (!stack) throw new Error(`Failed to resolve stack '${stackName}'`);
 
             try {
