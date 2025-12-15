@@ -1177,7 +1177,6 @@ const sys_014: Patch = {
             "_rev": "auto",
             "~class": "~Policy",
             "active": true,
-            "userId": "system",
             "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
             "description": "Allow users to access only their own user document or the system user",
             "targetClass": ["~User"]

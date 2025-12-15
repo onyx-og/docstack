@@ -93,6 +93,7 @@ export const test = base.extend<DocStackFixture>({
                 password: user.password,
                 groupId: ["Group-Tester"],
                 authMethod: "AuthMod-Classic",
+                keyDerivationSalt: "static-salt",
             };
             await stack.createDoc(userDoc._id, userDoc["~class"], schema, userDoc as any);
         };
@@ -115,18 +116,7 @@ export const test = base.extend<DocStackFixture>({
 
         if (username) {
             // Temporarily use system privileges to create the user if they don't exist
-            stack.setAuthSession({
-                session: {
-                    _id: `sess-bootstrap-user-seed`,
-                    "~class": "~UserSession",
-                    userId: "system",
-                    groupId: ["Group-Admin"],
-                    username: "system",
-                    sessionId: `sess-bootstrap-user-seed`,
-                    sessionStart: new Date().toISOString(),
-                    sessionStatus: "active",
-                },
-            });
+            await stack.authenticate({ username: "system", password: "system" })
 
             const existingUser = await stack.findDocument({ "~class": { $eq: "~User" }, username: { $eq: username } });
             if (!existingUser) {
