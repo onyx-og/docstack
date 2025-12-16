@@ -602,12 +602,18 @@ class Class extends Class_ {
     async get(...cardId: string[]): Promise<Document[]>;
     async get(...cardId: string[]): Promise<Document | Document[] | null> {
         const fnLogger = this.logger.child({ method: "get", args: { cardId } });
-        let docs = await this.getCards(
-            { _id: { $in: cardId } },
-        );
-        fnLogger.info("Fetched documents", { docs });
-        if (cardId.length === 1) return docs[0] || null;
-        return docs;
+        if (typeof cardId === "string") {
+            let docs = await this.getCards(
+                { _id: { $eq: cardId } },
+            );
+            return docs[0] || null;
+        } else {
+            let docs = await this.getCards(
+                { _id: { $in: cardId } },
+            );
+            fnLogger.info("Fetched documents", { docs });
+            return docs;
+        }
     }
 
     addTrigger = async (name: string, model: TriggerModel) => {

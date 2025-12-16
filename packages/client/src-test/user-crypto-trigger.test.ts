@@ -20,8 +20,7 @@ describe("user triggers", () => {
 
                 await stack.cryptoEngine.setDocumentKey(documentKey);
 
-                // const User = await Class.get(stack, "~User");
-                const User = await stack.getClass("~User");
+                const User = await Class.fetch(stack, "~User");
 
                 if (!User) {
                     throw new Error("User class not found");
