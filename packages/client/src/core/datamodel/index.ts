@@ -1123,7 +1123,7 @@ const sys_013: Patch = {
     "~class": "patch",
     "version": "0.0.13",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.13\\n#### New Documents: Group-Admin, Group-Default",
+    "changelog": "### Schema Patch: v0.0.13\\n#### New Documents: Group-Admin, Group-Default\\n#### Updates: ~User with after trigger for wrappedDocumentKey",
     "docs": [
         {
             "_id": "Group-Admin",
@@ -1136,6 +1136,97 @@ const sys_013: Patch = {
             "~class": "~Group",
             "active": true,
             "name": "Default"
+        }
+        ,
+        {
+            "_id": "~User",
+            "_rev": "auto",
+            "active": true,
+            "name": "User",
+            "description": "A user class for secure login",
+            "~class": "class",
+            "triggers": [
+                {
+                    "name": "auto-wrap-document-key",
+                    "order": "after",
+                    "run": "async (document, classObj, stack) => { if (!document.wrappedDocumentKey && stack.cryptoEngine.documentKey) { const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.documentKey, document.keyDerivationSalt); document.wrappedDocumentKey = wrappedKey; } return document; }"
+                }
+            ],
+            "schema": {
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false
+                    }
+                },
+                "password": {
+                    "name": "password",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false,
+                        "encrypted": true
+                    }
+                },
+                "groupId": {
+                    "name": "groupId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "isArray": true,
+                        "targetClass": "~Group"
+                    }
+                },
+                "email": {
+                    "name": "email",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "firstName": {
+                    "name": "firstName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "lastName": {
+                    "name": "lastName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "authMethod": {
+                    "name": "authMethod",
+                    "type": "foreign_key",
+                    "config": { "mandatory": true, "targetClass": "~AuthModule" }
+                },
+                "externalId": {
+                    "name": "externalId",
+                    "type": "string",
+                    "config": { "maxLength": 200, "isArray": false }
+                },
+                "keyDerivationSalt": {
+                    "name": "keyDerivationSalt",
+                    "type": "string",
+                    "config": { "mandatory": true, "maxLength": 200, "isArray": false }
+                },
+                "wrappedDocumentKey": {
+                    "name": "wrappedDocumentKey",
+                    "type": "string",
+                    "config": { "mandatory": false, "maxLength": 4096, "isArray": false, "encrypted": true }
+                }
+            }
         }
     ]
 };

@@ -16,8 +16,8 @@
         console.log("DocStack (UMD):", window.docstack || typeof docstack);
         document.getElementById('umd-result').textContent = typeof docstack !== 'undefined' ? 'Loaded ✓' : 'Failed ✗';
     </script>
-    
-    <!--
+
+    <!-- Test script
     <script>
         // Initialize DocStack with a stack instance and log the result
         (async () => {
@@ -31,18 +31,74 @@
                     docStack.removeEventListener("ready", onReady);
                     const stack = docStack.stacks[0]
                     const { Class, Attribute } = (window).docstack;
-                    const className = `Book-${Math.random().toString(16).slice(2)}`;
-                    const classObj = await Class.create(stack, className, "class", "Books catalog");
 
-                    await Attribute.create(classObj, "title", "string", "Title", { mandatory: true });
-                    await Attribute.create(classObj, "pages", "integer", "Pages", { mandatory: true, min: 1 });
-                    
-                    const createdDoc = await classObj.addCard({ title: "Document 1", pages: 10 });
+                    const ensureGroup = async (stack, groupId, name = groupId.replace(/^Group-/, "")) => {
+                        const groupClassModel = (await stack.getClassModel("~Group")) || (await stack.getClassModel("Group"));
+                        const schema = groupClassModel?.schema || {};
+                        const groupDoc = { _id: groupId, "~class": "~Group", name };
+                        try {
+                            await stack.createDoc(groupId, "~Group", schema, groupDoc);
+                        } catch (e) {
+                            // Ignore if group already exists
+                        }
+                        return groupDoc;
+                    };
+                    const seedClassicUser = async (stack, user) => {
+                        await ensureGroup(stack, "Group-Tester", "Tester");
+                        const userClassModel = (await stack.getClassModel("~User")) || (await stack.getClassModel("User"));
+                        const schema = userClassModel?.schema || {};
+                        const userDoc = {
+                            _id: `user-${user.username}`,
+                            "~class": "~User",
+                            username: user.username,
+                            password: user.password,
+                            groupId: ["Group-Tester"],
+                            authMethod: "AuthMod-Classic",
+                            keyDerivationSalt: "static-salt",
+                        };
+                        await stack.createDoc(userDoc._id, userDoc["~class"], schema, userDoc);
+                    };
+
+                    await stack.authenticate({ username: "system", password: "system" });
+
+                    debugger;
+
+                    await seedClassicUser(stack, { username: "alice", password: "password-123" });
+
+                    stack.clearAuthSession();
+
+                    /////////////////////////////
+                    const proof = await stack.authenticate({ username: "alice", password: "password-123" });
+
+                    const secureClass = await Class.create(stack, "SecureItem", "class", "Secured items", {
+                        title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true, encrypted: true } },
+                    });
+
+                    await secureClass.addCard({ title: "secret" });
+
+                    const { rows: authenticatedRows } = await stack.query("SELECT title FROM SecureItem;");
+
+                    stack.clearAuthSession();
+
+                    let threwWhenCleared = false;
+                    let errorMessage = "";
+                    try {
+                        await stack.query("SELECT title FROM SecureItem;");
+                    } catch (e) {
+                        threwWhenCleared = true;
+                        errorMessage = e.message || "";
+                    }
+
+                    console.log("Query Auth Test Results:", {
+                        authenticatedRows,
+                        threwWhenCleared,
+                        errorMessage,
+                    });
                 };
                 docStack.addEventListener("ready", onReady);
             } catch (error) {
                 console.error("Error initializing DocStack:", error);
             }
         })();
-    </script>-->
+    </script>  -->
 </html>

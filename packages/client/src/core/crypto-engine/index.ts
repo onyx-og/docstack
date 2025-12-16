@@ -2,6 +2,7 @@ import { AttributeModel, Document } from "@docstack/shared";
 import createLogger from "../../utils/logger/index.js";
 import Class from "../class.js";
 import type ClientStack from "../stack.js";
+import { wrapDocumentKey } from "./utils.js";
 import {
     EncryptedPayload,
     decryptWithAesGcm,
@@ -42,6 +43,10 @@ export class CryptoEngine {
 
     public isEnabled() {
         return this.enabled;
+    }
+
+    public async wrapDocumentKey(documentKey: string, derivedKeyHex: string): Promise<string> {
+        return wrapDocumentKey(documentKey, derivedKeyHex);
     }
 
     public async unwrapAndStoreDocumentKey(wrappedDocumentKey?: string | null, derivedKey?: string | null) {

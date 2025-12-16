@@ -536,6 +536,16 @@ class Class extends Class_ {
         }
     }
 
+    async add(params: { [key: string]: any }): Promise<Document | null>;
+    async add(...paramsArray: { [key: string]: any }[]): Promise<Document[]>;
+    async add(...paramsArray: { [key: string]: any }[]): Promise<Document | Document[] | null> {
+        const fnLogger = this.logger.child({ method: "add", args: { paramsArray } });
+        const addedCards = await this.addCards(paramsArray);
+        fnLogger.info("Added cards", { addedCards });
+        if (paramsArray.length === 1) return addedCards[0] || null;
+        return addedCards;
+    }
+
     addOrUpdateCard = async (params: { [key: string]: any }, cardId?: string) => {
         const fnLogger = this.logger.child({ method: "addOrUpdateCard", args: { params, cardId } });
         return new Promise<Document | null>(async (resolve, reject) => {
@@ -585,6 +595,18 @@ class Class extends Class_ {
         const _selector = { ...(selector || {}), "~class": { $eq: this.name } };
         this.logger.info("getCards - selector", { selector: _selector, fields, skip, limit })
         let docs = (await this.stack!.findDocuments<Document>(_selector, fields, skip, limit)).docs
+        return docs;
+    }
+
+    async get(cardId: string): Promise<Document | null>;
+    async get(...cardId: string[]): Promise<Document[]>;
+    async get(...cardId: string[]): Promise<Document | Document[] | null> {
+        const fnLogger = this.logger.child({ method: "get", args: { cardId } });
+        let docs = await this.getCards(
+            { _id: { $in: cardId } },
+        );
+        fnLogger.info("Fetched documents", { docs });
+        if (cardId.length === 1) return docs[0] || null;
         return docs;
     }
 
