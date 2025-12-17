@@ -772,7 +772,7 @@ const sys_008: Patch = {
                         "mandatory": false,
                         "maxLength": 4096,
                         "isArray": false,
-                        "encrypted": true
+                        "encrypted": false
                     }
                 }
             }
@@ -1020,7 +1020,7 @@ const sys_012: Patch = {
                         "mandatory": false,
                         "maxLength": 4096,
                         "isArray": false,
-                        "encrypted": true
+                        "encrypted": false
                     }
                 }
             }
@@ -1148,8 +1148,21 @@ const sys_013: Patch = {
             "triggers": [
                 {
                     "name": "auto-wrap-document-key",
-                    "order": "after",
-                    "run": "async (document, classObj, stack) => { if (!document.wrappedDocumentKey && stack.cryptoEngine.getDocumentKey()) { const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.getDocumentKey(), document.keyDerivationSalt); document.wrappedDocumentKey = wrappedKey; } return document; }"
+                    "order": "before",
+                    "run": `if (!document.wrappedDocumentKey && stack.cryptoEngine.getDocumentKey()) {
+        const authModuleId = document.authMethod || "AuthMod-Classic";
+        const authModule = await stack.db.get(authModuleId);
+        const jobId = authModule.jobId;
+        const run = await stack.jobEngine.executeJob(jobId, {
+            password: document.password,
+            salt: document.keyDerivationSalt,
+            keyDerivationSalt: document.keyDerivationSalt,
+        });
+        const derivedKey = (run.finalMetadata)?.derivedKey ?? (run.initialMetadata)?.derivedKey;
+        const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.getDocumentKey(), derivedKey);
+        document.wrappedDocumentKey = wrappedKey;
+    }
+    return document;`
                 }
             ],
             "schema": {
@@ -1224,7 +1237,7 @@ const sys_013: Patch = {
                 "wrappedDocumentKey": {
                     "name": "wrappedDocumentKey",
                     "type": "string",
-                    "config": { "mandatory": false, "maxLength": 4096, "isArray": false, "encrypted": true }
+                    "config": { "mandatory": false, "maxLength": 4096, "isArray": false, "encrypted": false }
                 }
             }
         }

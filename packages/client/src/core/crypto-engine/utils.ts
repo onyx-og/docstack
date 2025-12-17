@@ -94,11 +94,13 @@ export const wrapDocumentKey = async (documentKey: string, derivedKeyHex: string
     return JSON.stringify(payload);
 };
 
-export const unwrapDocumentKey = async (wrappedDocumentKey: string, derivedKeyHex: string): Promise<string> => {
+export const unwrapDocumentKey = async (wrappedDocumentKey: string, cryptoKey: CryptoKey, derivedKeyHex: string): Promise<string> => {
     const parsed: unknown = JSON.parse(wrappedDocumentKey);
     if (!isEncryptedPayload(parsed)) {
         throw new Error("Wrapped document key payload is malformed: "+wrappedDocumentKey);
     }
     const key = await importAesKeyFromHex(derivedKeyHex, ["decrypt"]);
-    return decryptWithAesGcm(parsed, key);
+    const firstLayer = await decryptWithAesGcm(parsed, key);
+    return firstLayer;
+    // return await decryptWithAesGcm((JSON.parse(firstLayer) as EncryptedPayload), key);
 };

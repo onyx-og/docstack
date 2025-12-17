@@ -280,7 +280,7 @@ class ClientStack extends Stack {
         await this.createDoc(sessionDoc._id, sessionDoc["~class"], sessionSchema, sessionDoc);
         // TODO: Initially the wrappedDocumentKey is missing for the system user,
         // perhaps the documentKey hasn't been set yet? 
-        const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(JSON.stringify(user.wrappedDocumentKey), user.wrappedDocumentKey, derivedKey);
+        const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey);
         
         const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey: documentKey ?? undefined };
         this.setAuthSession(proof);

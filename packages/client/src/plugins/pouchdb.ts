@@ -306,7 +306,6 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
             if (!stack.cryptoEngine.isEnabled()) {
                 console.log("Crypto engine not enabled, skipping encryption.");
-                console.log("Docs:", docs);
                 return pouchBulkDocs.call(this, docs as any, options, postExec);
             } else {
                 console.log("Crypto engine enabled, processing encryption.");
