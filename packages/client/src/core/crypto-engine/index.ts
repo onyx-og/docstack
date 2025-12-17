@@ -50,8 +50,8 @@ export class CryptoEngine {
     }
 
     public async unwrapAndStoreDocumentKey(wrappedDocumentKey?: string | null, derivedKey?: string | null) {
-        if (!this.enabled) return null;
-        if (!wrappedDocumentKey || !derivedKey) return null;
+        if (!this.enabled) throw new Error("Crypto engine is disabled");
+        if (!wrappedDocumentKey || !derivedKey) throw new Error("Missing wrapped document key or derived key");
 
         const key = await unwrapDocumentKey(wrappedDocumentKey, derivedKey);
         await this.setDocumentKey(key);

@@ -278,9 +278,10 @@ class ClientStack extends Stack {
         const sessionClassModel = (await this.getClassModel("~UserSession")) || (await this.getClassModel("UserSession"));
         const sessionSchema = sessionClassModel?.schema || {};
         await this.createDoc(sessionDoc._id, sessionDoc["~class"], sessionSchema, sessionDoc);
-
-        const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey);
-
+        // TODO: Initially the wrappedDocumentKey is missing for the system user,
+        // perhaps the documentKey hasn't been set yet? 
+        const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(JSON.stringify(user.wrappedDocumentKey), user.wrappedDocumentKey, derivedKey);
+        
         const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey: documentKey ?? undefined };
         this.setAuthSession(proof);
         await this.ensureCryptoMarkerEncryption();
@@ -340,7 +341,7 @@ class ClientStack extends Stack {
                         delete doc._rev;
                         const existingDoc = await this.db.get(doc._id);
                         if (existingDoc) {
-                            doc._rev = existingDoc._rev;
+                            doc = { ...existingDoc, ...doc };
                         }
                     }
                     return doc;
@@ -622,6 +623,14 @@ class ClientStack extends Stack {
             if (error?.name === "not_found" || error?.status === 404) return null;
             throw error;
         });
+
+        if (!this.cryptoEngineDisabled && !this.cryptoEngine.getDocumentKey()) {
+            const randomBytes = new Uint8Array(32);
+            globalThis.crypto.getRandomValues(randomBytes);
+            const documentKey = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            await this.cryptoEngine.setDocumentKey(documentKey);
+            logger.info("Initialized new document key");
+        }
 
         if (existing) {
             this.validateCryptoConfig(existing);

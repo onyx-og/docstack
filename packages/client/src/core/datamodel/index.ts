@@ -1149,7 +1149,7 @@ const sys_013: Patch = {
                 {
                     "name": "auto-wrap-document-key",
                     "order": "after",
-                    "run": "async (document, classObj, stack) => { if (!document.wrappedDocumentKey && stack.cryptoEngine.documentKey) { const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.documentKey, document.keyDerivationSalt); document.wrappedDocumentKey = wrappedKey; } return document; }"
+                    "run": "async (document, classObj, stack) => { if (!document.wrappedDocumentKey && stack.cryptoEngine.getDocumentKey()) { const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.getDocumentKey(), document.keyDerivationSalt); document.wrappedDocumentKey = wrappedKey; } return document; }"
                 }
             ],
             "schema": {
@@ -1252,7 +1252,6 @@ const sys_014: Patch = {
             "authMethod": "AuthMod-Classic",
             "externalId": "",
             "keyDerivationSalt": "system-salt",
-            "wrappedDocumentKey": ""
         },
         {
             "_id": "Policy-Admin",
