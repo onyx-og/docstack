@@ -1148,7 +1148,7 @@ const sys_013: Patch = {
             "triggers": [
                 {
                     "name": "auto-wrap-document-key",
-                    "order": "before",
+                    "order": "after",
                     "run": `if (!document.wrappedDocumentKey && stack.cryptoEngine.getDocumentKey()) {
         const authModuleId = document.authMethod || "AuthMod-Classic";
         const authModule = await stack.db.get(authModuleId);

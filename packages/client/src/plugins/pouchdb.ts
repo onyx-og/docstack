@@ -128,7 +128,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 return { error, result }
             }
 
-            const postExec: typeof callback = async (error, result) => {
+            const postExec = async (error, result) => {
                 if (!options?.isPostOp) {
                     const { error: err, result: res } = await postOperations(error, result);
                     if (callback) callback(err, res);
@@ -306,7 +306,17 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
             if (!stack.cryptoEngine.isEnabled()) {
                 console.log("Crypto engine not enabled, skipping encryption.");
-                return pouchBulkDocs.call(this, docs as any, options, postExec);
+                return await new Promise<(PouchDB.Core.Error | PouchDB.Core.Response)[]>((resolve, reject) => {
+                    pouchBulkDocs.call(this, payload as any, options, async (err, res) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            await postExec(null, res).then(() => {
+                                resolve(res);
+                            }).catch(reject);
+                        }
+                    })
+                });
             } else {
                 console.log("Crypto engine enabled, processing encryption.");
             }
@@ -334,7 +344,17 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 ? encryptedDocs
                 : { ...(docs as any), docs: encryptedDocs };
 
-            return pouchBulkDocs.call(this, payload as any, options, postExec);
+            return await new Promise<(PouchDB.Core.Error | PouchDB.Core.Response)[]>((resolve, reject) => {
+                pouchBulkDocs.call(this, payload as any, options, async (err, res) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        await postExec(null, res).then(() => {
+                            resolve(res);
+                        }).catch(reject);
+                    }
+                })
+            });
         },
 
         get: async function (docId, options?: PouchDB.Core.GetOptions | null, callback?) {
