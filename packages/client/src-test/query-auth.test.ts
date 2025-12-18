@@ -12,11 +12,11 @@ describe("query authentication", () => {
                 const { Class } = (window as any).docstack;
 
                 // Generate a random 32-byte hex key in the browser
-                const array = new Uint8Array(32);
-                crypto.getRandomValues(array);
-                const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
+                // const array = new Uint8Array(32);
+                // crypto.getRandomValues(array);
+                // const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
 
-                await stack.cryptoEngine.setDocumentKey(documentKey);
+                // await stack.cryptoEngine.setDocumentKey(documentKey);
 
                 const secureClass = await Class.create(stack, "SecureItem", "class", "Secured items", {
                     title: { name: "title", type: "string", config: { mandatory: true, encrypted: true } },
@@ -27,7 +27,7 @@ describe("query authentication", () => {
                 const { rows: authenticatedRows } = await stack.query("SELECT title FROM SecureItem;");
 
                 stack.clearAuthSession();
-                await stack.cryptoEngine.setDocumentKey(null);
+                // await stack.cryptoEngine.setDocumentKey(null);
 
                 let threwWhenCleared = false;
                 let unauthenticatedRows;

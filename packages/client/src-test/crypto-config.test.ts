@@ -74,12 +74,12 @@ describe("crypto engine configuration", () => {
             name: "crypto-marker",
             evaluate: async ({ stack }) => {
                 // Generate a random 32-byte hex key in the browser
-                const array = new Uint8Array(32);
-                crypto.getRandomValues(array);
-                const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
+                // const array = new Uint8Array(32);
+                // crypto.getRandomValues(array);
+                // const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
 
-                await stack.cryptoEngine.setDocumentKey(documentKey);
-                await (stack as any).ensureCryptoMarkerEncryption();
+                // await stack.cryptoEngine.setDocumentKey(documentKey);
+                // await (stack as any).ensureCryptoMarkerEncryption();
 
                 const marker = await stack.db.get<any>("~crypto-engine-config");
                 const encryptedMarker = marker.encryptedMarker;

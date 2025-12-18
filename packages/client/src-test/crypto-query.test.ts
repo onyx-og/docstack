@@ -12,11 +12,11 @@ describe("crypto-engine queries", () => {
                 const { Class } = (window as any).docstack;
 
                 // Generate a random 32-byte hex key in the browser
-                const array = new Uint8Array(32);
-                crypto.getRandomValues(array);
-                const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
+                // const array = new Uint8Array(32);
+                // crypto.getRandomValues(array);
+                // const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
 
-                await stack.cryptoEngine.setDocumentKey(documentKey);
+                // await stack.cryptoEngine.setDocumentKey(documentKey);
 
                 const secureClass = await Class.create(stack, "SecureQueryItem", "class", "Encrypted query records", {
                     title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
@@ -43,11 +43,11 @@ describe("crypto-engine queries", () => {
                 const { Class } = (window as any).docstack;
 
                 // Generate a random 32-byte hex key in the browser
-                const array = new Uint8Array(32);
-                crypto.getRandomValues(array);
-                const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
+                // const array = new Uint8Array(32);
+                // crypto.getRandomValues(array);
+                // const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
 
-                await stack.cryptoEngine.setDocumentKey(documentKey);
+                // await stack.cryptoEngine.setDocumentKey(documentKey);
 
                 const secureClass = await Class.create(stack, "PartialSecureItem", "class", "Partially encrypted records", {
                     title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
@@ -63,7 +63,8 @@ describe("crypto-engine queries", () => {
 
                 const { rows: withKeyRows } = await stack.query("SELECT title, secret FROM PartialSecureItem;");
 
-                await stack.cryptoEngine.setDocumentKey(null);
+                // await stack.cryptoEngine.setDocumentKey(null);
+                stack.clearAuthSession();
 
                 const { rows: withoutKeyRows } = await stack.query("SELECT title, secret FROM PartialSecureItem;");
                 const { rows: fullyLockedRows } = await stack.query("SELECT secret FROM FullyLockedItem;");
