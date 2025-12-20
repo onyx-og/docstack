@@ -3,7 +3,7 @@
 
 # @docstack/client
 
-**The Intelligent, Offline-First Database Engine for Modern Web Apps.**
+**One does not simply stack documents.**
 
 DocStack Client is a standalone, browser-based datastore built on PouchDB. It bridges the gap between simple client-side storage and full-fledged backend databases by bringing schemas, relationships, SQL-like querying, and background processing directly to the browser.
 
