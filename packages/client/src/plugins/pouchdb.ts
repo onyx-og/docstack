@@ -97,7 +97,6 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                                 }
                                 const afterTriggers = triggerQueue[docRes.id]
                                 if (afterTriggers && afterTriggers.length) {
-                                    debugger;
                                     for (const afterTrigger of afterTriggers) {
                                         const updatedDoc = await afterTrigger.execute(doc);
                                         Object.assign(doc, updatedDoc);
