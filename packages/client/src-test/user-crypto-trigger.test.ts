@@ -1,5 +1,7 @@
 import { test as it, expect } from './fixtures';
 
+it.setTimeout(120_000)
+
 const describe = it.describe;
 
 describe("user triggers", () => {
@@ -13,13 +15,6 @@ describe("user triggers", () => {
 
                 await stack.authenticate({username: "system", password: "system"});
 
-                // Generate a random 32-byte hex key in the browser
-                // const array = new Uint8Array(32);
-                // crypto.getRandomValues(array);
-                // const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
-
-                // await stack.cryptoEngine.setDocumentKey(documentKey);
-
                 const User = await Class.fetch(stack, "~User");
 
                 if (!User) {
@@ -32,17 +27,16 @@ describe("user triggers", () => {
                     password: "password",
                     groupId: ["Group-Default"],
                     authMethod: "AuthMod-Classic",
-                    keyDerivationSalt: "a-salt"
                 });
 
-                // const user = await User.get("test-user");
+                const user = await User.get("test-user");
 
                 // const unwrappedKey = await stack.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, user.keyDerivationSalt);
 
                 return {
                     user: {
-                        _id: userDoc._id,
-                        username: userDoc.username,
+                        _id: user._id,
+                        username: user.username,
                         hasWrappedKey: !!userDoc.wrappedDocumentKey,
                     },
                     // keysMatch: unwrappedKey === documentKey

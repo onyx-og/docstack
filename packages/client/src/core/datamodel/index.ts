@@ -1156,19 +1156,33 @@ const sys_013: Patch = {
                 },
                 {
                     "name": "auto-wrap-document-key",
-                    "order": "after",
+                    "order": "before",
                     "run": `if (document.password && document.keyDerivationSalt && stack.cryptoEngine.getDocumentKey()) {
-        const authModuleId = document.authMethod || "AuthMod-Classic";
-        const authModule = await stack.db.get(authModuleId);
-        const jobId = authModule.jobId;
-        const run = await stack.jobEngine.executeJob(jobId, {
-            password: document.password,
-            salt: document.keyDerivationSalt,
-            keyDerivationSalt: document.keyDerivationSalt,
-        });
-        const derivedKey = (run.finalMetadata)?.derivedKey ?? (run.initialMetadata)?.derivedKey;
-        const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.getDocumentKey(), derivedKey);
-        document.wrappedDocumentKey = wrappedKey;
+        let shouldRecalculate = true;
+        if (document._id) {
+            try {
+                const currentDoc = await stack.db.get(document._id);
+                if (currentDoc && currentDoc.password === document.password && currentDoc.keyDerivationSalt === document.keyDerivationSalt && currentDoc.wrappedDocumentKey) {
+                    shouldRecalculate = false;
+                    if (!document.wrappedDocumentKey) {
+                        document.wrappedDocumentKey = currentDoc.wrappedDocumentKey;
+                    }
+                }
+            } catch (e) { }
+        }
+        if (shouldRecalculate) {
+            const authModuleId = document.authMethod || "AuthMod-Classic";
+            const authModule = await stack.db.get(authModuleId);
+            const jobId = authModule.jobId;
+            const run = await stack.jobEngine.executeJob(jobId, {
+                password: document.password,
+                salt: document.keyDerivationSalt,
+                keyDerivationSalt: document.keyDerivationSalt,
+            });
+            const derivedKey = (run.finalMetadata)?.derivedKey ?? (run.initialMetadata)?.derivedKey;
+            const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.getDocumentKey(), derivedKey);
+            document.wrappedDocumentKey = wrappedKey;
+        }
     }
     return document;`
                 }

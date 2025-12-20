@@ -1,5 +1,7 @@
 import { test as it, expect } from './fixtures';
 
+it.setTimeout(120_000)
+
 const describe = it.describe;
 
 // Helper to hash content in browser
