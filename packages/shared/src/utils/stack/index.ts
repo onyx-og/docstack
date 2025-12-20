@@ -26,7 +26,6 @@ abstract class Stack extends EventTarget {
     abstract name: string;
     public appVersion: string = "0.0.1";
     abstract schemaVersion: string | undefined;
-    abstract patches: Patch[];
     /* Used to retrieve faster data */
     public cache: {
         [className: string]: CachedClass | CachedDomain

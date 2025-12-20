@@ -1,14 +1,15 @@
-import { isClassModel, isDocument, isRelation, Stack, Domain } from "@docstack/shared";
-import type {AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType} from "@docstack/shared";
+import { isClassModel, isDocument, isRelation, Domain } from "@docstack/shared";
+import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
+import Stack from "../core/stack"
 import PouchDB from "pouchdb-browser";
 import { Trigger } from "../core/trigger/index.js";
 import createLogger from "../utils/logger/index.js";
-import * as jsondiff from 'jsondiffpatch';
+import {diff} from 'jsondiffpatch';
 import { applySchemaDelta } from "../utils/index.js";
 import Class from "../core/class.js";
 
-const logger = createLogger().child({module: "pouchdb"});
+const logger = createLogger().child({ module: "pouchdb" });
 /**
  * Plugin Factory method that returns a PouchDB plugin object
  * which performs on documents (before) triggers and validation against
@@ -16,7 +17,7 @@ const logger = createLogger().child({module: "pouchdb"});
  * @param stack 
  * @returns 
  */
-export const StackPlugin: StackPluginType = (stack: Stack) => {
+export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack) => {
     const pouchBulkDocs = PouchDB.prototype.bulkDocs;
     const pouchGet = PouchDB.prototype.get;
     const pouchPut = PouchDB.prototype.put;
@@ -24,7 +25,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
         bulkDocs: async function (docs, options: PouchDB.Core.BulkDocsOptions & {
             isPostOp?: boolean
         } | null, callback) {
-            const fnLogger = logger.child({method: "bulkDocs"});
+            const fnLogger = logger.child({ method: "bulkDocs" });
             if (typeof options == 'function') {
                 callback = options
                 options = {}
@@ -44,9 +45,9 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 }
             }
 
-            if (skipPatchValidation) {
-                return originalFn();
-            }
+            // if (skipPatchValidation) {
+            //     return originalFn();
+            // }
 
             let documentsToProcess: typeof docs;
             if (Array.isArray(docs)) {
@@ -82,13 +83,13 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 result: (PouchDB.Core.Error | PouchDB.Core.Response)[] | null
             ) => {
                 if (error) {
-                    return {error, result}
+                    return { error, result }
                 } else if (result) {
                     const docs: Document[] = []
                     for (const docRes of result) {
                         if (docRes.id) {
                             // const doc = await stack.db.get(docRes.id, { rev: (docRes as any).rev }) as Document;
-                            const doc = documentsToProcess.find(d => d._id === docRes.id) as Document | undefined;
+                            const doc = documentsToProcess.find(d => d._id === docRes.id) as unknown as Document | undefined;
                             if (doc) {
                                 const updatedRev = (docRes as any).rev;
                                 if (updatedRev) {
@@ -96,7 +97,6 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                                 }
                                 const afterTriggers = triggerQueue[docRes.id]
                                 if (afterTriggers && afterTriggers.length) {
-                                    debugger;
                                     for (const afterTrigger of afterTriggers) {
                                         const updatedDoc = await afterTrigger.execute(doc);
                                         Object.assign(doc, updatedDoc);
@@ -114,47 +114,48 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             (this.bulkDocs as any).apply(this, [docs, {
                                 isPostOp: true
                             }, (rErr: typeof error, rRes: typeof result) => resolve({
-                                error: rErr, 
+                                error: rErr,
                                 result: rRes
                             })])
                         })
-                        const {error: rErr, result: rRes} = await recurse;
+                        const { error: rErr, result: rRes } = await recurse;
                         await flushRelationQueue();
-                        return {error: rErr, result: rRes}
+                        return { error: rErr, result: rRes }
                     }
                 }
                 await flushRelationQueue();
-                return {error, result}
+                return { error, result }
             }
 
-            const postExec: typeof callback = async (error, result) => {
+            const postExec = async (error, result) => {
                 if (!options?.isPostOp) {
-                    const {error: err, result: res} = await postOperations(error, result);
+                    const { error: err, result: res } = await postOperations(error, result);
                     if (callback) callback(err, res);
                 } else if (callback) {
                     callback(error, result);
                 }
             }
 
+            // TODO: use promise.all for concurrency
             for (const doc of documentsToProcess) {
                 if (isClassModel(doc)) {
                     // Validate against parent class
                     if (doc["~class"] !== "~self") {
                         const parentClass = await stack.getClass(doc["~class"]);
                         if (parentClass) {
-                            fnLogger.info("Validating class model against parent class", {doc, parentClass: parentClass.name});
+                            fnLogger.info("Validating class model against parent class", { doc, parentClass: parentClass.name });
                             const validationResult = await parentClass.validate(doc);
                             if (!validationResult) {
-                                fnLogger.error("Class model is not valid for its parent class", {doc, parentClass: parentClass.name});
+                                fnLogger.error("Class model is not valid for its parent class", { doc, parentClass: parentClass.name });
                                 throw new Error(`Discarded class model because model not valid for its parent class '${parentClass.name}' schema`);
                             }
                         } else {
-                            fnLogger.error("Parent class not found", {doc});
+                            fnLogger.error("Parent class not found", { doc });
                             throw new Error(`Parent class '${doc["~class"]}' not found for class model '${doc._id}'`);
                         }
                     } else {
                         // TODO: Consider validating against self after registering the class?
-                        fnLogger.info("Class model is of type '~self', skipping parent class validation", {doc});
+                        console.log("Class model is of type '~self', skipping parent class validation", { doc });
                     }
 
                     fnLogger.info("Document is class model, following update propagation procedure.");
@@ -163,7 +164,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     const className = typeof doc.name === "string" ? doc.name : classDocId;
                     try {
                         // Get the previous version of the class model
-                        const docWithRevs = await stack.db.get(classDocId, {revs: true});
+                        const docWithRevs = await stack.db.get(classDocId, { revs: true });
                         const revisionIDList = docWithRevs._revisions!.ids;
                         if (revisionIDList.length == 1) {
                             fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
@@ -185,8 +186,8 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                     //     throw new Error(`Unexpected, can't retrieve class '${className}' (doc '${classDocId}')`);
                     // }
                     // const previousClassDoc = classObj.model;
-                    fnLogger.info("Retrieved documents", {doc, previousClassDoc});
-                    const schemaDelta = jsondiff.diff(previousClassDoc.schema, doc.schema);
+                    fnLogger.info("Retrieved documents", { doc, previousClassDoc });
+                    const schemaDelta = diff(previousClassDoc.schema, doc.schema);
 
                     if (!schemaDelta) {
                         fnLogger.info(`Class '${className}' has no changes on schema.`);
@@ -254,8 +255,9 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         }
 
                         const relationalAttrs = Object.values(classObj.getAttributes()).filter(a => {
-                            if (classObj.getName().startsWith("Account-"))
-                                console.log("Checking attribute for relation", {class: classObj.getName(),attr: a.name, type: a.model.type})
+                            if (classObj.getName().startsWith("Account-")) {
+                                // console.log("Checking attribute for relation", { class: classObj.getName(), attr: a.name, type: a.model.type })
+                            }
                             return a.model.type === "reference"
                         });
                         for (const attr of relationalAttrs) {
@@ -268,7 +270,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // Validate relation constraint
                             const validation = await domain.validateRelation(doc, relationValue);
                             if (!validation.exists) {
-                                console.log("Queuing relation creation for doc", {docId: doc._id, domain: domain.name, params: validation.params})
+                                // console.log("Queuing relation creation for doc", {docId: doc._id, domain: domain.name, params: validation.params})
                                 relationQueue.push({
                                     domain,
                                     params: validation.params,
@@ -276,8 +278,8 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             }
                         }
                         // TODO: skip execution of before triggers if option.isPostOp
-                        const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
-                        const afterTriggers = classObj.triggers.filter( t => t.order === "after");
+                        const beforeTriggers = classObj.triggers.filter(t => t.order === "before");
+                        const afterTriggers = classObj.triggers.filter(t => t.order === "after");
 
                         for (const trigger of beforeTriggers) {
                             const updatedDoc = await trigger.execute(doc);
@@ -293,16 +295,29 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         const validationResult = await classObj.validate(doc);
                         if (!validationResult) {
                             fnLogger.error("Validation failed for document", { id: doc._id, className, doc });
-                            throw new Error("Discarded object because object not valid for its Class schema");
+                            throw new Error(`Discarded document ${JSON.stringify(doc)} because object not valid for its Class schema: ${JSON.stringify(classObj.buildSchema())}`);
                         }
                     } catch (error) {
                         return Promise.reject(error);
                     }
                 }
-            }            
+            }
 
             if (!stack.cryptoEngine.isEnabled()) {
-                return pouchBulkDocs.call(this, docs as any, options, postExec);
+                console.log("Crypto engine not enabled, skipping encryption.");
+                return await new Promise<(PouchDB.Core.Error | PouchDB.Core.Response)[]>((resolve, reject) => {
+                    pouchBulkDocs.call(this, payload as any, options, async (err, res) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            await postExec(null, res).then(() => {
+                                resolve(res);
+                            }).catch(reject);
+                        }
+                    })
+                });
+            } else {
+                console.log("Crypto engine enabled, processing encryption.");
             }
 
             const originalDocs = Array.isArray(docs) ? documentsToProcess : (docs as any).docs;
@@ -328,7 +343,17 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 ? encryptedDocs
                 : { ...(docs as any), docs: encryptedDocs };
 
-            return pouchBulkDocs.call(this, payload as any, options, postExec);
+            return await new Promise<(PouchDB.Core.Error | PouchDB.Core.Response)[]>((resolve, reject) => {
+                pouchBulkDocs.call(this, payload as any, options, async (err, res) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        await postExec(null, res).then(() => {
+                            resolve(res);
+                        }).catch(reject);
+                    }
+                })
+            });
         },
 
         get: async function (docId, options?: PouchDB.Core.GetOptions | null, callback?) {
@@ -337,31 +362,31 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                 options = undefined;
             }
 
-                const exec = async () => {
-                    const result = await pouchGet.call(this, docId, options ?? {});
-                    if (result && isDocument(result) && stack.cryptoEngine.isEnabled()) {
-                        const classObj = await stack.getClass(result["~class"], true).catch(() => null);
-                        if (classObj && classObj.getEncryptedAttributes().length) {
-                            await stack.cryptoEngine.decryptDocument(result as Document, classObj);
-                        }
+            const exec = async () => {
+                const result = await pouchGet.call(this, docId, options ?? {});
+                if (result && isDocument(result) && stack.cryptoEngine.isEnabled()) {
+                    const classObj = await stack.getClass(result["~class"], true).catch(() => null);
+                    if (classObj && classObj.getEncryptedAttributes().length) {
+                        await stack.cryptoEngine.decryptDocument(result as Document, classObj);
                     }
-                    return result;
-                };
+                }
+                return result;
+            };
 
             if (callback) {
-                exec().then((res) => callback(null, res)).catch((err) => callback(err));
+                exec().then((res) => callback(null, res)).catch((err) => callback(err, undefined));
                 return;
             }
             return exec();
         },
-
+        /*
         put: async function (doc, options?: PouchDB.Core.PutOptions | null, callback?) {
             if (typeof options === "function") {
                 callback = options;
                 options = undefined;
             }
-                const exec = async () => {
-                    let payload = doc as any;
+            const exec = async () => {
+                let payload = doc as any;
                 if (isDocument(doc) && stack.cryptoEngine.isEnabled()) {
                     const classObj = await stack.getClass(doc["~class"], true).catch(() => null);
                     if (classObj && classObj.getEncryptedAttributes().length) {
@@ -378,6 +403,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
             }
             return exec();
         },
+        */
 
     };
 };

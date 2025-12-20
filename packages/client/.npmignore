@@ -1,8 +1,16 @@
+src/
+test/
 server/
 ui/
 example/
+
+# Configs
 jest.config.ts
+playwright.config.ts
 webpack.config.js
+rollup.config.js
+rollup.vendor
+tsconfig.json
 
 # Example files
 example/
@@ -15,3 +23,7 @@ errors.log
 
 .env
 example.env
+
+# Playwright
+test-results/
+playwright-report/

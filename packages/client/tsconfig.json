@@ -12,7 +12,7 @@
     "declarationDir": "lib",
     "baseUrl": "./src",
     "skipLibCheck": true,
-    "strict": true,
+    "strict": false,
     "alwaysStrict": true,
     "noImplicitAny": false,
     "esModuleInterop": true,
@@ -22,14 +22,20 @@
     "emitDecoratorMetadata": true,
     "composite": true,
     "paths": {
-      "@docstack/shared": ["../../shared"]
+      "@docstack/shared": [
+        "../../shared"
+      ]
     }
   },
   "include": [
     "src/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "lib",
+    "node_modules",
+    "**/*.test.ts",
+    "e2e",
+    "src/fixtures.ts"
   ],
   "references": [
     {

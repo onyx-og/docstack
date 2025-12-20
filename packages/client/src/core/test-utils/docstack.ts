@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { DocStack } from "../index.js";
-import type ClientStack from "../stack.js";
-import type { AuthSessionProof, UserModel, UserSessionModel } from "@docstack/shared";
+import ClientStack from "../stack.js";
+import { Stack, type AuthSessionProof, type UserModel, type UserSessionModel } from "@docstack/shared";
 
 export type TestStackContext = {
     docStack: DocStack;
@@ -14,6 +14,7 @@ export const waitForDocStackReady = (docStack: DocStack, timeout = 10000): Promi
     return new Promise((resolve, reject) => {
         const onReady = (event: Event) => {
             clearTimeout(timer);
+            console.log("DocStack is ready");
             docStack.removeEventListener("ready", onReady as EventListener);
             resolve();
         };
@@ -25,6 +26,47 @@ export const waitForDocStackReady = (docStack: DocStack, timeout = 10000): Promi
 
         docStack.addEventListener("ready", onReady as EventListener);
     });
+};
+
+export const ensureGroup = async (stack: ClientStack, groupId: string, name = groupId.replace(/^Group-/, "")) => {
+    const previousSession = (stack as any).authSession as AuthSessionProof | undefined;
+    const restoreSession = () => {
+        if (previousSession) {
+            stack.setAuthSession(previousSession);
+        } else {
+            stack.clearAuthSession();
+        }
+    };
+
+    stack.setAuthSession({
+        session: {
+            _id: `sess-bootstrap-${groupId}`,
+            "~class": "~UserSession",
+            userId: "system",
+            groupId: ["Group-Admin"],
+            username: "system",
+            sessionId: `sess-bootstrap-${groupId}`,
+            sessionStart: new Date().toISOString(),
+            sessionStatus: "active",
+        },
+    });
+
+    const existingGroup = await stack.findDocument({
+        "~class": { $eq: "~Group" },
+        _id: { $eq: groupId },
+    });
+
+    if (existingGroup) {
+        restoreSession();
+        return existingGroup;
+    }
+
+    const groupClassModel = (await stack.getClassModel("~Group")) || (await stack.getClassModel("Group"));
+    const schema = groupClassModel?.schema || {};
+    const groupDoc = { _id: groupId, "~class": "~Group", name };
+    await stack.createDoc(groupId, "~Group", schema, groupDoc as any);
+    restoreSession();
+    return groupDoc;
 };
 
 export const createTestDocStack = async (
@@ -44,6 +86,28 @@ export const createTestDocStack = async (
         (stack.db as any).setMaxListeners(0);
     }
 
+    const originalSession = (stack as any).authSession as AuthSessionProof | undefined;
+    stack.setAuthSession({
+        session: {
+            _id: `sess-bootstrap-${stackName}`,
+            "~class": "~UserSession",
+            userId: "system",
+            groupId: ["Group-Admin"],
+            username: "system",
+            sessionId: `sess-bootstrap-${stackName}`,
+            sessionStart: new Date().toISOString(),
+            sessionStatus: "active",
+        },
+    });
+    
+    await ensureGroup(stack, "Group-Tester", "Tester");
+
+    if (originalSession) {
+        stack.setAuthSession(originalSession);
+    } else {
+        stack.clearAuthSession();
+    }
+
     if (options?.withSession !== false) {
         const sessionUsername = options?.sessionUsername || "tester";
         const existingUser = await stack.findDocument<UserModel>({
@@ -59,14 +123,30 @@ export const createTestDocStack = async (
     }
 
     const cleanup = async () => {
-        const listeners = [...stack.listeners];
-        for (const listener of listeners) {
-            if (typeof listener.cancel === "function") {
-                listener.cancel();
-            }
-        }
+        // Clear the stack's class/domain cache to prevent references to destroyed databases
+        (stack as any).cache = {};
         stack.close();
-        await stack.db.destroy();
+        
+        // Close the stack first (this calls removeAllListeners internally)
+        await ClientStack.clear(stackName);
+        
+        // Remove all event listeners from the database to prevent MaxListenersExceeded warnings
+        if (typeof (stack.db as any).removeAllListeners === "function") {
+            (stack.db as any).removeAllListeners();
+        }
+        
+        // Destroy the database
+        try {
+            await stack.db.destroy();
+        } catch (e) {
+            // Database might already be destroyed
+        }
+        
+        // Remove stack from docStack instance's stacks array
+        const stackIndex = docStack.getStacks().indexOf(stack);
+        if (stackIndex > -1) {
+            docStack.getStacks().splice(stackIndex, 1);
+        }
     };
 
     return { docStack, stack, stackName, cleanup };
@@ -87,12 +167,18 @@ export const seedClassicUser = async (
                 _id: `sess-bootstrap-${user.username}`,
                 "~class": "~UserSession",
                 userId: "system",
+                groupId: ["Group-Admin"],
                 username: "system",
                 sessionId: `sess-bootstrap-${user.username}`,
                 sessionStart: new Date().toISOString(),
                 sessionStatus: "active",
             },
         });
+    }
+
+    const requestedGroups = user.groupId && user.groupId.length ? user.groupId : ["Group-Tester"];
+    for (const groupId of requestedGroups) {
+        await ensureGroup(stack, groupId, groupId.replace(/^Group-/, ""));
     }
 
     const userClassModel = (await stack.getClassModel("~User")) || (await stack.getClassModel("User"));
@@ -103,6 +189,7 @@ export const seedClassicUser = async (
         "~class": "~User",
         username: user.username,
         password: user.password,
+        groupId: requestedGroups,
         email: user.email || "",
         firstName: user.firstName || "",
         lastName: user.lastName || "",
@@ -135,6 +222,7 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
                 _id: `sess-bootstrap-${username}`,
                 "~class": "~UserSession",
                 userId: "system",
+                groupId: ["Group-Admin"],
                 username: "system",
                 sessionId: `sess-bootstrap-${username}`,
                 sessionStart: new Date().toISOString(),
@@ -148,15 +236,6 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
         username: { $eq: username },
     });
 
-    if (!user && username === "system") {
-        user = await seedClassicUser(stack, {
-            _id: "system",
-            username: "system",
-            password: "system",
-            keyDerivationSalt: "system-salt",
-        });
-    }
-
     if (!user) {
         throw new Error(`Cannot create session proof: user '${username}' does not exist`);
     }
@@ -165,6 +244,7 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
         _id: `sess-${username}`,
         "~class": "~UserSession",
         userId: user._id || user.username,
+        groupId: Array.isArray(user.groupId) ? user.groupId : user.groupId ? [user.groupId] : ["Group-Default"],
         username,
         sessionId: `sess-${username}`,
         sessionStart: new Date().toISOString(),
@@ -176,11 +256,13 @@ export const createSessionProof = async (stack: ClientStack, username: string): 
     return session;
 };
 
-export const createAuthenticatedStack = async (
+export const createAuthenticatedStack = async ({
     username = "alice",
-    password = "password-123"
+    password = "password-123",
+    stack = "auth-test",
+}: {username?: string; password?: string; stack?: string}
 ): Promise<TestStackContext & { user: UserModel; proof: AuthSessionProof }> => {
-    const context = await createTestDocStack("auth-test", { withSession: false });
+    const context = await createTestDocStack(stack, { withSession: false });
     await createSessionProof(context.stack, "system");
 
     const user = await seedClassicUser(context.stack, {

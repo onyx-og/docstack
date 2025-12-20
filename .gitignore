@@ -138,3 +138,8 @@ lib/
 .rollup.cache
 
 package-lock.json
+
+# Playwright
+packages/client/test-results/
+packages/client/playwright-report/
+packages/client/test/vendor-bundle.js

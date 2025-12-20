@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "build:types": "npx tsc -build --force ./tsconfig.json",
-    "build": "rollup --config ./rollup.config.js && npm run build:types",
+    "build": "rollup --config ./rollup.config.js",
+    "build:vendor": "rollup --config ./rollup.vendor.js",
     "lint": "eslint ./src --ext .ts,.tsx",
-    "test": "jest --config jest.config.ts"
+    "test": "playwright test"
   },
   "repository": {
     "type": "git",
@@ -28,18 +29,29 @@
   "homepage": "https://github.com/onyx-og/docstack#readme",
   "description": "",
   "dependencies": {
-    "@docstack/shared": "file:../shared",
-    "semver": "^7.7.3"
+    "jsondiffpatch": "^0.6.0",
+    "pouchdb-browser": "^9.0.0",
+    "pouchdb-find": "^9.0.0",
+    "semver": "^7.7.3",
+    "setimmediate": "^1.0.5",
+    "winston": "^3.17.0",
+    "winston-transport": "^4.9.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@docstack/shared": "file:../shared",
+    "@playwright/test": "^1.57.0",
+    "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-replace": "^5.0.7",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/semver": "^7.7.1",
-    "cpy-cli": "^6.0.0",
-    "eslint": "^9.38.0",
-    "eslint-webpack-plugin": "^5.0.2",
-    "replace-in-file": "^8.3.0",
+    "http-server": "^14.1.1",
     "rollup": "^4.53.1",
-    "rollup-plugin-require-context": "^1.0.1"
+    "rollup-plugin-polyfill-node": "^0.13.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "*"
   }
 }

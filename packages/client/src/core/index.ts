@@ -3,21 +3,21 @@
 // import * as dotenv from "dotenv";
 // import cors from "cors";
 // dotenv.config({ path: './.env' })
-import createlogger from "../utils/logger/index.js"
+import createlogger from "../utils/logger/index"
 // import test from '../../../server/src//utils/dbManager/test';
 // import { generateJwtKeys, generatePswKeys } from '../../../server/src/utils/crypto';
-import ClientStack from './stack.js';
+import ClientStack from './stack';
 // import { login, JWTAuthPayload, setupAdminUser } from '../../../server/src//utils/auth';
 // import memoryAdapter from "pouchdb-adapter-memory"
 // import cookieParser from 'cookie-parser';
 // import jwt from 'jsonwebtoken';
-import Class from "./class.js";
-import Domain from './domain.js';
-import {Trigger} from "./trigger/index.js";
-import { JobEngine } from "./job-engine/index.js";
+import Class from "./class";
+import Domain from './domain';
+import { Trigger } from "./trigger/index";
+import { JobEngine } from "./job-engine/index";
 // import AbstractClass from '../../shared/src//utils/stack/class';
-import Attribute from './attribute.js';
-import {AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions} from "@docstack/shared";
+import Attribute from './attribute';
+import { AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions } from "@docstack/shared";
 import { createLogger, Logger } from "winston";
 // import { EventTarget } from 'node:events';
 
@@ -35,24 +35,55 @@ import { createLogger, Logger } from "winston";
 // but also api tokens
 // Remote connection that require auth can be opened but
 // cannot send or receive messages until authentication
+/**
+ * The main entry point for the DocStack client library.
+ * 
+ * DocStack manages multiple {@link ClientStack} instances and provides
+ * a unified interface for database operations, authentication, and
+ * class/attribute creation.
+ * 
+ * The client emits a `ready` event when all stacks are initialized.
+ * 
+ * @example
+ * ```typescript
+ * // Initialize DocStack with a single database
+ * const docstack = new DocStack({ name: 'my-app' });
+ * 
+ * // Wait for ready
+ * docstack.addEventListener('ready', async () => {
+ *     const stack = docstack.getStack('my-app');
+ *     const taskClass = await stack.getClass('Task');
+ * });
+ * 
+ * // Initialize with credentials for automatic authentication
+ * const docstack = new DocStack({
+ *     name: 'my-app',
+ *     credentials: { username: 'admin', password: 'secret' }
+ * });
+ * ```
+ * 
+ * @extends EventTarget
+ */
 class DocStack extends EventTarget {
-    //private app: Express;
-    // private dbName: string;
+    /** Array of stack configurations used for initialization. */
     private config: StackConfig[] = [];
-    private readyState: boolean; 
+    /** Whether all stacks have been initialized and ready for use. */
+    private readyState: boolean;
+    /** The primary/default stack (first in the list). */
     private store!: ClientStack;
-    private stacks: ClientStack[] = [];
-    private logger: Logger = createlogger().child({module: "client"});
+    /** Array of all initialized ClientStack instances. */
+    stacks: ClientStack[] = [];
+    private logger: Logger = createlogger().child({ module: "client" });
 
     private async addStack(config: StackConfig) {
-        let stack: ClientStack | undefined; 
+        let stack: ClientStack | undefined;
         if (typeof config == "object" && config.name) {
             stack = await ClientStack.create(`db-${config.name}`, {
                 // defaults to leveldb
                 // adapter: 'memory',
                 plugins: [
-                // https://www.npmjs.com/package/pouchdb-adapter-memory
-                // memoryAdapter
+                    // https://www.npmjs.com/package/pouchdb-adapter-memory
+                    // memoryAdapter
                 ],
                 patches: config.patches,
                 credentials: (config as any).credentials,
@@ -63,29 +94,30 @@ class DocStack extends EventTarget {
                 // defaults to leveldb
                 // adapter: 'memory',
                 plugins: [
-                // https://www.npmjs.com/package/pouchdb-adapter-memory
-                // memoryAdapter
+                    // https://www.npmjs.com/package/pouchdb-adapter-memory
+                    // memoryAdapter
                 ]
             });
         }
         if (stack) {
             this.stacks.push(stack);
-            let window_ = window as Window & typeof globalThis & {
-                stacks: ClientStack[]
-            }
-            if (window_.stacks) {
-                window_.stacks.push(stack)
-            } 
+            // let window_ = window as Window & typeof globalThis & {
+            //     stacks: ClientStack[]
+            // }
+            // if (window_.stacks) {
+            //     window_.stacks.push(stack)
+            // } 
             return stack;
         }
         // await setupAdminUser();
     }
 
     private initStacks = async (configs: StackConfig[]) => {
+        // TODO: Consider changing to Promise.all for concurrency
         for (const config of configs) {
             const stack = await this.addStack(config);
         }
-        
+
         this.readyState = true;
         this.dispatchEvent(new CustomEvent("ready", {
             detail: {
@@ -104,14 +136,48 @@ class DocStack extends EventTarget {
         }
     }
 
+    /**
+     * Returns all initialized stacks.
+     * @returns Array of ClientStack instances
+     */
     public getStacks() {
         return this.stacks;
     }
 
+    /**
+     * Gets a stack by its name or connection string.
+     * 
+     * @param name - The stack name or connection identifier
+     * @returns The matching ClientStack, or `undefined` if not found
+     * 
+     * @example
+     * ```typescript
+     * const stack = docstack.getStack('my-app');
+     * if (stack) {
+     *     const users = await stack.query('SELECT * FROM User');
+     * }
+     * ```
+     */
     public getStack = (name: string) => {
-        return this.stacks.find(s => s.name == name || s.connection == name );
+        return this.stacks.find(s => s.name == name || s.connection == name);
     }
 
+    /**
+     * Authenticates a user on a specific stack.
+     * 
+     * @param name - The stack name to authenticate against
+     * @param credentials - The user's login credentials
+     * @returns The authentication session proof
+     * @throws Error if the stack is not found
+     * 
+     * @example
+     * ```typescript
+     * const proof = await docstack.authenticateStack('my-app', {
+     *     username: 'user@example.com',
+     *     password: 'password123'
+     * });
+     * ```
+     */
     public async authenticateStack(name: string, credentials: ClientCredentials) {
         const stack = this.getStack(name);
         if (!stack) {
@@ -120,9 +186,17 @@ class DocStack extends EventTarget {
         return stack.authenticate(credentials);
     }
 
+    /**
+     * Returns whether all stacks have been initialized.
+     * @returns `true` if ready, `false` otherwise
+     */
     public getReadyState() {
         return this.readyState;
     }
+    /**
+     * Resets all stacks and re-initializes them.
+     * Useful for testing or clearing all data.
+     */
     async reset() {
         try {
             await this.resetAll();
@@ -133,7 +207,7 @@ class DocStack extends EventTarget {
     }
 
     public clearConnection = async (conn: string) => {
-        const fnLogger = this.logger.child({method: 'clearConnection'});
+        const fnLogger = this.logger.child({ method: 'clearConnection' });
         try {
             // const conn = req.params.conn;
             if (!conn) {
@@ -148,6 +222,13 @@ class DocStack extends EventTarget {
         }
     }
 
+    /**
+     * Exports all documents from a stack.
+     * 
+     * @param stackName - The name of the stack to export
+     * @returns All documents from the stack
+     * @throws Error if the stack is not found
+     */
     public export = async (stackName: string) => {
         const stack = this.getStack(stackName);
         if (stack) {
@@ -158,64 +239,122 @@ class DocStack extends EventTarget {
         }
     }
 
-    public createClass = async (name: string, config: {
+    /**
+     * Creates a new Class in the specified stack.
+     * 
+     * @param stackName - The name of the stack to create the class in
+     * @param name - The class name
+     * @param config - Configuration with type and description
+     * @throws Error if the stack is not found
+     * 
+     * @example
+     * ```typescript
+     * await docstack.createClass('my-app', 'Product', {
+     *     type: 'class',
+     *     description: 'Product catalog items'
+     * });
+     * ```
+     */
+    public createClass = async (stackName: string, name: string, config: {
         type: string,
         description: string
     }) => {
-        const fnLogger = this.logger.child({method: 'createClass'});
+        const fnLogger = this.logger.child({ method: 'createClass' });
+        const stack = this.getStack(stackName);
+        if (!stack) {
+            throw new Error(`Stack '${stackName}' not found`);
+        }
         const { type, description } = config;
         fnLogger.info("Args", {
-            name, config
+            stackName, name, config
         })
 
         try {
             const newClass = await Class.create(
-                this.store, name, "class", description as string,
+                stack, name, "class", description as string,
                 {}
             );
             fnLogger.info(`class '${name}' created successfully.`,
-                {classModel: newClass.getModel()}
+                { classModel: newClass.getModel() }
             )
         } catch (e: any) {
-            throw new Error(`Error during class '${name} creation. ${e}`);
+            throw new Error(`Error during class '${name}' creation. ${e}`);
         }
-        
+
         fnLogger.info('Class created successfully');
     }
 
-    public createAttribute = async (className: string, params: {
+    /**
+     * Creates a new Attribute on a Class in the specified stack.
+     * 
+     * @param stackName - The name of the stack containing the class
+     * @param className - The class to add the attribute to
+     * @param params - Attribute configuration
+     * @throws Error if the stack or class is not found
+     * 
+     * @example
+     * ```typescript
+     * await docstack.createAttribute('my-app', 'Product', {
+     *     name: 'price',
+     *     type: 'number',
+     *     description: 'Product price in cents'
+     * });
+     * ```
+     */
+    public createAttribute = async (stackName: string, className: string, params: {
         name: string, type: AttributeType["type"], description?: string, config?: {}
     }) => {
-        const fnLogger = this.logger.child({method: 'createAttribute'}); 
+        const fnLogger = this.logger.child({ method: 'createAttribute' });
+        const stack = this.getStack(stackName);
+        if (!stack) {
+            throw new Error(`Stack '${stackName}' not found`);
+        }
         const { name, type, description, config } = params;
-        fnLogger.info(`Creating attribute for class '${className}'`, {
+        fnLogger.info(`Creating attribute for class '${className}' in stack '${stackName}'`, {
             name, type, config
         });
 
         try {
             // Loads the class object
-            let classObj = await this.store.getClass(className);
+            let classObj = await stack.getClass(className);
             if (classObj) {
                 let newAttribute = await Attribute.create(classObj, name, type, description, config);
-                fnLogger.info(`Attribute '${name}' added to class '${className}'`, 
-                    {attributeModel: newAttribute.getModel()}
+                fnLogger.info(`Attribute '${name}' added to class '${className}'`,
+                    { attributeModel: newAttribute.getModel() }
                 );
             } else {
                 throw new Error(`Failed to retrieve Class '${className}'`);
             }
-            
+
         } catch (e: any) {
             fnLogger.error(`Error during attribute '${name}' creation: ${e}`);
             throw new Error(`Error during attribute '${name}' creation: ${e}`);
         }
-    } 
+    }
 
+    /**
+     * Creates a new DocStack client instance.
+     * Initializes all configured stacks asynchronously.
+     * Listen for the `ready` event to know when initialization is complete.
+     * 
+     * @param config - One or more stack configurations
+     * 
+     * @example
+     * ```typescript
+     * const docstack = new DocStack(
+     *     { name: 'primary-db' },
+     *     { name: 'backup-db' }
+     * );
+     * 
+     * docstack.addEventListener('ready', () => {
+     *     console.log('All stacks ready!');
+     * });
+     * ```
+     */
     constructor(...config: StackConfig[]) {
         super();
-        //this.dbName = (config && config.dbName) ? config.dbName : "docstack";
-        // this.app = express();
         this.readyState = false;
-        const fnLogger = this.logger.child({method: "constructor"});
+        const fnLogger = this.logger.child({ method: "constructor" });
 
         /*
         this.app.use(logRequest)
@@ -413,5 +552,10 @@ class DocStack extends EventTarget {
     // }
 }
 
+/**
+ * Core exports from the DocStack client library.
+ * 
+ * @module @docstack/client
+ */
 export { ClientStack, Trigger, Class, Attribute, Domain, JobEngine };
 export { DocStack };

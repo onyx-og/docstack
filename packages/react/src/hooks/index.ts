@@ -26,7 +26,7 @@ export const useQuerySQL = (stack: string, sql: string, ...params: any[]) => {
                 if (stackInstance) {
                     // Run the initial query
                     console.log("Preparing to run query", {sql, params})
-                    debugger
+                    // debugger
                     const queryResult = await stackInstance.query(sql, ...params);
                     setResult(queryResult);
 

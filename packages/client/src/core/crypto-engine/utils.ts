@@ -1,4 +1,4 @@
-import { webcrypto } from "crypto";
+
 
 export type EncryptedPayload = {
     __enc: true;
@@ -10,7 +10,7 @@ export type EncryptedPayload = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-const getCrypto = () => globalThis.crypto || webcrypto;
+const getCrypto = () => globalThis.crypto;
 
 export const hexToBytes = (hex: string): Uint8Array => {
     if (hex.length % 2 !== 0) {
@@ -26,10 +26,7 @@ export const hexToBytes = (hex: string): Uint8Array => {
 const toUint8Array = (data: ArrayBuffer | Uint8Array) => data instanceof ArrayBuffer ? new Uint8Array(data) : data;
 
 export const toBase64 = (data: ArrayBuffer | Uint8Array): string => {
-    const bytes = toUint8Array(data);
-    if (typeof Buffer !== "undefined") {
-        return Buffer.from(bytes).toString("base64");
-    }
+    const bytes = toUint8Array(data);    
     let binary = "";
     bytes.forEach((byte) => {
         binary += String.fromCharCode(byte);
@@ -37,10 +34,7 @@ export const toBase64 = (data: ArrayBuffer | Uint8Array): string => {
     return btoa(binary);
 };
 
-export const fromBase64 = (value: string): Uint8Array => {
-    if (typeof Buffer !== "undefined") {
-        return new Uint8Array(Buffer.from(value, "base64"));
-    }
+export const fromBase64 = (value: string): Uint8Array => {    
     const binary = atob(value);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -53,8 +47,8 @@ export const importAesKeyFromHex = async (hexKey: string, usages: KeyUsage[] = [
     const cryptoObj = getCrypto();
     return cryptoObj.subtle.importKey(
         "raw",
-        hexToBytes(hexKey),
-        { name: "AES-GCM", length: 256 },
+        hexToBytes(hexKey) as BufferSource,
+        { name: "AES-GCM" } as any,
         false,
         usages,
     );
@@ -68,8 +62,10 @@ export const isEncryptedPayload = (value: unknown): value is EncryptedPayload =>
 
 export const encryptWithAesGcm = async (plaintext: string, key: CryptoKey): Promise<EncryptedPayload> => {
     const cryptoObj = getCrypto();
-    const iv = cryptoObj.getRandomValues(new Uint8Array(12));
-    const ciphertext = await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(plaintext));
+    const iv = new Uint8Array(12);
+    (cryptoObj as any).getRandomValues(iv);
+    const ivBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength);
+    const ciphertext = await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv: ivBuffer } as any, key, encoder.encode(plaintext));
     return {
         __enc: true,
         iv: toBase64(iv),
@@ -80,10 +76,14 @@ export const encryptWithAesGcm = async (plaintext: string, key: CryptoKey): Prom
 
 export const decryptWithAesGcm = async (payload: EncryptedPayload, key: CryptoKey): Promise<string> => {
     const cryptoObj = getCrypto();
+    const ivBytes = fromBase64(payload.iv);
+    const dataBytes = fromBase64(payload.data);
+    const ivBuffer = ivBytes.buffer.slice(ivBytes.byteOffset, ivBytes.byteOffset + ivBytes.byteLength);
+    const dataBuffer = dataBytes.buffer.slice(dataBytes.byteOffset, dataBytes.byteOffset + dataBytes.byteLength);
     const decrypted = await cryptoObj.subtle.decrypt(
-        { name: "AES-GCM", iv: fromBase64(payload.iv) },
+        { name: "AES-GCM", iv: ivBuffer } as any,
         key,
-        fromBase64(payload.data),
+        dataBuffer as BufferSource,
     );
     return decoder.decode(decrypted);
 };
@@ -94,11 +94,24 @@ export const wrapDocumentKey = async (documentKey: string, derivedKeyHex: string
     return JSON.stringify(payload);
 };
 
-export const unwrapDocumentKey = async (wrappedDocumentKey: string, derivedKeyHex: string): Promise<string> => {
+export const unwrapDocumentKey = async (wrappedDocumentKey: string, cryptoKey: CryptoKey, derivedKeyHex: string): Promise<string> => {
     const parsed: unknown = JSON.parse(wrappedDocumentKey);
     if (!isEncryptedPayload(parsed)) {
-        throw new Error("Wrapped document key payload is malformed");
+        throw new Error("Wrapped document key payload is malformed: "+wrappedDocumentKey);
     }
     const key = await importAesKeyFromHex(derivedKeyHex, ["decrypt"]);
-    return decryptWithAesGcm(parsed, key);
+    const firstLayer = await decryptWithAesGcm(parsed, key);
+    return firstLayer;
+    // return await decryptWithAesGcm((JSON.parse(firstLayer) as EncryptedPayload), key);
 };
+
+/**
+ * Generate random string of given length in bytes, returned as hex string
+ *
+**/
+export const generateRandomString = (length: number = 16): string => {
+    const cryptoObj = getCrypto();
+    const array = new Uint8Array(length);
+    (cryptoObj as any).getRandomValues(array);
+    return Array.from(array).map(b => ('00' + b.toString(16)).slice(-2)).join('');
+}

@@ -247,7 +247,8 @@ export interface JobRunModel extends Document {
 
 export interface PolicyModel extends Document {
     "~class": "~Policy";
-    userId: string;
+    userId?: string;
+    groupId?: string;
     rule: string;
     description?: string;
     targetClass: string[];
@@ -264,6 +265,7 @@ export interface UserModel extends Document {
     "~class": "~User";
     username: string;
     password: string;
+    groupId: string[];
     email?: string;
     firstName?: string;
     lastName?: string;
@@ -276,6 +278,7 @@ export interface UserModel extends Document {
 export interface UserSessionModel extends Document {
     "~class": "~UserSession";
     userId: string;
+    groupId: string[];
     username: string;
     sessionId: string;
     sessionStart: string;
@@ -317,18 +320,18 @@ export const isClassModel = (object: {[key: string]: any}): object is ClassModel
     return false;
 }
 
-export type StackPluginType = (stackInstance: Stack) => {
+export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack, conn: string) => {
     bulkDocs<Model>(
         docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
         options: PouchDB.Core.BulkDocsOptions | null,
         callback: PouchDB.Core.Callback<Array<PouchDB.Core.Response | PouchDB.Core.Error>>,
     ): void;
-    put<Model>(
-        doc: PouchDB.Core.PutDocument<{} & Model>,
-        options?: PouchDB.Core.PutOptions | null,
-        callback?: PouchDB.Core.Callback<PouchDB.Core.Response>,
-    ): void;
-    get<Model>(
+    // put<Model>(
+    //     doc: PouchDB.Core.PutDocument<{} & Model>,
+    //     options?: PouchDB.Core.PutOptions | null,
+    //     callback?: PouchDB.Core.Callback<PouchDB.Core.Response>,
+    // ): void;
+    get?<Model>(
         docId: PouchDB.Core.DocumentId,
         options?: PouchDB.Core.GetOptions | null,
         callback?: PouchDB.Core.Callback<PouchDB.Core.Document<{} & Model>>,

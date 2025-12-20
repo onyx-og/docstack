@@ -1,9 +1,12 @@
 import { Patch } from "@docstack/shared";
 import semver from "semver";
-import crypto from "crypto";
 
 const syspatches: Patch[] = [];
-const hashContent = (content: string) => crypto.createHash("sha256").update(content).digest("hex");
+const hashContent = async (content: string) => {
+    const data = new TextEncoder().encode(content);
+    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
 
 // TODO: implement _rev auto handler:
 // If patches include updates to existing documents, 
@@ -91,31 +94,31 @@ const sys_001: Patch = {
     ]
 }
 
-const sys_002: Patch = {
-    "_id": "~sys-0.0.2",
-    "~class": "patch",
-    "version": "0.0.2",
-    "target": "system",
-    "changelog": "### Initial patch with system classes and domains",
-    "docs": [
-        {
-            "_id": "log",
-            "active": true,
-            "name": "log",
-            "description": "Contains the system logs",
-            "~class": "class",
-            "schema": {
-                "log": {
-                    "name": "log",
-                    "type": "object",
-                    "config": {
-                        "isArray": false
-                    }
-                }
-            }
-        }
-    ]
-}
+// const sys_002: Patch = {
+//     "_id": "~sys-0.0.2",
+//     "~class": "patch",
+//     "version": "0.0.2",
+//     "target": "system",
+//     "changelog": "### Initial patch with system classes and domains",
+//     "docs": [
+//         {
+//             "_id": "log",
+//             "active": true,
+//             "name": "log",
+//             "description": "Contains the system logs",
+//             "~class": "class",
+//             "schema": {
+//                 "log": {
+//                     "name": "log",
+//                     "type": "object",
+//                     "config": {
+//                         "isArray": false
+//                     }
+//                 }
+//             }
+//         }
+//     ]
+// }
 
 const sys_003: Patch = {
     "_id": "~sys-0.0.3",
@@ -440,23 +443,45 @@ const sys_004: Patch = {
                 "jobId": { "name": "jobId", "type": "foreign_key", "config": { "mandatory": true, "targetClass": "~Job" } }
             }
         },
+    ]
+};
+
+const sys_005: Patch = {
+    "_id": "~sys-0.0.5",
+    "~class": "patch",
+    "version": "0.0.5",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.5\\n#### New Documents: Job-Auth-Classic, AuthMod-Classic, Policy-System-Classes",
+    "docs": [
         {
             "_id": "Job-Auth-Classic",
             "~class": "~Job",
+            "active": true,
             "name": "Classic authentication",
             "description": "Derive key material from password and salt",
             "type": "user",
             "workerPlatform": "client",
             "content": classicAuthJobContent,
-            "hash": hashContent(classicAuthJobContent),
+            "hash": "e63887145113429477843420c388d35116e255403148163f4c4a436f0b8338b1", // Pre-calculated hash
             "isEnabled": true,
             "isSingleton": true,
             "defaultParams": {},
             "metadata": {}
         },
+    ]
+};
+
+const sys_006: Patch = {
+    "_id": "~sys-00.6",
+    "~class": "patch",
+    "version": "0.0.6",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.6\\n#### New Documents: AuthMod-Classic, Policy-System-Classes",
+    "docs": [
         {
             "_id": "AuthMod-Classic",
             "~class": "~AuthModule",
+            "active": true,
             "name": "Classic Email/Password",
             "config": { "mode": "password" },
             "jobId": "Job-Auth-Classic"
@@ -464,6 +489,7 @@ const sys_004: Patch = {
         {
             "_id": "Policy-System-Classes",
             "~class": "~Policy",
+            "active": true,
             "userId": "system",
             "rule": "return true;",
             "description": "Default system policy",
@@ -472,14 +498,12 @@ const sys_004: Patch = {
     ]
 };
 
-syspatches.push(sys_001, sys_002, sys_003, sys_004);
-
-const sys_005: Patch = {
-    "_id": "~sys-0.0.5",
+const sys_007: Patch = {
+    "_id": "~sys-0.0.7",
     "~class": "patch",
-    "version": "0.0.5",
+    "version": "0.0.7",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.5\\n#### Updates: enforce enum/foreign key definitions for job, policy, and user auth fields",
+    "changelog": "### Schema Patch: v0.0.7\\n#### Updates: enforce enum/foreign key definitions for job, policy, and user auth fields",
     "docs": [
         {
             "_id": "~User",
@@ -638,7 +662,7 @@ const sys_005: Patch = {
             "description": "Access policies for classes and documents",
             "~class": "class",
             "schema": {
-                "userId": { "name": "userId", "type": "foreign_key", "config": { "mandatory": true, "targetClass": "~User" } },
+                "userId": { "name": "userId", "type": "foreign_key", "config": { "mandatory": false, "targetClass": "~User" } },
                 "rule": { "name": "rule", "type": "string", "config": { "mandatory": true, "maxLength": 2000 } },
                 "description": { "name": "description", "type": "string", "config": { "mandatory": false } },
                 "targetClass": { "name": "targetClass", "type": "foreign_key", "config": { "mandatory": true, "isArray": true, "targetClass": "class" } }
@@ -647,6 +671,7 @@ const sys_005: Patch = {
         {
             "_id": "system",
             "~class": "~User",
+            "active": true,
             "username": "system",
             "password": "system",
             "email": "",
@@ -659,12 +684,12 @@ const sys_005: Patch = {
     ]
 };
 
-const sys_006: Patch = {
-    "_id": "~sys-0.0.6",
+const sys_008: Patch = {
+    "_id": "~sys-0.0.8",
     "~class": "patch",
-    "version": "0.0.6",
+    "version": "0.0.8",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.6\\n#### Updates: support wrapped document keys and encrypted user secrets",
+    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: support wrapped document keys and encrypted user secrets",
     "docs": [
         {
             "_id": "~User",
@@ -747,7 +772,7 @@ const sys_006: Patch = {
                         "mandatory": false,
                         "maxLength": 4096,
                         "isArray": false,
-                        "encrypted": true
+                        "encrypted": false
                     }
                 }
             }
@@ -756,6 +781,7 @@ const sys_006: Patch = {
             "_id": "system",
             "_rev": "auto",
             "~class": "~User",
+            "active": true,
             "username": "system",
             "password": "system",
             "email": "",
@@ -769,19 +795,19 @@ const sys_006: Patch = {
     ]
 };
 
-syspatches.push(sys_005, sys_006);
-
-const sys_007: Patch = {
-    "_id": "~sys-0.0.7",
+const sys_009: Patch = {
+    "_id": "~sys-0.0.9",
     "~class": "patch",
-    "version": "0.0.7",
+
+    "version": "0.0.9",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.7\\n#### Updates: restrict ~User access to the owner and system user",
+    "changelog": "### Schema Patch: v0.0.9\\n#### Updates: restrict ~User access to the owner and system user",
     "docs": [
         {
             "_id": "Policy-System-Classes",
             "_rev": "auto",
             "~class": "~Policy",
+            "active": true,
             "userId": "system",
             "rule": "return true;",
             "description": "Default system policy",
@@ -790,7 +816,7 @@ const sys_007: Patch = {
         {
             "_id": "Policy-User-SelfAccess",
             "~class": "~Policy",
-            "userId": "system",
+            "active": true,
             "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
             "description": "Allow users to access only their own user document or the system user",
             "targetClass": ["~User"]
@@ -798,14 +824,12 @@ const sys_007: Patch = {
     ]
 };
 
-syspatches.push(sys_007);
-
-const sys_008: Patch = {
-    "_id": "~sys-0.0.8",
+const sys_010: Patch = {
+    "_id": "~sys-0.0.10",
     "~class": "patch",
-    "version": "0.0.8",
+    "version": "0.0.10",
     "target": "system",
-    "changelog": "### Schema Patch: v0.0.8\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
+    "changelog": "### Schema Patch: v0.0.10\\n#### Updates: enforce ~UserSession references an existing ~User via userId",
     "docs": [
         {
             "_id": "~UserSession",
@@ -876,14 +900,431 @@ const sys_008: Patch = {
     ]
 };
 
-syspatches.push(sys_008);
+syspatches.push(sys_001, /* sys_002 ,*/ sys_003, sys_004, sys_005, sys_006, sys_007, sys_008, sys_009, sys_010);
 
-export function getSystemPatches(currentVersion: string) {
+const sys_011: Patch = {
+    "_id": "~sys-0.0.11",
+    "~class": "patch",
+    "version": "0.0.11",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.11\\n#### New Class: ~Group",
+    "docs": [
+        {
+            "_id": "~Group",
+            "active": true,
+            "name": "Group",
+            "description": "Represents a user group",
+            "~class": "class",
+            "schema": {
+                "name": { "name": "name", "type": "string", "config": { "primaryKey": true, "mandatory": true, "maxLength": 100, "isArray": false } }
+            }
+        }
+    ]
+};
+
+const sys_012: Patch = {
+    "_id": "~sys-0.0.12",
+    "~class": "patch",
+    "version": "0.0.12",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.12\\n#### Updates: introduce groups, optional policy principals, and group-aware sessions",
+    "docs": [
+        {
+            "_id": "~User",
+            "_rev": "auto",
+            "active": true,
+            "name": "User",
+            "description": "A user class for secure login",
+            "~class": "class",
+            "schema": {
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false
+                    }
+                },
+                "password": {
+                    "name": "password",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false,
+                        "encrypted": true
+                    }
+                },
+                "groupId": {
+                    "name": "groupId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "isArray": true,
+                        "targetClass": "~Group"
+                    }
+                },
+                "email": {
+                    "name": "email",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "firstName": {
+                    "name": "firstName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "lastName": {
+                    "name": "lastName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "authMethod": {
+                    "name": "authMethod",
+                    "type": "foreign_key",
+                    "config": { "mandatory": true, "targetClass": "~AuthModule" }
+                },
+                "externalId": {
+                    "name": "externalId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "isArray": false
+                    }
+                },
+                "keyDerivationSalt": {
+                    "name": "keyDerivationSalt",
+                    "type": "string",
+                    "config": {
+                        "mandatory": true,
+                        "maxLength": 200,
+                        "isArray": false
+                    }
+                },
+                "wrappedDocumentKey": {
+                    "name": "wrappedDocumentKey",
+                    "type": "string",
+                    "config": {
+                        "mandatory": false,
+                        "maxLength": 4096,
+                        "isArray": false,
+                        "encrypted": false
+                    }
+                }
+            }
+        },
+        {
+            "_id": "~UserSession",
+            "_rev": "auto",
+            "name": "UserSession",
+            "active": true,
+            "description": "Tracks user sessions",
+            "~class": "class",
+            "schema": {
+                "userId": {
+                    "name": "userId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "targetClass": "~User",
+                        "isArray": false
+                    }
+                },
+                "groupId": {
+                    "name": "groupId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "targetClass": "~Group",
+                        "isArray": true
+                    }
+                },
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false,
+                        "primaryKey": true,
+                        "mandatory": true
+                    }
+                },
+                "sessionId": {
+                    "name": "sessionId",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 200,
+                        "primaryKey": true,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStart": {
+                    "name": "sessionStart",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionStatus": {
+                    "name": "sessionStatus",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": true
+                    }
+                },
+                "sessionEnd": {
+                    "name": "sessionEnd",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 100,
+                        "isArray": false,
+                        "mandatory": false
+                    }
+                }
+            }
+        },
+        {
+            "_id": "~Policy",
+            "_rev": "auto",
+            "active": true,
+            "name": "Policy",
+            "description": "Access policies for classes and documents",
+            "~class": "class",
+            "schema": {
+                "userId": { "name": "userId", "type": "foreign_key", "config": { "mandatory": false, "targetClass": "~User" } },
+                "groupId": { "name": "groupId", "type": "foreign_key", "config": { "mandatory": false, "targetClass": "~Group" } },
+                "rule": { "name": "rule", "type": "string", "config": { "mandatory": true, "maxLength": 2000 } },
+                "description": { "name": "description", "type": "string", "config": { "mandatory": false } },
+                "targetClass": { "name": "targetClass", "type": "foreign_key", "config": { "mandatory": true, "isArray": true, "targetClass": "class" } }
+            }
+        }
+    ]
+};
+
+const sys_013: Patch = {
+    "_id": "~sys-0.0.13",
+    "~class": "patch",
+    "version": "0.0.13",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.13\\n#### New Documents: Group-Admin, Group-Default\\n#### Updates: ~User with after trigger for wrappedDocumentKey",
+    "docs": [
+        {
+            "_id": "Group-Admin",
+            "~class": "~Group",
+            "active": true,
+            "name": "Admin"
+        },
+        {
+            "_id": "Group-Default",
+            "~class": "~Group",
+            "active": true,
+            "name": "Default"
+        }
+        ,
+        {
+            "_id": "~User",
+            "_rev": "auto",
+            "active": true,
+            "name": "User",
+            "description": "A user class for secure login",
+            "~class": "class",
+            "triggers": [
+                {
+                    "name": "ensure-salt",
+                    "order": "before",
+                    "run": `if (!document.keyDerivationSalt) {
+                        const salt = stack.cryptoEngine.generateRandomString(32);
+                        document.keyDerivationSalt = salt;
+                    }
+                    return document;`
+                },
+                {
+                    "name": "auto-wrap-document-key",
+                    "order": "before",
+                    "run": `if (document.password && document.keyDerivationSalt && stack.cryptoEngine.getDocumentKey()) {
+        let shouldRecalculate = true;
+        if (document._id) {
+            try {
+                const currentDoc = await stack.db.get(document._id);
+                if (currentDoc && currentDoc.password === document.password && currentDoc.keyDerivationSalt === document.keyDerivationSalt && currentDoc.wrappedDocumentKey) {
+                    shouldRecalculate = false;
+                    if (!document.wrappedDocumentKey) {
+                        document.wrappedDocumentKey = currentDoc.wrappedDocumentKey;
+                    }
+                }
+            } catch (e) { }
+        }
+        if (shouldRecalculate) {
+            const authModuleId = document.authMethod || "AuthMod-Classic";
+            const authModule = await stack.db.get(authModuleId);
+            const jobId = authModule.jobId;
+            const run = await stack.jobEngine.executeJob(jobId, {
+                password: document.password,
+                salt: document.keyDerivationSalt,
+                keyDerivationSalt: document.keyDerivationSalt,
+            });
+            const derivedKey = (run.finalMetadata)?.derivedKey ?? (run.initialMetadata)?.derivedKey;
+            const wrappedKey = await stack.cryptoEngine.wrapDocumentKey(stack.cryptoEngine.getDocumentKey(), derivedKey);
+            document.wrappedDocumentKey = wrappedKey;
+        }
+    }
+    return document;`
+                }
+            ],
+            "schema": {
+                "username": {
+                    "name": "username",
+                    "type": "string",
+                    "config": {
+                        "primaryKey": true,
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false
+                    }
+                },
+                "password": {
+                    "name": "password",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "mandatory": true,
+                        "isArray": false,
+                        "encrypted": true
+                    }
+                },
+                "groupId": {
+                    "name": "groupId",
+                    "type": "foreign_key",
+                    "config": {
+                        "mandatory": true,
+                        "isArray": true,
+                        "targetClass": "~Group"
+                    }
+                },
+                "email": {
+                    "name": "email",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "firstName": {
+                    "name": "firstName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "lastName": {
+                    "name": "lastName",
+                    "type": "string",
+                    "config": {
+                        "maxLength": 50,
+                        "isArray": false
+                    }
+                },
+                "authMethod": {
+                    "name": "authMethod",
+                    "type": "foreign_key",
+                    "config": { "mandatory": true, "targetClass": "~AuthModule" }
+                },
+                "externalId": {
+                    "name": "externalId",
+                    "type": "string",
+                    "config": { "maxLength": 200, "isArray": false }
+                },
+                "keyDerivationSalt": {
+                    "name": "keyDerivationSalt",
+                    "type": "string",
+                    "config": { "mandatory": true, "maxLength": 200, "isArray": false }
+                },
+                "wrappedDocumentKey": {
+                    "name": "wrappedDocumentKey",
+                    "type": "string",
+                    "config": { "mandatory": false, "maxLength": 4096, "isArray": false, "encrypted": false }
+                }
+            }
+        }
+    ]
+};
+
+const sys_014: Patch = {
+    "_id": "~sys-0.0.14",
+    "~class": "patch",
+    "version": "0.0.14",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.14\\n#### New Documents: Policy-Admin, Policy-User-SelfAccess\\n#### Updates: system user with groupId",
+    "docs": [
+        {
+            "_id": "system",
+            "_rev": "auto",
+            "~class": "~User",
+            "active": true,
+            "username": "system",
+            "password": "system",
+            "groupId": ["Group-Admin"],
+            "email": "",
+            "firstName": "System",
+            "lastName": "User",
+            "authMethod": "AuthMod-Classic",
+            "externalId": "",
+        },
+        {
+            "_id": "Policy-Admin",
+            "~class": "~Policy",
+            "active": true,
+            "groupId": "Group-Admin",
+            "rule": "return true;",
+            "description": "Default admin policy",
+            "targetClass": ["class", "~UserSession", "~Policy", "~Job", "~JobRun", "~AuthModule", "~Group"]
+        },
+        {
+            "_id": "Policy-User-SelfAccess",
+            "_rev": "auto",
+            "~class": "~Policy",
+            "active": true,
+            "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
+            "description": "Allow users to access only their own user document or the system user",
+            "targetClass": ["~User"]
+        }
+    ]
+};
+
+syspatches.push(sys_011, sys_012, sys_013, sys_014);
+
+export async function getSystemPatches(currentVersion: string) {
+    const classicAuthJobHash = await hashContent(classicAuthJobContent);
+    const jobAuthClassic = sys_005.docs.find(d => d._id === 'Job-Auth-Classic');
+    if (jobAuthClassic) {
+        (jobAuthClassic as any).hash = classicAuthJobHash;
+    }
+
     return syspatches
+        .sort((a, b) => semver.compare(a.version, b.version))
         .filter((patch) => semver.gt(patch.version, currentVersion))
-        .sort((a, b) => semver.compare(a.version, b.version));
 }
 
-export function getAllSystemPatches() {
+export async function getAllSystemPatches() {
+    const classicAuthJobHash = await hashContent(classicAuthJobContent);
+    const jobAuthClassic = sys_005.docs.find(d => d._id === 'Job-Auth-Classic');
+    if (jobAuthClassic) { (jobAuthClassic as any).hash = classicAuthJobHash; }
     return syspatches.sort((a, b) => semver.compare(a.version, b.version));
 }

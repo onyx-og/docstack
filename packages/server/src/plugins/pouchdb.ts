@@ -1,5 +1,5 @@
 import { isDocument, Stack } from "@docstack/shared";
-import type {StackPluginType} from "@docstack/shared";
+import type { StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
 import PouchDB from "pouchdb-browser";
 import { Trigger } from "../utils/stack/trigger";
@@ -42,7 +42,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                         if (classObj) {
                             // You can now access the schema and triggers from the model.
                             const { schema } = classObj.model;
-                            const beforeTriggers = classObj.triggers.filter( t => t.order === "before");
+                            const beforeTriggers = classObj.triggers.filter(t => t.order === "before");
 
                             for (const trigger of beforeTriggers) {
                                 const updatedDoc = await trigger.execute(doc);
@@ -52,7 +52,7 @@ export const StackPlugin: StackPluginType = (stack: Stack) => {
                             // Perform validation using the schema.
                             const validationResult = await stack.validateObjectByType(doc, className, schema);
                             if (!validationResult) {
-                                throw new Error("Discarded object because object not valid for its Class schema");
+                                throw new Error(`Discarded document ${doc} because object not valid for its Class schema: ${schema}`);
                             }
                         }
                     } catch (error) {
