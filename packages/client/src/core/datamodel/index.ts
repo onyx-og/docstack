@@ -662,7 +662,7 @@ const sys_007: Patch = {
             "description": "Access policies for classes and documents",
             "~class": "class",
             "schema": {
-                "userId": { "name": "userId", "type": "foreign_key", "config": { "mandatory": true, "targetClass": "~User" } },
+                "userId": { "name": "userId", "type": "foreign_key", "config": { "mandatory": false, "targetClass": "~User" } },
                 "rule": { "name": "rule", "type": "string", "config": { "mandatory": true, "maxLength": 2000 } },
                 "description": { "name": "description", "type": "string", "config": { "mandatory": false } },
                 "targetClass": { "name": "targetClass", "type": "foreign_key", "config": { "mandatory": true, "isArray": true, "targetClass": "class" } }
@@ -817,7 +817,6 @@ const sys_009: Patch = {
             "_id": "Policy-User-SelfAccess",
             "~class": "~Policy",
             "active": true,
-            "userId": "system",
             "rule": "if (!session || session.sessionStatus !== 'active') return false; if (session.username === 'system') return true; const targetUsername = document?.username || document?._id; return targetUsername === session.username;",
             "description": "Allow users to access only their own user document or the system user",
             "targetClass": ["~User"]
@@ -1147,9 +1146,18 @@ const sys_013: Patch = {
             "~class": "class",
             "triggers": [
                 {
+                    "name": "ensure-salt",
+                    "order": "before",
+                    "run": `if (!document.keyDerivationSalt) {
+                        const salt = stack.cryptoEngine.generateRandomString(32);
+                        document.keyDerivationSalt = salt;
+                    }
+                    return document;`
+                },
+                {
                     "name": "auto-wrap-document-key",
                     "order": "after",
-                    "run": `if (!document.wrappedDocumentKey && stack.cryptoEngine.getDocumentKey()) {
+                    "run": `if (document.password && document.keyDerivationSalt && stack.cryptoEngine.getDocumentKey()) {
         const authModuleId = document.authMethod || "AuthMod-Classic";
         const authModule = await stack.db.get(authModuleId);
         const jobId = authModule.jobId;
@@ -1264,7 +1272,6 @@ const sys_014: Patch = {
             "lastName": "User",
             "authMethod": "AuthMod-Classic",
             "externalId": "",
-            "keyDerivationSalt": "system-salt",
         },
         {
             "_id": "Policy-Admin",

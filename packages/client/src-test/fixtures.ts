@@ -93,7 +93,6 @@ export const test = base.extend<DocStackFixture>({
                 password: user.password,
                 groupId: ["Group-Tester"],
                 authMethod: "AuthMod-Classic",
-                keyDerivationSalt: "static-salt",
             };
             await stack.createDoc(userDoc._id, userDoc["~class"], schema, userDoc as any);
         };

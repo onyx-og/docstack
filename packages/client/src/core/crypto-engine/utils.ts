@@ -104,3 +104,14 @@ export const unwrapDocumentKey = async (wrappedDocumentKey: string, cryptoKey: C
     return firstLayer;
     // return await decryptWithAesGcm((JSON.parse(firstLayer) as EncryptedPayload), key);
 };
+
+/**
+ * Generate random string of given length in bytes, returned as hex string
+ *
+**/
+export const generateRandomString = (length: number = 16): string => {
+    const cryptoObj = getCrypto();
+    const array = new Uint8Array(length);
+    (cryptoObj as any).getRandomValues(array);
+    return Array.from(array).map(b => ('00' + b.toString(16)).slice(-2)).join('');
+}

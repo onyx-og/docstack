@@ -2,7 +2,7 @@ import { AttributeModel, Document } from "@docstack/shared";
 import createLogger from "../../utils/logger/index.js";
 import Class from "../class.js";
 import type ClientStack from "../stack.js";
-import { wrapDocumentKey } from "./utils.js";
+import { wrapDocumentKey, generateRandomString } from "./utils.js";
 import {
     EncryptedPayload,
     decryptWithAesGcm,
@@ -32,6 +32,10 @@ export class CryptoEngine {
 
     public getDocumentKey() {
         return this.enabled ? this.documentKey : undefined;
+    }
+
+    public generateRandomString(length: number = 16): string {
+        return generateRandomString(length);
     }
 
     public async encryptValueForMarker(value: unknown) {
