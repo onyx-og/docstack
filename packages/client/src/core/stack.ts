@@ -4,8 +4,6 @@ import Class from "./class.js";
 import Domain from "./domain.js";
 import PouchDBFind from 'pouchdb-find';
 
-// Verify why is not being called
-import { decryptString } from "../utils/crypto/index.js";
 import { getAllSystemPatches, getSystemPatches } from "./datamodel/index.js";
 import {
     Stack,
@@ -85,18 +83,57 @@ const DOMAIN_SCHEMA: ClassModel["schema"] = {
     "sourceClass": { name: "sourceClass", type: "foreign_key", config: { isArray: false } },
     "targetClass": { name: "targetClass", type: "foreign_key", config: { isArray: false } },
 };
+/**
+ * The core database engine for DocStack client applications.
+ * 
+ * ClientStack provides a complete offline-first datastore built on PouchDB with:
+ * - Schema validation and class-based document modeling
+ * - SQL-like querying capabilities
+ * - Field-level encryption via {@link CryptoEngine}
+ * - Access control via {@link PolicyEngine}
+ * - Background job execution via {@link JobEngine}
+ * 
+ * @example
+ * ```typescript
+ * // Create a new stack instance
+ * const stack = await ClientStack.create('my-app-db');
+ * 
+ * // Authenticate a user
+ * const session = await stack.authenticate({ username: 'admin', password: 'secret' });
+ * 
+ * // Query documents using SQL
+ * const { rows } = await stack.query('SELECT * FROM Task WHERE isComplete = false');
+ * ```
+ * 
+ * @extends Stack
+ */
 class ClientStack extends Stack {
     private static readonly CRYPTO_CONFIG_DOC_ID = "~crypto-engine-config";
-    /* Initialized asynchronously */
+    /**
+     * The underlying PouchDB database instance.
+     * Initialized asynchronously during stack creation.
+     * 
+     * @example
+     * ```typescript
+     * // Access the raw PouchDB API for advanced operations
+     * const allDocs = await stack.db.allDocs({ include_docs: true });
+     * ```
+     */
     db!: PouchDB.Database<{}>;
+    /** The unique name identifier for this stack instance, derived from the connection string. */
     name!: string;
     /* Retrieved asynchronously */
     lastDocId!: number;
-    /* Populated on async constructor */
+    /** The connection string used to create this stack. */
     connection!: string;
+    /** Configuration options provided during stack creation. */
     options?: StackOptions;
+    /** The current application version string. */
     appVersion: string = "0.0.1";
-    /* Used to retrieve faster data */
+    /**
+     * In-memory cache for Class and Domain objects.
+     * Items are cached with a 15-minute TTL to improve performance.
+     */
     cache: {
         [className: string]: CachedClass | CachedDomain
     }
@@ -105,10 +142,34 @@ class ClientStack extends Stack {
     listeners: PouchDB.Core.Changes<{}>[] = [];
 
     modelWorker: Worker | null = null;
+    /**
+     * Engine for executing background jobs and scheduled tasks.
+     * Jobs are defined as documents and run in a sandboxed environment.
+     * 
+     * @example
+     * ```typescript
+     * const run = await stack.jobEngine.executeJob('Job-CleanupOldData');
+     * console.log('Job completed:', run.status);
+     * ```
+     */
     jobEngine!: JobEngine;
+
+    /**
+     * Engine for enforcing read/write access control policies.
+     * Policies are evaluated based on user session and document content.
+     */
     policyEngine!: PolicyEngine;
+
+    /**
+     * Engine for field-level encryption and decryption.
+     * Handles key derivation (PBKDF2) and AES-GCM encryption.
+     */
     cryptoEngine!: CryptoEngine;
     schemaVersion: string | undefined;
+    /**
+     * The current authenticated user session, if any.
+     * Contains session details, derived key, and document encryption key.
+     */
     authSession?: AuthSessionProof;
     private cryptoEngineDisabled!: boolean;
 
@@ -157,31 +218,61 @@ class ClientStack extends Stack {
         this.cryptoEngine = new CryptoEngine(this);
     }
 
+    /**
+     * Returns the underlying PouchDB database instance.
+     * @returns The PouchDB database
+     */
     public getDb() {
         return this.db
     }
 
+    /**
+     * Retrieves information about the database including document count and update sequence.
+     * @returns Database information object
+     */
     public async getDbInfo() {
         return this.db.info();
     }
 
+    /**
+     * Returns the name of the underlying PouchDB database.
+     * @returns The database name string
+     */
     public getDbName() {
         return this.db.name;
     }
 
+    /**
+     * Checks if the crypto engine was disabled during stack initialization.
+     * @returns `true` if encryption is disabled, `false` otherwise
+     */
     public isCryptoEngineDisabled() {
         return this.cryptoEngineDisabled;
     }
 
+    /**
+     * Sets the current authentication session.
+     * Called automatically by {@link authenticate}, but can be set manually for custom auth flows.
+     * @param proof - The authentication session proof containing session and encryption keys
+     */
     public setAuthSession(proof: AuthSessionProof) {
         this.authSession = proof;
     }
 
+    /**
+     * Clears the current authentication session and removes the document encryption key.
+     * Call this when a user logs out.
+     */
     public clearAuthSession() {
         this.authSession = undefined;
         this.cryptoEngine.setDocumentKey(null);
     }
 
+    /**
+     * Exports all documents from the database.
+     * Useful for debugging or creating backups.
+     * @returns All documents including their content
+     */
     public dump = async () => {
         const all = await this.db.allDocs({ include_docs: true });
         return all;
@@ -213,7 +304,30 @@ class ClientStack extends Stack {
         }
     }
 
-    // asynchronous factory method
+    /**
+     * Creates and initializes a new ClientStack instance.
+     * This is the primary way to instantiate a stack - the constructor is private.
+     * 
+     * @param conn - The connection string or database name
+     * @param options - Optional configuration including plugins, patches, and credentials
+     * @returns A fully initialized ClientStack instance
+     * 
+     * @example
+     * ```typescript
+     * // Basic initialization
+     * const stack = await ClientStack.create('my-app-db');
+     * 
+     * // With authentication
+     * const stack = await ClientStack.create('my-app-db', {
+     *     credentials: { username: 'admin', password: 'secret' }
+     * });
+     * 
+     * // With custom patches
+     * const stack = await ClientStack.create('my-app-db', {
+     *     patches: [myCustomPatch]
+     * });
+     * ```
+     */
     public static async create(conn: string, options?: StackOptions): Promise<ClientStack> {
         const stack = new ClientStack();
         await stack.initialize(conn, options);
@@ -221,7 +335,6 @@ class ClientStack extends Stack {
         if (options?.patches && options.patches.length) {
             for (const patch of options.patches) {
                 await stack.applyPatch(patch);
-                // ClientStack.logger.info(`Applied patch '${patch._id}' to stack '${stack.name}'`);
             }
         }
         if (options?.credentials) {
@@ -230,6 +343,28 @@ class ClientStack extends Stack {
         return stack;
     }
 
+    /**
+     * Authenticates a user and establishes a session.
+     * 
+     * This method:
+     * 1. Looks up the user by username
+     * 2. Executes the configured authentication job (e.g., password verification)
+     * 3. Creates a new session document
+     * 4. Sets up encryption keys for the session
+     * 
+     * @param credentials - The user's login credentials containing username and password
+     * @returns The authentication session proof containing session info and encryption keys
+     * @throws Error if the user is not found or authentication fails
+     * 
+     * @example
+     * ```typescript
+     * const proof = await stack.authenticate({
+     *     username: 'john.doe',
+     *     password: 'securePassword123'
+     * });
+     * console.log('Logged in as:', proof.session.username);
+     * ```
+     */
     public async authenticate(credentials: ClientCredentials) {
         const { username, password } = credentials;
         const userQuery = await this.db.find({
@@ -281,7 +416,7 @@ class ClientStack extends Stack {
         // TODO: Initially the wrappedDocumentKey is missing for the system user,
         // perhaps the documentKey hasn't been set yet? 
         const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey);
-        
+
         const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey: documentKey ?? undefined };
         this.setAuthSession(proof);
         await this.ensureCryptoMarkerEncryption();
@@ -605,15 +740,15 @@ class ClientStack extends Stack {
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
     async initdb() {
-        logger.warn("initdb - starting initialization", {"stackName": this.name});
+        logger.warn("initdb - starting initialization", { "stackName": this.name });
         await this.ensureCryptoConfigDocument();
-        logger.warn("initdb - crypto config ensured", {"stackName": this.name});
+        logger.warn("initdb - crypto config ensured", { "stackName": this.name });
         await this.initIndex();
-        logger.warn("initdb - index initialized", {"stackName": this.name});
+        logger.warn("initdb - index initialized", { "stackName": this.name });
         await this.checkSystem();
-        logger.warn("initdb - system checked", {"stackName": this.name});
+        logger.warn("initdb - system checked", { "stackName": this.name });
         this.setListeners();
-        logger.warn("initdb - listeners set, initialization complete", {"stackName": this.name});
+        logger.warn("initdb - listeners set, initialization complete", { "stackName": this.name });
         return this;
     }
 
@@ -646,7 +781,7 @@ class ClientStack extends Stack {
         if (!this.cryptoEngineDisabled) {
             const randomBytes = new Uint8Array(12);
             globalThis.crypto.getRandomValues(randomBytes);
-            const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({                
+            const encryptedMarker = await this.cryptoEngine.encryptValueForMarker({
                 nonce: Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
             });
             if (encryptedMarker) {
@@ -705,12 +840,31 @@ class ClientStack extends Stack {
         }
     }
 
+    /**
+     * Closes the stack and cleans up all resources.
+     * Removes event listeners and terminates background workers.
+     */
     close = () => {
         this.removeAllListeners();
         if (this.modelWorker) this.modelWorker.terminate();
     }
 
-    // TODO: Make the caching time configurable, and implement regular cleaning of cache
+    /**
+     * Retrieves a Class instance by name.
+     * Results are cached for 15 minutes to improve performance.
+     * 
+     * @param className - The name or ID of the class to retrieve
+     * @param fresh - If `true`, bypasses the cache and fetches from database
+     * @returns The Class instance, or `null` if not found
+     * 
+     * @example
+     * ```typescript
+     * const taskClass = await stack.getClass('Task');
+     * if (taskClass) {
+     *     const tasks = await taskClass.getCards();
+     * }
+     * ```
+     */
     getClass = async (className: string, fresh = false): Promise<Class | null> => {
         const fnLogger = logger.child({ method: "getClass", args: { className, fresh } });
         if (!fresh) {
@@ -729,6 +883,14 @@ class ClientStack extends Stack {
         return classObj;
     }
 
+    /**
+     * Retrieves a Domain instance by name.
+     * Results are cached for 15 minutes to improve performance.
+     * 
+     * @param domainName - The name or ID of the domain to retrieve
+     * @param fresh - If `true`, bypasses the cache and fetches from database
+     * @returns The Domain instance, or `null` if not found
+     */
     getDomain = async (domainName: string, fresh = false): Promise<Domain | null> => {
         const fnLogger = logger.child({ method: "getDomain", args: { domainName, fresh } });
         if (!fresh) {
@@ -783,7 +945,21 @@ class ClientStack extends Stack {
     //     return result;
     // }
 
-    // TODO: Consider filtering returned properties
+    /**
+     * Retrieves a single document by its ID.
+     * 
+     * @typeParam T - The expected document type
+     * @param docId - The document ID to retrieve
+     * @returns The document, or `null` if not found
+     * 
+     * @example
+     * ```typescript
+     * const task = await stack.getDocument<TaskDocument>('Task-123');
+     * if (task) {
+     *     console.log(task.title);
+     * }
+     * ```
+     */
     async getDocument<T extends Document>(docId: string) {
         let doc: PouchDB.Core.ExistingDocument<T> | undefined = undefined;
         try {
@@ -811,7 +987,26 @@ class ClientStack extends Stack {
         return _rev;
     }
 
-    // Expects a selector like { "~class": { $eq: "class" } }
+    /**
+     * Finds multiple documents matching a PouchDB/Mango-style selector.
+     * Automatically filters to only active documents and applies access policies.
+     * 
+     * @typeParam T - The expected document type
+     * @param selector - A PouchDB/Mango query selector
+     * @param fields - Optional list of fields to return
+     * @param skip - Number of documents to skip (for pagination)
+     * @param limit - Maximum number of documents to return
+     * @returns Object containing matching documents array
+     * 
+     * @example
+     * ```typescript
+     * const result = await stack.findDocuments({
+     *     '~class': { $eq: 'Task' },
+     *     isComplete: { $eq: false }
+     * });
+     * console.log('Found tasks:', result.docs.length);
+     * ```
+     */
     findDocuments = async <T extends Document | RelationDocument = Document>(selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => {
         const fnLogger = logger.child({ method: "findDocuments", args: { selector, fields, skip, limit } });
 
@@ -927,6 +1122,17 @@ class ClientStack extends Stack {
         return clone;
     }
 
+    /**
+     * Finds a single document matching a selector.
+     * Convenience wrapper around {@link findDocuments} that returns the first match.
+     * 
+     * @typeParam T - The expected document type
+     * @param selector - A PouchDB/Mango query selector
+     * @param fields - Optional list of fields to return
+     * @param skip - Number of documents to skip
+     * @param limit - Maximum number of documents to check
+     * @returns The first matching document, or `null` if none found
+     */
     async findDocument<T extends Document | RelationDocument = Document>(selector: any, fields = undefined, skip = undefined, limit = undefined) {
         let result = await this.findDocuments<T>(selector, fields, skip, limit);
         return result.docs.length > 0 ? result.docs[0] : null;
@@ -944,7 +1150,7 @@ class ClientStack extends Stack {
         };
 
         try {
-            let response = await this.db.find({selector});
+            let response = await this.db.find({ selector });
             if (response == null) return null;
             let result: ClassModel = response.docs[0] as unknown as ClassModel
             logger.info("getClassModel - result", { result: result })
@@ -1352,6 +1558,34 @@ class ClientStack extends Stack {
         return params as unknown as Document | RelationDocument;
     }
 
+    /**
+     * Creates or updates a single document in the database.
+     * 
+     * If `docId` is provided and the document exists, it will be updated.
+     * If `docId` is `null`, a new ID will be auto-generated in the format `{type}-{incrementalId}`.
+     * Access policies are enforced before writing.
+     * 
+     * @param docId - The document ID, or `null` to auto-generate
+     * @param type - The class name (e.g., 'Task', 'User')
+     * @param classObj - The Class instance or schema definition for validation
+     * @param params - The document data to save
+     * @returns The created or updated document
+     * @throws Error if policy check fails or document type conflicts
+     * 
+     * @example
+     * ```typescript
+     * // Create with auto-generated ID
+     * const task = await stack.createDoc(null, 'Task', taskClass, {
+     *     title: 'New Task',
+     *     isComplete: false
+     * });
+     * 
+     * // Update existing document
+     * await stack.createDoc('Task-123', 'Task', taskClass, {
+     *     title: 'Updated Title'
+     * });
+     * ```
+     */
     createDoc = async (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}) => {
         const fnLogger = logger.child({ method: "createDoc", args: { docId, type, params } });
         fnLogger.info("Creating document");
@@ -1445,6 +1679,25 @@ class ClientStack extends Stack {
         return doc;
     }
 
+    /**
+     * Creates or updates multiple documents in a single batch operation.
+     * More efficient than calling {@link createDoc} multiple times.
+     * 
+     * @param docs - Array of document specifications with optional docId and params
+     * @param type - The class name for all documents
+     * @param classObj - The Class instance or schema definition for validation
+     * @returns Array of created or updated documents
+     * @throws Error if policy check fails for any document
+     * 
+     * @example
+     * ```typescript
+     * const tasks = await stack.createDocs([
+     *     { docId: null, params: { title: 'Task 1' } },
+     *     { docId: null, params: { title: 'Task 2' } },
+     *     { docId: 'Task-existing', params: { title: 'Updated' } }
+     * ], 'Task', taskClass);
+     * ```
+     */
     createDocs = async (docs: { docId: string | null, params: {} }[], type: string, classObj: Class | ClassModel["schema"]) => {
         const fnLogger = logger.child({ method: "createDocs", args: { docs } });
 
@@ -1516,6 +1769,31 @@ class ClientStack extends Stack {
         return documents;
     }
 
+    /**
+     * Creates a relation document linking two entities via a Domain.
+     * Relation documents represent relationships between documents (e.g., 1:N, N:N).
+     * 
+     * @param docId - The relation document ID, or `null` to auto-generate
+     * @param relationName - A descriptive name for this relation instance
+     * @param domainObj - The Domain defining the relationship type
+     * @param params - The relation parameters including source and target references
+     * @returns The created relation document, or `null` on error
+     * 
+     * @example
+     * ```typescript
+     * const relation = await stack.createRelationDoc(
+     *     null,
+     *     'ProjectTask',
+     *     projectTaskDomain,
+     *     {
+     *         sourceClass: 'Project',
+     *         targetClass: 'Task',
+     *         sourceId: 'Project-1',
+     *         targetId: 'Task-42'
+     *     }
+     * );
+     * ```
+     */
     createRelationDoc = async (
         docId: string | null,
         relationName: string,
@@ -1574,6 +1852,23 @@ class ClientStack extends Stack {
         return doc;
     }
 
+    /**
+     * Creates multiple relation documents in a single batch operation.
+     * More efficient than calling {@link createRelationDoc} multiple times.
+     * 
+     * @param docs - Array of relation specifications
+     * @param relationName - A descriptive name for these relations
+     * @param domainObj - The Domain defining the relationship type
+     * @returns Array of created relation documents
+     * 
+     * @example
+     * ```typescript
+     * const relations = await stack.createRelationDocs([
+     *     { docId: null, params: { sourceClass: 'Project', targetClass: 'Task', sourceId: 'Project-1', targetId: 'Task-1' } },
+     *     { docId: null, params: { sourceClass: 'Project', targetClass: 'Task', sourceId: 'Project-1', targetId: 'Task-2' } }
+     * ], 'ProjectTasks', projectTaskDomain);
+     * ```
+     */
     createRelationDocs = async (docs: {
         docId: string | null; params: {
             sourceClass: string;
@@ -1674,6 +1969,31 @@ class ClientStack extends Stack {
         }
     }
 
+    /**
+     * Executes a SQL query against the local database.
+     * Supports SELECT, JOIN, WHERE, ORDER BY, GROUP BY, and UNION operations.
+     * 
+     * @param sql - The SQL query string
+     * @param params - Optional query parameters for prepared statements
+     * @returns Object containing result rows and the parsed AST
+     * 
+     * @example
+     * ```typescript
+     * // Simple select
+     * const { rows } = await stack.query('SELECT * FROM Task WHERE isComplete = false');
+     * 
+     * // Join with ordering
+     * const { rows } = await stack.query(`
+     *     SELECT t.title, u.username AS assignee
+     *     FROM Task AS t
+     *     JOIN User AS u ON u._id = t.assigneeId
+     *     ORDER BY t.createdAt DESC
+     * `);
+     * 
+     * // With parameters
+     * const { rows } = await stack.query('SELECT * FROM Task WHERE priority = ?', 'high');
+     * ```
+     */
     query = async (sql: string, ...params: any[]) => {
         const fnLogger = logger.child({ method: "query", args: { sql, params } });
         fnLogger.info("Executing query");

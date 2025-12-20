@@ -1,3 +1,6 @@
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=4QSQ8L9AK2C74)
+
+
 # @docstack/client
 
 **The Intelligent, Offline-First Database Engine for Modern Web Apps.**

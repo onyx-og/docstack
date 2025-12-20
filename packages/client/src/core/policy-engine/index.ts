@@ -1,6 +1,10 @@
 import type ClientStack from "../stack.js";
 import type { AuthSessionProof, Document, PolicyModel } from "@docstack/shared";
 
+/**
+ * Set of system classes that bypass policy evaluation.
+ * These classes are internal to DocStack and always accessible.
+ */
 const SYSTEM_CLASSES = new Set([
     "~Policy",
     "~Job",
@@ -11,19 +15,59 @@ const SYSTEM_CLASSES = new Set([
     "domain"
 ]);
 
+/** The type of operation being authorized: read or write. */
 export type PolicyOperation = "read" | "write";
 
+/**
+ * Engine for evaluating access control policies on documents.
+ * 
+ * PolicyEngine implements role-based access control (RBAC) by evaluating
+ * policy rules against documents and user sessions. Policies can be:
+ * - Class-level (apply to all documents of a class)
+ * - User-specific (apply only to a specific user)
+ * - Group-specific (apply only to users in a specific group)
+ * 
+ * Policy rules are JavaScript expressions that receive the document,
+ * session, and groupId as context and return a boolean.
+ * 
+ * @example
+ * ```typescript
+ * // Policy engine is used automatically during document operations
+ * // Policies are defined as documents:
+ * await stack.createDoc(null, '~Policy', null, {
+ *     name: 'user-read-own',
+ *     targetClass: ['User'],
+ *     rule: 'return document.userId === session.userId;'
+ * });
+ * ```
+ */
 export class PolicyEngine {
+    /** Reference to the parent stack for database and session access. */
     private readonly stack: ClientStack;
 
+    /**
+     * Creates a new PolicyEngine instance.
+     * @param stack - The parent ClientStack instance
+     */
     constructor(stack: ClientStack) {
         this.stack = stack;
     }
 
+    /**
+     * Gets the current authentication session proof.
+     * @returns The session proof, or undefined if not authenticated
+     */
     private getSessionProof(): AuthSessionProof | undefined {
         return this.stack.authSession;
     }
 
+    /**
+     * Checks if a class should bypass policy evaluation.
+     * System classes (prefixed with ~) are always allowed.
+     * 
+     * @param targetClass - The class name to check
+     * @returns `true` if the class should bypass policies
+     */
     private shouldBypass(targetClass: string) {
         if (SYSTEM_CLASSES.has(targetClass)) return true;
         const normalized = targetClass.startsWith("~") ? targetClass.slice(1) : `~${targetClass}`;
@@ -63,6 +107,15 @@ export class PolicyEngine {
         };
     }
 
+    /**
+     * Evaluates a policy rule against a document and session.
+     * The rule is a JavaScript expression that returns a boolean.
+     * 
+     * @param policy - The policy containing the rule
+     * @param document - The document being accessed
+     * @param session - The current auth session
+     * @returns Whether the rule permits access
+     */
     private async evaluateRule(policy: PolicyModel, document: Document | null, session: AuthSessionProof): Promise<boolean> {
         const executor = new Function(
             "document",
@@ -136,6 +189,20 @@ export class PolicyEngine {
         return allowed;
     }
 
+    /**
+     * Ensures write access is allowed for a document of the given class.
+     * Throws an error if no policy permits the write operation.
+     * 
+     * @param targetClass - The class of the document being written
+     * @param document - The document to write
+     * @throws Error if write is not permitted
+     * 
+     * @example
+     * ```typescript
+     * // Called automatically during createDoc/updateCard operations
+     * await policyEngine.ensureWriteAllowed('Task', taskDocument);
+     * ```
+     */
     public async ensureWriteAllowed(targetClass: string, document: Document | null) {
         const allowed = await this.authorize(targetClass, "write", document);
         if (!allowed) {
@@ -143,6 +210,23 @@ export class PolicyEngine {
         }
     }
 
+    /**
+     * Checks if a document is readable by the current user.
+     * Used to filter query results based on read policies.
+     * 
+     * @param document - The document to check
+     * @returns `true` if the document can be read
+     * @throws Error if the stack is not authenticated
+     * 
+     * @example
+     * ```typescript
+     * // Used internally during findDocuments
+     * const readable = await policyEngine.isReadableDocument(doc);
+     * if (readable) {
+     *     results.push(doc);
+     * }
+     * ```
+     */
     public async isReadableDocument(document: Document): Promise<boolean> {
         const targetClass = (document as any)?.["~class"] as string;
         const { id: targetId, name: targetName } = await this.resolveClassTarget(targetClass);

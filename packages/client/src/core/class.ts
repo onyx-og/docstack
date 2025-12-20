@@ -8,22 +8,54 @@ import { Trigger } from "./trigger/index.js";
 import { z } from "zod";
 import clientLogger from "../utils/logger/index.js";
 
+/**
+ * Represents a data class (schema definition) in the DocStack database.
+ * 
+ * A Class defines the structure of documents, including their attributes,
+ * validation rules (via Zod), and triggers that execute during document operations.
+ * 
+ * Use the static factory methods ({@link Class.create}, {@link Class.fetch}) to
+ * instantiate classes - the constructor is private.
+ * 
+ * @example
+ * ```typescript
+ * // Create a new class with schema
+ * const taskClass = await Class.create(stack, 'Task', 'class', 'User Tasks');
+ * 
+ * // Add attributes to define the schema
+ * await Attribute.create(taskClass, 'title', 'string', 'Task Title', { mandatory: true });
+ * await Attribute.create(taskClass, 'isComplete', 'boolean', 'Done?', { defaultValue: false });
+ * 
+ * // Create documents (cards) of this class
+ * const task = await taskClass.add({ title: 'My Task', isComplete: false });
+ * ```
+ * 
+ * @extends Class_
+ */
 class Class extends Class_ {
+    /** Reference to the parent stack instance. */
     stack: Stack | undefined;
-    /* Populated in init() */
+    /** The name of this class (e.g., 'Task', 'User'). */
     name!: string;
-    /* Populated in init() */
+    /** The class type (e.g., 'class', '~self'). */
     type!: ClassModel["~class"];
+    /** Optional description of the class purpose. */
     description?: string;
+    /** Map of attribute names to Attribute instances defining the schema. */
     attributes: { [name: string]: Attribute } = {};
+    /** The raw schema definition from the ClassModel. */
     schema: ClassModel["schema"] = {};
+    /** Zod schema for runtime validation of document data. */
     schemaZOD: z.ZodObject = z.object({});
+    /** The unique identifier for this class (e.g., 'Task', 'Class-123'). */
     id?: string;
-    // parentClass: Class | null;
+    /** The underlying ClassModel document. */
     model!: ClassModel;
+    /** Current state indicating if the class is processing an operation. */
     state: "busy" | "idle" = "idle";
     static logger: Logger = createLogger().child({ module: "class" });
     logger!: Logger;
+    /** Array of triggers that execute before/after document operations. */
     triggers: Trigger[] = [];
 
     private constructor() {
@@ -99,6 +131,19 @@ class Class extends Class_ {
     }
 
 
+    /**
+     * Gets a Class instance without persisting it to the database.
+     * Use this for working with existing class models or for testing.
+     * Sets up a document change listener for real-time updates.
+     * 
+     * @param stack - The parent stack instance
+     * @param id - The class ID
+     * @param name - The class name
+     * @param type - The class type
+     * @param description - Optional description
+     * @param schema - Initial schema definition
+     * @returns A new Class instance (not persisted)
+     */
     public static get = (
         stack: Stack,
         id: string,
@@ -121,25 +166,45 @@ class Class extends Class_ {
         return class_;
     }
 
+    /**
+     * Creates a new class and persists it to the database.
+     * This is the primary factory method for creating new classes.
+     * 
+     * @param stack - The parent stack instance
+     * @param name - The name for the new class
+     * @param type - The class type (typically 'class')
+     * @param description - Optional description of the class
+     * @param schema - Initial schema definition
+     * @returns The persisted Class instance
+     * 
+     * @example
+     * ```typescript
+     * const userClass = await Class.create(stack, 'User', 'class', 'Application users');
+     * ```
+     */
     public static create = async (
         stack: Stack,
         name: string,
         type: ClassModel["~class"],
         description?: string,
         schema: ClassModel["schema"] = {},
-        // parentClass: Class | null = null
     ) => {
         const class_ = Class.get(stack, name, name, type, description, schema);
         await class_.build();
         return class_;
     }
 
+    /**
+     * Builds a Class instance from an existing ClassModel document.
+     * Hydrates attributes and triggers from the model.
+     * 
+     * @param stack - The parent stack instance
+     * @param classModel - The ClassModel document from the database
+     * @returns The hydrated Class instance
+     */
     static buildFromModel = async (stack: Stack, classModel: ClassModel) => {
         Class.logger.info("buildFromModel - Instantiate from model", { classModel });
-        // let parentClassModel = (classModel.parentClass ? await stack.getClassModel(classModel.parentClass) : null);
-        // let parentClass = (parentClassModel ? await Class.buildFromModel(stack, parentClassModel) : null);
 
-        // [TODO] Redundancy: Class.create retrieve model from db and builds it (therefore also setting the model)
         if (classModel._rev) {
             let classObj: Class = Class.get(
                 stack, classModel._id, classModel.name,
@@ -155,6 +220,14 @@ class Class extends Class_ {
         }
     }
 
+    /**
+     * Fetches a class by its document ID.
+     * 
+     * @param stack - The parent stack instance
+     * @param classId - The class document ID
+     * @returns The Class instance
+     * @throws Error if the class is not found
+     */
     static fetchById = async (stack: Stack, classId: string) => {
         try {
             let classModel = await stack.db.get<ClassModel>(classId);
@@ -165,13 +238,27 @@ class Class extends Class_ {
         }
     }
 
+    /**
+     * Fetches a class by its name.
+     * This is the most common way to retrieve an existing class.
+     * 
+     * @param stack - The parent stack instance
+     * @param className - The class name to fetch
+     * @returns The Class instance, or `null` if not found
+     * 
+     * @example
+     * ```typescript
+     * const taskClass = await Class.fetch(stack, 'Task');
+     * if (taskClass) {
+     *     const tasks = await taskClass.getCards();
+     * }
+     * ```
+     */
     static fetch = async (stack: Stack, className: string) => {
         let classModel = await stack.getClassModel(className);
         if (classModel) {
-            // console.log("Fetched class model", {classModel});
             return Class.buildFromModel(stack, classModel);
         } else {
-            // throw new Error("Class not found: "+className);
             return null;
         }
     }
@@ -232,6 +319,12 @@ class Class extends Class_ {
 
     }
 
+    /**
+     * Validates document data against the class schema using Zod.
+     * 
+     * @param data - The document data to validate
+     * @returns `true` if validation passes, `false` otherwise
+     */
     validate = async (data: { [key: string]: any }): Promise<boolean> => {
         const fnLogger = this.logger.child({ method: "validate" });
         const result = await this.schemaZOD.safeParseAsync(data);
@@ -268,6 +361,10 @@ class Class extends Class_ {
         return this.id;
     }
 
+    /**
+     * Builds the schema object from the current attributes.
+     * @returns The schema definition object
+     */
     buildSchema = () => {
         let schema: ClassModel["schema"] = {};
         Object.entries(this.attributes).forEach(t => {
@@ -276,6 +373,10 @@ class Class extends Class_ {
         return schema;
     }
 
+    /**
+     * Returns the current ClassModel representation of this class.
+     * @returns The ClassModel document
+     */
     getModel = () => {
         let triggers: ClassModel["triggers"] = [];
         for (const trigger of this.triggers) {
@@ -289,7 +390,7 @@ class Class extends Class_ {
             schema: this.buildSchema(),
             triggers: triggers,
             active: true,
-            _rev: this.model ? this.model._rev : "", // [TODO] Error prone
+            _rev: this.model ? this.model._rev : "",
             "~createTimestamp": this.model ? this.model["~createTimestamp"] : undefined,
         };
         return model;
@@ -336,6 +437,10 @@ class Class extends Class_ {
         Class.logger.info("setModel - model after processing", { model: model })
     }
 
+    /**
+     * Returns the primary key attribute names for this class.
+     * @returns Array of attribute names marked as primary keys
+     */
     getPrimaryKeys = () => {
         return Object.values(this.attributes).filter(attr => attr.isPrimaryKey())
             .map(attr => attr.getName());
@@ -393,6 +498,19 @@ class Class extends Class_ {
     }
 
 
+    /**
+     * Adds a new attribute to the class schema.
+     * Persists the change to the database.
+     * 
+     * @param attribute - The Attribute instance or AttributeModel to add
+     * @returns This Class instance for chaining
+     * 
+     * @example
+     * ```typescript
+     * await taskClass.addAttribute(new Attribute(taskClass, 'dueDate', 'date', 'Due Date'));
+     * // Or use Attribute.create() for a simpler API
+     * ```
+     */
     addAttribute = async (attribute: Attribute | AttributeModel): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "addAttribute", args: { attribute: attribute.name } });
         const attribute_ = attribute instanceof Attribute
@@ -440,6 +558,13 @@ class Class extends Class_ {
         }
     }
 
+    /**
+     * Modifies an existing attribute in the class schema.
+     * 
+     * @param name - The name of the attribute to modify
+     * @param attribute - The new Attribute or AttributeModel definition
+     * @returns This Class instance for chaining
+     */
     modifyAttribute = async (name: string, attribute: Attribute | AttributeModel): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "modifyAttribute", args: { name } });
         const originSchema = { ...this.model.schema[name] },
@@ -464,6 +589,12 @@ class Class extends Class_ {
         return this;
     }
 
+    /**
+     * Removes an attribute from the class schema.
+     * 
+     * @param name - The name of the attribute to remove
+     * @returns This Class instance for chaining
+     */
     removeAttribute = async (name: string): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "removeAttribute", args: { name } });
         const originSchema = { ...this.model.schema[name] },
@@ -485,8 +616,20 @@ class Class extends Class_ {
         return this;
     };
 
-    // TODO: modify to pass also the current class model
-    // consider first fetching/updating the local class model
+    /**
+     * Creates a new document (card) of this class type.
+     * 
+     * @param params - The document data
+     * @returns The created document, or `null` if stack is not defined
+     * 
+     * @example
+     * ```typescript
+     * const task = await taskClass.addCard({
+     *     title: 'My Task',
+     *     isComplete: false
+     * });
+     * ```
+     */
     addCard = async (params: { [key: string]: any }) => {
         const fnLogger = this.logger.child({ method: "addCard", args: { params } });
         if (!this.stack) {
@@ -496,6 +639,12 @@ class Class extends Class_ {
         return await this.stack.createDoc(null, this.getName(), this, params);
     }
 
+    /**
+     * Creates multiple documents (cards) of this class type in a batch.
+     * 
+     * @param paramsArray - Array of document data objects
+     * @returns Array of created documents
+     */
     addCards = async (paramsArray: { [key: string]: any }[]) => {
         const fnLogger = this.logger.child({ method: "addCards", args: { paramsArray } });
         if (!this.stack) {
@@ -536,6 +685,25 @@ class Class extends Class_ {
         }
     }
 
+    /**
+     * Creates one or more documents of this class type.
+     * Convenience method that handles both single and batch creation.
+     * 
+     * @param params - Document data (single object for one doc, or multiple for batch)
+     * @returns Single document when one param passed, array when multiple
+     * 
+     * @example
+     * ```typescript
+     * // Single document
+     * const task = await taskClass.add({ title: 'Task 1' });
+     * 
+     * // Multiple documents
+     * const tasks = await taskClass.add(
+     *     { title: 'Task 1' },
+     *     { title: 'Task 2' }
+     * );
+     * ```
+     */
     async add(params: { [key: string]: any }): Promise<Document | null>;
     async add(...paramsArray: { [key: string]: any }[]): Promise<Document[]>;
     async add(...paramsArray: { [key: string]: any }[]): Promise<Document | Document[] | null> {
@@ -568,6 +736,13 @@ class Class extends Class_ {
 
     }
 
+    /**
+     * Updates an existing document (card) of this class.
+     * 
+     * @param cardId - The document ID to update
+     * @param params - The updated document data
+     * @returns The updated document, or `null` if stack is not defined
+     */
     updateCard = async (cardId: string, params: { [key: string]: any }) => {
         return new Promise<Document | null>(async (resolve, reject) => {
             if (this.stack) {
@@ -580,6 +755,12 @@ class Class extends Class_ {
         })
     }
 
+    /**
+     * Soft-deletes a document by setting its `active` flag to `false`.
+     * 
+     * @param cardId - The document ID to delete
+     * @returns `true` if successful, `false` otherwise
+     */
     deleteCard = async (cardId: string) => {
         const fnLogger = this.logger.child({ method: "deleteCard", args: { cardId } });
         if (this.stack) {
@@ -591,6 +772,24 @@ class Class extends Class_ {
         }
     }
 
+    /**
+     * Retrieves documents (cards) of this class type.
+     * 
+     * @param selector - Optional PouchDB/Mango selector for filtering
+     * @param fields - Optional list of fields to return
+     * @param skip - Number of documents to skip
+     * @param limit - Maximum number of documents to return
+     * @returns Array of matching documents
+     * 
+     * @example
+     * ```typescript
+     * // Get all tasks
+     * const allTasks = await taskClass.getCards();
+     * 
+     * // Get incomplete tasks
+     * const incomplete = await taskClass.getCards({ isComplete: { $eq: false } });
+     * ```
+     */
     getCards = async (selector?: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => {
         const _selector = { ...(selector || {}), "~class": { $eq: this.name } };
         this.logger.info("getCards - selector", { selector: _selector, fields, skip, limit })
@@ -598,6 +797,21 @@ class Class extends Class_ {
         return docs;
     }
 
+    /**
+     * Retrieves one or more documents by their IDs.
+     * 
+     * @param cardId - Single ID or multiple IDs to fetch
+     * @returns Single document (or null) when one ID passed, array when multiple
+     * 
+     * @example
+     * ```typescript
+     * // Get single document
+     * const task = await taskClass.get('Task-123');
+     * 
+     * // Get multiple documents
+     * const tasks = await taskClass.get('Task-1', 'Task-2', 'Task-3');
+     * ```
+     */
     async get(cardId: string): Promise<Document | null>;
     async get(...cardId: string[]): Promise<Document[]>;
     async get(...cardId: string[]): Promise<Document | Document[] | null> {
@@ -616,13 +830,30 @@ class Class extends Class_ {
         }
     }
 
+    /**
+     * Adds a trigger to this class.
+     * Triggers execute before or after document operations.
+     * 
+     * @param name - The trigger name
+     * @param model - The trigger model containing the execution logic
+     * @returns This Class instance for chaining
+     * 
+     * @example
+     * ```typescript
+     * await taskClass.addTrigger('generate-slug', {
+     *     name: 'generate-slug',
+     *     order: 'before',
+     *     run: `document.slug = document.title.toLowerCase().replace(/\\s+/g, '-'); return document;`
+     * });
+     * ```
+     */
     addTrigger = async (name: string, model: TriggerModel) => {
         const fnLogger = this.logger.child({ method: "addTrigger" });
         try {
             const trigger = new Trigger(model, this);
             this.triggers.push(trigger);
             if (this.stack) {
-                this.setModel(); // [TODO] Change to buildFromModel();
+                this.setModel();
                 let res = await this.stack.updateClass(this);
             } else {
                 throw new Error(`Stack is not defined. Can't update class`);
@@ -633,6 +864,12 @@ class Class extends Class_ {
         return this;
     }
 
+    /**
+     * Removes a trigger from this class by name.
+     * 
+     * @param name - The name of the trigger to remove
+     * @returns This Class instance for chaining
+     */
     removeTrigger = async (name: string) => {
         this.triggers = this.triggers.filter(t => t.name != name)
         return this;
