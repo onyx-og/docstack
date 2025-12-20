@@ -14,6 +14,8 @@ import {
 
 import Class from "./class";
 import Domain from "./domain";
+import type PouchDB from "pouchdb";
+
 
 abstract class Stack extends EventTarget {
     /* Initialized asynchronously */

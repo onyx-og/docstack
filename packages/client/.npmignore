@@ -1,19 +1,17 @@
 src/
+src-test/
 test/
-server/
-ui/
 example/
 
-# Configs
+# Jest
 jest.config.ts
-playwright.config.ts
-webpack.config.js
+jest.setup.js
+
+# Rollup
 rollup.config.js
 rollup.vendor
-tsconfig.json
 
-# Example files
-example/
+tsconfig.json
 
 # PouchDB database and logs
 log/
@@ -27,3 +25,5 @@ example.env
 # Playwright
 test-results/
 playwright-report/
+playwright.config.ts
+playwright.setup.ts

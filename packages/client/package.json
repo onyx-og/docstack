@@ -3,11 +3,16 @@
   "version": "0.0.1",
   "main": "lib/index.js",
   "src": "src/index.ts",
+  "types": "lib/index.d.ts",
   "type": "module",
+  "files": [
+    "lib"
+  ],
   "scripts": {
     "build:types": "npx tsc -build --force ./tsconfig.json",
     "build": "rollup --config ./rollup.config.js",
     "build:vendor": "rollup --config ./rollup.vendor.js",
+    "prepublishOnly": "npm run build",
     "lint": "eslint ./src --ext .ts,.tsx",
     "test": "playwright test"
   },
@@ -27,7 +32,14 @@
     "url": "https://github.com/onyx-og/docstack/issues"
   },
   "homepage": "https://github.com/onyx-og/docstack#readme",
-  "description": "",
+  "description": "One does not simply stack documents.",
+  "exports": {
+    ".": {
+      "import": "./lib/index.js",
+      "require": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    }
+  },
   "dependencies": {
     "jsondiffpatch": "^0.6.0",
     "pouchdb-browser": "^9.0.0",
