@@ -20,7 +20,7 @@ const logger = createLogger().child({ module: "pouchdb" });
 export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack) => {
     const pouchBulkDocs = PouchDB.prototype.bulkDocs;
     const pouchGet = PouchDB.prototype.get;
-    const pouchPut = PouchDB.prototype.put;
+    // const pouchPut = PouchDB.prototype.put;
     return {
         bulkDocs: async function (docs, options: PouchDB.Core.BulkDocsOptions & {
             isPostOp?: boolean
@@ -35,15 +35,15 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             // schema documents might not yet validate against the current runtime
             // (e.g. during initial migration). Regular application code should not
             // set this flag because it bypasses validation and trigger execution.
-            const skipPatchValidation = Boolean((options as any)?.isPatch);
+            // const skipPatchValidation = Boolean((options as any)?.isPatch);
 
-            const originalFn = () => {
-                if (callback) {
-                    return pouchBulkDocs.call(this, docs, options, callback);
-                } else {
-                    return pouchBulkDocs.call(this, docs, options);
-                }
-            }
+            // const originalFn = () => {
+            //     if (callback) {
+            //         return pouchBulkDocs.call(this, docs, options, callback);
+            //     } else {
+            //         return pouchBulkDocs.call(this, docs, options);
+            //     }
+            // }
 
             // if (skipPatchValidation) {
             //     return originalFn();
@@ -157,7 +157,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         // TODO: Consider validating against self after registering the class?
                         console.log("Class model is of type '~self', skipping parent class validation", { doc });
                     }
-
+                    debugger;
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
                     const classDocId = doc._id;

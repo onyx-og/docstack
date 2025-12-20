@@ -679,7 +679,6 @@ const sys_007: Patch = {
             "lastName": "User",
             "authMethod": "AuthMod-Classic",
             "externalId": "",
-            "keyDerivationSalt": "system-salt"
         }
     ]
 };
@@ -789,7 +788,6 @@ const sys_008: Patch = {
             "lastName": "User",
             "authMethod": "AuthMod-Classic",
             "externalId": "",
-            "keyDerivationSalt": "system-salt",
             "wrappedDocumentKey": ""
         }
     ]
@@ -1149,6 +1147,7 @@ const sys_013: Patch = {
                     "name": "ensure-salt",
                     "order": "before",
                     "run": `if (!document.keyDerivationSalt) {
+                        debugger;
                         const salt = stack.cryptoEngine.generateRandomString(32);
                         document.keyDerivationSalt = salt;
                     }
@@ -1157,7 +1156,7 @@ const sys_013: Patch = {
                 {
                     "name": "auto-wrap-document-key",
                     "order": "before",
-                    "run": `if (document.password && document.keyDerivationSalt && stack.cryptoEngine.getDocumentKey()) {
+                    "run": `debugger; if (document.password && document.keyDerivationSalt && stack.cryptoEngine.getDocumentKey()) {
         let shouldRecalculate = true;
         if (document._id) {
             try {
