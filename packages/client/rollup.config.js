@@ -4,7 +4,8 @@ import json from '@rollup/plugin-json';
 export default {
   input: './src/index.ts',
   // Externalize all dependencies - they'll be loaded from node_modules in HTML
-  external: ['crypto', 'stream', 'path', 'fs', 'util', 'setimmediate', 'winston', 'winston-transport', '@docstack/shared', 'pouchdb', 'pouchdb-browser', 'pouchdb-find', 'zod', 'semver', 'jsondiffpatch'],
+  // Note: @docstack/shared is NOT externalized - it gets bundled into the output
+  external: ['crypto', 'stream', 'path', 'fs', 'util', 'setimmediate', 'winston', 'winston-transport', 'pouchdb', 'pouchdb-browser', 'pouchdb-find', 'zod', 'semver', 'jsondiffpatch'],
   output: [
     {
       // UMD bundle for CommonJS/browser environments
