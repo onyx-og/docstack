@@ -139,5 +139,7 @@ lib/
 
 package-lock.json
 
+# Playwright
+packages/client/test-results/
+packages/client/playwright-report/
 packages/client/test/vendor-bundle.js
-packages/client/test-results/.last-run.json
