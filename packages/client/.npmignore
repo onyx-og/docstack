@@ -4,12 +4,25 @@ server/
 ui/
 example/
 
-# Configs
-jest.config.ts
+# Test related
+tests/
+src-test/
+
+# Playwright
+playwright.setup.ts
 playwright.config.ts
-webpack.config.js
+test-results/
+playwright-report/
+
+# Jest
+jest.config.ts
+jest.setup.js
+
+# Rollup
 rollup.config.js
-rollup.vendor
+rollup.vendor.js
+
+# TypeScript
 tsconfig.json
 
 # Example files
@@ -23,7 +36,3 @@ errors.log
 
 .env
 example.env
-
-# Playwright
-test-results/
-playwright-report/
