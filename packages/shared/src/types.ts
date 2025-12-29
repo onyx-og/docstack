@@ -313,6 +313,13 @@ export const isRelation = (object: {[key: string]: any}): object is RelationDocu
     return false;
 }
 
+export const isPatch = (object: {[key: string]: any}): object is Patch => {
+    if (object.hasOwnProperty("~class") && object["~class"] === "patch") {
+        return true;
+    }
+    return false;
+}
+
 export const isClassModel = (object: {[key: string]: any}): object is ClassModel => {
     if (object.hasOwnProperty("~class") && ["class","~self"].includes(object["~class"])) {
         return true;

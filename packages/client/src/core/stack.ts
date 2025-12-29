@@ -333,7 +333,15 @@ class ClientStack extends Stack {
         await stack.initialize(conn, options);
         await stack.initdb()
         if (options?.patches && options.patches.length) {
-            for (const patch of options.patches) {
+            const patches = await stack.findDocuments<Patch>({
+                "~class": { $eq: "patch" }
+            })
+            for (const patch of options.patches.filter(
+                p => !patches.docs.find(
+                    existing => existing.version === p.version
+                    && existing.target === p.target
+                )
+            )) {
                 await stack.applyPatch(patch);
             }
         }
@@ -484,13 +492,15 @@ class ClientStack extends Stack {
                 fnLogger.info("applyPatch - hydration complete, calling bulkDocs", { docCount: hydratedDocs.length });
                 await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions).then((result) => {
                     fnLogger.warn("applyPatch - bulkDocs completed with result", { result });
-                    fnLogger.warn("Successfully applied patch", { version: patch.version });
-                    resolve(patch.version);
+                    fnLogger.warn("Successfully processed patch", { version: patch.version });
                 }).catch((error) => {
                     fnLogger.error("applyPatch - bulkDocs error", { error });
                     reject(error);
                 });
-
+                // Store patch itself
+                await this.db.post({createTimestamp: (new Date()).valueOf(), ...patch});
+                fnLogger.info("Successfully stored patch", { version: patch.version, target: patch.target });
+                resolve(patch.version);
             } catch (e: any) {
                 fnLogger.error("Failed to apply patch", e)
                 reject(new Error(e));

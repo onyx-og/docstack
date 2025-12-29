@@ -1,4 +1,4 @@
-import { isClassModel, isDocument, isRelation, Domain } from "@docstack/shared";
+import { isClassModel, isDocument, isRelation, isPatch, Domain } from "@docstack/shared";
 import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
 import Stack from "../core/stack"
@@ -31,23 +31,6 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 options = {}
             }
 
-            // The `isPatch` flag is reserved for bootstrapping system patches where
-            // schema documents might not yet validate against the current runtime
-            // (e.g. during initial migration). Regular application code should not
-            // set this flag because it bypasses validation and trigger execution.
-            const skipPatchValidation = Boolean((options as any)?.isPatch);
-
-            const originalFn = () => {
-                if (callback) {
-                    return pouchBulkDocs.call(this, docs, options, callback);
-                } else {
-                    return pouchBulkDocs.call(this, docs, options);
-                }
-            }
-
-            // if (skipPatchValidation) {
-            //     return originalFn();
-            // }
 
             let documentsToProcess: typeof docs;
             if (Array.isArray(docs)) {
@@ -232,6 +215,9 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         throw new Error(`Target document '${doc.targetId}' does not exist for domain '${domain.name}'.`);
                     }
 
+                    continue;
+                } else if (isPatch(doc)) {
+                    // Patches are not validated or processed, just stored
                     continue;
                 } else if (isDocument(doc)) {
                     const className = doc["~class"];
