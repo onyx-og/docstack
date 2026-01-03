@@ -1,10 +1,10 @@
 import PouchDB from "pouchdb-browser";
-import createLogger from "../utils/logger/index.js";
-import Class from "./class.js";
-import Domain from "./domain.js";
+import createLogger from "../utils/logger";
+import Class from "./class";
+import Domain from "./domain";
 import PouchDBFind from 'pouchdb-find';
 
-import { getAllSystemPatches, getSystemPatches } from "./datamodel/index.js";
+import { getAllSystemPatches, getSystemPatches } from "./datamodel";
 import {
     Stack,
     StackOptions,
@@ -23,14 +23,14 @@ import {
 } from "@docstack/shared";
 
 import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
-import { StackPlugin } from "../plugins/pouchdb.js";
+import { StackPlugin } from "../plugins/pouchdb";
 
-import { parse, createPlan, executePlan } from "./query-engine/index.js";
-import type { SelectAST, UnionAST } from "./query-engine/index.js";
-import { JobEngine } from "./job-engine/index.js";
-import { PolicyEngine } from "./policy-engine/index.js";
-import { CryptoEngine } from "./crypto-engine/index.js";
-import { isEncryptedPayload } from "./crypto-engine/utils.js";
+import { parse, createPlan, executePlan } from "./query-engine";
+import type { SelectAST, UnionAST } from "./query-engine";
+import { JobEngine } from "./job-engine";
+import { PolicyEngine } from "./policy-engine";
+import { CryptoEngine } from "./crypto-engine";
+import { isEncryptedPayload } from "./crypto-engine/utils";
 
 const logger = createLogger().child({ module: "stack" });
 
@@ -535,6 +535,7 @@ class ClientStack extends Stack {
     // TODO: Test if works corrrectly with multiple patch files
     async checkSystem() {
         let systemDoc = await this.getSystem();
+        console.log("System doc rev", {systemDoc});
         let _systemDoc: SystemDoc;
         const dbInfo = await this.getDbInfo();
         logger.info("checkSystem - current system doc", { system: systemDoc })
@@ -567,6 +568,7 @@ class ClientStack extends Stack {
             await this.db.put(_systemDoc);
 
         } catch (e: any) {
+            console.log("Got system doc", _systemDoc);
             logger.error("checkSystem - There was a problem while updating system", { error: e })
             throw new Error(e)
         }
@@ -764,10 +766,16 @@ class ClientStack extends Stack {
 
     private async ensureCryptoConfigDocument() {
         const markerId = ClientStack.CRYPTO_CONFIG_DOC_ID;
-        const existing = await this.db.get<{ cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }>(markerId).catch((error: any) => {
-            if (error?.name === "not_found" || error?.status === 404) return null;
-            throw error;
-        });
+        let existing: { cryptoEngineDisabled?: boolean; encryptedMarker?: unknown } | null = null;
+        try {
+            existing = await this.db.get<{ cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }>(markerId);
+        } catch (error: any) {
+            if (error?.name === "not_found" || error?.status === 404) {
+                existing = null;
+            } else {
+                throw error;
+            }
+        }
 
         if (!this.cryptoEngineDisabled && !this.cryptoEngine.getDocumentKey()) {
             const randomBytes = new Uint8Array(32);
@@ -879,7 +887,7 @@ class ClientStack extends Stack {
         const fnLogger = logger.child({ method: "getClass", args: { className, fresh } });
         if (!fresh) {
             // Check if class is in cache and not expired
-            if (this.cache[className] && Date.now() < this.cache[className].ttl) {
+            if (this.cache[className] && this.cache[className] instanceof Class && Date.now() < this.cache[className].ttl) {
                 fnLogger.info("Retrieving class from cache", { ttl: this.cache[className].ttl })
                 return this.cache[className] as Class;
             }
@@ -887,8 +895,8 @@ class ClientStack extends Stack {
 
         const classObj = await Class.fetch(this, className);
         if (classObj) {
-            (classObj as CachedClass).ttl = Date.now() + 60000 * 15; // 15 minutes expiration
-            this.cache[className] = classObj as CachedClass;
+            (classObj as unknown as CachedClass).ttl = Date.now() + 60000 * 15; // 15 minutes expiration
+            this.cache[className] = classObj as unknown as CachedClass;
         }
         return classObj;
     }
@@ -1041,13 +1049,13 @@ class ClientStack extends Stack {
             //     index: { fields: indexFields }
             // });
             // fnLogger.info("Index result", indexResult);
-
-            let foundResult = await this.db.find({
-                selector: selector,
-                fields: fields,
-                skip: skip,
-                limit: limit
-            });
+            const query = {
+                selector
+            }
+            if (fields) query["fields"] = fields;
+            if (skip) query["skip"] = skip;
+            if (limit) query["limit"] = limit;
+            let foundResult = await this.db.find(query);
             if (selector.hasOwnProperty("username")) {
                 console.log("Found result", { result: foundResult, selector })
             }
@@ -1057,6 +1065,7 @@ class ClientStack extends Stack {
                 selector: selector,
             });
             const readableDocs: T[] = [];
+
             for (const doc of foundResult.docs as unknown as Document[]) {
                 const canRead = await this.policyEngine.isReadableDocument(doc);
                 if (!canRead) {
@@ -1069,7 +1078,6 @@ class ClientStack extends Stack {
                 const classObj = encryptedKeys.length || (fields && fields.length)
                     ? (await this.getClass(doc["~class"], true)) ?? undefined
                     : undefined;
-
                 const processedDoc = await this.processReadableDocument(doc as Document, classObj, fields, encryptedKeys);
                 if (processedDoc) {
                     readableDocs.push(processedDoc as unknown as T);

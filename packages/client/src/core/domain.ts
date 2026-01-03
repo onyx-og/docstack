@@ -1,5 +1,5 @@
 import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "@docstack/shared";
-import clientLogger from "../utils/logger/index.js";
+import clientLogger from "../utils/logger";
 import winston, { createLogger, Logger } from "winston";
 
 /**
@@ -59,7 +59,7 @@ class Domain extends Domain_ {
         super();
     }
 
-    getStack = () => {
+    getStack = (): Stack | undefined => {
         return this.stack;
     }
 
@@ -383,7 +383,7 @@ class Domain extends Domain_ {
         return docs[0] || null;
     }
 
-    throwIfRelationExists = async (filter: { [key: string]: any }, params: DomainRelationParams) => {
+    throwIfRelationExists = async (filter: { [key: string]: any }, params: DomainRelationParams): Promise<RelationDocument | null> => {
         const relation = await this.findRelationDoc(filter);
         if (relation) {
             if (relation.sourceId === params.sourceId && relation.targetId === params.targetId) {
@@ -468,7 +468,7 @@ class Domain extends Domain_ {
      * const relation = await projectTaskDomain.addRelation(taskDoc, 'Project-1');
      * ```
      */
-    addRelation = async (document: Document, referenceId: string) => {
+    addRelation = async (document: Document, referenceId: string): Promise<RelationDocument | null>=> {
         const fnLogger = this.logger.child({ method: "addRelation", args: { document, referenceId } });
         const stack = this.requireStack();
         const validation = await this.validateRelation(document, referenceId);

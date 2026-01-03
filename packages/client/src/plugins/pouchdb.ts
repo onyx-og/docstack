@@ -3,11 +3,11 @@ import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams
 // import Stack from "../utils/stack";
 import Stack from "../core/stack"
 import PouchDB from "pouchdb-browser";
-import { Trigger } from "../core/trigger/index.js";
-import createLogger from "../utils/logger/index.js";
+import { Trigger } from "../core/trigger/index";
+import createLogger from "../utils/logger/index";
 import {diff} from 'jsondiffpatch';
-import { applySchemaDelta } from "../utils/index.js";
-import Class from "../core/class.js";
+import { applySchemaDelta } from "../utils/index";
+import Class from "../core/class";
 
 const logger = createLogger().child({ module: "pouchdb" });
 /**

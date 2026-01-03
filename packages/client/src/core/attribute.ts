@@ -1,4 +1,4 @@
-import z, { ZodType } from "zod";
+import z, { ZodType, SafeParseReturnType } from "zod";
 import Class from "./class.js";
 import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, AttributeTypeReference } from "@docstack/shared";
 
@@ -36,7 +36,7 @@ class Attribute extends Attribute_ {
     /** The underlying AttributeModel containing type and configuration. */
     model!: AttributeModel;
     /** Zod schema for runtime validation of this field. */
-    field: ZodType = z.any();
+    field: any = z.any();
     /** Reference to the parent Class that owns this attribute. */
     class: Class | null;
     /** Default value to use when the field is not provided. */
@@ -345,7 +345,7 @@ class Attribute extends Attribute_ {
      * }
      * ```
      */
-    public validate = async (data: any): Promise<z.ZodSafeParseResult<unknown>> => {
+    public validate = async (data: any): Promise<SafeParseReturnType<any, any>> => {
         return this.field.safeParseAsync(data);
     }
 

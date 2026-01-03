@@ -1,8 +1,13 @@
 {
   "name": "@docstack/client",
   "description": "One does not simply stack documents.",
-  "version": "0.0.1",
+  "version": "0.0.8",
   "main": "lib/index.js",
+  "module": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js"
+  },
   "src": "src/index.ts",
   "publishConfig": {
     "access": "public"
@@ -11,6 +16,8 @@
   "scripts": {
     "build:types": "npx tsc -build --force ./tsconfig.json",
     "build": "rollup --config ./rollup.config.js",
+    "build:dev": "webpack --node-env=development",
+    "build:prod": "webpack --node-env=production",
     "build:vendor": "rollup --config ./rollup.vendor.js",
     "lint": "eslint ./src --ext .ts,.tsx",
     "test": "playwright test"
@@ -30,8 +37,9 @@
   "bugs": {
     "url": "https://github.com/onyx-og/docstack/issues"
   },
-  "homepage": "https://github.com/onyx-og/docstack#readme",
+  "homepage": "https://onyx.ac/docstack",
   "dependencies": {
+    "@docstack/shared": "^0.0.2",
     "jsondiffpatch": "^0.6.0",
     "pouchdb-browser": "^9.0.0",
     "pouchdb-find": "^9.0.0",
@@ -42,7 +50,6 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@docstack/shared": "file:../shared",
     "@playwright/test": "^1.57.0",
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-json": "^6.1.0",

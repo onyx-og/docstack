@@ -1,8 +1,8 @@
 import { AttributeModel, Document } from "@docstack/shared";
-import createLogger from "../../utils/logger/index.js";
-import Class from "../class.js";
-import type ClientStack from "../stack.js";
-import { wrapDocumentKey, generateRandomString } from "./utils.js";
+import createLogger from "../../utils/logger/index";
+import Class from "../class";
+import type ClientStack from "../stack";
+import { wrapDocumentKey, generateRandomString } from "./utils";
 import {
     EncryptedPayload,
     decryptWithAesGcm,
@@ -10,7 +10,7 @@ import {
     importAesKeyFromHex,
     isEncryptedPayload,
     unwrapDocumentKey,
-} from "./utils.js";
+} from "./utils";
 
 /**
  * Engine for handling document-level encryption and decryption.
@@ -241,5 +241,5 @@ export class CryptoEngine {
     }
 }
 
-export type { EncryptedPayload } from "./utils.js";
-export { wrapDocumentKey, unwrapDocumentKey } from "./utils.js";
+export type { EncryptedPayload } from "./utils";
+export { wrapDocumentKey, unwrapDocumentKey } from "./utils";

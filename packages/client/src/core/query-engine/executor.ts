@@ -1,7 +1,7 @@
 // @ts-nocheck
-import { evalExpression, createRowEvaluator, evalAggregatedRowExpression } from './evaluator.js';
-import { createAccumulators } from './accumulators.js';
-import ClientStack from '../stack.js';
+import { evalExpression, createRowEvaluator, evalAggregatedRowExpression } from './evaluator';
+import { createAccumulators } from './accumulators';
+import ClientStack from '../stack';
 
 /**
  * An async version of Array.prototype.filter.

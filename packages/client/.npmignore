@@ -22,6 +22,9 @@ jest.setup.js
 rollup.config.js
 rollup.vendor.js
 
+# Webpack (comparison)
+webpack.config.js
+
 # TypeScript
 tsconfig.json
 

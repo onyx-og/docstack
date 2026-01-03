@@ -1,12 +1,12 @@
-import { Class as Class_, DesignDocument, TriggerModel } from "@docstack/shared";
-import createLogger from "../utils/logger/index.js";
+import { Class as Class_, DesignDocument, isAttributeModel, TriggerModel } from "@docstack/shared";
+import createLogger from "../utils/logger/index";
 // import ReferenceAttribute from '../Reference';
-import { Stack, ClassModel, AttributeModel, Document } from "@docstack/shared";
-import Attribute from "./attribute.js";
+import { Stack, ClassModel, Attribute as Attribute_, AttributeModel, Document } from "@docstack/shared";
+import Attribute from "./attribute";
 import { Logger } from 'winston';
-import { Trigger } from "./trigger/index.js";
+import { Trigger } from "./trigger/index";
 import { z } from "zod";
-import clientLogger from "../utils/logger/index.js";
+import clientLogger from "../utils/logger/index";
 
 /**
  * Represents a data class (schema definition) in the DocStack database.
@@ -46,7 +46,7 @@ class Class extends Class_ {
     /** The raw schema definition from the ClassModel. */
     schema: ClassModel["schema"] = {};
     /** Zod schema for runtime validation of document data. */
-    schemaZOD: z.ZodObject = z.object({});
+    schemaZOD: z.ZodObject<any, any, any> = z.object({});
     /** The unique identifier for this class (e.g., 'Task', 'Class-123'). */
     id?: string;
     /** The underlying ClassModel document. */
@@ -345,11 +345,11 @@ class Class extends Class_ {
         return this.name;
     }
 
-    getStack = () => {
+    getStack = (): Stack | undefined => {
         return this.stack;
     }
 
-    getDescription = () => {
+    getDescription = (): string | undefined => {
         return this.description;
     }
 
@@ -357,7 +357,7 @@ class Class extends Class_ {
         return this.type;
     }
 
-    getId = () => {
+    getId = (): string | undefined => {
         return this.id;
     }
 
@@ -511,13 +511,13 @@ class Class extends Class_ {
      * // Or use Attribute.create() for a simpler API
      * ```
      */
-    addAttribute = async (attribute: Attribute | AttributeModel): Promise<Class> => {
+    addAttribute = async (attribute: Attribute_ | AttributeModel): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "addAttribute", args: { attribute: attribute.name } });
-        const attribute_ = attribute instanceof Attribute
-            ? attribute : new Attribute(
+        const attribute_ = isAttributeModel(attribute) 
+            ? new Attribute(
                 this, attribute.name, attribute.type,
                 attribute.description, attribute.config
-            );
+            ) : attribute;
         try {
             let name = attribute_.getName();
             // console.log("Adding attribute", {className: this.name, attribute: name})
@@ -565,15 +565,15 @@ class Class extends Class_ {
      * @param attribute - The new Attribute or AttributeModel definition
      * @returns This Class instance for chaining
      */
-    modifyAttribute = async (name: string, attribute: Attribute | AttributeModel): Promise<Class> => {
+    modifyAttribute = async (name: string, attribute: Attribute_ | AttributeModel): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "modifyAttribute", args: { name } });
         const originSchema = { ...this.model.schema[name] },
             originAttr = this.attributes[name];
-        const attribute_ = attribute instanceof Attribute
-            ? attribute : new Attribute(
+        const attribute_ = isAttributeModel(attribute)
+            ? new Attribute(
                 this, attribute.name, attribute.type,
                 attribute.description, attribute.config
-            );
+            ) : attribute;
         try {
             fnLogger.info(`Attempting to change attribute definition.`);
             delete this.model.schema[name];
@@ -630,7 +630,7 @@ class Class extends Class_ {
      * });
      * ```
      */
-    addCard = async (params: { [key: string]: any }) => {
+    addCard = async (params: { [key: string]: any }): Promise<Document | null> => {
         const fnLogger = this.logger.child({ method: "addCard", args: { params } });
         if (!this.stack) {
             fnLogger.error("Stack is not defined");
@@ -714,7 +714,7 @@ class Class extends Class_ {
         return addedCards;
     }
 
-    addOrUpdateCard = async (params: { [key: string]: any }, cardId?: string) => {
+    addOrUpdateCard = async (params: { [key: string]: any }, cardId?: string): Promise<Document | null> => {
         const fnLogger = this.logger.child({ method: "addOrUpdateCard", args: { params, cardId } });
         return new Promise<Document | null>(async (resolve, reject) => {
             if (cardId) {
@@ -743,7 +743,7 @@ class Class extends Class_ {
      * @param params - The updated document data
      * @returns The updated document, or `null` if stack is not defined
      */
-    updateCard = async (cardId: string, params: { [key: string]: any }) => {
+    updateCard = async (cardId: string, params: { [key: string]: any }): Promise<Document | null> => {
         return new Promise<Document | null>(async (resolve, reject) => {
             if (this.stack) {
                 const res = await this.stack.createDoc(cardId, this.getName(), this, params);
