@@ -1,12 +1,12 @@
 import Class from "../class";
 import { AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, Document } from "../../../types";
-import { z, ZodAny, ZodDefault } from "zod";
+import { z, ZodType, SafeParseReturnType } from "zod";
 
 abstract class Attribute {
     abstract name: string;
     abstract description?: string;
     model!: AttributeModel;
-    abstract field: z.ZodType;
+    abstract field: ZodType;
     class: Class | null = null;
     defaultValue?: any;
     
@@ -32,7 +32,7 @@ abstract class Attribute {
 
     abstract setField: () => void;
 
-    abstract validate: (data: any) =>  Promise<z.ZodSafeParseResult<unknown>>;
+    abstract validate: (data: any) =>  Promise<SafeParseReturnType<any, any>>;
 
     abstract getClass: () => Class;
 

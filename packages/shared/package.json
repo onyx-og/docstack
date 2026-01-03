@@ -1,10 +1,19 @@
 {
     "name": "@docstack/shared",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "main": "lib/index.js",
     "src": "src/index.ts",
     "type": "module",
+    "publishConfig": {
+        "access": "public"
+    },
     "description": "Shared utilities and types for docstack packages",
+    "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
+    "homepage": "https://onyx.ac/docstack",
+    "license": "CC-BY-SA-4.0",
+    "bugs": {
+        "url": "https://github.com/onyx-og/docstack/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/onyx-og/docstack.git"
@@ -20,6 +29,9 @@
         "types",
         "docstack"
     ],
+    "dependencies": {
+        "zod": "^3.24.1"
+    },
     "devDependencies": {
         "@rollup/plugin-typescript": "^12.3.0",
         "rollup": "^4.53.1"

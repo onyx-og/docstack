@@ -19,7 +19,7 @@ abstract class Class extends EventTarget {
     description?: string;
     attributes: { [name: string]: Attribute } = {};
     schema: ClassModel["schema"] = {};
-    schemaZOD: z.ZodObject = z.object({});
+    schemaZOD: z.ZodObject<any, any, any> = z.object({});
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
@@ -77,7 +77,7 @@ abstract class Class extends EventTarget {
 
     abstract getName: () => string;
 
-    abstract getStack: () => Stack | undefined;
+    abstract getStack: () => typeof this.stack;
 
     abstract getDescription: () => string | undefined;
 
@@ -118,6 +118,10 @@ abstract class Class extends EventTarget {
 
     abstract getEncryptedAttributes: () => Attribute[];
 
+    abstract add(params: { [key: string]: any }): Promise<Document | null>;
+    abstract add(...paramsArray: { [key: string]: any }[]): Promise<Document[]>;
+    abstract add(...paramsArray: { [key: string]: any }[]): Promise<Document | Document[] | null>;
+
     // TODO: modify to pass also the current class model
     // consider first fetching/updating the local class model
     abstract addCard: (params: { [key: string]: any }) => Promise<Document | null>;
@@ -127,6 +131,10 @@ abstract class Class extends EventTarget {
     abstract addOrUpdateCard: (params: { [key: string]: any }, cardId?: string) => Promise<Document | null>;
 
     abstract updateCard: (cardId: string, params: { [key: string]: any }) => Promise<Document | null>;
+
+    abstract get(cardId: string): Promise<Document | null>;
+    abstract get(...cardId: string[]): Promise<Document[]>;
+    abstract get(...cardId: string[]): Promise<Document | Document[] | null>
 
     abstract getCards: (selector?: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
 

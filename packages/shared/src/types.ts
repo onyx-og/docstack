@@ -327,6 +327,13 @@ export const isClassModel = (object: {[key: string]: any}): object is ClassModel
     return false;
 }
 
+export const isAttributeModel = (object: {[key: string]: any}): object is AttributeModel => {
+    if (object.hasOwnProperty("name") && object.hasOwnProperty("type") && object.hasOwnProperty("config")) {
+        return true;
+    }
+    return false;
+}
+
 export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack, conn: string) => {
     bulkDocs<Model>(
         docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
