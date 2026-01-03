@@ -15,8 +15,9 @@ const config = {
     },
     externals: {
         react: 'react',
-        reactDOM: 'react-dom',
+        'react-dom': 'react-dom',
         '@docstack/client': '@docstack/client',
+        '@docstack/shared': '@docstack/shared',
     },
     devtool: 'source-map',
     module: {

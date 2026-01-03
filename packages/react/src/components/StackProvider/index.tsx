@@ -1,9 +1,13 @@
-import { ReactNode, createContext, useRef, useCallback, useEffect, useState } from 'react';
+import { ReactNode, createContext, useContext, useRef, useCallback, useEffect, useState } from 'react';
 import {DocStack} from '@docstack/client'; // Import your DocStack class
 import { ClientCredentials, StackConfig } from '@docstack/shared';
 
 // You can give it a default value, e.g., null, which can be checked later.
 export const DocStackContext = createContext<DocStack | null>(null);
+
+export const useDocStack = () => {
+    return useContext(DocStackContext);
+};
 
 export interface DocStackProviderProps {
     config: StackConfig[];

@@ -1,9 +1,14 @@
 {
   "name": "@docstack/react",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "One does not simply stack documents.",
   "main": "lib/index.js",
+  "module": "lib/index.js",
+  "types": "lib/index.d.ts",
   "src": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "npm run build:prod",
     "build:dev": "webpack --node-env=development",
@@ -18,17 +23,23 @@
     "components",
     "database",
     "documents",
-    "nosql"
+    "nosql", "sql",
+    "storage",
+    "state-management"
   ],
   "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
   "license": "CC-BY-SA-4.0",
   "bugs": {
     "url": "https://github.com/onyx-og/docstack/issues"
   },
-  "homepage": "https://github.com/onyx-og/docstack#readme",
+  "homepage": "https://onyx.ac/docstack",
+  "peerDependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
   "dependencies": {
-    "@docstack/client": "file:../client",
-    "@docstack/shared": "file:../shared"
+    "@docstack/client": "^0.0.8",
+    "@docstack/shared": "^0.0.2"
   },
   "devDependencies": {
     "eslint": "^9.38.0",
