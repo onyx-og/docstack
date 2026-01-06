@@ -1,6 +1,6 @@
 {
     "name": "@docstack/shared",
-    "version": "0.0.2",
+    "version": "0.0.5",
     "main": "lib/index.js",
     "src": "src/index.ts",
     "type": "module",
@@ -19,8 +19,8 @@
         "url": "git+https://github.com/onyx-og/docstack.git"
     },
     "scripts": {
-        "build:types": "npx tsc -build --force ./tsconfig.json",
-        "build": "rollup --config ./rollup.config.js && npm run build:types",
+        "build": "npx tsc -build --force ./tsconfig.json",
+        "build:dev": "rollup --config ./rollup.config.js",
         "lint": "eslint ./src --ext .ts,.tsx"
     },
     "keywords": [
