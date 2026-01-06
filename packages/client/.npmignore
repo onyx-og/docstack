@@ -4,6 +4,10 @@ server/
 ui/
 example/
 
+package-lock.json
+
+node_modules/
+
 # Test related
 tests/
 src-test/

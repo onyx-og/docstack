@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { evalExpression } from './evaluator';
+import { evalExpression } from './evaluator.js';
 
 /**
  * Accumulator for the SUM() aggregate function.

@@ -1,10 +1,10 @@
 import PouchDB from "pouchdb-browser";
-import createLogger from "../utils/logger";
-import Class from "./class";
-import Domain from "./domain";
+import createLogger from "../utils/logger/index.js";
+import Class from "./class.js";
+import Domain from "./domain.js";
 import PouchDBFind from 'pouchdb-find';
 
-import { getAllSystemPatches, getSystemPatches } from "./datamodel";
+import { getAllSystemPatches, getSystemPatches } from "./datamodel/index.js";
 import {
     Stack,
     StackOptions,
@@ -23,14 +23,14 @@ import {
 } from "@docstack/shared";
 
 import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
-import { StackPlugin } from "../plugins/pouchdb";
+import { StackPlugin } from "../plugins/pouchdb.js";
 
-import { parse, createPlan, executePlan } from "./query-engine";
-import type { SelectAST, UnionAST } from "./query-engine";
-import { JobEngine } from "./job-engine";
-import { PolicyEngine } from "./policy-engine";
-import { CryptoEngine } from "./crypto-engine";
-import { isEncryptedPayload } from "./crypto-engine/utils";
+import { parse, createPlan, executePlan } from "./query-engine/index.js";
+import type { SelectAST, UnionAST } from "./query-engine/index.js";
+import { JobEngine } from "./job-engine/index.js";
+import { PolicyEngine } from "./policy-engine/index.js";
+import { CryptoEngine } from "./crypto-engine/index.js";
+import { isEncryptedPayload } from "./crypto-engine/utils.js";
 
 const logger = createLogger().child({ module: "stack" });
 
@@ -200,7 +200,8 @@ class ClientStack extends Stack {
 
         // Load default plugins
         PouchDB.plugin(PouchDBFind);
-        PouchDB.plugin(StackPlugin(PouchDB, this, conn));
+        PouchDB.plugin(StackPlugin(PouchDB, this));
+        
         // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
@@ -210,6 +211,13 @@ class ClientStack extends Stack {
         this.db = new PouchDB(
             conn,
         );
+        (this.db as any).bulkDocs = StackPlugin(PouchDB, this).bulkDocs;
+        (this.db as any).bulkGet = StackPlugin(PouchDB, this).bulkGet;
+
+        const pong = await (this.db as any).ping();
+        if (!pong || pong !== "pong") {
+            throw new Error("PouchDB ping failed");
+        }
         this.cache = {
             // empty at init
         }

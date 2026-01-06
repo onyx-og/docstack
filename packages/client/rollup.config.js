@@ -27,7 +27,9 @@ export default {
   ],
   plugins: [
     resolve({
-      preferBuiltins: false
+      preferBuiltins: false,
+       // Explicitly state extensions if we encounter resolution issues
+      extensions: ['.mjs', '.js', '.json', '.node', '.ts']
     }),
     commonjs(),
     json(),
