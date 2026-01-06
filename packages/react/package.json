@@ -1,6 +1,6 @@
 {
   "name": "@docstack/react",
-  "version": "0.0.2",
+  "version": "0.0.9",
   "description": "One does not simply stack documents.",
   "main": "lib/index.js",
   "module": "lib/index.js",
@@ -10,7 +10,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "npm run build:prod",
+    "build": "npx tsc -build --force ./tsconfig.json",
     "build:dev": "webpack --node-env=development",
     "build:prod": "webpack --node-env=production"
   },
@@ -38,8 +38,10 @@
     "react-dom": "^19.2.3"
   },
   "dependencies": {
-    "@docstack/client": "^0.0.8",
-    "@docstack/shared": "^0.0.2"
+    "@docstack/client": "^0.1.4",
+    "@docstack/shared": "^0.0.5",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "eslint": "^9.38.0",
