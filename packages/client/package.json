@@ -1,7 +1,7 @@
 {
   "name": "@docstack/client",
   "description": "One does not simply stack documents.",
-  "version": "0.0.8",
+  "version": "0.1.4",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -39,7 +39,7 @@
   },
   "homepage": "https://onyx.ac/docstack",
   "dependencies": {
-    "@docstack/shared": "^0.0.2",
+    "@docstack/shared": "^0.0.5",
     "jsondiffpatch": "^0.6.0",
     "pouchdb-browser": "^9.0.0",
     "pouchdb-find": "^9.0.0",
