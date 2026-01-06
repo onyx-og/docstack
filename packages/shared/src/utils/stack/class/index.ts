@@ -1,10 +1,10 @@
-import Attribute from '../attribute'
+import Attribute from '../attribute/index.js'
 import { z } from "zod";
 // import ReferenceAttribute from '../Reference';
-import { ClassModel, AttributeModel, Document, TriggerModel } from "../../../types";
-import Stack from '..';
+import { ClassModel, AttributeModel, Document, TriggerModel } from "../../../types.js";
+import Stack from '../index.js';
 import { Logger } from 'winston';
-import Trigger from '../trigger';
+import Trigger from '../trigger.js';
 
 const CLASS_TYPE = "class";
 const SUPERCLASS_TYPE = "superclass";

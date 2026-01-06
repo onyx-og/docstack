@@ -1,5 +1,5 @@
-import Class from "../class";
-import { AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, Document } from "../../../types";
+import Class from "../class/index.js";
+import { AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, Document } from "../../../types.js";
 import { z, ZodType, SafeParseReturnType } from "zod";
 
 abstract class Attribute {
