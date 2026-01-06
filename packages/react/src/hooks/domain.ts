@@ -1,8 +1,34 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
-import { DocStackContext } from "../components/StackProvider";
+import { DocStackContext } from "../components/StackProvider/index.js";
 import { Class } from "@docstack/client";
 import {Document,  Domain,  DomainModel,  RelationDocument,  SelectAST, UnionAST} from "@docstack/shared";
 
+/**
+ * Hook to create a new Domain in a specific stack.
+ * 
+ * @param stack - The name of the stack to create the domain in.
+ * @returns A callback function to create the domain.
+ * 
+ * @example
+ * ```tsx
+ * const CreateDomain = () => {
+ *     const createDomain = useDomainCreate('my-stack');
+ *     // Assume sourceClass and targetClass are available Class instances
+ *     
+ *     const handleCreate = async () => {
+ *         const newDomain = await createDomain(
+ *             'UserProjects',
+ *             '1:N',
+ *             userClass,
+ *             projectClass,
+ *             'User has many projects'
+ *         );
+ *     };
+ *     
+ *     return <button onClick={handleCreate}>Create Domain</button>;
+ * };
+ * ```
+ */
 export const useDomainCreate = (stack: string) => {
     const docStack = useContext(DocStackContext);
 
@@ -33,6 +59,31 @@ export const useDomainCreate = (stack: string) => {
     );
 }
 
+/**
+ * Hook to retrieve a list of domains from a stack based on a selector.
+ * Maintains a real-time list of domains matching the selector.
+ * 
+ * @param stack - The name of the stack to query.
+ * @param selector - Mango selector to filter domains.
+ * @returns Object containing the list of domains, loading state, and error.
+ * 
+ * @example
+ * ```tsx
+ * const DomainList = () => {
+ *     const { domainList, loading } = useDomainList('my-stack', {
+ *         relation: { $eq: '1:N' }
+ *     });
+ *     
+ *     if (loading) return <div>Loading...</div>;
+ *     
+ *     return (
+ *         <ul>
+ *             {domainList.map(d => <li key={d.id}>{d.name} ({d.relation})</li>)}
+ *         </ul>
+ *     );
+ * };
+ * ```
+ */
 export const useDomainList = (stack: string, selector: {[key: string]: any}) => {
     const docStack = useContext(DocStackContext);
 
@@ -138,6 +189,25 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
     return { domainList, loading, error };
 }
 
+/**
+ * Hook to retrieve a single Domain instance by name.
+ * 
+ * @param stack - The name of the stack.
+ * @param domainName - The name of the domain to retrieve.
+ * @returns Object containing the Domain instance, loading state, and error.
+ * 
+ * @example
+ * ```tsx
+ * const DomainDetails = () => {
+ *     const { domain, loading } = useDomain('my-stack', 'UserProjects');
+ *     
+ *     if (loading) return <div>Loading...</div>;
+ *     if (!domain) return <div>Domain not found</div>;
+ *     
+ *     return <div>Relation Type: {domain.relation}</div>;
+ * };
+ * ```
+ */
 export const useDomain = (stack: string, domainName: string) => {
     const docStack = useContext(DocStackContext);
     const [loading, setLoading] = useState<boolean>(false);
@@ -188,6 +258,34 @@ export const useDomain = (stack: string, domainName: string) => {
 }
 
 
+/**
+ * Hook to retrieve relation documents for a specific domain.
+ * Maintains a real-time list of relations matching the query.
+ * 
+ * @param stack - The name of the stack.
+ * @param domainName - The domain name to fetch relations for.
+ * @param query - Optional Mango selector to filter relations.
+ * @returns Object containing the list of relation documents, loading state, and error.
+ * 
+ * @example
+ * ```tsx
+ * const ProjectTasks = () => {
+ *     const { docs, loading } = useDomainRelations('my-stack', 'ProjectTasks', {
+ *         sourceId: { $eq: 'Project-123' }
+ *     });
+ *     
+ *     if (loading) return <div>Loading...</div>;
+ *     
+ *     return (
+ *         <ul>
+ *             {docs.map(rel => (
+ *                 <li key={rel._id}>Linked Task: {rel.targetId}</li>
+ *             ))}
+ *         </ul>
+ *     );
+ * };
+ * ```
+ */
 export const useDomainRelations = (stack: string, domainName: string, query = {}) => {
     const docStack = useContext(DocStackContext);
 
