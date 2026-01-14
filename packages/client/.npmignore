@@ -25,12 +25,14 @@ jest.setup.js
 # Rollup
 rollup.config.js
 rollup.vendor.js
+.rollup.cache
 
 # Webpack (comparison)
 webpack.config.js
 
 # TypeScript
 tsconfig.json
+tsconfig.tsbuildinfo
 
 # Example files
 example/

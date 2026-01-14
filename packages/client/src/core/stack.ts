@@ -1677,6 +1677,7 @@ class ClientStack extends Stack {
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
             await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
             let response = await db.put(doc_);
+            doc = doc_;
             // Find me
             fnLogger.info("Response after put", { "response": response });
             if (response.ok && isNewDoc) {

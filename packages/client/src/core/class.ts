@@ -716,7 +716,7 @@ class Class extends Class_ {
 
     addOrUpdateCard = async (params: { [key: string]: any }, cardId?: string): Promise<Document | null> => {
         const fnLogger = this.logger.child({ method: "addOrUpdateCard", args: { params, cardId } });
-        return new Promise<Document | null>(async (resolve, reject) => {
+        const document = await new Promise<Document | null>(async (resolve, reject) => {
             if (cardId) {
                 fnLogger.info("Provided document's id, performing an update");
                 const res = await this.updateCard(cardId, params);
@@ -733,7 +733,21 @@ class Class extends Class_ {
                 }
             }
         });
+        fnLogger.warn("Updated document", { document })
+        return document;
 
+    }
+
+    /**
+     * Pushes a document to the database.
+     * This is an alias for {@alias addOrUpdateCard}.
+     * 
+     * @param params - The document data
+     * @param docId - Optional document ID. If provided, performs an update.
+     * @returns The created or updated document
+     */
+    push = async (params: { [key: string]: any }, docId?: string): Promise<Document | null> => {
+        return this.addOrUpdateCard(params, docId);
     }
 
     /**

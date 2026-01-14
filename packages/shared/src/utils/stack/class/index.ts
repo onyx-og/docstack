@@ -129,6 +129,7 @@ abstract class Class extends EventTarget {
     abstract addCards: (paramsArray: { [key: string]: any }[]) => Promise<Document[]>;
 
     abstract addOrUpdateCard: (params: { [key: string]: any }, cardId?: string) => Promise<Document | null>;
+    abstract push: (params: { [key: string]: any }, cardId?: string) => Promise<Document | null>;
 
     abstract updateCard: (cardId: string, params: { [key: string]: any }) => Promise<Document | null>;
 
