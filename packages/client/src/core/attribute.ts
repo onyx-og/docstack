@@ -251,13 +251,13 @@ class Attribute extends Attribute_ {
         if (config.defaultValue) {
             field = field.default(config.defaultValue);
         }
-        if (config.mandatory !== true) {
-            field = field.optional();
-        }
         if (config.isArray === true) {
             field = z.array(field);
         }
-
+        if (config.mandatory !== true) {
+            field = field.optional();
+        }
+        
         this.field = field;
     }
 
