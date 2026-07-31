@@ -137,7 +137,7 @@ build/
 lib/
 .rollup.cache
 
-package-lock.json
+# package-lock.json
 
 # Playwright
 packages/client/test-results/
