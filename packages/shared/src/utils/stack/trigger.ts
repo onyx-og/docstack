@@ -1,5 +1,5 @@
-import { Document, TriggerRunFunction, TriggerModel } from "../../types";
-import Class from "./class";
+import { Document, TriggerRunFunction, TriggerModel } from "../../types.js";
+import Class from "./class/index.js";
 
 abstract class Trigger {
     abstract readonly name: string;

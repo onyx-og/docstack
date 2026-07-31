@@ -1,7 +1,7 @@
-import { isClassModel, isDocument, isRelation, Domain } from "@docstack/shared";
+import { isClassModel, isDocument, isRelation, isPatch, Domain } from "@docstack/shared";
 import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
-import Stack from "../core/stack"
+import Stack from "../core/stack.js"
 import PouchDB from "pouchdb-browser";
 import { Trigger } from "../core/trigger/index.js";
 import createLogger from "../utils/logger/index.js";
@@ -18,10 +18,13 @@ const logger = createLogger().child({ module: "pouchdb" });
  * @returns 
  */
 export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack) => {
-    const pouchBulkDocs = PouchDB.prototype.bulkDocs;
-    const pouchGet = PouchDB.prototype.get;
-    // const pouchPut = PouchDB.prototype.put;
+    const pouchBulkDocs = stack.db ? stack.db.bulkDocs : pouch.prototype.bulkDocs;
+    const pouchBulkGet = stack.db ? stack.db.bulkGet : pouch.prototype.bulkGet;
+    // const pouchPut = pouch.prototype.put;
     return {
+        ping: () => {
+            return Promise.resolve("pong");
+        },
         bulkDocs: async function (docs, options: PouchDB.Core.BulkDocsOptions & {
             isPostOp?: boolean
         } | null, callback) {
@@ -31,23 +34,6 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 options = {}
             }
 
-            // The `isPatch` flag is reserved for bootstrapping system patches where
-            // schema documents might not yet validate against the current runtime
-            // (e.g. during initial migration). Regular application code should not
-            // set this flag because it bypasses validation and trigger execution.
-            // const skipPatchValidation = Boolean((options as any)?.isPatch);
-
-            // const originalFn = () => {
-            //     if (callback) {
-            //         return pouchBulkDocs.call(this, docs, options, callback);
-            //     } else {
-            //         return pouchBulkDocs.call(this, docs, options);
-            //     }
-            // }
-
-            // if (skipPatchValidation) {
-            //     return originalFn();
-            // }
 
             let documentsToProcess: typeof docs;
             if (Array.isArray(docs)) {
@@ -233,6 +219,9 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     }
 
                     continue;
+                } else if (isPatch(doc)) {
+                    // Patches are not validated or processed, just stored
+                    continue;
                 } else if (isDocument(doc)) {
                     const className = doc["~class"];
 
@@ -356,6 +345,47 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             });
         },
 
+        bulkGet: async function (options: PouchDB.Core.BulkGetOptions, callback?) {
+            if (typeof options === "function") {
+                callback = options;
+                options = {
+                    docs: []
+                };
+            }
+
+            const exec = async () => {
+                const result = await pouchBulkGet.call(this, options ?? {});
+                if (result && result.results && stack.cryptoEngine.isEnabled()) {
+                    const classCache = new Map<string, Class>();
+                    for (const row of result.results) {
+                        for (const docResult of row.docs) {
+                            if ('ok' in docResult) {
+                                const doc = docResult.ok as Document;
+                                if (isDocument(doc)) {
+                                    const className = doc["~class"];
+                                    let classObj = classCache.get(className);
+                                    if (!classObj) {
+                                        classObj = await stack.getClass(className, true).catch(() => null) || undefined;
+                                        if (classObj) classCache.set(className, classObj);
+                                    }
+                                    if (classObj && classObj.getEncryptedAttributes().length) {
+                                        await stack.cryptoEngine.decryptDocument(doc, classObj);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return result;
+            };
+
+            if (callback) {
+                exec().then((res) => callback(null, res)).catch((err) => callback(err, null));
+                return;
+            }
+            return exec();
+        },
+        /*
         get: async function (docId, options?: PouchDB.Core.GetOptions | null, callback?) {
             if (typeof options === "function") {
                 callback = options;
@@ -379,7 +409,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             }
             return exec();
         },
-        /*
+        
         put: async function (doc, options?: PouchDB.Core.PutOptions | null, callback?) {
             if (typeof options === "function") {
                 callback = options;

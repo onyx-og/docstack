@@ -10,12 +10,10 @@ import {
     UnionAST,
     RelationDocument,
     AuthSessionProof,
-} from "../../types";
+} from "../../types.js";
 
-import Class from "./class";
-import Domain from "./domain";
-import type PouchDB from "pouchdb";
-
+import Class from "./class/index.js";
+import Domain from "./domain.js";
 
 abstract class Stack extends EventTarget {
     /* Initialized asynchronously */

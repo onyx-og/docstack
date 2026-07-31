@@ -1,8 +1,31 @@
 // src/hooks/useFind.js
 import { useContext, useEffect, useRef, useState } from 'react';
-import { DocStackContext } from '../components/StackProvider';
+import { DocStackContext } from '../components/StackProvider/index.js';
 import { Document, SelectAST, UnionAST } from '@docstack/shared';
 
+/**
+ * Hook to execute a SQL query against a specific stack.
+ * 
+ * @param stack - The name of the stack to query.
+ * @param sql - The SQL query string.
+ * @param params - Optional parameters for the SQL query.
+ * @returns Object containing the query result (rows and AST), loading state, and error.
+ * 
+ * @example
+ * ```tsx
+ * const UserList = () => {
+ *     const { result, loading } = useQuerySQL('my-stack', 'SELECT * FROM User WHERE age > ?', 18);
+ *     
+ *     if (loading) return <div>Loading...</div>;
+ *     
+ *     return (
+ *         <ul>
+ *             {result.rows.map(user => <li key={user._id}>{user.name}</li>)}
+ *         </ul>
+ *     );
+ * };
+ * ```
+ */
 export const useQuerySQL = (stack: string, sql: string, ...params: any[]) => {
     const docStack = useContext(DocStackContext);
     const [result, setResult] = useState<{ rows: any[]; ast: (SelectAST | UnionAST)[] | null; }>({ rows: [], ast: [] });
@@ -59,6 +82,36 @@ export const useQuerySQL = (stack: string, sql: string, ...params: any[]) => {
     return { loading, result, error };
 }
 
+/**
+ * Hook to find documents in a stack using a Mango selector.
+ * 
+ * @param stack - The name of the stack to query.
+ * @param query - Object containing the selector and optional fields projection.
+ * @param sort - Optional sort criteria.
+ * @param limit - Maximum number of documents to return (default: 50).
+ * @returns Object containing the list of documents, loading state, and error.
+ * 
+ * @example
+ * ```tsx
+ * const ActiveTasks = () => {
+ *     const { docs, loading } = useFind('my-stack', {
+ *         selector: { 
+ *             "~class": "Task",
+ *             active: true 
+ *         },
+ *         fields: ['_id', 'title']
+ *     });
+ *     
+ *     if (loading) return <div>Loading...</div>;
+ *     
+ *     return (
+ *         <ul>
+ *             {docs.map(doc => <li key={doc._id}>{doc.title}</li>)}
+ *         </ul>
+ *     );
+ * };
+ * ```
+ */
 export const useFind = (stack: string, query: {
     selector: { [key: string]: string | number },
     fields?: string[]

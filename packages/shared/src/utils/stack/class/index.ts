@@ -1,10 +1,10 @@
-import Attribute from '../attribute'
+import Attribute from '../attribute/index.js'
 import { z } from "zod";
 // import ReferenceAttribute from '../Reference';
-import { ClassModel, AttributeModel, Document, TriggerModel } from "../../../types";
-import Stack from '..';
+import { ClassModel, AttributeModel, Document, TriggerModel } from "../../../types.js";
+import Stack from '../index.js';
 import { Logger } from 'winston';
-import Trigger from '../trigger';
+import Trigger from '../trigger.js';
 
 const CLASS_TYPE = "class";
 const SUPERCLASS_TYPE = "superclass";
@@ -19,7 +19,7 @@ abstract class Class extends EventTarget {
     description?: string;
     attributes: { [name: string]: Attribute } = {};
     schema: ClassModel["schema"] = {};
-    schemaZOD: z.ZodObject = z.object({});
+    schemaZOD: z.ZodObject<any, any, any> = z.object({});
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
@@ -77,7 +77,7 @@ abstract class Class extends EventTarget {
 
     abstract getName: () => string;
 
-    abstract getStack: () => Stack | undefined;
+    abstract getStack: () => typeof this.stack;
 
     abstract getDescription: () => string | undefined;
 
@@ -118,6 +118,10 @@ abstract class Class extends EventTarget {
 
     abstract getEncryptedAttributes: () => Attribute[];
 
+    abstract add(params: { [key: string]: any }): Promise<Document | null>;
+    abstract add(...paramsArray: { [key: string]: any }[]): Promise<Document[]>;
+    abstract add(...paramsArray: { [key: string]: any }[]): Promise<Document | Document[] | null>;
+
     // TODO: modify to pass also the current class model
     // consider first fetching/updating the local class model
     abstract addCard: (params: { [key: string]: any }) => Promise<Document | null>;
@@ -125,8 +129,13 @@ abstract class Class extends EventTarget {
     abstract addCards: (paramsArray: { [key: string]: any }[]) => Promise<Document[]>;
 
     abstract addOrUpdateCard: (params: { [key: string]: any }, cardId?: string) => Promise<Document | null>;
+    abstract push: (params: { [key: string]: any }, cardId?: string) => Promise<Document | null>;
 
     abstract updateCard: (cardId: string, params: { [key: string]: any }) => Promise<Document | null>;
+
+    abstract get(cardId: string): Promise<Document | null>;
+    abstract get(...cardId: string[]): Promise<Document[]>;
+    abstract get(...cardId: string[]): Promise<Document | Document[] | null>
 
     abstract getCards: (selector?: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => Promise<Document[]>;
 

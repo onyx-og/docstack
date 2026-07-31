@@ -3,20 +3,20 @@
 // import * as dotenv from "dotenv";
 // import cors from "cors";
 // dotenv.config({ path: './.env' })
-import createlogger from "../utils/logger/index"
+import createlogger from "../utils/logger/index.js"
 // import test from '../../../server/src//utils/dbManager/test';
 // import { generateJwtKeys, generatePswKeys } from '../../../server/src/utils/crypto';
-import ClientStack from './stack';
+import ClientStack from './stack.js';
 // import { login, JWTAuthPayload, setupAdminUser } from '../../../server/src//utils/auth';
 // import memoryAdapter from "pouchdb-adapter-memory"
 // import cookieParser from 'cookie-parser';
 // import jwt from 'jsonwebtoken';
-import Class from "./class";
-import Domain from './domain';
-import { Trigger } from "./trigger/index";
-import { JobEngine } from "./job-engine/index";
+import Class from "./class.js";
+import Domain from './domain.js';
+import { Trigger } from "./trigger/index.js";
+import { JobEngine } from "./job-engine/index.js";
 // import AbstractClass from '../../shared/src//utils/stack/class';
-import Attribute from './attribute';
+import Attribute from './attribute.js';
 import { AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions } from "@docstack/shared";
 import { createLogger, Logger } from "winston";
 // import { EventTarget } from 'node:events';
@@ -126,6 +126,12 @@ class DocStack extends EventTarget {
         }))
     }
 
+    /**
+     * Resets all initialized stacks.
+     * This clears the data in all stacks managed by this DocStack instance.
+     * 
+     * @throws Error if the reset operation fails for any stack.
+     */
     async resetAll() {
         try {
             for (const stack of this.stacks) {
@@ -206,6 +212,12 @@ class DocStack extends EventTarget {
         }
     }
 
+    /**
+     * Clears the connection data for a specific stack connection string.
+     * 
+     * @param conn - The connection string or name to clear.
+     * @throws Error if the connection name is missing or the operation fails.
+     */
     public clearConnection = async (conn: string) => {
         const fnLogger = this.logger.child({ method: 'clearConnection' });
         try {

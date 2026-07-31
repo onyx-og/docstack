@@ -11,23 +11,25 @@ export default {
   output: [
     {
       // UMD bundle for CommonJS/browser environments
-      dir: 'lib',
+      file: 'lib/index.umd.js',
       format: 'umd',
       name: 'docstack',
       entryFileNames: 'index.js',
       chunkFileNames: '[name].js',
     },
-    // {
-    //   // Browser-ready ES module for direct import
-    //   dir: 'dist',
-    //   format: 'es',
-    //   entryFileNames: 'index.js',
-    //   chunkFileNames: '[name].js',
-    // }
+    {
+      // Browser-ready ES module for direct import
+      dir: 'lib',
+      format: 'es',
+      entryFileNames: 'index.js',
+      chunkFileNames: '[name].js',
+    }
   ],
   plugins: [
     resolve({
-      preferBuiltins: false
+      preferBuiltins: false,
+       // Explicitly state extensions if we encounter resolution issues
+      extensions: ['.mjs', '.js', '.json', '.node', '.ts']
     }),
     commonjs(),
     json(),

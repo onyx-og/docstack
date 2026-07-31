@@ -1,6 +1,6 @@
 import { Logger } from "winston";
 import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "../../types";
-import Stack from "./"
+import Stack from "./index.js"
 
 abstract class Domain extends EventTarget {
     abstract stack: Stack | undefined;

@@ -15,8 +15,9 @@ const config = {
     },
     externals: {
         react: 'react',
-        reactDOM: 'react-dom',
+        'react-dom': 'react-dom',
         '@docstack/client': '@docstack/client',
+        '@docstack/shared': '@docstack/shared',
     },
     devtool: 'source-map',
     module: {
@@ -38,6 +39,11 @@ const config = {
             '.tsx',
             '.ts',
         ],
+        extensionAlias: {
+            '.js': ['.js', '.ts', '.tsx'],
+            '.mjs': ['.mjs', '.mts'],
+            '.cjs': ['.cjs', '.cts'],
+        },
         alias: {
             'styles': path.resolve(__dirname, 'src/styles'),
             'components': path.resolve(__dirname, 'src/components'),

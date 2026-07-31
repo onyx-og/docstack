@@ -1,7 +1,7 @@
-import Domain from "./utils/stack/domain";
-import Stack from "./utils/stack";
-import type Class from "./utils/stack/class";
-import Trigger from "./utils/stack/trigger";
+import Domain from "./utils/stack/domain.js";
+import Stack from "./utils/stack/index.js";
+import type Class from "./utils/stack/class/index.js";
+import Trigger from "./utils/stack/trigger.js";
 
 export type JobStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILURE" | "CANCELED" | "SKIPPED";
 export type JobTriggerType = "manual" | "scheduled" | "event";
@@ -313,6 +313,13 @@ export const isRelation = (object: {[key: string]: any}): object is RelationDocu
     return false;
 }
 
+export const isPatch = (object: {[key: string]: any}): object is Patch => {
+    if (object.hasOwnProperty("~class") && object["~class"] === "patch") {
+        return true;
+    }
+    return false;
+}
+
 export const isClassModel = (object: {[key: string]: any}): object is ClassModel => {
     if (object.hasOwnProperty("~class") && ["class","~self"].includes(object["~class"])) {
         return true;
@@ -320,7 +327,14 @@ export const isClassModel = (object: {[key: string]: any}): object is ClassModel
     return false;
 }
 
-export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack, conn: string) => {
+export const isAttributeModel = (object: {[key: string]: any}): object is AttributeModel => {
+    if (object.hasOwnProperty("name") && object.hasOwnProperty("type") && object.hasOwnProperty("config")) {
+        return true;
+    }
+    return false;
+}
+
+export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack) => {
     bulkDocs<Model>(
         docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
         options: PouchDB.Core.BulkDocsOptions | null,
@@ -335,6 +349,10 @@ export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack, conn:
         docId: PouchDB.Core.DocumentId,
         options?: PouchDB.Core.GetOptions | null,
         callback?: PouchDB.Core.Callback<PouchDB.Core.Document<{} & Model>>,
+    ): void;
+    bulkGet?<Model>(
+        options: PouchDB.Core.BulkGetOptions,
+        callback?: PouchDB.Core.Callback<PouchDB.Core.BulkGetResponse<{} & Model>>,
     ): void;
 }
 
