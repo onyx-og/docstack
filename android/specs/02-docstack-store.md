@@ -98,6 +98,8 @@ so numeric and lexical order agree.
 
 - **D-1** Does the WebView carrier need a lease when `docstack-headless` is also
   running, or does the headless engine always own the store and the WebView route
-  through it? Spec 04 decides; the store must support whichever answer.
+  through it? Spec 04 decides; the store must support whichever answer. Moot for
+  topologies with no WebView carrier at all (spec 04's primary-carrier mode) — the
+  headless engine is then the only writer.
 - **D-2** Filesystem spill threshold for attachments — 1 MB is a starting guess,
   not a measurement.
