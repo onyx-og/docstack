@@ -49,6 +49,7 @@ const sidebars: SidebarsConfig = {
         'architecture/infrastructure',
         'architecture/communication',
         'architecture/security',
+        'architecture/android-permetic',
       ],
     },
     {
