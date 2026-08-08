@@ -12,9 +12,13 @@ Credential Manager flow in Kotlin, not the `auth` capability.
 
 ## Phase 0 — De-risking spikes (parallel, timeboxed ~2–3 days)
 
-- [ ] `docstack-headless` boot spike (spec 04 task 1): bundle `pouchdb-core` +
-      `pouchdb-adapter-native` + a stub carrier, evaluate in Zipline/QuickJS.
-      Highest-risk unknown — record what it complains about.
+- [x] `docstack-headless` boot spike (spec 04 task 1): bundle `pouchdb-core` +
+      a stand-in adapter + a stub carrier, evaluate in Zipline/QuickJS. **Conditional
+      pass** — see `android/docstack-headless/SPIKE-NOTES.md`. `pouchdb-core` loads
+      and runs real async work inside QuickJS via Zipline on plain JVM; found and
+      documented the full shim list (spec 04 updated), including that Zipline's
+      `setTimeout`/event-loop bridge is not free for a raw bundle the way spec 04
+      originally assumed — real fix is spec 04 task 2, not yet done.
 - [ ] `docstack-store` engine spike (spec 02 task 1): RocksDB-on-Android viability
       (APK size per ABI, NDK build, atomic `WriteBatch`). Bundled SQLite is the
       named fallback — don't let this block Phase 1.

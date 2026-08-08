@@ -54,28 +54,59 @@ QuickJS via Zipline, running a bundle containing `pouchdb-core`,
 `pouchdb-replication`. The carrier is one bound Zipline suspending function into
 the same dispatcher the WebView uses.
 
-Zipline supplies `setTimeout` and an event loop, and bridges Kotlin `suspend`
-functions to JS promises — which is exactly the shape the carrier needs.
+Zipline bridges Kotlin `suspend` functions to JS promises via Kotlin/JS-compiler-
+generated glue — exactly the shape the carrier needs for its own Kotlin↔JS calls.
+**That bridge, including `setTimeout`/the event loop it implies, is not automatically
+available to arbitrary bundled JS the way a browser or Node provides it** — confirmed
+by the boot spike (task 1; see `SPIKE-NOTES.md`). `Zipline.create()`'s own source sets
+up no such global; it only "just works" for genuine Kotlin/JS-compiled Zipline guest
+code. Task 2 (carrier binding) needs to supply a real `setTimeout` implementation
+bridged to Kotlin's coroutine dispatcher — not assume one exists.
 
 ## Shims
 
 Because `pouchdb-adapter-leveldb-core` is not in the bundle (ADR-0001), the list
-is browser globals rather than a Node environment:
+is browser globals rather than a Node environment. None of these are free — the boot
+spike confirmed every one of them is missing from a bare QuickJS instance, including
+ones this spec didn't originally anticipate:
 
-- `setTimeout` / `setInterval` — Zipline provides `setTimeout`; confirm the rest
-- `fetch` — OkHttp bridge, for the Drive adapter
-- `TextEncoder` / `TextDecoder`, `atob` / `btoa`
+- `console` — **not native to QuickJS/Zipline at all**, contrary to what an earlier
+  draft of this spec assumed. Only present for genuine Kotlin/JS-compiled apps
+  (via Kotlin/JS's own stdlib polyfill, not anything Zipline provides).
+- `setTimeout` / `clearTimeout` / `setInterval` / `clearInterval` — see above; task 2
+  owns the real implementation. A naive synchronous-invoke shim breaks adapters whose
+  constructors rely on deferred initialization actually staying deferred.
+- `fetch`, `Headers` — OkHttp bridge, for the Drive adapter. Note `pouchdb-core`
+  requires `pouchdb-fetch` unconditionally at load time even when nothing on that
+  path is exercised, so this is needed even before replication is wired up.
+- `TextEncoder` / `TextDecoder`, `atob` / `btoa` — no `Buffer` either (this is neither
+  Node nor a browser), so `atob`/`btoa` need a `Buffer`-free implementation.
 - a `process` stub (`nextTick`, `browser`)
+- `stream` (Node builtin), `global`, `self` — needed just to get a
+  `pouchdb-adapter-memory`-based bundle through esbuild/QuickJS at all; may not apply
+  once the real native adapter (spec 03) replaces the stand-in used for the spike.
 
 Bundle with esbuild at `platform: 'browser'` so the PouchDB packages resolve
 their browser fields — `spark-md5` instead of `crypto`, base64 instead of
-`Buffer`.
+`Buffer`. `pouchdb-core`'s Node-oriented transitive deps (via whatever stand-in or
+real adapter is linked in) may still need individual `--alias`/`--define` fixes on
+top of the platform flag; see `SPIKE-NOTES.md` for the concrete set found so far.
+
+Separately: `zipline-cli compile`'s own dependency-collection step actually
+*executes* the bundle once, on a bare `QuickJs` instance with none of the above
+(not even `console`) — not just the real Zipline runtime at load time. Bundles need
+to tolerate evaluation in that bare sandbox too. Relevant to `permetic-ota`
+(spec 06) as well, since it's the same compile step.
 
 ## Tasks
 
 1. **Boot spike, before anything depends on this.** Bundle `pouchdb-core` plus the
    native adapter with a stub carrier, evaluate it in Zipline, and record what it
    complains about. A day's work that tells you whether this branch is viable.
+   **Done — conditional pass, see `SPIKE-NOTES.md`.** `pouchdb-core` loads and runs
+   real async operations inside QuickJS via Zipline on plain JVM. The full shim list
+   above came out of this. Task 2 still owns the real `setTimeout`/event-loop bridge
+   the spike's polling shortcut stood in for.
 2. Carrier binding: Kotlin suspend function ↔ JS promise, plus the binary
    side-channel for attachment bodies.
 3. OkHttp `fetch` polyfill with the token supplied by `auth`.
