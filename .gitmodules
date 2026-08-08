@@ -1,0 +1,12 @@
+[submodule "android/docstack-permetic"]
+	path = android/docstack-permetic
+	url = git@github.com:onyx-ac/docstack-permetic.git
+[submodule "android/docstack-headless"]
+	path = android/docstack-headless
+	url = git@github.com:onyx-ac/docstack-headless.git
+[submodule "packages/pouchdb-adapter-native"]
+	path = packages/pouchdb-adapter-native
+	url = git@github.com:onyx-ac/pouchdb-adapter-native.git
+[submodule "android/docstack-store"]
+	path = android/docstack-store
+	url = git@github.com:onyx-ac/docstack-store.git
