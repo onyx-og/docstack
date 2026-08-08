@@ -48,6 +48,8 @@ describe("@docstack/core-datamodel integration", () => {
     it("creates classes and manages attributes", async ({ useDocStack }) => {
         const test = await useDocStack({
             name: "integration-attributes",
+            username: "book-test-user",
+            password: "book-test-pass",
             evaluate: async ({ stack }) => {
                 const { Class, Attribute } = (window as any).docstack;
                 const className = `Book-${Math.random().toString(16).slice(2)}`;
@@ -96,6 +98,8 @@ describe("@docstack/core-datamodel integration", () => {
     it("creates, updates, deletes and validates documents for a class", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "integration-listeners",
+            username: "card-test-user",
+            password: "card-test-pass",
             evaluate: async ({ stack }) => {
                 const { Class, Attribute } = (window as any).docstack;
                 const className = `Card-${Math.random().toString(16).slice(2)}`;
@@ -137,6 +141,8 @@ describe("@docstack/core-datamodel integration", () => {
     it("notifies class listeners when documents change", async ({ useDocStack }) => {
         const eventDetail = await useDocStack({
             name: "integration-documents",
+            username: "listener-test-user",
+            password: "listener-test-pass",
             evaluate: async ({ stack }) => {
                 const { Class, Attribute } = (window as any).docstack;
                 const className = `Listener-${Math.random().toString(16).slice(2)}`;
@@ -192,6 +198,8 @@ describe("@docstack/core-datamodel integration", () => {
     it("validates relation documents passed through bulkDocs", async ({ useDocStack }) => {
         const test = await useDocStack({
             name: "integration-domain-validation",
+            username: "bulkdocs-test-user",
+            password: "bulkdocs-test-pass",
             evaluate: async ({ stack }) => {
                 const { Class, Domain, Attribute } = (window as any).docstack;
                 const sourceClass = await Class.create(stack, `BulkSource-${Date.now()}`, "class", "Sources");
@@ -307,6 +315,8 @@ describe("@docstack/core-datamodel integration", () => {
     it("creates and deletes domain relations via reference attributes", async ({ useDocStack }) => {
         const test = await useDocStack({
             name: "integration-reference-domain",
+            username: "relation-test-user",
+            password: "relation-test-pass",
             evaluate: async ({ stack }) => {
                 const { Class, Domain, Attribute } = (window as any).docstack;
                 const customerClass = await Class.create(stack, `Customer-${Date.now()}`, "class", "Customers");

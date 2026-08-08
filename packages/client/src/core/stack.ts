@@ -200,19 +200,22 @@ class ClientStack extends Stack {
 
         // Load default plugins
         PouchDB.plugin(PouchDBFind);
-        PouchDB.plugin(StackPlugin(PouchDB, this));
-        
+
         // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
                 PouchDB.plugin(plugin);
             }
         }
+        // Captured before `this.db` is assigned, so it wraps the pristine PouchDB
+        // methods rather than double-wrapping (see StackPlugin's `stack.db ? ... : pouch.prototype...` fallback).
+        const stackPlugin = StackPlugin(PouchDB, this);
         this.db = new PouchDB(
             conn,
         );
-        (this.db as any).bulkDocs = StackPlugin(PouchDB, this).bulkDocs;
-        (this.db as any).bulkGet = StackPlugin(PouchDB, this).bulkGet;
+        (this.db as any).ping = stackPlugin.ping;
+        (this.db as any).bulkDocs = stackPlugin.bulkDocs;
+        (this.db as any).bulkGet = stackPlugin.bulkGet;
 
         const pong = await (this.db as any).ping();
         if (!pong || pong !== "pong") {
@@ -299,6 +302,7 @@ class ClientStack extends Stack {
         const policyDoc: PolicyModel = {
             _id: `Policy-${targetClass._id}`,
             "~class": "~Policy",
+            active: true,
             rule: "return session && session.sessionStatus === 'active';",
             description: `Default policy for ${targetClass.name || targetClass._id}`,
             targetClass: [targetClass._id],

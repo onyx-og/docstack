@@ -13,7 +13,7 @@ import nodePolyfills from 'rollup-plugin-polyfill-node';
 export default {
   input: './src-test/vendor.js',
   output: {
-    file: 'lib/vendor-bundle.js',
+    file: 'test/vendor-bundle.js',
     format: 'iife'
   },
   plugins: [
@@ -21,6 +21,8 @@ export default {
       browser: true,
       preferBuiltins: false,
     }),
+    json(),
+    commonjs(),
     nodePolyfills(),
     replace({
       preventAssignment: true,
@@ -34,7 +36,5 @@ export default {
       'process.browser': 'true',
       'setImmediate(': 'queueMicrotask(',
     }),
-    json(),
-    // commonjs(),
   ]
 };

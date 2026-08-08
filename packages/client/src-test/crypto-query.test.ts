@@ -34,20 +34,13 @@ describe("crypto-engine queries", () => {
         expect(result.rows).toEqual([{ title: "visible", secret: "classified", category: "general" }]);
     });
 
-    it("drops encrypted fields and rows gracefully when the document key is absent", async ({ useDocStack }) => {
+    it("rejects queries on encrypted classes once the session is cleared", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "crypto-query-absent",
             username: "crypto-query-user2",
             password: "crypto-query-pass2",
             evaluate: async ({ stack }) => {
                 const { Class } = (window as any).docstack;
-
-                // Generate a random 32-byte hex key in the browser
-                // const array = new Uint8Array(32);
-                // crypto.getRandomValues(array);
-                // const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
-
-                // await stack.cryptoEngine.setDocumentKey(documentKey);
 
                 const secureClass = await Class.create(stack, "PartialSecureItem", "class", "Partially encrypted records", {
                     title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
@@ -63,22 +56,40 @@ describe("crypto-engine queries", () => {
 
                 const { rows: withKeyRows } = await stack.query("SELECT title, secret FROM PartialSecureItem;");
 
-                // await stack.cryptoEngine.setDocumentKey(null);
                 stack.clearAuthSession();
 
-                const { rows: withoutKeyRows } = await stack.query("SELECT title, secret FROM PartialSecureItem;");
-                const { rows: fullyLockedRows } = await stack.query("SELECT secret FROM FullyLockedItem;");
+                let partialThrew = false;
+                let partialErrorMessage = "";
+                try {
+                    await stack.query("SELECT title, secret FROM PartialSecureItem;");
+                } catch (e: any) {
+                    partialThrew = true;
+                    partialErrorMessage = e.message || "";
+                }
+
+                let lockedThrew = false;
+                let lockedErrorMessage = "";
+                try {
+                    await stack.query("SELECT secret FROM FullyLockedItem;");
+                } catch (e: any) {
+                    lockedThrew = true;
+                    lockedErrorMessage = e.message || "";
+                }
 
                 return {
                     withKeyRows,
-                    withoutKeyRows,
-                    fullyLockedRows,
+                    partialThrew,
+                    partialErrorMessage,
+                    lockedThrew,
+                    lockedErrorMessage,
                 };
             },
         });
 
         expect(result.withKeyRows).toEqual([{ title: "partially-visible", secret: "semi" }]);
-        expect(result.withoutKeyRows).toEqual([{ title: "partially-visible", secret: null }]);
-        expect(result.fullyLockedRows).toEqual([]);
+        expect(result.partialThrew).toBe(true);
+        expect(result.partialErrorMessage).toContain("authenticated");
+        expect(result.lockedThrew).toBe(true);
+        expect(result.lockedErrorMessage).toContain("authenticated");
     });
 });

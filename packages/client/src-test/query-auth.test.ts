@@ -30,7 +30,7 @@ describe("query authentication", () => {
                 // await stack.cryptoEngine.setDocumentKey(null);
 
                 let threwWhenCleared = false;
-                let unauthenticatedRows;
+                let unauthenticatedRows: any[] = [];
                 let errorMessage = "";
                 try {
                     let { rows } = await stack.query("SELECT title FROM SecureItem;");

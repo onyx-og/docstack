@@ -679,6 +679,7 @@ const sys_007: Patch = {
             "lastName": "User",
             "authMethod": "AuthMod-Classic",
             "externalId": "",
+            "keyDerivationSalt": "system-key-derivation-salt",
         }
     ]
 };
@@ -788,6 +789,7 @@ const sys_008: Patch = {
             "lastName": "User",
             "authMethod": "AuthMod-Classic",
             "externalId": "",
+            "keyDerivationSalt": "system-key-derivation-salt",
             "wrappedDocumentKey": ""
         }
     ]
