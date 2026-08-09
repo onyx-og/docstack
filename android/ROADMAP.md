@@ -40,8 +40,25 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       limitation: attachment refcounts only increment for now — decrement-on-
       supersede needs prior-revision digest info the contract doesn't pass yet
       (spec 02 task 6).
-- [ ] Dispatcher generated from `permetic-web/src/index.d.ts`'s envelope shape
-      (reused here as the Kotlin↔JS wire format inside Zipline).
+- [x] Dispatcher (`ac.onyx.docstack.store.dispatcher.StorageDispatcher`), hand-mirrored
+      from `permetic-web/src/index.d.ts`'s Transport section and `StorageCapability`
+      the same way `DocumentStore.kt` mirrors the contract — no codegen tooling exists
+      yet (flagged as future work, not silently skipped). Two scope calls made: (1)
+      `BridgeRequest`/`BridgeResponse`/`BridgeError`/`BridgeErrorCode` are mirrored
+      locally in `docstack-store` rather than pulled from a shared module, since none
+      exists yet and this module must not depend on `permetic-core`; `docstack-permetic`
+      reconciles the two copies later. (2) `dispatch()` covers only the 14 plain
+      request/response methods; `subscribeChanges`/`getAttachment`/`putAttachment` are
+      direct typed passthroughs instead, since subscription-id/cancellation bookkeeping
+      (spec 01 task 2) and the binary side-channel (spec 04 task 2) belong to other
+      modules. Error mapping: `NoSuchElementException`→`NOT_FOUND`,
+      `IllegalArgumentException`→`INVALID_ARGUMENT`, unknown method→`INTERNAL`,
+      `CancellationException` explicitly rethrown (never mapped to an `Err`). Doc
+      bodies round-trip through a small hand-written `JsonElement ↔ Any?` converter,
+      not kotlinx.serialization's data-class codecs, since `Map<String, Any?>` is
+      arbitrary JSON DocumentStore never interprets. 18/18 tests pass, including a
+      real mid-flight cancellation-propagation test and a coverage guard asserting
+      the dispatched-method set matches the contract's 14.
 - [ ] Swap in the real engine (RocksDB or SQLite) once Phase 0's spike lands.
 - [x] `allDocs`, `changes`, `bulkGet`/`revsDiff` query paths — done as part of the
       `DocumentStore` implementation above.
