@@ -28,11 +28,23 @@ Credential Manager flow in Kotlin, not the `auth` capability.
 
 ## Phase 1 — Core store (spec 02 tasks 2–5)
 
-- [ ] `DocumentStore` interface + in-memory implementation.
+- [x] `DocumentStore` interface + in-memory implementation. Full contract mirrored
+      1:1 from `StorageCapability` (`ac.onyx.docstack:docstack-store`, JVM unit
+      tests, no emulator needed — nothing here touches Android APIs). Lock-free
+      reads via `ConcurrentSkipListMap`/`ConcurrentHashMap`, a single `Mutex`
+      serializing only the write path, so "a reader is never blocked by the
+      writer" is true by construction. 7/7 conformance tests pass, including a
+      real multi-threaded concurrent-read-under-write case and a gap/duplicate-free
+      `subscribeChanges` replay-then-live case. `allDocs`/`changes`/`bulkGet`/
+      `revsDiff` (below) landed as part of this, not separately. Known, documented
+      limitation: attachment refcounts only increment for now — decrement-on-
+      supersede needs prior-revision digest info the contract doesn't pass yet
+      (spec 02 task 6).
 - [ ] Dispatcher generated from `permetic-web/src/index.d.ts`'s envelope shape
       (reused here as the Kotlin↔JS wire format inside Zipline).
 - [ ] Swap in the real engine (RocksDB or SQLite) once Phase 0's spike lands.
-- [ ] `allDocs`, `changes`, `bulkGet`/`revsDiff` query paths.
+- [x] `allDocs`, `changes`, `bulkGet`/`revsDiff` query paths — done as part of the
+      `DocumentStore` implementation above.
 
 ## Phase 2 — Adapter (spec 03)
 
