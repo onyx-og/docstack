@@ -116,6 +116,36 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       (`npm install --no-workspaces`) and its `package-lock.json` gitignored rather
       than committed, since it's a workaround artifact, not the normal
       workspace-hoisted lockfile.
+- [x] `_info`, `_get`, `_getRevisionTree`, local docs (`_getLocal`/`_putLocal`/
+      `_removeLocal`). Modeled method-by-method on `pouchdb-adapter-leveldb-core`
+      (the reference every real PouchDB adapter follows) so error/callback shapes
+      match every other adapter, not just what happened to pass our own tests.
+      Regular docs only ever enter a PouchDB store through `_bulkDocs`, so
+      `_get`/`_getRevisionTree` have no vendorable upstream file yet — covered
+      instead by a hand-written `test/native-methods.spec.js` (deliberately outside
+      `test/vendor/`) that seeds the fake carrier directly via `bulkWrite`, the same
+      call `_bulkDocs` will make next task. Local docs bypass `_bulkDocs` entirely,
+      so `test.local_docs.js` vendors and passes unmodified — the real proof for
+      this task, the same role `test.aa.setup.js` played for the harness task.
+      Three real bugs found and fixed while making that vendored file pass, all
+      cross-repo (`permetic-web/src/index.d.ts`, both `docstack-store` engines,
+      the dispatcher, both mirrored spec-02 copies — "contract drift is a compile
+      error" held across all three): (1) local-doc revs were `"N-local"`, PouchDB
+      expects `"0-N"`/`"0-0"`; (2) `putLocal`/`removeLocal` had no way to detect a
+      conflicting write — both gained a `prevRev` parameter and now throw
+      `BridgeErrorCode.CONFLICT` (reusing `IllegalStateException`, no new exception
+      hierarchy) on mismatch; (3) `getLocal` returned only the body, never the rev,
+      so a `db.get()` → `db.put()` round trip always looked like a stale write —
+      now returns `{ rev, body }`. None of these were designed up front; all three
+      surfaced from running a real upstream conformance test, not guessed at.
+      Two adapter-only fixes along the way: PouchDB's own adapter methods must stay
+      synchronous (`async function` broke callback delivery since core inspects
+      `_putLocal`'s return value — methods now return `undefined` and do the async
+      work in an internal `runAsync` helper instead), and even a not-yet-implemented
+      stub must report its error through the trailing callback rather than throwing
+      synchronously, or `db.destroy()` (used by test cleanup) hangs instead of
+      rejecting. `./gradlew test`: 8/8 + 19/19. `./gradlew connectedAndroidTest`:
+      8/8. `npm test`: 19/19.
 - [ ] `_bulkDocs` with `pouchdb-merge`, `_allDocs`/`_changes`,
       `_revsDiff`/`_bulkGet` overrides.
 - [ ] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`

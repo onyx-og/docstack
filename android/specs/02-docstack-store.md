@@ -61,6 +61,19 @@ so numeric and lexical order agree.
 - Attachment refcounts are adjusted inside the same transaction as the write that
   references them. A digest reaching zero is deleted.
 - `destroy` removes every family for that database name and is idempotent.
+- `putLocal`/`removeLocal` detect conflicting writes themselves: a caller-supplied
+  `prevRev` that doesn't match the currently stored rev — including a rev supplied
+  where none exists, or none supplied where one does — throws `CONFLICT`, unlike
+  regular docs where JS decides conflicts. Local docs are exempt from ADR-0001's
+  "native never decides revision semantics" because they never replicate; native owns
+  their whole lifecycle. Revs are formatted `"0-N"` (`"0-0"` after removal), matching
+  CouchDB/PouchDB's own local-doc convention exactly, since `pouchdb-adapter-native`
+  vendors PouchDB's real conformance tests and they assert this literal format.
+- `getLocal` returns the rev alongside the body (`{ rev, body }`, not a bare body) —
+  PouchDB's `_getLocal` callback must report `_rev` on the doc it returns, since a
+  caller's next `db.get()` → `db.put()` round trip needs it to avoid a spurious
+  conflict. Found by `pouchdb-adapter-native`'s vendored `test.local_docs.js`, not
+  designed up front.
 
 ## Tasks
 
