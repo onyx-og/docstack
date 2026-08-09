@@ -328,10 +328,52 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       `./gradlew test`/`connectedAndroidTest`: unchanged (12/12 + 20/20, 12/12) —
       no Kotlin touched. `npm test`: 372/372, 29 pending, 0 failing (was 354/354,
       47 pending).
-- [ ] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`
-      (separate repo, already built and published — see
-      `E:\repos\docstack-pouchdb-adapter-gdrive`; do this test early as the real
-      proof multi-device sync works).
+- [x] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`
+      (spec 03 task 8, separate repo — `E:\repos\docstack-pouchdb-adapter-gdrive`).
+      New `pouchdb-adapter-native/test/replication-gdrive.spec.js`, self-skipping
+      unless `TEST_ENV=production` (mirrors that repo's own `maybeDescribe`
+      convention — `npm test` stays fast/credential-free by default). Added the
+      Drive package as a `file:` devDependency plus `pouchdb-replication`/`dotenv`;
+      topology: native-adapter instance A, real-Drive instance B, `A.replicate.to(B)`,
+      new docs written directly on B replicated back, then a genuine concurrent
+      edit (both sides edit the same doc independently, `A.sync(B)`) asserting
+      both sides converge on the identical winning `_rev` and both report the
+      loser via `conflicts: true`.
+      First run found a real bug — not in this repo, in
+      `@docstack/pouchdb-adapter-googledrive` itself: it had **no revision tree at
+      all**. `IndexEntry` tracked one `{rev, seq, deleted, location}` per doc id;
+      `_bulkDocs`'s `new_edits: false` path (what every replication pull uses)
+      unconditionally overwrote the index with whatever arrived last — no merge,
+      no conflict detection (`_getRevisionTree` even synthesized a fake
+      single-leaf tree from whatever was "current," rather than returning
+      anything real). Two peers syncing a concurrent edit would each just keep
+      their own write, silently disagreeing about the winner — confirmed exactly
+      that: A and B each reported the *other's* edit as their own local winner.
+      Fixed by porting `pouchdb-adapter-native`'s own already-proven `_bulkDocs`
+      merge algorithm onto Drive's storage primitives: `pouchdb-adapter-utils`'s
+      `parseDoc()` + `pouchdb-merge`'s `merge()`/`winningRev()`, added as real
+      dependencies there. `IndexEntry` gained `tree` (opaque pouchdb-merge JSON)
+      and `conflictLocations` (non-winning leaf bodies, by rev); `compact()`
+      updated to carry conflict bodies forward too (previously the first
+      auto-compaction after any conflict existed would have silently deleted the
+      losing branch — a latent data-loss trap, not just a convergence bug).
+      `_get`/`bulkGet` gained conflict-body lookup by specific rev.
+      One more gap surfaced along the way: the Drive adapter does `api.get =
+      api._get` (replaces the whole public method, same reason
+      `pouchdb-adapter-native`'s own `revsDiff`/`bulkGet` had to — see that task's
+      note above), which bypasses `AbstractPouchDB.prototype.get`'s generic
+      `opts.conflicts` handling entirely — added explicit `_conflicts` reporting
+      to its `_get` via `pouchdb-merge`'s `collectConflicts()`.
+      Deferred (matches this project's own precedent of deferring the identical
+      things here): `_allDocs({conflicts: true})`, `_changes`'s `conflicts`/
+      `style` options, a dedicated `revsDiff` override (PouchDB core's default
+      works correctly now that `_getRevisionTree` is real).
+      Verified clean: the Drive repo's own full suite (mock suite +
+      `TEST_ENV=production npm test`, including its multi-phase production
+      replication round-trip) — 7/7 suites, 11/11 tests, no regressions.
+      `npm test` (`pouchdb-adapter-native`): 373/373, 29 pending, 0 failing (was
+      372/372, 30 pending — the new spec file un-skipped itself under
+      `TEST_ENV=production`).
 
 ## Phase 3 — Headless engine as primary carrier (spec 04, re-scoped tasks 2–4, 7)
 

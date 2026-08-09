@@ -118,7 +118,7 @@ another PouchDB database on this adapter, and encodes emitted keys with
    scope for now (2026-08-09, see Non-goals).
 7. `_doCompaction` and `_destroy`.
 8. Replication against `@docstack/pouchdb-adapter-googledrive`, both directions,
-   including conflicts and attachments.
+   including conflicts. (Attachments deferred, matching the Non-goal above.)
 
 ## Verification
 
@@ -127,4 +127,17 @@ another PouchDB database on this adapter, and encodes emitted keys with
   alongside the upstream ref and any modifications each vendored file needed.
 - `pouchdb-mapreduce` view tests pass unmodified.
 - Bidirectional replication with the Drive adapter converges, and a deliberate
-  concurrent edit produces the same winning revision on both sides.
+  concurrent edit produces the same winning revision on both sides. **Verified**
+  (2026-08-09) — `pouchdb-adapter-native/test/replication-gdrive.spec.js`, run
+  against real Google Drive (`TEST_ENV=production npm run test:prod:replication`).
+  Getting there required a real fix in `@docstack/pouchdb-adapter-googledrive`
+  itself (a separate repo): it had no revision tree at all — `_bulkDocs`'s
+  `new_edits: false` path (what every replication pull uses) unconditionally
+  overwrote the index with whatever arrived last, so two peers syncing a
+  concurrent edit through it would each just keep their own write, silently
+  disagreeing about the winner. Fixed there by porting this adapter's own
+  proven `_bulkDocs` merge algorithm (`pouchdb-adapter-utils`'s `parseDoc()` +
+  `pouchdb-merge`'s `merge()`/`winningRev()`) onto Drive's storage primitives —
+  full write-up in that repo's `docs/TESTING.md`. Confirmed via that repo's own
+  full test suite too (mock suite + `npm run test:prod`, including its
+  multi-phase production replication round-trip): all passed, no regressions.
