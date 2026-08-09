@@ -292,6 +292,42 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       `./gradlew test`/`connectedAndroidTest`: unchanged (12/12 + 20/20, 12/12) — no
       Kotlin touched. `npm test`: 354/354, 47 pending, 0 failing (was 341/341, 43
       pending).
+- [x] `_doCompaction`, `_destroy`, `_close` (task 6, attachments, decided out of
+      scope for now — see "Deferrable past v1" below — so this follows task 5
+      directly). Unlike `revsDiff`/`bulkGet`, these three *are* real
+      `_`-prefixed hooks `pouchdb-core@9`'s `AbstractPouchDB` calls directly
+      (traced the real source to confirm): `compactDocument(docId, maxHeight, cb)`
+      already uses our existing `_getRevisionTree`, computes the candidate revs via
+      `pouchdbMerge.traverseRevTree`, then calls `_doCompaction(docId, revs, cb)`
+      with just that list, no tree; `db.compact()`'s whole-db loop is entirely
+      core-provided (`AbstractPouchDB.prototype._compact`), so `_doCompaction`
+      alone covers both. No Kotlin changes for these three — `compact`/`destroy`/
+      `close` were already declared, dispatched, and implemented on both engines
+      and the fake carrier. `_close` matters for real on `RocksDbDocumentStore`
+      specifically (releases that db's actual native handle) — crosses to native,
+      not a JS-only no-op, or file handles leak.
+      Un-skipped 18 cases across `test.basics.js`/`test.changes.js`/
+      `test.all_docs.js` that were blocked only on `_destroy`/`_close`.
+      Tracing `test.bulk_docs.js`'s two remaining skips (`4372 revs_limit ...
+      deletes old revisions of the doc`) surfaced two real gaps, both fixed: (1)
+      `merge()`'s `revs_limit` stemming (wired into `_bulkDocs` since task 3) only
+      ever pruned the *tree* — the cut revisions' bodies stayed in native storage
+      forever, still fetchable by explicit rev, since `merge()`'s own
+      `stemmedRevs` return value was computed but discarded. Fixed by threading it
+      through to a `compact()` crossing right after a successful write — reuses
+      the existing capability `_doCompaction` also uses, no contract change,
+      only costs an extra crossing on the rare write that actually crosses
+      `revsLimit` (default 1000). (2) The `auto_compaction: true` variant of that
+      same test expects something *stronger* than `revs_limit`-bounded stemming —
+      compaction to leaves-only on every write. Traced that `auto_compaction`
+      isn't wired to anything in `pouchdb-core@9` itself (real disk-based
+      adapters implement it themselves); fixed by additionally running
+      `pouchdb-merge`'s own `compactTree()` (marks every non-leaf `'available'`
+      node missing — a superset-safe operation, since it skips anything `merge()`
+      already stemmed) whenever `opts.auto_compaction` is set.
+      `./gradlew test`/`connectedAndroidTest`: unchanged (12/12 + 20/20, 12/12) —
+      no Kotlin touched. `npm test`: 372/372, 29 pending, 0 failing (was 354/354,
+      47 pending).
 - [ ] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`
       (separate repo, already built and published — see
       `E:\repos\docstack-pouchdb-adapter-gdrive`; do this test early as the real
