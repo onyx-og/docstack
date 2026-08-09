@@ -146,8 +146,58 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       synchronously, or `db.destroy()` (used by test cleanup) hangs instead of
       rejecting. `./gradlew test`: 8/8 + 19/19. `./gradlew connectedAndroidTest`:
       8/8. `npm test`: 19/19.
-- [ ] `_bulkDocs` with `pouchdb-merge`, `_allDocs`/`_changes`,
-      `_revsDiff`/`_bulkGet` overrides.
+- [x] `_bulkDocs` with `pouchdb-merge`, including `new_edits: false`. Traced exactly
+      from `pouchdb-adapter-utils`'s `updateDoc.js`/`processDocs.js` (new dependency,
+      alongside `pouchdb-merge` for `merge`/`winningRev`/`isDeleted`/`revExists`):
+      `parseDoc` every doc up front (a parse error fails the whole call, matching
+      every real adapter); one `getRevTrees` crossing for the batch; per doc id,
+      threaded sequentially so a second edit to the same id in one batch sees the
+      first edit's merged tree; brand-new-doc and existing-doc branches (including
+      the CouchDB "resurrection" special case — undeleting via a fresh `newEdits`
+      root put re-parents onto the tombstone rev instead of conflicting); one
+      `bulkWrite` crossing for the whole batch. Local docs route through the
+      already-implemented `putLocal`/`removeLocal` inline, same as
+      `processDocs.js` itself does.
+      Vendored `test.bulk_docs.js`, `test.basics.js`, `test.get.js` (full vendoring,
+      not scoped down, despite the combined 163 test cases being far larger than
+      anticipated when the plan was approved) — 247 passing, 43 documented skips
+      (`VENDORED.md`), 0 failing. Skips fall into four buckets, none of them new
+      scope creep: methods later tasks own (`_allDocs`/`_changes` — task 4;
+      `_close`/`_destroy` — task 7; `_get`'s `latest`/`open_revs` resolution —
+      already deferred in task 2's own doc comment); a few whose callback-style
+      call sites turn a clean "not implemented" error into a mocha timeout instead
+      (same root cause, just a different failure shape); two tests needing the
+      `pouchdb-replication` plugin, which this local-only harness never loads; and
+      one upstream test (`putting is override-able`) that can't pass under any
+      adapter as written — a legacy replication-hook pattern `pouchdb-core@9`
+      doesn't wire up anymore.
+      Vendoring surfaced three real, previously-undesigned gaps, all fixed across
+      every repo (`permetic-web/src/index.d.ts`, both `docstack-store` engines, the
+      dispatcher, both mirrored spec copies), same "contract drift is a compile
+      error" discipline as task 2: (1) two concurrent `_bulkDocs` calls to the same
+      brand-new doc id both silently succeeded with no conflict, since `bulkWrite`
+      unconditionally overwrote whatever was stored — fixed by adding
+      `WriteOp.expectedPrevWinningRev`, a compare-and-swap token (not a
+      tree-semantics decision — ADR-0001 still holds) that `bulkWrite` checks per
+      op, rejecting just the stale op (reported as `null`, positionally aligned)
+      rather than failing the whole batch, matching CouchDB's own per-doc
+      partial-failure semantics; ops within one batch touching the same id chain
+      against each other's result, not the pre-batch state (both Kotlin engines
+      and the fake carrier needed a same-batch "pending" tracking layer for this,
+      since RocksDB's real write only commits at the end of the batch); (2)
+      `info().doc_count` counted every doc regardless of deletion instead of
+      excluding docs whose winning revision is deleted, per CouchDB's own
+      semantics; (3) `db.id()` had no adapter method at all — not even a stub —
+      so it hung instead of failing; added `_id`, backed by a reserved
+      `_local/instanceId` local doc riding the existing local-doc primitives, same
+      persisted-UUID idea `pouchdb-adapter-leveldb-core` uses. Also fixed in
+      passing: `revs_limit` (tree-stemming depth) was hardcoded to `1000` instead
+      of read from the db's own open options.
+      `./gradlew test`: 10/10 + 20/20 (was 8/8 + 19/19 — two new CAS-focused cases
+      each). `./gradlew connectedAndroidTest`: 10/10. `npm test`: 247/247, 43
+      pending, 0 failing.
+- [ ] `_allDocs`/`_changes` (wiring the changes event emitter to a native
+      `subscribeChanges` subscription), `_revsDiff`/`_bulkGet` overrides.
 - [ ] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`
       (separate repo, already built and published — see
       `E:\repos\docstack-pouchdb-adapter-gdrive`; do this test early as the real

@@ -49,11 +49,18 @@ so numeric and lexical order agree.
 
 ## Semantics that must hold
 
-- `bulkWrite` is one atomic transaction. Sequences are allocated inside it and
-  returned in the result.
+- `bulkWrite` applies every op whose `expectedPrevWinningRev` still matches the
+  document's current winning rev as one atomic transaction, allocating sequences
+  inside it. An op that's gone stale (a concurrent writer got there first) is
+  skipped and reported as `null` at that position — positionally aligned with the
+  ops list — rather than failing the whole call, matching CouchDB's own
+  per-doc partial-failure `_bulkDocs` semantics.
 - Sequences are monotonic. Gaps are acceptable; reordering is not — replication
   checkpoints on them.
 - A reader is never blocked by the writer.
+- `info`'s `docCount` excludes documents whose winning revision is deleted, matching
+  CouchDB's own `doc_count` semantics. Found by `pouchdb-adapter-native`'s vendored
+  `test.basics.js` ("db.info should give correct doc_count"), not designed up front.
 - `allDocs` with `includeConflicts` returns non-winning leaf revisions so JS can
   report conflicts. Native does not decide what a conflict is; it returns leaves.
 - `compact` deletes the named revision bodies and stores the rewritten tree JS
@@ -74,6 +81,14 @@ so numeric and lexical order agree.
   caller's next `db.get()` → `db.put()` round trip needs it to avoid a spurious
   conflict. Found by `pouchdb-adapter-native`'s vendored `test.local_docs.js`, not
   designed up front.
+- `WriteOp.expectedPrevWinningRev` (omitted means "the document must not exist yet")
+  is a compare-and-swap token, not a tree-semantics decision — it lets native detect
+  two concurrent writers racing on the same id without parsing the tree ADR-0001
+  keeps opaque to native. Within one `bulkWrite` call, later ops touching an id
+  already written earlier in the same call compare against that earlier op's result,
+  not the pre-call state, since real replication payloads can legally edit the same
+  id twice in one batch. Found by `pouchdb-adapter-native`'s vendored
+  `test.bulk_docs.js` ("handles simultaneous writes"), not designed up front.
 
 ## Tasks
 

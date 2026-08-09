@@ -46,9 +46,14 @@ throughput.
 ## `_bulkDocs`
 
 1. `getRevTrees(db, ids)` — one crossing
-2. merge in JS, compute new trees and winning revisions
-3. `bulkWrite(db, ops)` — one crossing, one native transaction; sequences
-   allocated inside it and returned with the new revisions
+2. merge in JS, compute new trees and winning revisions; each `WriteOp` carries
+   `expectedPrevWinningRev` — the winning rev the merge was computed against, or
+   omitted for a doc JS believes doesn't exist yet
+3. `bulkWrite(db, ops)` — one crossing, one native transaction for whichever ops
+   are still current when it runs; sequences allocated inside it and returned with
+   the new revisions. An op whose `expectedPrevWinningRev` has gone stale (a
+   concurrent writer landed first) comes back `null` at that position — the adapter
+   maps it to that doc's per-result conflict, same as any other `_bulkDocs` failure
 4. emit changes
 
 Two crossings whether the batch is three documents or three thousand.
