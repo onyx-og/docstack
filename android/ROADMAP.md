@@ -59,9 +59,36 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       arbitrary JSON DocumentStore never interprets. 18/18 tests pass, including a
       real mid-flight cancellation-propagation test and a coverage guard asserting
       the dispatched-method set matches the contract's 14.
-- [ ] Swap in the real engine (RocksDB or SQLite) once Phase 0's spike lands.
+- [x] Swap in the real engine: `RocksDbDocumentStore` (`ac.onyx.docstack.store.engine`),
+      running the exact same `DocumentStoreConformanceTest` suite the in-memory store
+      does (spec 02 tasks 4-5 combined). One RocksDB directory per `db` name, each
+      with its own `docs`/`revs`/`trees`/`seq`/`local`/`attachments` column families
+      (spec 02's layout table) — simpler than one shared instance with dynamically-
+      created per-db column families, and makes `destroy(db)` exactly "close the
+      handle, delete the directory." No separate sequence-counter key: the in-process
+      counter is seeded from the `seq` column family's own last key on open. `revs`
+      keyed by `id + 0x00 + rev` so a doc's still-known revisions can be prefix-scanned
+      for `allDocs(includeConflicts)` and `revsDiff` — RocksDB's answer to what
+      `InMemoryDocumentStore`'s `revisions` map gives for free. Doc bodies stored as
+      JSON (`kotlinx-serialization-json`, already a dependency); attachment bytes and
+      the opaque tree string stored raw, no wrapper. `bulkWrite`/`compact` use one
+      `WriteBatch` each, serialized by the same `Mutex` pattern the in-memory store
+      uses; reads never take it. Attachment refcounts carry forward the exact same
+      documented limitation as the in-memory store (contract doesn't give enough
+      info to decrement on supersede — spec 02 task 6, not engine-specific).
+      Two things forced by real build constraints, not choices: `compileSdk` bumped
+      35→36 (the RocksDB AAR's metadata requires it — the spike used 36 for the same
+      reason), and the conformance suite's test method names lost their descriptive
+      backtick/spaces form (Android's DEX format rejects spaces in the synthetic
+      lambda class names those generate — only surfaced once the suite was compiled
+      into an instrumented-test APK). The conformance suite itself moved to plain
+      JUnit 4 and now lives in `src/sharedTest`, wired into both `test` (JVM, the
+      in-memory store) and `androidTest` (on-device, RocksDB's native `.so` only
+      loads on Android) — one abstract class, zero duplication between engines.
+      `./gradlew test`: 25/25 (7 store + 18 dispatcher). `./gradlew connectedAndroidTest`
+      on `Medium_Phone_API_36.1`: 7/7 against the real engine.
 - [x] `allDocs`, `changes`, `bulkGet`/`revsDiff` query paths — done as part of the
-      `DocumentStore` implementation above.
+      `DocumentStore` implementation above; re-verified against the real engine here.
 
 ## Phase 2 — Adapter (spec 03)
 
