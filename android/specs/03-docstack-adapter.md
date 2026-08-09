@@ -58,6 +58,29 @@ throughput.
 
 Two crossings whether the batch is three documents or three thousand.
 
+## `_allDocs` and `_changes`
+
+`_allDocs`'s `opts.keys` crosses as native's `AllDocsOptions.keys` directly - one
+crossing for the whole key list, not the N-crossing per-key emulation
+`pouchdb-adapter-utils`'s `allDocsKeysQuery` uses for adapters without native
+multi-get support.
+
+`_changes`'s non-live path is one `changes(db, options)` crossing; the live path is
+`Carrier.subscribeChanges(db, since, listener)` - a live push subscription, not a
+request/response call, so it's attached directly on the carrier object rather than
+dispatched through the envelope (same split `StorageDispatcher.kt`'s
+`DISPATCHED_METHODS` makes on the Kotlin side). Both paths run every candidate
+change through `pouchdb-core`'s own `opts.processChange`/`pouchdb-utils`'s
+`filterChange`, reusing core's filter/ddoc/view/selector resolution instead of
+reimplementing it. A JS-side filter function needs the real doc body to evaluate
+against regardless of `include_docs`, and native's `limit` can't be trusted once a
+filter is active (it applies pre-filter) - the non-live path fetches unlimited and
+counts `limit` against post-filter matches when a filter function is present, same
+as the reference adapter's per-row stream approach. `opts.conflicts` and
+`opts.style: 'all_docs'` need a real per-doc rev tree that neither `changes()` nor
+`subscribeChanges()` carries (both only ever cross a flat, single-rev `StoredDoc`) -
+deferred, same class of gap as `_get`'s `revs`/`open_revs`/`conflicts` options.
+
 ## Carrier injection
 
 ```ts
@@ -92,7 +115,8 @@ another PouchDB database on this adapter, and encodes emitted keys with
 ## Verification
 
 - PouchDB's adapter conformance suite passes in full. Any skipped test is recorded
-  with a reason in this spec.
+  with a reason — in practice, in `pouchdb-adapter-native/test/vendor/VENDORED.md`,
+  alongside the upstream ref and any modifications each vendored file needed.
 - `pouchdb-mapreduce` view tests pass unmodified.
 - Bidirectional replication with the Drive adapter converges, and a deliberate
   concurrent edit produces the same winning revision on both sides.

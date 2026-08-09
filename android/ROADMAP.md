@@ -196,8 +196,62 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       `./gradlew test`: 10/10 + 20/20 (was 8/8 + 19/19 — two new CAS-focused cases
       each). `./gradlew connectedAndroidTest`: 10/10. `npm test`: 247/247, 43
       pending, 0 failing.
-- [ ] `_allDocs`/`_changes` (wiring the changes event emitter to a native
-      `subscribeChanges` subscription), `_revsDiff`/`_bulkGet` overrides.
+- [x] `_allDocs` and `_changes`, live and non-live. `_allDocs`'s `opts.keys` crosses
+      as native's `AllDocsOptions.keys` directly — one crossing for the whole key
+      list, not the reference adapter's N-crossing per-key emulation
+      (`pouchdb-adapter-utils`'s `allDocsKeysQuery`). `_changes` non-live is one
+      `changes()` crossing; live is `Carrier.subscribeChanges(db, since, listener)` —
+      a live push subscription, so it's attached directly on the carrier object
+      rather than dispatched through the envelope, the same split
+      `StorageDispatcher.kt`'s `DISPATCHED_METHODS` already makes on the Kotlin
+      side. Both paths reuse `pouchdb-core`'s own `opts.processChange` and
+      `pouchdb-utils`'s `filterChange` rather than reimplementing filter/ddoc/view/
+      selector resolution — same "reuse the real algorithm" principle task 3 used
+      for `pouchdb-merge`. `opts.conflicts`/`style: 'all_docs'` on `_changes` are
+      explicitly deferred (need a real per-doc rev tree neither `changes()` nor
+      `subscribeChanges()` carry — same class of gap as `_get`'s `revs`/`open_revs`
+      deferral from task 2).
+      Vendored `test.all_docs.js` (980 lines/27 cases) and `test.changes.js` (1880
+      lines/64 cases) — full vendoring, same "Full test case" preference as task 3.
+      Un-skipped the 16 cases across `test.bulk_docs.js`/`test.basics.js` that were
+      only blocked on `_allDocs`/`_changes` not existing yet; two of those needed a
+      *second*, previously-hidden fix (`_destroy`, task 7) once the first blocker
+      cleared.
+      Vendoring surfaced five real bugs, all fixed: (1) `_all_docs`'s `totalRows`
+      was computed from the *filtered* result set instead of the whole database's
+      non-deleted doc count (CouchDB's actual `_all_docs` semantics — only
+      `rows`/`offset` are query-dependent, never `total_rows`) — fixed in both
+      Kotlin engines and the fake carrier, cross-repo (`specs/02-docstack-store.md`),
+      pinned with a new conformance test; (2) a deleted doc row with
+      `include_docs: true` returned a stub tombstone body instead of `doc: null`;
+      (3) `_changes`'s non-live path only fetched doc bodies when `include_docs` was
+      requested, so any filtered-changes call silently dropped every doc, since
+      filter functions need the body regardless of what the caller asked for in the
+      output; (4) `limit` was passed straight to native, which applies it
+      pre-filter — with a JS-side filter active this silently truncated candidates
+      before the filter ever ran; fixed to fetch unlimited and count `limit` against
+      post-filter matches instead. Two more bugs were found and fixed in the
+      *test-only* fake carrier (not native, not the adapter): (5a) `subscribeChanges`
+      never replayed already-committed writes from `since`, contradicting
+      `DocumentStore.subscribeChanges`'s own documented replay-then-live contract
+      that the real Kotlin engines already implement and test; (5b) once replay was
+      added, it fired synchronously during `subscribeChanges()` itself — before
+      PouchDB core's chained `.on('change', ...)` had even been attached — so every
+      replayed event fired into a void; fixed by deferring delivery to a microtask
+      while still snapshotting synchronously (race-free).
+      Remaining skips (documented in `VENDORED.md`, none new scope creep): methods
+      later tasks own (`_close`/`_destroy` — task 7); `_changes`'s deferred
+      `conflicts`/`style` options; two chai 4.5.0 assertion-library limitations
+      (`.least`/`.most`/`.above` don't accept strings, unrelated to any adapter);
+      the `pouchdb-replication` plugin not being loaded in this local-only harness;
+      one upstream test that can't pass under any adapter as written (a stale
+      `pouchdb-core@9`-incompatible replication-hook pattern); and CouchDB's
+      server-side-only `_design` built-in filter, which `pouchdb-changes-filter`
+      doesn't implement client-side.
+      `./gradlew test`: 12/12 + 20/20 (was 10/10 + 20/20 — one new `totalRows`
+      conformance case). `./gradlew connectedAndroidTest`: 12/12. `npm test`:
+      341/341, 43 pending, 0 failing.
+- [ ] `_revsDiff` and `_bulkGet` overrides (spec 03 task 5).
 - [ ] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`
       (separate repo, already built and published — see
       `E:\repos\docstack-pouchdb-adapter-gdrive`; do this test early as the real

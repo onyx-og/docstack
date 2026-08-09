@@ -63,6 +63,11 @@ so numeric and lexical order agree.
   `test.basics.js` ("db.info should give correct doc_count"), not designed up front.
 - `allDocs` with `includeConflicts` returns non-winning leaf revisions so JS can
   report conflicts. Native does not decide what a conflict is; it returns leaves.
+- `allDocs`'s `totalRows` is always the whole database's non-deleted doc count,
+  completely independent of `startkey`/`endkey`/`keys`/`skip`/`limit` — matching
+  CouchDB's own `_all_docs` semantics, where only `rows`/`offset` are affected by
+  the query. Found by `pouchdb-adapter-native`'s vendored `test.all_docs.js`
+  ("test total_rows with a variety of criteria"), not designed up front.
 - `compact` deletes the named revision bodies and stores the rewritten tree JS
   supplies, in one transaction.
 - Attachment refcounts are adjusted inside the same transaction as the write that
