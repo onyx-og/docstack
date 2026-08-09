@@ -19,9 +19,12 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       documented the full shim list (spec 04 updated), including that Zipline's
       `setTimeout`/event-loop bridge is not free for a raw bundle the way spec 04
       originally assumed — real fix is spec 04 task 2, not yet done.
-- [ ] `docstack-store` engine spike (spec 02 task 1): RocksDB-on-Android viability
-      (APK size per ABI, NDK build, atomic `WriteBatch`). Bundled SQLite is the
-      named fallback — don't let this block Phase 1.
+- [x] `docstack-store` engine spike (spec 02 task 1): RocksDB-on-Android viability.
+      **Pass** — see `android/docstack-store/SPIKE-NOTES.md` and the updated
+      ADR-0003 (now "confirmed", was "provisional"). `io.maryk.rocksdb:rocksdb-android`
+      is real and current; atomic `WriteBatch` and ordered iteration both verified
+      on a real emulator; APK cost quantified at ~18–26 MB per ABI. Bundled SQLite
+      remains the documented fallback if a later finding invalidates this.
 
 ## Phase 1 — Core store (spec 02 tasks 2–5)
 
