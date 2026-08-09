@@ -38,10 +38,13 @@ Implemented: `_info`, `_get`, `_bulkDocs`, `_allDocs`, `_changes`,
 `_getRevisionTree`, `_doCompaction`, `_getLocal`, `_putLocal`, `_removeLocal`,
 `_getAttachment`, `_destroy`, `_close`.
 
-**Overridden rather than left to PouchDB's defaults:** `_revsDiff` and `_bulkGet`.
-Core emulates both with N individual gets, and replication calls them constantly.
-Overriding turns each into a single crossing, which is most of the sync
-throughput.
+**Overridden rather than left to PouchDB's defaults:** `revsDiff` and `bulkGet` (no
+underscore - unlike every other method here, `pouchdb-core`'s `AbstractPouchDB`
+assigns these two as concrete public methods with no `_`-prefixed hook to
+implement, so overriding means replacing the whole public method, the way real
+adapters like `pouchdb-adapter-http` do). Core's own versions emulate both with N
+individual gets, and replication calls them constantly. Overriding turns each into
+a single crossing, which is most of the sync throughput.
 
 ## `_bulkDocs`
 

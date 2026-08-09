@@ -251,7 +251,47 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       `./gradlew test`: 12/12 + 20/20 (was 10/10 + 20/20 — one new `totalRows`
       conformance case). `./gradlew connectedAndroidTest`: 12/12. `npm test`:
       341/341, 43 pending, 0 failing.
-- [ ] `_revsDiff` and `_bulkGet` overrides (spec 03 task 5).
+- [x] `revsDiff` and `bulkGet` overrides. Research corrected the plan of record: the
+      `_revsDiff`/`_bulkGet` stubs in place since task 2 were dead code under the
+      wrong names. Traced `pouchdb-core@9.0.0`'s real source — unlike every other
+      overridden method, `revsDiff`/`bulkGet` have no `_`-prefixed hook at all;
+      `AbstractPouchDB`'s constructor assigns them as concrete public methods
+      directly (confirmed by grepping `pouchdb-core`/`pouchdb-utils`/
+      `pouchdb-adapter-utils` for `_revsDiff`/`_bulkGet` — zero matches anywhere).
+      Overriding means replacing the whole public method the way real adapters
+      (`pouchdb-adapter-http`) do, which works cleanly here since `PouchInternal`'s
+      constructor runs `super()` (setting the defaults) before synchronously
+      invoking this adapter's init function. Both overrides wrap with
+      `pouchdb-utils`'s own `adapterFun`, the same wrapping the defaults use, so
+      promise/callback duality and the taskqueue/closed/destroyed checks are
+      unchanged.
+      No Kotlin/native changes needed — `StorageCapability.revsDiff`/`.bulkGet`
+      were already declared, dispatched, and implemented in both engines and the
+      fake carrier since earlier tasks; native's `revs` column family already keeps
+      every revision body ever written (not just winning), so conflicting and
+      deleted-but-superseded revisions are already "known" for `revsDiff` with no
+      tree-walking needed.
+      `revsDiff`: one crossing; native returns an entry per requested id
+      unconditionally (even with nothing missing), but CouchDB/PouchDB's own
+      convention omits those — filtered out adapter-side, the one real translation
+      step this task needed.
+      `bulkGet`: one crossing; native's results aren't positionally aligned with
+      the request list (misses are simply absent), so results are grouped by id
+      into a `Map` — not a plain object, since the vendored `#5886 bulkGet with
+      reserved id` case uses `_id: 'constructor'`, which a plain-object lookup
+      table would resolve to `Object.prototype.constructor` before any assignment.
+      Vendored `test.revs_diff.js` (163 lines/8 cases, full vendoring, no
+      modifications, no skips — all 8 pass unmodified) and `test.bulk_get.js` (226
+      lines/10 cases; 6 pass unmodified, 4 skipped: `latest=true` needs the same
+      real-rev-tree branch resolution already deferred for `_get` since task 2; 3
+      attachment cases need task 6's digest/blob storage, which doesn't exist yet).
+      Also fixed a documentation bug found along the way: `03-docstack-adapter.md`'s
+      `## Methods` section named these `_revsDiff`/`_bulkGet` — corrected to
+      `revsDiff`/`bulkGet` with a note on why their override shape differs from
+      every other method in that list.
+      `./gradlew test`/`connectedAndroidTest`: unchanged (12/12 + 20/20, 12/12) — no
+      Kotlin touched. `npm test`: 354/354, 47 pending, 0 failing (was 341/341, 43
+      pending).
 - [ ] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`
       (separate repo, already built and published — see
       `E:\repos\docstack-pouchdb-adapter-gdrive`; do this test early as the real
