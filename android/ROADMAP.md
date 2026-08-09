@@ -92,8 +92,30 @@ Credential Manager flow in Kotlin, not the `auth` capability.
 
 ## Phase 2 — Adapter (spec 03)
 
-- [ ] Conformance harness against the in-memory store first — the gate, not a late
-      check.
+- [x] Conformance harness (`packages/pouchdb-adapter-native`, npm workspace member).
+      PouchDB doesn't publish an installable conformance package, and third-party
+      adapters that get its suite "for free" (`pouchdb-adapter-fs`) all build on
+      `pouchdb-adapter-leveldb-core` — a key/value seam this adapter deliberately
+      isn't (ADR-0001: document-level seam). Decision: vendor real spec files from
+      `apache/pouchdb`'s `tests/integration/` into `test/vendor/`, recorded in
+      `VENDORED.md` with upstream ref + modifications (every file's `adapters` array
+      trimmed to `['local']` — no CouchDB `http` target here), rather than write a
+      bespoke suite — most faithful to "PouchDB's adapter conformance suite passes in
+      full." First vendored file: `test.aa.setup.js` (needs no adapter methods,
+      proves the harness runs a real upstream file end-to-end); wider files land as
+      the methods they exercise are implemented in tasks below, not all at once.
+      Built alongside it: a complete JS fake carrier (`test/fake-carrier.js`) — same
+      design as `InMemoryDocumentStore.kt`/`StorageDispatcher.kt` ported to JS, much
+      simpler since JS is single-threaded (no `Mutex`/`AtomicLong` equivalents
+      needed) — and an adapter skeleton (`src/index.ts`, `NativeAdapter({ carrier })`
+      registered via `PouchDB.adapter()`) with every `_method` stubbed until the
+      tasks below fill them in for real. `npm test`: 2/2 passing.
+      Pre-existing, unrelated to this task: the repo root's `npm install` is broken
+      (`EBADPLATFORM` on `@rollup/rollup-linux-x64-gnu` — a stale optional-dependency
+      entry in the root lockfile), so this package was installed standalone
+      (`npm install --no-workspaces`) and its `package-lock.json` gitignored rather
+      than committed, since it's a workaround artifact, not the normal
+      workspace-hoisted lockfile.
 - [ ] `_bulkDocs` with `pouchdb-merge`, `_allDocs`/`_changes`,
       `_revsDiff`/`_bulkGet` overrides.
 - [ ] Bidirectional replication test against `@docstack/pouchdb-adapter-googledrive`
