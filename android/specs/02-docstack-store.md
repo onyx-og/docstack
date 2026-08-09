@@ -14,6 +14,10 @@ ADR-0003 can be revisited without touching the contract or the adapter.
 - Parsing revision trees. They are opaque blobs. See ADR-0001.
 - Replication, conflict resolution, or anything that knows what a `_rev` means.
 - Exposing a public Kotlin query API. Native reaches data through DocStack only.
+- Attachments. Decided out of scope for now (2026-08-09) — see task 6. Existing
+  refcount bookkeeping in `bulkWrite`/`compact` (below) predates this decision and
+  stays as-is; task 6 (digest storage, filesystem spill, the binary side-channel)
+  just isn't being picked up.
 
 ## Structure
 
@@ -109,8 +113,9 @@ so numeric and lexical order agree.
    `bulkWrite`, sequence allocation.
 5. **Query paths.** `allDocs` ranges, `changes` since seq, `bulkGet`, `revsDiff`.
    These are where the document seam earns its keep — each is one crossing.
-6. **Attachments.** Digest storage, refcounting, filesystem spill above ~1 MB, and
-   the binary side-channel plumbed through the carrier.
+6. ~~**Attachments.**~~ Out of scope for now (2026-08-09, see Non-goals). Was:
+   digest storage, refcounting, filesystem spill above ~1 MB, and the binary
+   side-channel plumbed through the carrier.
 7. **Compaction and `destroy`.**
 8. **`docstack-permetic`.** Registration with `PermeticController.Builder`, the
    WebMessageListener carrier, `available('storage')` wiring.

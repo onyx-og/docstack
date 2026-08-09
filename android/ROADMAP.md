@@ -318,7 +318,9 @@ topology — there is only ever one carrier, so spec 04 task 6 (lease) is skippe
 
 ## Deferrable past v1
 
-- [ ] Attachments (spec 02/03 task 6) — only if the data model needs binary blobs.
+- [ ] Attachments (spec 02/03 task 6) — decided out of scope for now (2026-08-09);
+      DocStack doesn't treat attachments. Revisit only if the data model turns out
+      to need binary blobs after all.
 - [ ] Compaction / `destroy` polish.
 - [ ] `pouchdb-mapreduce` views — only once queries go beyond `allDocs`/`get`.
 

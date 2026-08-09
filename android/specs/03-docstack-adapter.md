@@ -13,6 +13,10 @@ protocol. Same code in the WebView and in QuickJS; only the `Carrier` differs.
 - Storage. It holds no data and no cache in v1.
 - Replication. That is `pouchdb-replication` and the Drive adapter, unchanged.
 - A carrier branch anywhere in the adapter. See ADR-0002.
+- Attachments. Decided out of scope for now (2026-08-09) — see task 6 and spec
+  02's matching Non-goal. `_getAttachment` stays `notImplemented`; the
+  Responsibility split below still describes the design for whenever this is
+  revisited, not current behavior.
 
 ## Responsibility split
 
@@ -36,7 +40,7 @@ Revision trees cross as opaque blobs in both directions.
 
 Implemented: `_info`, `_get`, `_bulkDocs`, `_allDocs`, `_changes`,
 `_getRevisionTree`, `_doCompaction`, `_getLocal`, `_putLocal`, `_removeLocal`,
-`_getAttachment`, `_destroy`, `_close`.
+`_destroy`, `_close`. (`_getAttachment` excluded — see Non-goals.)
 
 **Overridden rather than left to PouchDB's defaults:** `revsDiff` and `bulkGet` (no
 underscore - unlike every other method here, `pouchdb-core`'s `AbstractPouchDB`
@@ -110,7 +114,8 @@ another PouchDB database on this adapter, and encodes emitted keys with
 3. `_bulkDocs` with `pouchdb-merge`, including `new_edits: false`.
 4. `_allDocs` and `_changes`, live and non-live.
 5. `_revsDiff` and `_bulkGet` overrides.
-6. Attachments: digests, stubs versus bodies, binary side-channel.
+6. ~~Attachments: digests, stubs versus bodies, binary side-channel.~~ Out of
+   scope for now (2026-08-09, see Non-goals).
 7. `_doCompaction` and `_destroy`.
 8. Replication against `@docstack/pouchdb-adapter-googledrive`, both directions,
    including conflicts and attachments.
