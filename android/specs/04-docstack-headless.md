@@ -184,8 +184,16 @@ to tolerate evaluation in that bare sandbox too. Relevant to `permetic-ota`
 2. Carrier binding: Kotlin suspend function ↔ JS promise, plus the binary
    side-channel for attachment bodies. **Mechanism confirmed and signatures written
    2026-08-10** — see "Kotlin API surface" above and
-   `docstack-headless/SPIKE-NOTES.md`. Remaining: the real (non-`spike/`) module and
-   wiring `HeadlessCarrier`'s host side to the real `StorageDispatcher`.
+   `docstack-headless/SPIKE-NOTES.md`. The real (non-`spike/`) module was built
+   2026-08-10 — `RealHeadlessCarrier` wired to the real `StorageDispatcher`, the real
+   `@docstack/pouchdb-adapter-native` bundle in place of the spike's stand-in — and
+   compiles/links end to end, **but is blocked on an apparent Zipline/QuickJS bug**: a
+   JS-exposed Kotlin closure making an outbound suspend call works once, or
+   concurrently, but a second call chained off the first's own resolution never
+   reaches the host. Reproduces identically across every coroutine/dispatcher/promise
+   strategy tried and across Zipline 1.25.0/1.27.0 — see `SPIKE-NOTES.md`'s "Real
+   module" section for the full bisection trail and next steps. Not something fixable
+   from this module alone as currently understood.
 3. OkHttp `fetch` polyfill with the token supplied by `auth`.
 4. Engine lifecycle: create, warm, tear down. Bytecode precompilation of the
    bundle to avoid paying parse cost on every wake.

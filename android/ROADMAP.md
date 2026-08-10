@@ -399,9 +399,20 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       `permetic-web/src/index.d.ts`'s boolean `ok: true/false` discriminator, not
       kotlinx.serialization's default `type`-tagged polymorphism (`EnvelopeTest.kt`
       pins this). Full write-up: `docstack-headless/SPIKE-NOTES.md`'s "Task 2
-      continuation" section and spec 04's "Kotlin API surface." Remaining, not done
-      by this pass: the real (non-`spike/`) `docstack-headless` module, and wiring
-      the now-designed `HeadlessCarrier` to the real `StorageDispatcher`.
+      continuation" section and spec 04's "Kotlin API surface." **2026-08-10, later
+      the same day: the real (non-`spike/`) `docstack-headless/engine/` module was
+      built** — `RealHeadlessCarrier` wired to the real `StorageDispatcher`, the real
+      `@docstack/pouchdb-adapter-native` bundle (`engine/js-bundle/`) in place of the
+      spike's stand-in, all compiling and linking end to end (`androidTarget()` +
+      `js()` via `com.android.kotlin.multiplatform.library`, a composite build
+      against `docstack-store`). **Blocked** on an apparent Zipline/QuickJS bug found
+      during this pass, not something fixable from this module alone as currently
+      understood: a JS-exposed Kotlin closure making an outbound suspend call works
+      once, or concurrently, but a second call chained off the first call's own
+      resolution never reaches the host — reproduces identically across every
+      coroutine/dispatcher/promise strategy tried (7+) and across Zipline
+      1.25.0/1.27.0. Full bisection trail: `docstack-headless/SPIKE-NOTES.md`'s "Real
+      module" section.
 - [ ] OkHttp `fetch` polyfill fed by the app's own Google Sign-In token.
 - [ ] Engine lifecycle + bytecode precompilation. Cold-start budget is UX-facing
       here — measure cold-start-to-first-read and steady-state CRUD latency.
@@ -409,8 +420,10 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       `bulkDocs`, `query`, `changes`) for ViewModels to call directly. **2026-08-10:
       exact signatures written up** (spec 04, `PouchDbFacade`) as part of the carrier
       binding work above, since task 7's own open question below was blocked on that
-      design. Implementation (the real guest-side glue calling into the actual
-      `PouchDB` instance) is still outstanding.
+      design. **Same day: implemented** (`RealPouchDbFacade` in `engine/`'s `Guest.kt`,
+      a thin wrapper over a real `PouchDB` instance) — blocked on the same Zipline bug
+      as the carrier binding item above, since every CRUD call needing more than one
+      outbound `dispatchFn` round trip hits it.
 
 Note: spec 02 D-1 (WebView-vs-engine store ownership) does not apply in this
 topology — there is only ever one carrier, so spec 04 task 6 (lease) is skipped.
