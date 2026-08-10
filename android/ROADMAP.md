@@ -379,11 +379,38 @@ Credential Manager flow in Kotlin, not the `auth` capability.
 
 - [ ] Carrier binding (Kotlin `suspend` ↔ JS promise) + binary side-channel — now
       on the critical path for every UI read/write, not just background sync.
+      **2026-08-10: the setTimeout/event-loop bridge this task owns is now proven,
+      not just designed.** Continued the Phase 0 boot spike
+      (`docstack-headless/spike/bootstrap/`, a real Kotlin/JS module built with the
+      `app.cash.zipline` Gradle plugin) to confirm Zipline's actual mechanism, read
+      directly from `cashapp/zipline`'s own source rather than guessed: calling
+      `Zipline.get()` triggers `GlobalBridge`'s `init{}`, which installs a real
+      `globalThis.setTimeout`/`console` wired to the host's `CoroutineEventLoop`. A
+      genuine Kotlin `delay(30)` round trip completed through it — conclusive proof,
+      not the original spike's host-side `__drainTasks()` polling shim. Combined with
+      the existing esbuild pouchdb bundle via Zipline's real multi-module manifest
+      loading (not textual concatenation) on the first attempt. Two real gaps found
+      and fixed along the way: (1) `mainFunction` runs *after* every module's own
+      top-level code, not before, so `entry.js`'s `db.put()`/`db.get()` call had to
+      move from top-level into a function deferred until the Kotlin bootstrap module
+      explicitly invokes it (was silently running before `setTimeout`/`console` were
+      real, same failure mode the original spike hit, just earlier); (2) `docstack-store`'s
+      `BridgeResponse` needed a custom `KSerializer` — its wire shape is
+      `permetic-web/src/index.d.ts`'s boolean `ok: true/false` discriminator, not
+      kotlinx.serialization's default `type`-tagged polymorphism (`EnvelopeTest.kt`
+      pins this). Full write-up: `docstack-headless/SPIKE-NOTES.md`'s "Task 2
+      continuation" section and spec 04's "Kotlin API surface." Remaining, not done
+      by this pass: the real (non-`spike/`) `docstack-headless` module, and wiring
+      the now-designed `HeadlessCarrier` to the real `StorageDispatcher`.
 - [ ] OkHttp `fetch` polyfill fed by the app's own Google Sign-In token.
 - [ ] Engine lifecycle + bytecode precompilation. Cold-start budget is UX-facing
       here — measure cold-start-to-first-read and steady-state CRUD latency.
 - [ ] Kotlin `suspend`/`Flow` CRUD surface (spec 04 task 7: `get`, `put`,
-      `bulkDocs`, `query`, `changes`) for ViewModels to call directly.
+      `bulkDocs`, `query`, `changes`) for ViewModels to call directly. **2026-08-10:
+      exact signatures written up** (spec 04, `PouchDbFacade`) as part of the carrier
+      binding work above, since task 7's own open question below was blocked on that
+      design. Implementation (the real guest-side glue calling into the actual
+      `PouchDB` instance) is still outstanding.
 
 Note: spec 02 D-1 (WebView-vs-engine store ownership) does not apply in this
 topology — there is only ever one carrier, so spec 04 task 6 (lease) is skipped.
@@ -404,5 +431,8 @@ topology — there is only ever one carrier, so spec 04 task 6 (lease) is skippe
 
 ## Open questions to settle before/during Phase 3
 
-- [ ] Write up the Kotlin CRUD surface's exact method signatures once the Phase 0
-      boot spike confirms what's ergonomic to bind through Zipline.
+- [x] ~~Write up the Kotlin CRUD surface's exact method signatures once the Phase 0
+      boot spike confirms what's ergonomic to bind through Zipline.~~ **Answered
+      2026-08-10**: `ZiplineService` interfaces bound via `bind`/`take` in either
+      direction, `Flow<T>` as a bound return type — see spec 04's "Kotlin API
+      surface" (`HeadlessCarrier`, `PouchDbFacade`) and the Phase 3 entry above.

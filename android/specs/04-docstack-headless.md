@@ -47,6 +47,66 @@ thin wrapper, not a second write path — it still delegates to the same
 parses a revision tree) still holds; the wrapper never touches a revision tree
 itself, only forwards to the JS side.
 
+**Confirmed 2026-08-10** (boot spike continuation, `docstack-headless/SPIKE-NOTES.md`'s
+"Task 2 continuation" section) — two `ZiplineService` interfaces, bound in opposite
+directions, cover the whole carrier + CRUD surface. Neither invents a new contract; both
+bind the shapes `permetic-web/src/index.d.ts`, ADR-0002, and `docstack-store`'s
+`DocumentStore`/`StorageDispatcher` already specify.
+
+**`HeadlessCarrier`** — satisfies ADR-0002's "Headless: one bound Zipline suspending
+function." Host binds, guest takes:
+```kotlin
+interface HeadlessCarrier : ZiplineService {
+  suspend fun dispatch(request: BridgeRequest): BridgeResponse
+  fun subscribeChanges(db: String, since: Long): Flow<StoredDoc>
+}
+```
+Host-side implementation delegates straight to the existing
+`StorageDispatcher.dispatch()`/`DocumentStore.subscribeChanges` (`docstack-store`,
+unchanged). Guest-side, the Kotlin/JS bootstrap module's `launchZipline()` does
+`Zipline.get().take<HeadlessCarrier>("carrier")` and exposes it to the plain-JS pouchdb
+bundle as `globalThis.__docstackHost = function(req) {...}` — the exact global this
+spec's own "Carrier injection" section already looks up — wrapping the suspend call as
+a JS Promise via `kotlinx.coroutines.promise` and kotlinx.serialization's
+`encodeToDynamic`/`decodeFromDynamic` for the `BridgeRequest`/`BridgeResponse` ↔
+plain-object conversion at that boundary. `subscribeChanges` is the one non-envelope
+passthrough `Carrier` also carries in `index.d.ts`; `Flow<T>` is a documented Zipline
+return type.
+
+`BridgeResponse` (`docstack-store`'s `Envelope.kt`) needed a custom `KSerializer`
+(`BridgeResponseSerializer`) rather than a bare `@Serializable` on its sealed
+interface — the wire shape is a boolean `ok: true/false` discriminator
+(`{v, id, ok: true, value} | {v, id, ok: false, error}`, matching `index.d.ts` exactly),
+not kotlinx.serialization's default `type`-tagged polymorphism. Fixed as part of this
+work (`EnvelopeTest.kt` pins the wire shape); `BridgeRequest`/`BridgeError`/
+`BridgeErrorCode` were already correctly `@Serializable`.
+
+**`PouchDbFacade`** — the CRUD surface itself. Guest binds, host takes (opposite
+direction from the carrier, since the app's ViewModels are the caller here):
+```kotlin
+interface PouchDbFacade : ZiplineService {
+  suspend fun get(db: String, id: String, options: GetOptions = GetOptions()): DocJson
+  suspend fun put(db: String, doc: DocJson): PutResult
+  suspend fun bulkDocs(db: String, docs: List<DocJson>): List<PutResult>
+  suspend fun query(db: String, options: AllDocsOptions = AllDocsOptions()): AllDocsResultJson
+  fun changes(db: String, options: ChangesOptions = ChangesOptions()): Flow<ChangeJson>
+}
+```
+Guest-side implementation is Kotlin/JS glue calling the real `db.get()`/`db.put()`/
+`db.bulkDocs()`/`db.allDocs()`/`db.changes()` on the actual `PouchDB` instance already
+living in the esbuild bundle (promisifying pouchdb-core's callback/promise-dual API) —
+confirming this "still delegates to the same pouchdb-adapter-native route every other
+mode uses," never touching a revision tree itself. `DocJson`/`AllDocsResultJson`/
+`ChangeJson` are opaque JSON payloads (mirrors the `JsonElement`-based shape
+`Envelope.kt` already uses for doc bodies), not typed Kotlin data classes — PouchDB doc
+bodies are arbitrary JSON, same reasoning `StorageDispatcher.kt`'s own hand-written
+`JsonElement ↔ Any?` converter documents.
+
+Production work still remaining, not done by the spike: the real (non-`spike/`)
+`docstack-headless` module, wiring `HeadlessCarrier`'s host implementation to the real
+`StorageDispatcher`, and the binary side-channel for attachment bodies mentioned below
+(moot while attachments stay out of scope).
+
 ## Shape
 
 QuickJS via Zipline, running a bundle containing `pouchdb-core`,
@@ -60,8 +120,22 @@ generated glue — exactly the shape the carrier needs for its own Kotlin↔JS c
 available to arbitrary bundled JS the way a browser or Node provides it** — confirmed
 by the boot spike (task 1; see `SPIKE-NOTES.md`). `Zipline.create()`'s own source sets
 up no such global; it only "just works" for genuine Kotlin/JS-compiled Zipline guest
-code. Task 2 (carrier binding) needs to supply a real `setTimeout` implementation
-bridged to Kotlin's coroutine dispatcher — not assume one exists.
+code.
+
+**Resolved 2026-08-10.** The exact mechanism: `Zipline.get()` (jsMain) references the
+`GlobalBridge` singleton on first call, whose `init {}` installs
+`globalThis.setTimeout`/`clearTimeout`/`console` for real, wired through a taken
+`HostService` RPC proxy to the host-side `CoroutineEventLoop` — a genuine
+`CoroutineScope`, not a stub. The fix is a real (small) Kotlin/JS module, built with
+the `app.cash.zipline` Gradle plugin, that calls `Zipline.get()` before the hand-bundled
+`pouchdb-core` module runs, sharing the same QuickJS `globalThis`; the two module sets
+combine via Zipline's own multi-module manifest loading (`dependsOnIds` ordering), not
+textual concatenation. Proven with a real `delay()` round trip completing through the
+bridge — see `docstack-headless/SPIKE-NOTES.md`'s "Task 2 continuation" section for the
+full mechanism, the Gradle shape, and the sequencing gotcha found along the way
+(`mainFunction` runs *after* every module's own top-level code, not before — anything
+needing the real `setTimeout`/`console` must be deferred into `mainFunction` rather than
+called at module-load time).
 
 ## Shims
 
@@ -108,7 +182,10 @@ to tolerate evaluation in that bare sandbox too. Relevant to `permetic-ota`
    above came out of this. Task 2 still owns the real `setTimeout`/event-loop bridge
    the spike's polling shortcut stood in for.
 2. Carrier binding: Kotlin suspend function ↔ JS promise, plus the binary
-   side-channel for attachment bodies.
+   side-channel for attachment bodies. **Mechanism confirmed and signatures written
+   2026-08-10** — see "Kotlin API surface" above and
+   `docstack-headless/SPIKE-NOTES.md`. Remaining: the real (non-`spike/`) module and
+   wiring `HeadlessCarrier`'s host side to the real `StorageDispatcher`.
 3. OkHttp `fetch` polyfill with the token supplied by `auth`.
 4. Engine lifecycle: create, warm, tear down. Bytecode precompilation of the
    bundle to avoid paying parse cost on every wake.
