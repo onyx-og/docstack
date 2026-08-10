@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf android/docstack-store; ls android 2>/dev/null; echo done)",
+      "Bash(curl -s \"https://api.github.com/repos/cashapp/zipline/releases/latest\")",
+      "Bash(npm install *)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/apache/pouchdb/master/tests/integration/test.aa.setup.js\")"
+    ],
+    "additionalDirectories": [
+      "E:\\repos\\docstack\\android\\docstack-store"
+    ]
+  }
+}
