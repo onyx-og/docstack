@@ -1,7 +1,7 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider/index.js";
 import { Class } from "@docstack/client";
-import {ClassModel, Document} from "@docstack/shared";
+import {ClassModel, Document} from "@docstack/client";
 
 /**
  * Hook to create a new Class in a specific stack.

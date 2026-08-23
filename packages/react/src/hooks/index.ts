@@ -1,7 +1,7 @@
 // src/hooks/useFind.js
 import { useContext, useEffect, useRef, useState } from 'react';
 import { DocStackContext } from '../components/StackProvider/index.js';
-import { Document, SelectAST, UnionAST } from '@docstack/shared';
+import { Document, SelectAST, UnionAST } from '@docstack/client';
 
 /**
  * Hook to execute a SQL query against a specific stack.

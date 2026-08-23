@@ -1,6 +1,6 @@
 import { ReactNode, createContext, useContext, useRef, useCallback, useEffect, useState } from 'react';
 import {DocStack} from '@docstack/client'; // Import your DocStack class
-import { ClientCredentials, StackConfig } from '@docstack/shared';
+import { ClientCredentials, StackConfig } from '@docstack/client';
 
 // You can give it a default value, e.g., null, which can be checked later.
 /**

@@ -1,7 +1,6 @@
 import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider/index.js";
-import { Class } from "@docstack/client";
-import {Document,  Domain,  DomainModel,  RelationDocument,  SelectAST, UnionAST} from "@docstack/shared";
+import { Class, Domain, Document, DomainModel, RelationDocument, SelectAST, UnionAST } from "@docstack/client";
 
 /**
  * Hook to create a new Domain in a specific stack.

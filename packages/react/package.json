@@ -38,8 +38,7 @@
     "react-dom": "^19.2.3"
   },
   "dependencies": {
-    "@docstack/client": "^0.1.4",
-    "@docstack/shared": "^0.0.5",
+    "@docstack/client": "^0.1.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },
