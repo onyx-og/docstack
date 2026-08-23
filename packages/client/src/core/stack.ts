@@ -491,7 +491,14 @@ class ClientStack extends Stack {
             try {
                 fnLogger.info("Attempting to apply patch", { patch })
                 fnLogger.info("applyPatch - starting to hydrate patch docs", { docCount: patch.docs.length });
-                const hydratedDocs = await Promise.all(patch.docs.map(async doc => {
+                const hydratedDocs = await Promise.all(patch.docs.map(async sourceDoc => {
+                    // Work on a copy: the patch definition must survive intact. System
+                    // patches are module-level objects shared by every stack in the
+                    // process, so deleting `_rev` from one would strip the "auto" marker
+                    // permanently — the next ClientStack created in the same context
+                    // would then rewrite those documents as fresh inserts, hit a 409,
+                    // and end up without its `class` class model.
+                    let doc = { ...sourceDoc };
                     if (doc._rev === "auto") {
                         delete doc._rev;
                         const existingDoc = await this.db.get(doc._id);

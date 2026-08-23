@@ -1318,9 +1318,14 @@ export async function getSystemPatches(currentVersion: string) {
         (jobAuthClassic as any).hash = classicAuthJobHash;
     }
 
+    // Hand back copies, never the module-level definitions themselves. A consumer that
+    // mutates what it is given (or a future change inside applyPatch) would otherwise
+    // corrupt the system schema for every stack created later in the same process.
     return syspatches
+        .slice()
         .sort((a, b) => semver.compare(a.version, b.version))
         .filter((patch) => semver.gt(patch.version, currentVersion))
+        .map((patch) => JSON.parse(JSON.stringify(patch)) as typeof patch)
 }
 
 export async function getAllSystemPatches() {
