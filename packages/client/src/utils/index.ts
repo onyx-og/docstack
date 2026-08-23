@@ -1,3 +1,4 @@
+import z from "zod";
 import { AttributeModel, Document } from "@docstack/shared";
 import Attribute from "../core/attribute.js";
 import Class from "../core/class.js";
@@ -22,7 +23,14 @@ const attributeEffect = async (
         delete doc[attribute.name];
     } else { // when addition or change also perform validation
         const res = await attribute.validate(doc[attribute.name]);
-        if (!res) throw new Error(`Attribute '${classObj.name}.${attribute.name}' ${operation} fails for current document because of its validation`);
+        // `safeParseAsync` resolves to a result object, which is truthy whether or not the
+        // value is valid: the outcome has to be read off `success`, otherwise every invalid
+        // value passes straight through.
+        if (!res.success) {
+            throw new Error(
+                `Attribute '${classObj.name}.${attribute.name}' ${operation} fails for current document because of its validation: ${z.prettifyError(res.error)}`
+            );
+        }
     }
 
    

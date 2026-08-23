@@ -248,14 +248,17 @@ class Attribute extends Attribute_ {
         }
 
         // These rules are applied regardless of the type, and in the correct order
-        if (config.defaultValue) {
+        if (config.defaultValue !== undefined) {
             field = field.default(config.defaultValue);
         }
         if (config.isArray === true) {
             field = z.array(field);
         }
         if (config.mandatory !== true) {
-            field = field.optional();
+            // Optional attributes accept `null` as well as absence: `undefined` does not
+            // survive JSON serialization, so `null` is the only way a client can express
+            // "clear this field" on a stored document.
+            field = field.nullable().optional();
         }
 
         this.field = field;
@@ -390,7 +393,7 @@ class Attribute extends Attribute_ {
      */
     getEmpty = () => {
         const partialDoc = {
-            [this.name]: this.field.parse(undefined) || null
+            [this.name]: this.field.parse(undefined) ?? null
         }
         return partialDoc;
     }
