@@ -112,7 +112,11 @@ export const createGuardedDb = <T extends {}>(db: PouchDB.Database<T>): PouchDB.
         const opts = typeof options === "function" ? null : (options as PouchDB.Core.BulkDocsOptions | null);
 
         if (readNewEdits(docs, opts) === false) return refuse("bulkDocs", handler);
-        return (db.bulkDocs as any).call(db, docs, options, callback);
+        // Forward exactly the arguments this call received: PouchDB's adapters use
+        // arguments.length to decide whether to normalize a missing `options`, so
+        // passing `options`/`callback` through as explicit `undefined`s (instead of
+        // omitting them) skips that normalization and crashes downstream.
+        return (db.bulkDocs as any).apply(db, arguments);
     };
 
     const guardedPut = function (doc: unknown, options?: unknown, callback?: unknown) {
@@ -123,7 +127,8 @@ export const createGuardedDb = <T extends {}>(db: PouchDB.Database<T>): PouchDB.
         // `force` is the same hatch under another name: PouchDB rewrites it into
         // `new_edits: false` to mint a deliberately conflicting revision.
         if (opts && (opts.new_edits === false || opts.force)) return refuse("put", handler);
-        return (db.put as any).call(db, doc, options, callback);
+        // See guardedBulkDocs above: forward the real arity, not a padded 3-arg call.
+        return (db.put as any).apply(db, arguments);
     };
 
     return new Proxy(db, {

@@ -9,12 +9,25 @@ type EvaluateInBrowser<T> = (args: {
   stackName: string;
 }) => T | Promise<T>;
 
+/**
+ * The document key every fixture stack is opened with.
+ *
+ * DocStack does not invent one (ADR-0018), so a stack created without a key opens locked
+ * and refuses to write encrypted attributes. Tests want a working stack, not a locked one,
+ * so the fixture supplies a fixed key; a test that wants the locked state passes
+ * `documentKey: null`. Deterministic on purpose - a stack reopened under the same name
+ * must decrypt what the previous open wrote.
+ */
+export const TEST_DOCUMENT_KEY = "0".repeat(64);
+
 type UseDocStackOptions<T> = {
   name?: string;
   evaluate: EvaluateInBrowser<T>;
   patches?: Patch[];
   username?: string;
   password?: string;
+  /** Pass `null` to open the stack locked. Defaults to {@link TEST_DOCUMENT_KEY}. */
+  documentKey?: string | null;
 };
 /**
  * Fixture for initializing the DocStack client library in the browser.
@@ -61,7 +74,7 @@ export const test = base.extend<DocStackFixture>({
   useDocStack: async ({ docStackPage }, use) => {
     const initDocStack = async <T>(options: UseDocStackOptions<T>) => {
       // The 'evaluate' function is passed as a string to the browser context.
-      return await docStackPage.evaluate(async ({ name, evaluate, patches, username, password }) => {
+      return await docStackPage.evaluate(async ({ name, evaluate, patches, username, password, documentKey }) => {
         // Access the compiled library that was injected
         const docStackLib = (window as any).docstack;
         if (!docStackLib) {
@@ -100,7 +113,7 @@ export const test = base.extend<DocStackFixture>({
         // Initialize DocStack with the provided options
         const { DocStack } = docStackLib;
         const stackName = name || `docstack-test-${Date.now()}`;
-        const docStack = new DocStack({ name: stackName, patches });
+        const docStack = new DocStack({ name: stackName, patches, documentKey: documentKey ?? undefined });
 
         // Wait for the ready event
         await new Promise<void>((resolve, reject) => {
@@ -129,7 +142,15 @@ export const test = base.extend<DocStackFixture>({
         // Reconstruct and execute the evaluate function in the browser
         const evaluateFunc = new Function('return ' + evaluate)();
         return await evaluateFunc({ docStack, stack, stackName });
-      }, { name: options.name, evaluate: options.evaluate.toString(), patches: options.patches, username: options.username, password: options.password });
+      }, {
+        name: options.name,
+        evaluate: options.evaluate.toString(),
+        patches: options.patches,
+        username: options.username,
+        password: options.password,
+        // `null` asks for a locked stack; anything else falls back to the shared key.
+        documentKey: options.documentKey === null ? null : (options.documentKey ?? TEST_DOCUMENT_KEY),
+      });
     };
     
     await use(initDocStack);

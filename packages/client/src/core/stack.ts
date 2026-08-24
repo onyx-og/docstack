@@ -51,6 +51,7 @@ const DOCSTACK_OPTION_KEYS: readonly string[] = [
     "patches",
     "credentials",
     "disableCryptoEngine",
+    "documentKey",
 ];
 
 /**
@@ -230,6 +231,12 @@ class ClientStack extends Stack {
      */
     authSession?: AuthSessionProof;
     private cryptoEngineDisabled!: boolean;
+    /**
+     * Application patches held back because they write encrypted attributes and the stack
+     * has no key yet. Replayed by {@link unlock}. Kept in memory on purpose - reopening
+     * the stack runs the same options through the same check.
+     */
+    private deferredPatches: Patch[] = [];
 
     private constructor() {
         super();
@@ -299,6 +306,9 @@ class ClientStack extends Stack {
         this.jobEngine = new JobEngine(this);
         this.policyEngine = new PolicyEngine(this);
         this.cryptoEngine = new CryptoEngine(this);
+        if (options?.documentKey) {
+            await this.cryptoEngine.setDocumentKey(options.documentKey);
+        }
     }
 
     /**
@@ -448,6 +458,108 @@ class ClientStack extends Stack {
     }
 
     /**
+     * Whether the stack is operating without its document encryption key.
+     *
+     * A locked stack reads everything that needs no key and refuses writes to classes
+     * carrying encrypted attributes, rather than storing them in the clear. Patches that
+     * would write encrypted data are deferred until {@link unlock}. Stacks with the crypto
+     * engine disabled are never locked - there is no key to be missing.
+     *
+     * @returns `true` when encryption is enabled but no key is held.
+     */
+    public isLocked() {
+        return this.cryptoEngine.isEnabled() && !this.cryptoEngine.getDocumentKey();
+    }
+
+    /**
+     * Supplies the document encryption key to a locked stack.
+     *
+     * The key is checked against the stack's canary before it is accepted, so passing the
+     * wrong one throws instead of quietly producing unreadable writes. On the first unlock
+     * of a stack that has none, the canary is minted from the key given - which is what
+     * makes every later open verifiable.
+     *
+     * Unlocking resumes any bootstrap deferred while locked, then emits `unlocked`.
+     *
+     * @param documentKey - The hex-encoded document key, from wherever the application
+     * provisions it.
+     * @throws If the stack has encryption disabled, or the key does not match the canary.
+     *
+     * @example
+     * ```typescript
+     * const stack = await ClientStack.create('db-app');   // opens locked
+     * await stack.unlock(await myServer.fetchDocumentKey());
+     * stack.isLocked(); // false
+     * ```
+     */
+    public async unlock(documentKey: string) {
+        if (!this.cryptoEngine.isEnabled()) {
+            throw new Error("Stack was opened with the crypto engine disabled; there is no document key to supply.");
+        }
+        if (!documentKey) {
+            throw new Error("unlock requires a document key.");
+        }
+
+        const previousKey = this.cryptoEngine.getDocumentKey();
+        await this.cryptoEngine.setDocumentKey(documentKey);
+
+        const config = await this.db
+            .get<{ encryptedMarker?: unknown }>(ClientStack.CRYPTO_CONFIG_DOC_ID)
+            .catch((error: any) => {
+                if (error?.name === "not_found" || error?.status === 404) return null;
+                throw error;
+            });
+
+        const canary = (config as any)?.encryptedMarker;
+        if (isEncryptedPayload(canary)) {
+            if (!(await this.cryptoEngine.verifyMarker(canary))) {
+                // Put the stack back as it was: a rejected key must not leave it half-keyed.
+                await this.cryptoEngine.setDocumentKey(previousKey ?? null);
+                throw new Error(
+                    "The supplied document key does not match this stack: it cannot decrypt the stack's key marker."
+                );
+            }
+        }
+
+        // Mints the canary if this is the first key the stack has seen, then finishes the
+        // bootstrap and patches that were waiting on one.
+        await this.onDocumentKeyAvailable();
+
+        this.dispatchEvent(new CustomEvent("unlocked", { detail: { stackName: this.name } }));
+        return this;
+    }
+
+    /**
+     * Encrypts bootstrap documents that were seeded before this stack had a key.
+     *
+     * The seed system user is the one document DocStack must write before a key can
+     * exist: the first open of a database has no wrapped key to recover one from, and
+     * refusing to seed it would leave nothing to authenticate against. It is therefore
+     * written in the clear - its password is the published constant `"system"`, so
+     * nothing secret is exposed - and repaired here.
+     *
+     * Rewriting it through the authoring path encrypts its attributes and lets
+     * `auto-wrap-document-key` run for the first time, producing the
+     * `wrappedDocumentKey` that lets another device recover this same document key.
+     * Without this step a stack bootstrapped locked could never authenticate, because
+     * the trigger no-ops when no key is held. See ADR-0018.
+     */
+    private async rekeyBootstrapDocuments() {
+        if (this.isLocked()) return;
+
+        const systemUser = await this.db.get<Document>("system").catch((error: any) => {
+            if (error?.name === "not_found" || error?.status === 404) return null;
+            throw error;
+        });
+        if (!systemUser) return;
+        // A wrapped key means a previous unlock already repaired it.
+        if ((systemUser as any).wrappedDocumentKey) return;
+
+        logger.warn("Re-keying bootstrap documents seeded before a document key was available");
+        await this.db.put(systemUser as any);
+    }
+
+    /**
      * Exports all documents from the database.
      * Useful for debugging or creating backups.
      * @returns All documents including their content
@@ -516,19 +628,83 @@ class ClientStack extends Stack {
             const patches = await stack.findDocuments<Patch>({
                 "~class": { $eq: "patch" }
             })
-            for (const patch of options.patches.filter(
+            await stack.applyConsumerPatches(options.patches.filter(
                 p => !patches.docs.find(
                     existing => existing.version === p.version
                     && existing.target === p.target
                 )
-            )) {
-                await stack.applyPatch(patch);
-            }
+            ));
         }
         if (options?.credentials) {
             await stack.authenticate(options.credentials);
         }
         return stack;
+    }
+
+    /**
+     * Applies application-supplied patches, holding back any that need a document key.
+     *
+     * A locked stack must not write encrypted attributes in the clear, so a patch that
+     * would do so is kept for {@link unlock} instead. This is a barrier rather than a
+     * filter: patches apply in order and a later one may depend on the schema an earlier
+     * one installs, so the first deferral stops the run.
+     *
+     * The held-back patches live on the instance, not in the database - reopening the
+     * stack replays the same options through the same check, so there is no persisted
+     * state to drift.
+     *
+     * @param patches - Patches not yet present in this stack.
+     */
+    private async applyConsumerPatches(patches: Patch[]) {
+        const fnLogger = logger.child({ method: "applyConsumerPatches" });
+        for (let index = 0; index < patches.length; index++) {
+            const patch = patches[index];
+            if (this.isLocked() && await this.patchNeedsDocumentKey(patch)) {
+                this.deferredPatches = patches.slice(index);
+                fnLogger.warn("Deferred patches that write encrypted attributes until the stack is unlocked", {
+                    from: patch.version,
+                    count: this.deferredPatches.length,
+                });
+                return;
+            }
+            await this.applyPatch(patch);
+        }
+        this.deferredPatches = [];
+    }
+
+    /**
+     * Decides whether applying a patch would write an encrypted attribute.
+     *
+     * The judgement is made immediately before the patch would be applied, against the
+     * schema as it stands then, plus any class model the patch carries itself - a patch
+     * can introduce an encrypted attribute and write a document using it in one go, as
+     * `~sys-0.0.8` does. Everything earlier has already landed, so nothing needs to
+     * simulate schema evolution ahead of time.
+     *
+     * @param patch - The patch about to be applied.
+     * @returns `true` if any document in it belongs to a class with encrypted attributes.
+     */
+    private async patchNeedsDocumentKey(patch: Patch): Promise<boolean> {
+        const hasEncryptedAttribute = (schema?: ClassModel["schema"]) =>
+            !!schema && Object.values(schema).some((attribute: any) => attribute?.config?.encrypted === true);
+
+        const schemasInPatch = new Map<string, ClassModel["schema"]>();
+        for (const doc of patch.docs) {
+            if (isClassModel(doc) && doc.schema) schemasInPatch.set(doc._id, doc.schema);
+        }
+
+        for (const doc of patch.docs) {
+            // Class models describe encryption; they never carry an encrypted value.
+            if (isClassModel(doc)) continue;
+            const className = (doc as any)["~class"];
+            if (!className) continue;
+
+            if (hasEncryptedAttribute(schemasInPatch.get(className))) return true;
+
+            const stored = await this.getClassModel(className).catch(() => null);
+            if (hasEncryptedAttribute(stored?.schema)) return true;
+        }
+        return false;
     }
 
     /**
@@ -601,14 +777,46 @@ class ClientStack extends Stack {
         const sessionClassModel = (await this.getClassModel("~UserSession")) || (await this.getClassModel("UserSession"));
         const sessionSchema = sessionClassModel?.schema || {};
         await this.createDoc(sessionDoc._id, sessionDoc["~class"], sessionSchema, sessionDoc);
-        // TODO: Initially the wrappedDocumentKey is missing for the system user,
-        // perhaps the documentKey hasn't been set yet? 
-        const documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey);
 
-        const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey: documentKey ?? undefined };
+        // Recovering the document key is the *ordinary* outcome here - it is how a second
+        // device ends up with the key the first one wrote - but it is not guaranteed. A
+        // user seeded before the stack had any key carries no wrapped copy (see ADR-0018's
+        // bootstrap exception), and authenticating cannot conjure one. Holding a session
+        // and holding a key are separate things, so the session stands either way and the
+        // stack simply stays locked until `unlock` supplies one.
+        let documentKey: string | undefined;
+        if (this.cryptoEngine.isEnabled() && user.wrappedDocumentKey) {
+            documentKey = await this.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, derivedKey) ?? undefined;
+        } else if (this.cryptoEngine.isEnabled()) {
+            logger.warn("Authenticated without recovering a document key: the user carries no wrapped key, so the stack stays locked", {
+                username: user.username,
+            });
+        }
+
+        const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey };
         this.setAuthSession(proof);
-        await this.ensureCryptoMarkerEncryption();
+        if (documentKey) {
+            await this.onDocumentKeyAvailable();
+        }
         return proof;
+    }
+
+    /**
+     * Finishes the work that could not be done while the stack had no document key.
+     *
+     * Reached from both ways a key arrives - {@link unlock} and {@link authenticate} -
+     * because the consequences are the same either way: the canary has to exist for later
+     * opens to be verifiable, bootstrap documents seeded in the clear have to be
+     * encrypted, and patches held back have to be applied.
+     */
+    private async onDocumentKeyAvailable() {
+        await this.ensureCryptoMarkerEncryption();
+        await this.rekeyBootstrapDocuments();
+        if (this.deferredPatches.length) {
+            const deferred = this.deferredPatches;
+            this.deferredPatches = [];
+            await this.applyConsumerPatches(deferred);
+        }
     }
 
     async getLastDocId() {
@@ -964,16 +1172,13 @@ class ClientStack extends Stack {
             }
         }
 
-        if (!this.cryptoEngineDisabled && !this.cryptoEngine.getDocumentKey()) {
-            const randomBytes = new Uint8Array(32);
-            globalThis.crypto.getRandomValues(randomBytes);
-            const documentKey = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-            await this.cryptoEngine.setDocumentKey(documentKey);
-            logger.info("Initialized new document key");
-        }
+        // No key is invented here. One generated per session cannot outlive it and a
+        // second device would generate a different one, so writes would look successful
+        // and read back as undecryptable ciphertext. Without a key the stack stays
+        // locked instead - see ADR-0018.
 
         if (existing) {
-            this.validateCryptoConfig(existing);
+            await this.validateCryptoConfig(existing);
             return existing;
         }
 
@@ -1000,7 +1205,7 @@ class ClientStack extends Stack {
         } catch (error: any) {
             if (error?.status === 409 || error?.name === "conflict") {
                 const current = await this.db.get<{ cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }>(markerId);
-                this.validateCryptoConfig(current);
+                await this.validateCryptoConfig(current);
                 return current;
             }
             throw error;
@@ -1030,7 +1235,21 @@ class ClientStack extends Stack {
         await this.db.put(markerDoc as any);
     }
 
-    private validateCryptoConfig(existing: { cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }) {
+    /**
+     * Checks a stack's stored crypto configuration against how it is being opened.
+     *
+     * The canary is the admission test for keys: `encryptedMarker` holds a value only the
+     * stack's own document key can decrypt, so a wrong key is caught here rather than
+     * becoming unreadable data later. Note what is *not* checked - whether the stack
+     * already holds encrypted documents. A key is admitted on proof, so a second device
+     * can open a stack the first one wrote, which is the whole point of the wrapped-key
+     * path. See ADR-0018.
+     *
+     * @param existing - The stored `~crypto-engine-config` document.
+     * @throws If the engine flag disagrees with the stored one, or a key is present but
+     * fails to decrypt the canary.
+     */
+    private async validateCryptoConfig(existing: { cryptoEngineDisabled?: boolean; encryptedMarker?: unknown }) {
         const storedDisabled = Boolean(existing.cryptoEngineDisabled);
         if (storedDisabled !== this.cryptoEngineDisabled) {
             throw new Error(
@@ -1040,8 +1259,24 @@ class ClientStack extends Stack {
             );
         }
 
-        if (!storedDisabled && isEncryptedPayload((existing as any).encryptedMarker) && !this.cryptoEngine.isEnabled()) {
+        if (storedDisabled) return;
+
+        const canary = (existing as any).encryptedMarker;
+        if (!isEncryptedPayload(canary)) return;
+
+        if (!this.cryptoEngine.isEnabled()) {
             throw new Error("Crypto engine must be enabled to access this stack because it contains encrypted data.");
+        }
+
+        // No key yet is not a failure: the stack opens locked and the canary is checked
+        // again when `unlock` supplies one.
+        if (!this.cryptoEngine.getDocumentKey()) return;
+
+        if (!(await this.cryptoEngine.verifyMarker(canary))) {
+            throw new Error(
+                "The supplied document key does not match this stack: it cannot decrypt the stack's key marker. " +
+                "Data written under a different key would be unreadable, so the stack was not opened."
+            );
         }
     }
 

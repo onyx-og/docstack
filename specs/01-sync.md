@@ -206,8 +206,13 @@ the replication without the application reaching into DocStack. Counters and
 
 ## Adapter contract
 
-The changes feed is what replication checkpoints against, so a custom adapter has
-obligations beyond "return some changes". Found and fixed in the Drive adapter:
+An adapter that replaces PouchDB's *public* methods rather than implementing the
+`_`-prefixed hooks — as the Drive adapter does with `api.bulkDocs = api._bulkDocs`,
+for the reasons permetic spec 03 records — inherits obligations `AbstractPouchDB`
+would otherwise have discharged for it. Five, all found and fixed while writing this
+down, and all of them apply to any future adapter.
+
+### The changes feed
 
 1. **Batches must be ordered by sequence.** Replication records the highest seq in a
    batch and `limit` makes every batch partial, so an unordered batch can checkpoint
@@ -227,7 +232,29 @@ obligations beyond "return some changes". Found and fixed in the Drive adapter:
    change-log file rather than one per document — and the batch is cut before the
    fetch so changes past `limit` cost nothing.
 
-Points 1–3 are correctness; 4 is throughput. All four apply to any future adapter.
+Points 1–3 are correctness; 4 is throughput.
+
+### Bulk writes
+
+5. **`new_edits` and the request shape must be normalized by the adapter itself.**
+   This is the same gap as the client's, mirrored, and it surfaced because a test
+   helper wrote the flag the other way round:
+
+   - `pouchdb-core` normalizes `req.new_edits` **into `opts`** and never writes it
+     back, then consults `opts` first. An adapter reading only `req` is therefore
+     correct for `pouchdb-replication` (which puts it on the envelope) and silently
+     wrong for `bulkDocs(docs, { new_edits: false })` and for
+     `put(doc, { new_edits: false })`, which core routes through `bulkDocs` with the
+     flag on `opts`. Both minted a fresh revision instead of storing verbatim.
+   - `db.bulkDocs([doc])` — the common call style — is turned into `{ docs: [doc] }`
+     by core before any adapter sees it. Without that, `req.docs` is `undefined` and
+     the call throws.
+
+   Replication is unaffected by the precedence change: its `bulkOpts` is
+   `{ timeout }`, with no `new_edits` key, so it still falls through to the envelope.
+
+Two of the five (3 and 5) were invisible to the existing suites because nothing
+exercised a filtered replication or the options-side flag. Both are now covered.
 
 ## Supporting changes
 
@@ -260,25 +287,37 @@ Points 1–3 are correctness; 4 is throughput. All four apply to any future adap
    config-diffing `StackProvider`; `useSyncStatus`.~~ Done.
 9. ~~Drive adapter `_changes`: seq ordering, `all_docs` leaves, tombstones, batched
    `include_docs`.~~ Done.
-10. Republish `@docstack/client` (carries the `debugger;` fix) and
-    `@docstack/pouchdb-adapter-googledrive`.
-11. Run the suites below. **Not yet run** — written on Windows, to be run under WSL.
-12. Firestore and peer transports as remote factories, against this same lifecycle.
+10. ~~Drive adapter `_bulkDocs`: read `new_edits` from both positions, accept a bare
+    array request.~~ Done (2026-08-24) — see Adapter contract point 5.
+11. Republish `@docstack/client` (carries the `debugger;` fix) and
+    `@docstack/pouchdb-adapter-googledrive` (carries 9 and 10).
+12. Run the client suites below. **Not yet run** — written on Windows, to be run
+    under WSL.
+13. Firestore and peer transports as remote factories, against this same lifecycle.
 
 ## Verification
 
-- `packages/client` — `plugins/__tests__/new-edits.test.ts`,
-  `core/sync/__tests__/{internal-docs,class-filter,filter-identity}.test.ts`,
-  `core/__tests__/replication-write-path.integration.test.ts`,
-  `core/sync/__tests__/sync.integration.test.ts`.
-  Run with `./node_modules/.bin/jest -c packages/client/jest.config.ts` — the
-  package's own `test` script is Playwright, against `src-test`.
-- `docstack-pouchdb-adapter-gdrive` — `tests/changes_ordering.test.ts`, plus the
-  existing mock and production suites (`npm test`, `npm run test:prod`).
-- **Open:** an end-to-end round trip of `stack.sync()` against real Google Drive,
-  two devices, including a deliberate concurrent edit and a deletion. The adapter's
-  own `test:prod:replication` covers raw replication; this would cover the DocStack
-  layer on top of it.
+**Adapter — passing** (2026-08-24, `npm test`): 6 suites, 24 tests, no failures; the
+two production suites skip without `TEST_ENV=production`. `tests/changes_ordering.test.ts`
+contributes 15 of those, covering all five contract points plus the checkpoint-safety
+case (a `limit`-cut batch that must not advance past a change it did not emit).
+
+Worth recording how point 5 was found: the first run of that file failed, and the
+failure was the adapter, not the test. The helper had written `new_edits` to `opts`
+rather than the envelope — the same normalisation gap as the client's, walked into
+from the other side.
+
+**Client — written, not yet run.** `plugins/__tests__/new-edits.test.ts`,
+`core/sync/__tests__/{internal-docs,class-filter,filter-identity}.test.ts`,
+`core/__tests__/replication-write-path.integration.test.ts`,
+`core/sync/__tests__/sync.integration.test.ts`. Run with
+`./node_modules/.bin/jest -c packages/client/jest.config.ts` — the package's own
+`test` script is Playwright, against `src-test`.
+
+**Open:** an end-to-end round trip of `stack.sync()` against real Google Drive, two
+devices, including a deliberate concurrent edit and a deletion. The adapter's own
+`test:prod:replication` covers raw replication; this would cover the DocStack layer
+on top of it.
 
 ## Known limits
 

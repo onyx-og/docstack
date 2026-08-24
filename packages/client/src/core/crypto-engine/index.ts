@@ -95,6 +95,37 @@ export class CryptoEngine {
     }
 
     /**
+     * Tests whether the current document key is the one a stack was written with.
+     *
+     * AES-GCM authenticates its ciphertext, so a wrong key fails to decrypt rather than
+     * yielding plausible garbage - which makes the stored marker a reliable canary. This
+     * is deliberately separate from {@link decryptValue}, which swallows failures to keep
+     * reads non-fatal: here the failure *is* the answer.
+     *
+     * @param marker - The stored `encryptedMarker` payload.
+     * @returns `true` if the held key decrypts the marker.
+     *
+     * @example
+     * ```typescript
+     * if (!await stack.cryptoEngine.verifyMarker(config.encryptedMarker)) {
+     *     throw new Error("wrong document key");
+     * }
+     * ```
+     */
+    public async verifyMarker(marker: unknown): Promise<boolean> {
+        if (!this.enabled) return false;
+        if (!isEncryptedPayload(marker)) return false;
+        const key = await this.getCryptoKey();
+        if (!key) return false;
+        try {
+            await decryptWithAesGcm(marker, key);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Checks if the crypto engine is enabled.
      * @returns `true` if encryption is enabled
      */

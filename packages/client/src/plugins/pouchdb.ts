@@ -12,6 +12,35 @@ import Class from "../core/class.js";
 const logger = createLogger().child({ module: "pouchdb" });
 
 /**
+ * Raised when a locked stack is asked to write a class carrying encrypted attributes.
+ *
+ * A stack is locked when encryption is enabled but no document key has been supplied.
+ * Writing then would store the encrypted fields as plaintext, so the write is refused.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *     await secretClass.addCard({ ssn: "..." });
+ * } catch (error) {
+ *     error instanceof StackLockedError; // true - call stack.unlock(key) first
+ * }
+ * ```
+ */
+export class StackLockedError extends Error {
+    override name = "StackLockedError";
+    /** The class the refused document belongs to. */
+    readonly className: string;
+
+    constructor(className: string) {
+        super(
+            `Stack is locked: '${className}' has encrypted attributes and no document key has been supplied, ` +
+            `so writing it would store those fields in the clear. Call 'stack.unlock(documentKey)' first.`
+        );
+        this.className = className;
+    }
+}
+
+/**
  * Resolves the effective `new_edits` flag for a `bulkDocs` call.
  *
  * `pouchdb-core` accepts it either on the request body or on the options object and
@@ -280,6 +309,15 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
                         classCache.set(className, classObj);
                         const encryptableAttributes = classObj.getEncryptedAttributes();
+                        // A locked stack has no key, so encrypting is impossible and the
+                        // fields would land in the clear. Refuse instead of degrading:
+                        // silent plaintext is the failure mode ADR-0018 exists to remove.
+                        // Bootstrap patches are the documented exception - the seed system
+                        // user has to exist before any key can be recovered, and
+                        // `rekeyBootstrapDocuments` encrypts it once one arrives.
+                        if (encryptableAttributes.length && stack.isLocked() && !(options as any)?.isPatch) {
+                            throw new StackLockedError(className);
+                        }
                         if (stack.cryptoEngine.isEnabled() && encryptableAttributes.length) {
                             await stack.cryptoEngine.decryptDocument(doc as Document, classObj);
                         }

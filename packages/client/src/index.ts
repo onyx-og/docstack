@@ -29,6 +29,7 @@ export {
     INTERNAL_DOC_CLASSES,
     OPTIONAL_INTERNAL_DOC_CLASSES,
     StackWriteGuardError,
+    StackLockedError,
 } from "./core/index.js";
 
 export type {

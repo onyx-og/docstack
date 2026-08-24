@@ -172,6 +172,20 @@ export type StackOptions = {
      * first use and cannot be changed when reopening the same database.
      */
     disableCryptoEngine?: boolean;
+
+    /**
+     * The document encryption key, as a hex string, supplied by the application.
+     *
+     * DocStack never invents this key: one generated per session could not outlive it,
+     * and a second device would generate a different one. Provision it from wherever the
+     * application can hand the same value to every device of a user - typically its own
+     * server - or let {@link ClientCredentials} recover it through the wrapped-key path.
+     *
+     * Omitting it opens the stack locked: readable, but refusing writes to any class
+     * carrying encrypted attributes until `stack.unlock(key)` supplies one. See
+     * ADR-0018.
+     */
+    documentKey?: string;
 } & PouchDB.Configuration.DatabaseConfiguration
 
 export type StackConfig = ({

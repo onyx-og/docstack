@@ -228,9 +228,14 @@ class DocStack extends EventTarget {
         }
 
         this.readyState = true;
+        // Readiness means "usable for what it currently permits", not "fully keyed": a
+        // locked stack must still signal ready, or consumers wait forever on the event -
+        // including the one that was about to supply the key. `locked` names the stacks
+        // still waiting for one. See ADR-0018.
         this.dispatchEvent(new CustomEvent("ready", {
             detail: {
-                stacks: this.stacks
+                stacks: this.stacks,
+                locked: this.stacks.filter(stack => stack.isLocked()).map(stack => stack.name),
             }
         }))
     }
@@ -713,4 +718,5 @@ export type {
     ClassFilterOptions,
 } from "./sync/index.js";
 export { StackWriteGuardError } from "./guarded-db.js";
+export { StackLockedError } from "../plugins/pouchdb.js";
 export { DocStack };
