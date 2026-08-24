@@ -25,6 +25,10 @@ import {
 import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
 import { StackPlugin } from "../plugins/pouchdb.js";
 
+import { createGuardedDb, createReplicationDb } from "./guarded-db.js";
+import { StackSyncHandle } from "./sync/index.js";
+import type { StackSyncOptions, SyncStatus } from "./sync/index.js";
+
 import { parse, createPlan, executePlan } from "./query-engine/index.js";
 import type { SelectAST, UnionAST } from "./query-engine/index.js";
 import { JobEngine } from "./job-engine/index.js";
@@ -33,6 +37,44 @@ import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
 
 const logger = createLogger().child({ module: "stack" });
+
+/**
+ * `StackOptions` keys DocStack consumes itself; everything else belongs to PouchDB.
+ *
+ * `name` is on the list because the two libraries mean different things by it: to
+ * DocStack it names the *stack*, and the database is `db-<name>`; to PouchDB it would
+ * name the database outright and override the connection string.
+ */
+const DOCSTACK_OPTION_KEYS: readonly string[] = [
+    "name",
+    "plugins",
+    "patches",
+    "credentials",
+    "disableCryptoEngine",
+];
+
+/**
+ * Extracts the PouchDB half of a {@link StackOptions} object.
+ *
+ * `StackOptions` extends PouchDB's own `DatabaseConfiguration`, so callers can pass
+ * `adapter`, `auto_compaction`, `revs_limit` and any adapter-specific option through
+ * to the database - which only works if they actually reach the constructor.
+ *
+ * @param options - The options a stack was created with.
+ * @returns The configuration to hand `new PouchDB(...)`, or `undefined` when nothing
+ * is left over.
+ */
+const toPouchConfiguration = (
+    options?: StackOptions
+): PouchDB.Configuration.DatabaseConfiguration | undefined => {
+    if (!options) return undefined;
+    const config: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(options)) {
+        if (DOCSTACK_OPTION_KEYS.includes(key)) continue;
+        config[key] = value;
+    }
+    return Object.keys(config).length ? (config as PouchDB.Configuration.DatabaseConfiguration) : undefined;
+};
 
 export const BASE_SCHEMA: ClassModel["schema"] = {
     "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
@@ -120,6 +162,22 @@ class ClientStack extends Stack {
      * ```
      */
     db!: PouchDB.Database<{}>;
+    /**
+     * The unguarded PouchDB instance. Only the sync layer reaches for it, through
+     * {@link getReplicationHandle}.
+     * @internal
+     */
+    private rawDb!: PouchDB.Database<{}>;
+    /**
+     * `bulkDocs`/`bulkGet` as PouchDB defines them, captured before {@link StackPlugin}
+     * replaces them.
+     * @internal
+     */
+    private pristineDbMethods!: { bulkDocs: Function; bulkGet: Function };
+    /** Memoised {@link getReplicationHandle} result. @internal */
+    private replicationDb?: PouchDB.Database<{}>;
+    /** The stack's replication, once {@link sync} has been called. @internal */
+    private syncHandle?: StackSyncHandle;
     /** The unique name identifier for this stack instance, derived from the connection string. */
     name!: string;
     /* Retrieved asynchronously */
@@ -184,15 +242,14 @@ class ClientStack extends Stack {
         this.connection = conn;
         this.options = options;
         this.cryptoEngineDisabled = Boolean(options?.disableCryptoEngine);
+        // An explicit name wins: a stack opened on a connection string that is not
+        // `db-<name>` (a URL, an adapter-specific handle) has no name to derive.
         if (options?.name) {
-            this.name = options?.name
-        }
-        const connRegExp = /(?<=db-).*/
-        const match = conn.match(connRegExp);
-        if (match) {
-            this.name = match[0];
+            this.name = options.name;
         } else {
-            this.name = conn;
+            const connRegExp = /(?<=db-).*/
+            const match = conn.match(connRegExp);
+            this.name = match ? match[0] : conn;
         }
 
         // PouchDB.plugin((await import('pouchdb-adapter-node-websql')).default);
@@ -210,12 +267,27 @@ class ClientStack extends Stack {
         // Captured before `this.db` is assigned, so it wraps the pristine PouchDB
         // methods rather than double-wrapping (see StackPlugin's `stack.db ? ... : pouch.prototype...` fallback).
         const stackPlugin = StackPlugin(PouchDB, this);
-        this.db = new PouchDB(
+        // Anything in `options` that isn't DocStack's own is PouchDB configuration -
+        // `adapter` most of all, without which a stack could only ever be opened on the
+        // default transport and never, say, on a remote-backed one.
+        const rawDb = new PouchDB(
             conn,
+            toPouchConfiguration(options),
         );
-        (this.db as any).ping = stackPlugin.ping;
-        (this.db as any).bulkDocs = stackPlugin.bulkDocs;
-        (this.db as any).bulkGet = stackPlugin.bulkGet;
+        // Captured before the plugin replaces them: replication needs to write documents
+        // verbatim and read them exactly as stored.
+        this.pristineDbMethods = { bulkDocs: rawDb.bulkDocs, bulkGet: rawDb.bulkGet };
+        (rawDb as any).ping = stackPlugin.ping;
+        (rawDb as any).bulkDocs = stackPlugin.bulkDocs;
+        (rawDb as any).bulkGet = stackPlugin.bulkGet;
+
+        this.rawDb = rawDb;
+        this.replicationDb = undefined;
+        // What consumers get is guarded: the two ways around the authoring path -
+        // `new_edits: false` and the `_`-prefixed adapter methods - are closed off, so a
+        // stack's schema validation, relation checks and triggers cannot be side-stepped
+        // by picking a different method on `stack.db`.
+        this.db = createGuardedDb(rawDb);
 
         const pong = await (this.db as any).ping();
         if (!pong || pong !== "pong") {
@@ -230,11 +302,107 @@ class ClientStack extends Stack {
     }
 
     /**
-     * Returns the underlying PouchDB database instance.
-     * @returns The PouchDB database
+     * Returns the stack's PouchDB database handle.
+     *
+     * The handle is guarded: reads and ordinary writes behave exactly as PouchDB
+     * documents them, and `put`/`post`/`remove`/`bulkDocs` all run the stack's
+     * authoring path. The two routes that would skip it - `bulkDocs` with
+     * `new_edits: false`, and the `_`-prefixed adapter methods - throw
+     * {@link StackWriteGuardError}; replicating into a stack goes through
+     * {@link sync} instead.
+     *
+     * @returns The guarded PouchDB database
      */
     public getDb() {
         return this.db
+    }
+
+    /**
+     * Returns the database with PouchDB's own `bulkDocs`/`bulkGet` restored, for the
+     * sync layer's exclusive use.
+     *
+     * Replication needs both halves of the plugin out of the way: it writes documents
+     * with revisions it already owns (`new_edits: false`), and it must read documents
+     * exactly as they are stored - the plugin's `bulkGet` decrypts on read, which would
+     * push plaintext to a remote that is meant to hold ciphertext.
+     *
+     * @returns A handle suitable for `PouchDB.replicate`/`PouchDB.sync`
+     * @internal
+     */
+    public getReplicationHandle(): PouchDB.Database<{}> {
+        if (!this.replicationDb) {
+            this.replicationDb = createReplicationDb(this.rawDb, this.pristineDbMethods);
+        }
+        return this.replicationDb;
+    }
+
+    /**
+     * Starts replicating this stack against a remote.
+     *
+     * DocStack owns the lifecycle - the filter that keeps `~system`, the crypto marker,
+     * design documents, locks, sessions and the patch ledger on this device; the schema
+     * gate that refuses a remote written by a newer build; the convergence state a UI
+     * renders; and cancellation when the stack closes. It owns nothing about the
+     * transport: the remote is whatever PouchDB database the caller hands over, so
+     * credentials and adapter configuration stay in the application.
+     *
+     * Calling it again replaces the previous replication.
+     *
+     * @param options - See {@link StackSyncOptions}.
+     * @returns The handle, once replication is running.
+     * @throws {SyncSchemaMismatchError} When the remote was last written by a newer schema.
+     *
+     * @example
+     * ```typescript
+     * const sync = await stack.sync({
+     *     remote: () => new PouchDB("workspace", { adapter: "googledrive", accessToken }),
+     *     direction: "both",
+     *     live: true,
+     *     retry: true,
+     * });
+     *
+     * sync.addEventListener("status", (event) => {
+     *     console.log((event as CustomEvent).detail.state);
+     * });
+     * ```
+     */
+    public async sync(options: StackSyncOptions): Promise<StackSyncHandle> {
+        if (this.syncHandle) this.syncHandle.cancel();
+        const handle = new StackSyncHandle(this, options);
+        this.syncHandle = handle;
+        await handle.start();
+        return handle;
+    }
+
+    /**
+     * Returns this stack's replication handle, or `null` if {@link sync} was never called.
+     */
+    public getSyncHandle(): StackSyncHandle | null {
+        return this.syncHandle || null;
+    }
+
+    /**
+     * Returns where this stack's replication stands, or `null` if it has none.
+     *
+     * @example
+     * ```typescript
+     * const status = stack.getSyncStatus();
+     * if (status?.lastConvergedAt) {
+     *     ui.setLabel(`Synced ${formatAgo(status.lastConvergedAt)}`);
+     * }
+     * ```
+     */
+    public getSyncStatus(): SyncStatus | null {
+        return this.syncHandle ? this.syncHandle.getStatus() : null;
+    }
+
+    /**
+     * Stops this stack's replication. Idempotent; called automatically by {@link close}.
+     */
+    public cancelSync() {
+        if (this.syncHandle) {
+            this.syncHandle.cancel();
+        }
     }
 
     /**
@@ -882,6 +1050,7 @@ class ClientStack extends Stack {
      * Removes event listeners and terminates background workers.
      */
     close = () => {
+        this.cancelSync();
         this.removeAllListeners();
         if (this.modelWorker) this.modelWorker.terminate();
     }

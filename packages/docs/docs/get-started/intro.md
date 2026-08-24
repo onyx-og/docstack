@@ -16,6 +16,7 @@ In the world of NoSQL, developers often face challenges with data consistency an
 * **Event-Driven Architecture:** DocStack leverages event emission to allow for seamless integration with other parts of your application. Respond to data changes, trigger side effects, and build reactive systems with ease.
 * **Built-in REST API Provisioning:** DocStack includes an Express-based system to automatically provision a REST API from your data models. This feature significantly reduces boilerplate code, allowing you to get a functional API up and running in minutes.
 * **Adapter-Based Flexibility:** Designed with an adapter pattern, DocStack can be extended to work with various NoSQL databases. The framework currently provides a robust implementation for **PouchDB** (specifically its Node.js adapter). Planned future integrations include **MongoDB** and **Firebase Firestore**, ensuring your application can grow with your needs.
+* **Sync & Backup to Google Drive:** Multi-device sync and backup without running a server or storing anyone's data. A stack replicates to the user's **own Google Drive** — their storage, their quota, their control — while attributes flagged as encrypted stay encrypted in transit and at rest, unreadable to Google and to you. The sync layer is transport-agnostic, so the same one call covers whatever comes next. See [Sync & backup](../sync/overview.md).
 
 ## How It Works
 

@@ -1,0 +1,60 @@
+<svg viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Palette matched to the sibling illustrations: navy #142D6E, teal #03D5B7,
+       yellow #FFC412, greys #DBDBDB / #EBEBEB. -->
+
+  <!-- decorative accents -->
+  <circle cx="64" cy="112" r="5" fill="#FFC412"/>
+  <circle cx="88" cy="70" r="3.5" fill="#03D5B7"/>
+  <circle cx="340" cy="122" r="6" fill="#03D5B7"/>
+  <circle cx="316" cy="66" r="4" fill="#FFC412"/>
+
+  <!-- ground -->
+  <ellipse cx="200" cy="258" rx="152" ry="14" fill="#EBEBEB"/>
+
+  <!-- sync links, tucked behind the cloud and the devices -->
+  <path d="M128 166C136 144 143 134 157 127" stroke="#03D5B7" stroke-width="5"
+        stroke-linecap="round" stroke-dasharray="2 12"/>
+  <path d="M286 158C278 142 270 134 254 128" stroke="#03D5B7" stroke-width="5"
+        stroke-linecap="round" stroke-dasharray="2 12"/>
+
+  <!-- cloud: an offset darker silhouette behind the body, so it reads on a white page -->
+  <g fill="#DBDBDB">
+    <circle cx="169" cy="99" r="28"/>
+    <circle cx="209" cy="84" r="36"/>
+    <circle cx="247" cy="102" r="26"/>
+    <rect x="141" y="104" width="132" height="26" rx="13"/>
+  </g>
+  <g fill="#EBEBEB">
+    <circle cx="165" cy="95" r="28"/>
+    <circle cx="205" cy="80" r="36"/>
+    <circle cx="243" cy="98" r="26"/>
+    <rect x="137" y="100" width="132" height="26" rx="13"/>
+  </g>
+
+  <!-- back up (teal, going out) and restore (navy, coming back) -->
+  <path d="M184 110V94h-7l11-13 11 13h-7v16h-8Z" fill="#03D5B7"/>
+  <path d="M210 81v16h-7l11 13 11-13h-7V81h-8Z" fill="#142D6E"/>
+
+  <!-- laptop -->
+  <rect x="82" y="168" width="76" height="50" rx="5" fill="#142D6E"/>
+  <rect x="88" y="174" width="64" height="38" rx="2" fill="#fff"/>
+  <rect x="96" y="182" width="44" height="5" rx="2.5" fill="#DBDBDB"/>
+  <rect x="96" y="192" width="32" height="5" rx="2.5" fill="#EBEBEB"/>
+  <rect x="96" y="202" width="38" height="5" rx="2.5" fill="#03D5B7"/>
+  <path d="M74 222h92l8 12H66l8-12Z" fill="#142D6E"/>
+  <rect x="64" y="234" width="112" height="6" rx="3" fill="#142D6E"/>
+
+  <!-- phone -->
+  <rect x="266" y="160" width="52" height="88" rx="8" fill="#142D6E"/>
+  <rect x="272" y="170" width="40" height="68" rx="3" fill="#fff"/>
+  <rect x="284" y="164" width="16" height="3" rx="1.5" fill="#fff"/>
+  <rect x="280" y="180" width="24" height="4" rx="2" fill="#DBDBDB"/>
+  <rect x="280" y="190" width="18" height="4" rx="2" fill="#EBEBEB"/>
+  <rect x="280" y="200" width="22" height="4" rx="2" fill="#03D5B7"/>
+  <rect x="282" y="241" width="20" height="3" rx="1.5" fill="#fff"/>
+
+  <!-- synced -->
+  <circle cx="320" cy="167" r="13" fill="#FFC412"/>
+  <path d="m314.5 167 4 4 7.5-8" stroke="#142D6E" stroke-width="3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

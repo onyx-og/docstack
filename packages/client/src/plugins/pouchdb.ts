@@ -10,6 +10,32 @@ import { applySchemaDelta } from "../utils/index.js";
 import Class from "../core/class.js";
 
 const logger = createLogger().child({ module: "pouchdb" });
+
+/**
+ * Resolves the effective `new_edits` flag for a `bulkDocs` call.
+ *
+ * `pouchdb-core` accepts it either on the request body or on the options object and
+ * normalizes the two before handing over to the adapter. {@link StackPlugin} replaces
+ * `bulkDocs` outright, so it never sees that normalization and has to repeat it -
+ * reading only `options.new_edits` misses every write `pouchdb-replication` makes.
+ *
+ * @param docs - The `bulkDocs` request: an array of documents or a `{ docs }` envelope.
+ * @param options - The `bulkDocs` options object, possibly `null`.
+ * @returns The resolved flag; `true` when neither side carries one.
+ */
+export const readNewEdits = (
+    docs: unknown,
+    options?: (PouchDB.Core.BulkDocsOptions & { new_edits?: boolean }) | null
+): boolean => {
+    if (options && typeof options === "object" && "new_edits" in options) {
+        return (options as { new_edits?: boolean }).new_edits !== false;
+    }
+    if (docs && !Array.isArray(docs) && typeof docs === "object" && "new_edits" in docs) {
+        return (docs as { new_edits?: boolean }).new_edits !== false;
+    }
+    return true;
+};
+
 /**
  * Plugin Factory method that returns a PouchDB plugin object
  * which performs on documents (before) triggers and validation against
@@ -34,6 +60,22 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 options = {}
             }
 
+            // `new_edits: false` means the caller already owns the revisions it is
+            // writing - replication is the one that always does. Those documents must
+            // land verbatim: re-running the authoring path over them validates them
+            // against a schema the writing device may not have yet, rejects relation
+            // documents whose endpoints happen to arrive later in the stream (batches
+            // carry no dependency order), and lets after-triggers mint a fresh
+            // revision in the middle of a `new_edits: false` write.
+            //
+            // The flag reaches `bulkDocs` in two places: `pouchdb-replication` puts it
+            // in the request body (`bulkDocs({ docs, new_edits: false })`), other
+            // callers put it in `options`. Only `pouchdb-core` normalizes between the
+            // two, and this method replaces it, so the normalization happens here.
+            if (readNewEdits(docs, options) === false) {
+                fnLogger.info("new_edits is false, storing documents verbatim");
+                return pouchBulkDocs.call(this, docs as any, options, callback);
+            }
 
             let documentsToProcess: typeof docs;
             if (Array.isArray(docs)) {
@@ -143,7 +185,6 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         // TODO: Consider validating against self after registering the class?
                         console.log("Class model is of type '~self', skipping parent class validation", { doc });
                     }
-                    debugger;
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
                     const classDocId = doc._id;

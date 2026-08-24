@@ -2,9 +2,10 @@ import StackProvider, {DocStackContext, useDocStack} from "./components/StackPro
 import { useFind, useQuerySQL } from "./hooks/index.js";
 import { useClass, useClassList, useClassDocs, useClassCreate } from "./hooks/class.js";
 import { useDomainList, useDomain, useDomainRelations, useDomainCreate } from "./hooks/domain.js";
+import { useSyncStatus } from "./hooks/sync.js";
 
 export { StackProvider, DocStackContext, useDocStack };
-export { useFind, useQuerySQL };
+export { useFind, useQuerySQL, useSyncStatus };
 
 export { useClassList, useClass, useClassDocs, useClassCreate };
 export { useDomainList, useDomain, useDomainRelations, useDomainCreate };
@@ -33,4 +34,11 @@ export type {
     DocstackReady,
     StackConfig,
     StackOptions,
+    SyncDirection,
+    SyncState,
+    SyncStatus,
+    StackSyncOptions,
+    DocStackSyncOptions,
+    RemoteResolver,
+    InternalDocFilterOptions,
 } from "@docstack/client";

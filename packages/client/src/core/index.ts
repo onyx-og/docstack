@@ -18,6 +18,8 @@ import { JobEngine } from "./job-engine/index.js";
 // import AbstractClass from '../../shared/src//utils/stack/class';
 import Attribute from './attribute.js';
 import { AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions } from "@docstack/shared";
+import { DocStackSyncHandle } from './sync/index.js';
+import type { DocStackSyncOptions } from './sync/index.js';
 import { createLogger, Logger } from "winston";
 // import { EventTarget } from 'node:events';
 
@@ -73,49 +75,156 @@ class DocStack extends EventTarget {
     private store!: ClientStack;
     /** Array of all initialized ClientStack instances. */
     stacks: ClientStack[] = [];
+    /** The handle from the last {@link sync} call. */
+    private syncHandle?: DocStackSyncHandle;
     private logger: Logger = createlogger().child({ module: "client" });
 
-    private async addStack(config: StackConfig) {
-        let stack: ClientStack | undefined;
-        if (typeof config == "object" && config.name) {
-            stack = await ClientStack.create(`db-${config.name}`, {
-                // defaults to leveldb
-                // adapter: 'memory',
-                plugins: [
-                    // https://www.npmjs.com/package/pouchdb-adapter-memory
-                    // memoryAdapter
-                ],
-                patches: config.patches,
-                credentials: (config as any).credentials,
-                disableCryptoEngine: (config as StackOptions).disableCryptoEngine,
-            });
-        } else if (typeof config === "string") {
-            stack = await ClientStack.create(`db-${config}`, {
-                // defaults to leveldb
-                // adapter: 'memory',
-                plugins: [
-                    // https://www.npmjs.com/package/pouchdb-adapter-memory
-                    // memoryAdapter
-                ]
-            });
+    /**
+     * Splits a {@link StackConfig} into the connection string and the options a stack
+     * is created with.
+     *
+     * Everything the caller passed is forwarded - including `adapter` and any
+     * adapter-specific keys - so a stack can be opened on a transport other than the
+     * default one.
+     *
+     * @param config - A stack name, or a full configuration object.
+     * @returns The connection string and the resolved {@link StackOptions}.
+     */
+    private static resolveStackConfig(config: StackConfig): { connection: string; options: StackOptions } {
+        if (typeof config === "string") {
+            return { connection: `db-${config}`, options: { name: config } };
         }
-        if (stack) {
-            this.stacks.push(stack);
-            // let window_ = window as Window & typeof globalThis & {
-            //     stacks: ClientStack[]
-            // }
-            // if (window_.stacks) {
-            //     window_.stacks.push(stack)
-            // } 
-            return stack;
+
+        const { connection, ...rest } = config as { connection?: string } & StackOptions;
+        const name = rest.name;
+        if (!connection && !name) {
+            throw new Error("A stack configuration needs either a 'name' or a 'connection'");
         }
-        // await setupAdminUser();
+        return {
+            connection: connection || `db-${name}`,
+            options: { ...rest, name: name || connection! },
+        };
+    }
+
+    /**
+     * Opens a stack and adds it to this instance.
+     *
+     * Public because an application's set of databases is not always known at startup:
+     * a workspace joined at runtime needs its own database, and its own replication
+     * pair, without tearing down the stacks already open. Adding a stack that is
+     * already open returns the existing instance rather than opening a second handle
+     * on the same database.
+     *
+     * Dispatches `stack-added` with the new stack in `detail`.
+     *
+     * @param config - A stack name, or a full configuration object.
+     * @returns The stack, initialized and ready.
+     *
+     * @example
+     * ```typescript
+     * const stack = await docstack.addStack({ name: `ws-${workspace.slug}`, patches });
+     * await stack.sync({ remote: () => driveFor(workspace) });
+     * ```
+     */
+    public addStack = async (config: StackConfig): Promise<ClientStack> => {
+        const { connection, options } = DocStack.resolveStackConfig(config);
+
+        const existing = this.getStack(options.name || connection);
+        if (existing) {
+            this.logger.child({ method: "addStack" }).info("Stack already open", { name: options.name });
+            return existing;
+        }
+
+        const stack = await ClientStack.create(connection, options);
+        this.stacks.push(stack);
+        if (!this.store) this.store = stack;
+        this.dispatchEvent(new CustomEvent("stack-added", { detail: { stack } }));
+        return stack;
+    }
+
+    /**
+     * Closes a stack and drops it from this instance.
+     *
+     * Closing cancels the stack's replication and releases its listeners; the data on
+     * disk is left alone unless `destroy` is set, which is what leaving a workspace for
+     * good looks like.
+     *
+     * Dispatches `stack-removed` with the stack's name in `detail`.
+     *
+     * @param name - The stack name or connection string.
+     * @param options - `destroy: true` also deletes the underlying database.
+     * @returns `true` if a stack was removed, `false` if there was none by that name.
+     */
+    public removeStack = async (name: string, options?: { destroy?: boolean }): Promise<boolean> => {
+        const stack = this.getStack(name);
+        if (!stack) return false;
+
+        stack.close();
+        this.stacks = this.stacks.filter(s => s !== stack);
+        if (this.store === stack) this.store = this.stacks[0];
+
+        if (options?.destroy) {
+            await stack.destroyDb();
+        }
+
+        this.dispatchEvent(new CustomEvent("stack-removed", { detail: { name } }));
+        return true;
+    }
+
+    /**
+     * Starts replication for every open stack against one transport.
+     *
+     * The `remote` resolver is called once per stack, which is what makes a
+     * database-per-workspace application a single call rather than a loop the
+     * application has to keep in step with its own stack list.
+     *
+     * @param options - See {@link DocStackSyncOptions}. `stacks` narrows it to a subset.
+     * @returns A handle holding every stack's replication.
+     *
+     * @example
+     * ```typescript
+     * const sync = await docstack.sync({
+     *     remote: (stack) => new PouchDB(stack.name, { adapter: 'googledrive', accessToken }),
+     * });
+     * sync.addEventListener('status', () => render(sync.getStatus()));
+     * ```
+     */
+    public sync = async (options: DocStackSyncOptions): Promise<DocStackSyncHandle> => {
+        const { stacks: names, ...stackOptions } = options;
+        const targets = names
+            ? names.map(name => {
+                const stack = this.getStack(name);
+                if (!stack) throw new Error(`Stack '${name}' not found`);
+                return stack;
+            })
+            : this.stacks;
+
+        const handle = new DocStackSyncHandle();
+        for (const stack of targets) {
+            handle.add(stack.name, await stack.sync(stackOptions));
+        }
+        this.syncHandle = handle;
+        return handle;
+    }
+
+    /**
+     * Returns the handle from the last {@link sync} call, or `null`.
+     */
+    public getSyncHandle = (): DocStackSyncHandle | null => {
+        return this.syncHandle || null;
+    }
+
+    /**
+     * Stops replication on every stack.
+     */
+    public cancelSync = () => {
+        if (this.syncHandle) this.syncHandle.cancel();
     }
 
     private initStacks = async (configs: StackConfig[]) => {
         // TODO: Consider changing to Promise.all for concurrency
         for (const config of configs) {
-            const stack = await this.addStack(config);
+            await this.addStack(config);
         }
 
         this.readyState = true;
@@ -555,6 +664,8 @@ class DocStack extends EventTarget {
 
         // Server "startup procedures"
         // setTimeout(test, 1000)
+        // Kept so `reset()` has the configurations to rebuild from.
+        this.config = config;
         this.initStacks(config);
         this.addEventListener("ready", () => fnLogger.info("DocStack client successfully initialized"));
     }
@@ -570,4 +681,36 @@ class DocStack extends EventTarget {
  * @module @docstack/client
  */
 export { ClientStack, Trigger, Class, Attribute, Domain, JobEngine };
+export {
+    StackSyncHandle,
+    DocStackSyncHandle,
+    SyncSchemaMismatchError,
+    SYNC_META_DOC_ID,
+    readRemoteSchemaVersion,
+    publishSchemaVersion,
+    createReplicationFilter,
+    isInternalDoc,
+    resolveInternalClasses,
+    createClassFilter,
+    hasClassRules,
+    DATA_MODEL_CLASSES,
+    withFilterIdentity,
+    describeFilter,
+    INTERNAL_DOC_IDS,
+    INTERNAL_DOC_ID_PREFIXES,
+    INTERNAL_DOC_CLASSES,
+    OPTIONAL_INTERNAL_DOC_CLASSES,
+} from "./sync/index.js";
+export type {
+    SyncDirection,
+    SyncState,
+    SyncStatus,
+    StackSyncOptions,
+    DocStackSyncOptions,
+    RemoteResolver,
+    SyncMetaDoc,
+    InternalDocFilterOptions,
+    ClassFilterOptions,
+} from "./sync/index.js";
+export { StackWriteGuardError } from "./guarded-db.js";
 export { DocStack };

@@ -27,6 +27,17 @@ Once a session exists, every read and write goes through the **Policy Engine**. 
 
 For data more sensitive than access control alone should protect, DocStack's **Crypto Engine** offers zero-knowledge, field-level encryption: attributes flagged `encrypted: true` in a class schema are encrypted client-side (AES-GCM) before they ever reach PouchDB, using a document key that is itself wrapped by a key derived from the user's password (PBKDF2). Neither the server nor a database administrator with raw access to the stored documents can read these fields. Details of the key hierarchy and wrapping process are in [Field-Level Encryption](./core-crypto.md).
 
+## Data in Sync: What Leaves the Device
+
+Replication is the point where a security model is easiest to lose by accident, so two properties are built into the sync layer rather than left to configuration:
+
+* **Encrypted attributes stay encrypted.** Replication reads documents exactly as they are stored, not through the decrypting read path the application uses. Fields flagged `encrypted: true` therefore reach a remote — a user's Google Drive, say — as ciphertext, with the key never leaving the device.
+* **Device-local documents never leave.** `~system` (which carries the schema version read on every mount), the crypto configuration marker, Mango indexes, propagation locks and sessions are filtered out automatically.
+
+Two caveats worth stating plainly. **Replication filters are not access control** — they shape what a device bothers to carry, not what someone with access to the remote can read; partitioning belongs to the topology (a database per workspace, a Drive folder per account). And **fields not flagged `encrypted: true` replicate as written**, so a field a remote should not see has to actually be flagged. See [Sync & backup](../sync/overview.md) and [What replicates](../sync/filtering.md).
+
+Writing around this path is guarded rather than merely discouraged: replicating into a stack by hand (`bulkDocs`/`put` with `new_edits: false`, or the adapter methods beneath the plugin) throws `StackWriteGuardError`, because those writes skip validation, relation checks, triggers and encryption alike.
+
 ## Transport & Network Hardening
 
 The REST layer applies a few standard protections, with room left for deployment-specific hardening:

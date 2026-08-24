@@ -138,6 +138,8 @@ The `__enc: true` property serves as a marker that allows the engine to quickly 
     *   On write operations (`bulkDocs`, `put`), it calls `encryptDocument` before the data is sent to the database.
     *   On read operations (`get`, `find`), it calls `decryptDocument` after the data is retrieved.
 
+*   **Replication**: Sync deliberately does *not* go through the plugin's read path. Replication reads documents exactly as they are stored, so encrypted attributes cross the wire and land on a remote — a user's Google Drive, for instance — as ciphertext, with the Document Key never leaving the device. Going through the decrypting `bulkGet` instead would have shipped plaintext to a remote meant to hold ciphertext. See [Sync & backup](../sync/overview.md).
+
 *   **Query Engine**: The Query Engine is aware of encryption. When `stack.query()` is executed:
     *   After the initial data is fetched and policies are checked, the query executor inspects the selected fields.
     *   If the `Document Key` is available, it automatically decrypts any encrypted fields in the result set.

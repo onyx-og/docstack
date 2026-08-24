@@ -35,16 +35,31 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/bytedance_tasks.svg').default,
     description: (
       <>
-        Accelerate your development. Our framework automates common tasks and the foundational API, 
+        Accelerate your development. Our framework automates common tasks and the foundational API,
         so you can dedicate your time to building core features and custom logic.
+      </>
+    ),
+  },
+  {
+    title: 'Sync Without a Server',
+    Svg: require('@site/static/img/sync_backup.svg').default,
+    description: (
+      <>
+        Give users multi-device sync and real backup through their own Google Drive —
+        their storage, their control, no infrastructure and no data custody for you.
+        Encrypted fields stay encrypted the whole way.
       </>
     ),
   },
 ];
 
+// Infima's grid is 12 columns wide; split it evenly when the feature count divides
+// into it, so adding a card re-flows the row instead of wrapping one card onto its own.
+const COLUMN_WIDTH = 12 % FeatureList.length === 0 ? 12 / FeatureList.length : 4;
+
 function Feature({title, Svg, description}: FeatureItem) {
   return (
-    <div className={clsx('col col--4')}>
+    <div className={clsx('col', `col--${COLUMN_WIDTH}`)}>
       <div className="text--center">
         <Svg className={styles.featureSvg} role="img" />
       </div>

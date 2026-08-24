@@ -37,8 +37,30 @@ Independently of whether a network call is involved, the engine is **event-drive
 
 This means a DocStack instance behaves less like a request/response API and more like an observable store: you ask for data once, then listen for what changes.
 
-## 4. Cross-Instance Sync (experimental)
+## 4. Cross-Instance Sync
 
-Because every DocStack instance — client or server — owns its own local database, keeping two instances in sync across a network is a distinct concern from serving requests. `@docstack/server` includes an early, opt-in building block for this: a `ReplicationService` that batches local `changes()` into a queue and periodically flushes it to a remote CouchDB-compatible endpoint (the current implementation targets IBM Cloudant).
+Because every DocStack instance owns its own local database, keeping two instances in sync is a distinct concern from serving requests — and, in an offline-first design, the more important one. `@docstack/client` owns this directly:
 
-This path is separate from PouchDB's own built-in `replicate`/`sync` protocol, and is not yet wired into the default `DocStack` bootstrap — it previews the direction planned for multi-adapter, multi-node deployments (see [Goals & roadmap](../get-started/goals.md)).
+```typescript
+await stack.sync({ remote: () => driveDb, direction: 'both', live: true, retry: true });
+```
+
+The layer is **transport-agnostic**: `remote` is whatever PouchDB database the application hands over, so `@docstack/client` takes no dependency on any backend and learns nothing about one. **Google Drive** is the first supported transport, via `@docstack/pouchdb-adapter-googledrive` — the application owns the OAuth token, DocStack owns the lifecycle.
+
+What DocStack contributes is the part that only it can know:
+
+* **What crosses the wire.** A stack's own bookkeeping — `~system`, the encryption marker, `_design/` indexes, propagation locks, sessions, the patch ledger — is device-local and filtered out automatically. Replicating `~system` would hand a peer's `schemaVersion` to `checkSystem` on the next mount.
+* **How replicated writes land.** Replication writes with `new_edits: false`, meaning the caller already owns the revisions. Those documents bypass the authoring path deliberately: re-validating them would reject anything authored by a device one patch ahead, relation checks would reject anything whose endpoints arrive later in the stream (batches carry no dependency ordering), and after-triggers would mint fresh revisions mid-write.
+* **When it is safe to start.** A schema gate refuses to pull from a remote last written by a newer build, rather than storing documents this build cannot read.
+* **How the database is read.** Replication reads documents exactly as stored, so attributes flagged `encrypted: true` cross as ciphertext instead of being decrypted on the way out (see [Field-Level Encryption](./core-crypto.md)).
+* **Convergence state.** Per-stack status — `idle`/`active`/`error`/`denied` plus `lastConvergedAt` — surfaced as events on the stack and through `useSyncStatus` in `@docstack/react`.
+
+Because writing around that path is a real hazard, `stack.db` is a **guarded handle**: `bulkDocs`/`put` with `new_edits: false` (or `force`), and the `_`-prefixed adapter methods beneath the plugin, throw `StackWriteGuardError` and point at `stack.sync()`. Ordinary reads and writes are unaffected.
+
+See [Sync & backup](../sync/overview.md) for the application-facing guide.
+
+## 5. The server's `ReplicationService` (experimental)
+
+Separately, `@docstack/server` includes an earlier, opt-in building block: a `ReplicationService` that batches local `changes()` into a queue and periodically flushes it to a remote CouchDB-compatible endpoint (the current implementation targets IBM Cloudant).
+
+This path predates the client sync layer, is not built on PouchDB's `replicate`/`sync` protocol, and is not wired into the default `DocStack` bootstrap. Folding it onto the same lifecycle as the client layer is an open item (see [Goals & roadmap](../get-started/goals.md)).

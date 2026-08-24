@@ -54,6 +54,17 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Sync & backup',
+      collapsible: true,
+      collapsed: false,
+      items: [
+        'sync/overview',
+        'sync/google-drive',
+        'sync/filtering',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Libraries',
       collapsible: true,
       collapsed: false,
