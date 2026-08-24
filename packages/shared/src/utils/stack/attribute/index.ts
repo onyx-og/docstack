@@ -1,6 +1,6 @@
 import Class from "../class/index.js";
 import { AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, Document } from "../../../types.js";
-import { z, ZodType, SafeParseReturnType } from "zod";
+import { z, ZodType, ZodSafeParseResult } from "zod";
 
 abstract class Attribute {
     abstract name: string;
@@ -32,7 +32,7 @@ abstract class Attribute {
 
     abstract setField: () => void;
 
-    abstract validate: (data: any) =>  Promise<SafeParseReturnType<any, any>>;
+    abstract validate: (data: any) =>  Promise<ZodSafeParseResult<any>>;
 
     abstract getClass: () => Class;
 

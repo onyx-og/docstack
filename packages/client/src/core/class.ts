@@ -3,7 +3,7 @@ import createLogger from "../utils/logger/index.js";
 // import ReferenceAttribute from '../Reference';
 import { Stack, ClassModel, Attribute as Attribute_, AttributeModel, Document } from "@docstack/shared";
 import Attribute from "./attribute.js";
-import { Logger } from 'winston';
+import type { Logger } from '../utils/logger/index.js';
 import { Trigger } from "./trigger/index.js";
 import { z } from "zod";
 import clientLogger from "../utils/logger/index.js";
@@ -46,7 +46,7 @@ class Class extends Class_ {
     /** The raw schema definition from the ClassModel. */
     schema: ClassModel["schema"] = {};
     /** Zod schema for runtime validation of document data. */
-    schemaZOD: z.ZodObject<any, any, any> = z.object({});
+    schemaZOD: z.ZodObject<any> = z.object({});
     /** The unique identifier for this class (e.g., 'Task', 'Class-123'). */
     id?: string;
     /** The underlying ClassModel document. */

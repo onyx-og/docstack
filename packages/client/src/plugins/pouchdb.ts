@@ -193,7 +193,25 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 }
             }
 
+            /**
+             * Reports a refused write in whichever style the caller asked in.
+             *
+             * `put`, `post` and `remove` all reach this plugin through PouchDB's callback
+             * form, and a callback caller is never watching the returned promise: rejecting
+             * it there settles nothing, the callback never fires, and the write hangs
+             * forever instead of failing. Only a caller that invoked `bulkDocs` directly
+             * gets a promise back.
+             */
+            const fail = (error: unknown) => {
+                if (callback) {
+                    (callback as (err: unknown) => void)(error);
+                    return undefined;
+                }
+                return Promise.reject(error);
+            };
+
             // TODO: use promise.all for concurrency
+            try {
             for (const doc of documentsToProcess) {
                 if (isClassModel(doc)) {
                     // Validate against parent class
@@ -369,9 +387,15 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                             throw new Error(`Discarded document ${JSON.stringify(doc)} because object not valid for its Class schema: ${JSON.stringify(classObj.buildSchema())}`);
                         }
                     } catch (error) {
-                        return Promise.reject(error);
+                        return fail(error);
                     }
                 }
+            }
+            } catch (error) {
+                // Branches other than `isDocument` throw directly - a class model failing
+                // its parent's schema, a relation naming a domain that does not exist.
+                // They need the same callback-aware answer.
+                return fail(error);
             }
 
             if (!stack.cryptoEngine.isEnabled()) {

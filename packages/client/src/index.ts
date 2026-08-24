@@ -30,7 +30,11 @@ export {
     OPTIONAL_INTERNAL_DOC_CLASSES,
     StackWriteGuardError,
     StackLockedError,
+    deriveKeyId,
+    isEncryptedPayload,
 } from "./core/index.js";
+
+export type { EncryptedPayload } from "./core/index.js";
 
 export type {
     SyncDirection,

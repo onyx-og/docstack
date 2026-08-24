@@ -124,6 +124,29 @@ type BaseDocumentFields = {
     [key: string]: any
 }
 
+/** Arbitrary structured context attached to a log line. */
+export type LogFields = Record<string, unknown>;
+
+/** Severity, most severe first. */
+export type LogLevel = "error" | "warn" | "info" | "debug";
+
+/**
+ * The logging surface DocStack uses.
+ *
+ * Declared here, structurally, rather than taken from a logging library. It used to be
+ * winston's `Logger`, which made every consumer of a browser package configure Node
+ * polyfills - `fs`, `http`, `zlib` and the rest - for a type. Anything with these five
+ * methods satisfies it, so an application can supply its own.
+ */
+export interface Logger {
+    /** Returns a logger that adds `fields` to everything it writes, cumulatively. */
+    child(fields: LogFields): Logger;
+    error(message: string, fields?: unknown): void;
+    warn(message: string, fields?: unknown): void;
+    info(message: string, fields?: unknown): void;
+    debug(message: string, fields?: unknown): void;
+}
+
 export type Document = PouchDB.Core.Document<{
     "~class": string;
     "~domain"?: never;

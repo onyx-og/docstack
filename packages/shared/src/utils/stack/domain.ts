@@ -1,4 +1,4 @@
-import { Logger } from "winston";
+import type { Logger } from "../../types.js";
 import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "../../types";
 import Stack from "./index.js"
 

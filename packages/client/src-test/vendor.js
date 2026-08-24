@@ -1,8 +1,14 @@
-import 'setimmediate';
-
-// Logging
-import winston from 'winston';
-import Transport from 'winston-transport';
+/**
+ * Globals for the UMD test page.
+ *
+ * `test/index.html` loads `lib/index.umd.js` with a plain `<script>` tag, and a UMD bundle
+ * resolves its externals from globals. This file supplies exactly the externals
+ * `rollup.config.js` declares, and nothing else.
+ *
+ * It is a test fixture and must never be shipped: claiming `globalThis.PouchDB` in a
+ * consumer's page would hand DocStack's copy to application code that opened its own, and
+ * two PouchDB instances on one database do not share change listeners.
+ */
 
 // Database
 import PouchDBBrowser from 'pouchdb-browser';
@@ -14,18 +20,9 @@ import * as zod from 'zod';
 import * as semver from 'semver';
 import * as jsondiffpatch from 'jsondiffpatch';
 
-globalThis._nextTick = function(...args) {
-    Promise.resolve().then(() => {
-        args[0].apply(null, args.slice(1));
-    });
-}
-
-globalThis.winston = winston;
-globalThis.Transport = Transport;
 globalThis.PouchDB = PouchDBBrowser;
 globalThis.PouchDBFind = PouchDBFind;
 globalThis.shared = shared;
 globalThis.z = zod;
 globalThis.semver = semver;
 globalThis.jsondiffpatch = jsondiffpatch;
-

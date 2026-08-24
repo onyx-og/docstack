@@ -1,6 +1,6 @@
 import { Document, Domain as Domain_, DomainModel, Stack, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "@docstack/shared";
 import clientLogger from "../utils/logger/index.js";
-import winston, { createLogger, Logger } from "winston";
+import type { Logger } from "../utils/logger/index.js";
 
 /**
  * Represents a relationship definition between two Classes in the DocStack database.

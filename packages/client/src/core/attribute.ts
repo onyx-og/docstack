@@ -1,4 +1,4 @@
-import z, { ZodType, SafeParseReturnType } from "zod";
+import z, { ZodType, ZodSafeParseResult } from "zod";
 import Class from "./class.js";
 import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, AttributeTypeReference } from "@docstack/shared";
 
@@ -348,7 +348,7 @@ class Attribute extends Attribute_ {
      * }
      * ```
      */
-    public validate = async (data: any): Promise<SafeParseReturnType<any, any>> => {
+    public validate = async (data: any): Promise<ZodSafeParseResult<any>> => {
         return this.field.safeParseAsync(data);
     }
 

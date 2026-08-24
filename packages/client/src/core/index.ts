@@ -20,8 +20,7 @@ import Attribute from './attribute.js';
 import { AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions } from "@docstack/shared";
 import { DocStackSyncHandle } from './sync/index.js';
 import type { DocStackSyncOptions } from './sync/index.js';
-import { createLogger, Logger } from "winston";
-// import { EventTarget } from 'node:events';
+import type { Logger } from "../utils/logger/index.js";
 
 // let envPath = process.env.ENVFILE || "./.env";
 // envPath = resolve(process.cwd(), envPath);
@@ -719,4 +718,12 @@ export type {
 } from "./sync/index.js";
 export { StackWriteGuardError } from "./guarded-db.js";
 export { StackLockedError } from "../plugins/pouchdb.js";
+/**
+ * Key-identity helpers, for applications that re-key a database.
+ *
+ * `deriveKeyId` names a key the same way stored payloads do, so an application can tell
+ * which of its keys a field belongs to without holding any of them.
+ */
+export { deriveKeyId, isEncryptedPayload } from "./crypto-engine/index.js";
+export type { EncryptedPayload } from "./crypto-engine/index.js";
 export { DocStack };

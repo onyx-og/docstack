@@ -6,6 +6,7 @@ import { wrapDocumentKey, generateRandomString } from "./utils.js";
 import {
     EncryptedPayload,
     decryptWithAesGcm,
+    deriveKeyId,
     encryptWithAesGcm,
     importAesKeyFromHex,
     isEncryptedPayload,
@@ -40,6 +41,18 @@ export class CryptoEngine {
     private documentKey?: string;
     /** The imported CryptoKey for Web Crypto API operations. */
     private cryptoKey?: CryptoKey;
+    /** Identifier of {@link documentKey}, stamped onto everything it encrypts. */
+    private documentKeyId?: string;
+    /**
+     * Keys this engine can still read but will never write with, by identifier.
+     *
+     * Re-keying a database is not instantaneous: between the moment a new key becomes the
+     * one that encrypts and the moment the last field has been rewritten, both keys are
+     * needed at once. Retiring a key rather than discarding it is what lets that interval
+     * be arbitrarily long - and therefore what lets a re-key be done in the background,
+     * interrupted, and resumed.
+     */
+    private retiredKeys = new Map<string, CryptoKey>();
     private readonly logger = createLogger().child({ module: "crypto-engine" });
     /** Reference to the parent stack. */
     private readonly stack: ClientStack;
@@ -66,6 +79,7 @@ export class CryptoEngine {
         if (!this.enabled) return;
         this.documentKey = documentKey || undefined;
         this.cryptoKey = undefined;
+        this.documentKeyId = documentKey ? await deriveKeyId(documentKey) : undefined;
     }
 
     /**
@@ -74,6 +88,63 @@ export class CryptoEngine {
      */
     public getDocumentKey() {
         return this.enabled ? this.documentKey : undefined;
+    }
+
+    /**
+     * Returns the identifier of the key this engine currently encrypts with.
+     *
+     * Every payload it writes carries this value, so comparing it against a stored
+     * payload's `kid` says whether that field is current or still under an older key -
+     * which is what makes an incremental re-key possible.
+     *
+     * @returns The key identifier, or `undefined` when no key is held.
+     *
+     * @example
+     * ```typescript
+     * const current = stack.cryptoEngine.getKeyId();
+     * const stale = doc.ssn.kid !== current;   // needs rewriting
+     * ```
+     */
+    public getKeyId() {
+        return this.enabled ? this.documentKeyId : undefined;
+    }
+
+    /**
+     * Keeps an old document key available for reading after it has stopped being used.
+     *
+     * Call this with the previous key before installing a replacement, and fields written
+     * under either will open while the database is rewritten a piece at a time. Without
+     * it, swapping the key makes every not-yet-rewritten field unreadable, which is what
+     * forces a re-key to be a single offline pass that cannot be resumed if it stops
+     * halfway.
+     *
+     * @param documentKey - The hex-encoded key to retire.
+     * @returns The retired key's identifier.
+     *
+     * @example
+     * ```typescript
+     * await stack.cryptoEngine.retireDocumentKey(oldKey);  // still readable
+     * await stack.unlock(newKey);                          // now writes under newKey
+     * ```
+     */
+    public async retireDocumentKey(documentKey: string): Promise<string> {
+        if (!this.enabled) throw new Error("Crypto engine is disabled");
+        const kid = await deriveKeyId(documentKey);
+        this.retiredKeys.set(kid, await importAesKeyFromHex(documentKey, ["decrypt"]));
+        return kid;
+    }
+
+    /**
+     * Identifiers of every key this engine can read with, current one first.
+     *
+     * @returns Key identifiers; empty when no key is held.
+     */
+    public getReadableKeyIds(): string[] {
+        if (!this.enabled) return [];
+        return [
+            ...(this.documentKeyId ? [this.documentKeyId] : []),
+            ...this.retiredKeys.keys(),
+        ];
     }
 
     /**
@@ -173,21 +244,40 @@ export class CryptoEngine {
         return this.cryptoKey;
     }
 
+    /**
+     * Chooses the key that can open a payload.
+     *
+     * A payload names its key, so an old field found mid-re-key is decrypted with the key
+     * it was actually written under instead of failing against the current one. Payloads
+     * from before identifiers existed name nothing, and are tried against the current key
+     * - which is what they meant when only one key could exist.
+     */
+    private async resolveKeyFor(payload: EncryptedPayload, fallback: CryptoKey | null) {
+        if (!payload.kid) return fallback;
+        if (payload.kid === this.documentKeyId) return fallback;
+        return this.retiredKeys.get(payload.kid) ?? null;
+    }
+
     private async encryptValue(value: unknown, key: CryptoKey | null): Promise<EncryptedPayload | unknown> {
         if (!this.enabled) return value;
         if (!key) return value;
         if (value === undefined || value === null) return value;
         if (isEncryptedPayload(value)) return value;
         const serialized = JSON.stringify(value);
-        return encryptWithAesGcm(serialized, key);
+        return encryptWithAesGcm(serialized, key, this.documentKeyId);
     }
 
     private async decryptValue(value: unknown, key: CryptoKey | null): Promise<unknown> {
         if (!this.enabled) return value;
         if (!key) return value;
         if (!isEncryptedPayload(value)) return value;
+        const resolved = await this.resolveKeyFor(value, key);
+        if (!resolved) {
+            this.logger.warn("No held key matches this payload; leaving it encrypted", { kid: value.kid });
+            return value;
+        }
         try {
-            const decrypted = await decryptWithAesGcm(value, key);
+            const decrypted = await decryptWithAesGcm(value, resolved);
             return JSON.parse(decrypted);
         } catch (error: any) {
             this.logger.error("Failed to decrypt value", { error: error?.message || error });
@@ -273,4 +363,4 @@ export class CryptoEngine {
 }
 
 export type { EncryptedPayload } from "./utils.js";
-export { wrapDocumentKey, unwrapDocumentKey } from "./utils.js";
+export { wrapDocumentKey, unwrapDocumentKey, deriveKeyId, isEncryptedPayload } from "./utils.js";

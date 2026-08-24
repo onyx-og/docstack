@@ -3,7 +3,7 @@ import { z } from "zod";
 // import ReferenceAttribute from '../Reference';
 import { ClassModel, AttributeModel, Document, TriggerModel } from "../../../types.js";
 import Stack from '../index.js';
-import { Logger } from 'winston';
+import type { Logger } from '../../../types.js';
 import Trigger from '../trigger.js';
 
 const CLASS_TYPE = "class";
@@ -19,7 +19,7 @@ abstract class Class extends EventTarget {
     description?: string;
     attributes: { [name: string]: Attribute } = {};
     schema: ClassModel["schema"] = {};
-    schemaZOD: z.ZodObject<any, any, any> = z.object({});
+    schemaZOD: z.ZodObject<any> = z.object({});
     id?: string;
     // parentClass: Class | null;
     model!: ClassModel;
