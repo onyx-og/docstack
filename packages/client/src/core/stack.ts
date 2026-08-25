@@ -77,6 +77,23 @@ const toPouchConfiguration = (
     return Object.keys(config).length ? (config as PouchDB.Configuration.DatabaseConfiguration) : undefined;
 };
 
+/**
+ * Removes `_rev` when there is no revision to state.
+ *
+ * PouchDB validates the field whenever the key is *present*, so a document carrying
+ * `_rev: undefined` - which is what spreading a freshly prepared document produces - is
+ * rejected with `bad_request: Invalid rev format`. PouchDB 7 ignored it, so the pattern
+ * survived unnoticed until the supported version moved on.
+ *
+ * @param doc - A document about to be written.
+ * @returns The same document, without a `_rev` key if it had no value.
+ */
+const withoutEmptyRev = <T extends { _rev?: string }>(doc: T): T => {
+    if (doc._rev) return doc;
+    const { _rev, ...rest } = doc as T & { _rev?: string };
+    return rest as T;
+};
+
 export const BASE_SCHEMA: ClassModel["schema"] = {
     "_id": { name: "_id", type: "string", config: { maxLength: 100, primaryKey: true } },
     "~class": { name: "~class", type: "string", config: { maxLength: 100 } },
@@ -271,9 +288,6 @@ class ClientStack extends Stack {
                 PouchDB.plugin(plugin);
             }
         }
-        // Captured before `this.db` is assigned, so it wraps the pristine PouchDB
-        // methods rather than double-wrapping (see StackPlugin's `stack.db ? ... : pouch.prototype...` fallback).
-        const stackPlugin = StackPlugin(PouchDB, this);
         // Anything in `options` that isn't DocStack's own is PouchDB configuration -
         // `adapter` most of all, without which a stack could only ever be opened on the
         // default transport and never, say, on a remote-backed one.
@@ -281,9 +295,17 @@ class ClientStack extends Stack {
             conn,
             toPouchConfiguration(options),
         );
-        // Captured before the plugin replaces them: replication needs to write documents
-        // verbatim and read them exactly as stored.
+        // Captured before the plugin replaces them, and the only correct source for them:
+        // PouchDB installs these per instance, so `PouchDB.prototype.bulkDocs` is
+        // `undefined` and capturing from there silently yields nothing. Replication needs
+        // them too - it writes documents verbatim and reads them exactly as stored.
+        // Unbound on purpose: StackPlugin forwards with `.call(this, ...)`.
         this.pristineDbMethods = { bulkDocs: rawDb.bulkDocs, bulkGet: rawDb.bulkGet };
+
+        // Built from the pristine methods rather than looking them up: the plugin can no
+        // longer be constructed at a moment when its capture would be wrong, because the
+        // capture is an argument. See ADR-0019.
+        const stackPlugin = StackPlugin(PouchDB, this, this.pristineDbMethods);
         (rawDb as any).ping = stackPlugin.ping;
         (rawDb as any).bulkDocs = stackPlugin.bulkDocs;
         (rawDb as any).bulkGet = stackPlugin.bulkGet;
@@ -444,8 +466,20 @@ class ClientStack extends Stack {
      * Called automatically by {@link authenticate}, but can be set manually for custom auth flows.
      * @param proof - The authentication session proof containing session and encryption keys
      */
-    public setAuthSession(proof: AuthSessionProof) {
+    public async setAuthSession(proof: AuthSessionProof) {
         this.authSession = proof;
+
+        // Symmetric with `clearAuthSession`, which does clear the engine's key. Without
+        // this a custom flow could hand over a proof carrying a document key and still be
+        // left with a locked stack - a session held, and nothing it can decrypt - because
+        // only the session half of the proof was ever applied.
+        //
+        // Guarded on the key being absent so the ordinary path is not repeated:
+        // `authenticate` has already installed it by the time it calls this.
+        if (proof.documentKey && this.cryptoEngine.isEnabled() && !this.cryptoEngine.getDocumentKey()) {
+            await this.cryptoEngine.setDocumentKey(proof.documentKey);
+            await this.onDocumentKeyAvailable();
+        }
     }
 
     /**
@@ -794,7 +828,7 @@ class ClientStack extends Stack {
         }
 
         const proof: AuthSessionProof = { session: sessionDoc, derivedKey, documentKey };
-        this.setAuthSession(proof);
+        await this.setAuthSession(proof);
         if (documentKey) {
             await this.onDocumentKeyAvailable();
         }
@@ -1959,8 +1993,9 @@ class ClientStack extends Stack {
             fnLogger.info('Design document updated successfully.');
         } catch (err: any) {
             if (err.name === 'not_found') {
-                // Doc doesn't exist, create it
-                await this.db.put(ddoc);
+                // Doc doesn't exist, create it. The `_rev` key has to go rather than be
+                // carried as `undefined` - PouchDB rejects that as an invalid rev format.
+                await this.db.put(withoutEmptyRev(ddoc));
                 fnLogger.info('Design document created successfully.');
             } else {
                 fnLogger.error('Error saving design document:', err);
@@ -2063,7 +2098,7 @@ class ClientStack extends Stack {
                 fnLogger.info("Generated docId", { newDocId });
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
-            let doc_ = { ...doc, ...params, _rev: doc._rev, "~updateTimestamp": new Date().getTime() };
+            let doc_ = withoutEmptyRev({ ...doc, ...params, _rev: doc._rev, "~updateTimestamp": new Date().getTime() });
             if (type === "~User" || type === "User") {
                 const groups = (doc_ as any).groupId;
                 if (!groups || (Array.isArray(groups) && groups.length === 0)) {
@@ -2179,7 +2214,7 @@ class ClientStack extends Stack {
                     fnLogger.info("Generated docId", docId);
                 }
                 fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
-                const doc_ = { ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() };
+                const doc_ = withoutEmptyRev({ ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() });
                 fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
                 await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
                 documents.push(doc_);
@@ -2273,7 +2308,7 @@ class ClientStack extends Stack {
                 fnLogger.info("Generated docId", docId);
             }
             fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
-            const doc_ = { ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() };
+            const doc_ = withoutEmptyRev({ ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() });
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
             let response = await db.put(doc_);
             fnLogger.info("Response after put", { "response": response });
@@ -2349,13 +2384,13 @@ class ClientStack extends Stack {
                     fnLogger.info("Generated docId", docId);
                 }
                 fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
-                const doc_ = {
+                const doc_ = withoutEmptyRev({
                     ...doc,
                     ...params,
                     _id: docId,
                     _rev: doc._rev,
                     "~updateTimestamp": new Date().getTime()
-                };
+                });
                 fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
                 documents.push(doc_);
                 if (isNewDoc) newDocsIds.push(docId);

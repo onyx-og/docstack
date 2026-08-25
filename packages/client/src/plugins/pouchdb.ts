@@ -1,5 +1,5 @@
 import { isClassModel, isDocument, isRelation, isPatch, Domain } from "@docstack/shared";
-import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, StackPluginType } from "@docstack/shared";
+import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, PristineDbMethods, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
 import Stack from "../core/stack.js"
 import PouchDB from "pouchdb-browser";
@@ -68,14 +68,17 @@ export const readNewEdits = (
 /**
  * Plugin Factory method that returns a PouchDB plugin object
  * which performs on documents (before) triggers and validation against
- * their class schema 
- * @param stack 
- * @returns 
+ * their class schema.
+ *
+ * @param pouch - The PouchDB constructor, for adapter-level lookups.
+ * @param stack - The stack the wrapped database belongs to.
+ * @param pristine - The database's own `bulkDocs`/`bulkGet`, captured before this plugin
+ * replaced them. Handed in rather than looked up, because both places it could be looked
+ * up are wrong - see {@link StackPluginType} and ADR-0019.
  */
-export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack) => {
-    const pouchBulkDocs = stack.db ? stack.db.bulkDocs : pouch.prototype.bulkDocs;
-    const pouchBulkGet = stack.db ? stack.db.bulkGet : pouch.prototype.bulkGet;
-    // const pouchPut = pouch.prototype.put;
+export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack, pristine: PristineDbMethods) => {
+    const pouchBulkDocs = pristine.bulkDocs;
+    const pouchBulkGet = pristine.bulkGet;
     return {
         ping: () => {
             return Promise.resolve("pong");

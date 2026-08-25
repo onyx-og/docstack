@@ -15,10 +15,11 @@ import {
 } from "@docstack/shared";
 
 
-import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal, 
+import {SystemDoc, Patch, ClassModel, Document, AttributeModel, AttributeTypeDecimal,
     AttributeTypeForeignKey,
     AttributeTypeInteger,
     AttributeTypeString} from "@docstack/shared";
+import type { PristineDbMethods } from "@docstack/shared";
 import { StackPlugin } from "../../plugins/pouchdb";
 
 const logger = getLogger().child({module: "stack"});
@@ -88,7 +89,6 @@ class ServerStack extends Stack {
 
         // Load default plugins
         PouchDB.plugin(Find);
-        PouchDB.plugin(StackPlugin(this));
         // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
@@ -96,6 +96,19 @@ class ServerStack extends Stack {
             }
         }
         this.db = new PouchDB(conn);
+
+        // Installed on the instance rather than through `PouchDB.plugin`, which assigns to
+        // the prototype. PouchDB 9 gives every instance its own `bulkDocs`, and an own
+        // property shadows the prototype - so a prototype-level override is not merely
+        // wrong, it is never called, and writes would skip validation and triggers in
+        // silence. Capturing the instance's method first is also the only way to get a
+        // real one to forward to. See ADR-0019.
+        const pristineDbMethods: PristineDbMethods = {
+            bulkDocs: this.db.bulkDocs,
+            bulkGet: this.db.bulkGet,
+        };
+        const stackPlugin = StackPlugin(PouchDB as any, this, pristineDbMethods);
+        (this.db as any).bulkDocs = stackPlugin.bulkDocs;
         this.cache = {
             // empty at init
         }

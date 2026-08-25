@@ -1,7 +1,7 @@
 {
   "name": "@docstack/client",
   "description": "One does not simply stack documents.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -18,7 +18,8 @@
   ],
   "scripts": {
     "build:types": "npx tsc -build --force ./tsconfig.json",
-    "build": "rollup --config ./rollup.config.js",
+    "clean": "node -e \"require('fs').rmSync('lib',{recursive:true,force:true})\"",
+    "build": "npm run clean && npm run build:types && rollup --config ./rollup.config.js",
     "build:dev": "webpack --node-env=development",
     "build:prod": "webpack --node-env=production",
     "build:vendor": "rollup --config ./rollup.vendor.js",

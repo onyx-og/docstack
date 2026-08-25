@@ -371,7 +371,28 @@ export const isAttributeModel = (object: {[key: string]: any}): object is Attrib
     return false;
 }
 
-export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack) => {
+/**
+ * The database methods a stack plugin wraps, captured before it replaces them.
+ *
+ * Unbound: the plugin forwards with `.call(this, ...)` so the receiver is whichever
+ * database is being written to.
+ */
+export type PristineDbMethods = {
+    bulkDocs: Function;
+    bulkGet: Function;
+};
+
+/**
+ * Builds the plugin that wraps a stack's database methods.
+ *
+ * `pristine` is an argument rather than something the plugin looks up, and that is
+ * load-bearing. It cannot be taken from `pouch.prototype`: PouchDB installs the core
+ * document methods per instance, so `PouchDB.prototype.bulkDocs` is `undefined` on
+ * PouchDB 9 and the capture would silently be nothing. It cannot be taken from
+ * `stack.db` either: by the time the plugin runs, `stack.db` *is* the plugin, so
+ * forwarding through it recurses until the tab stops responding. See ADR-0019.
+ */
+export type StackPluginType = (pouch: PouchDB.Static, stackInstance: Stack, pristine: PristineDbMethods) => {
     bulkDocs<Model>(
         docs: Array<PouchDB.Core.PutDocument<{} & Model>>,
         options: PouchDB.Core.BulkDocsOptions | null,
@@ -391,6 +412,14 @@ export type StackPluginType = (pouch: PouchDB.Static,stackInstance: Stack) => {
         options: PouchDB.Core.BulkGetOptions,
         callback?: PouchDB.Core.Callback<PouchDB.Core.BulkGetResponse<{} & Model>>,
     ): void;
+    /**
+     * Confirms the plugin is installed on a database.
+     *
+     * `initialize` calls it right after construction: the plugin's methods are assigned
+     * onto the instance, so a failure to do so would otherwise only surface later, as a
+     * write that quietly skipped validation.
+     */
+    ping?(): Promise<string>;
 }
 
 export interface DesignDocument extends PouchDB.Core.Document<any> {
