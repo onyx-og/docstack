@@ -1,7 +1,7 @@
 import Attribute from '../attribute/index.js'
 import { z } from "zod";
 // import ReferenceAttribute from '../Reference';
-import { ClassModel, AttributeModel, Document, TriggerModel } from "../../../types.js";
+import { ClassModel, AttributeModel, Document, TriggerModel, ChangesSubscription } from "../../../types.js";
 import Stack from '../index.js';
 import type { Logger } from '../../../types.js';
 import Trigger from '../trigger.js';
@@ -28,6 +28,34 @@ abstract class Class extends EventTarget {
 
     static logger: Logger;
     abstract logger: Logger;
+
+    /**
+     * This instance's subscription to changes on its documents, when it has one.
+     *
+     * Assigned by whatever factory subscribed it; released by {@link close}.
+     */
+    protected docSubscription?: ChangesSubscription;
+
+    /**
+     * Releases this instance's live document subscription.
+     *
+     * Subscribing is not free: the handle keeps its handler - and everything that handler
+     * closes over - reachable for as long as the stack lives. Close a Class that was
+     * built outside the stack's cache (`getClass(name, true)`, or an entry a class list
+     * has replaced) once it is no longer needed. Afterwards the instance stops emitting
+     * `doc` events; its data methods still work. Safe to call twice.
+     *
+     * @example
+     * ```typescript
+     * const snapshot = await stack.getClass('Task', true);
+     * // ...
+     * snapshot.close();
+     * ```
+     */
+    close = () => {
+        this.stack?.releaseListener(this.docSubscription);
+        this.docSubscription = undefined;
+    }
 
     abstract getPrimaryKeys: () => string[];
 

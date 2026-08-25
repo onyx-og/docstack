@@ -34,7 +34,7 @@ export {
     isEncryptedPayload,
 } from "./core/index.js";
 
-export type { EncryptedPayload } from "./core/index.js";
+export type { EncryptedPayload, ClassBuildOptions } from "./core/index.js";
 
 export type {
     SyncDirection,

@@ -20,6 +20,7 @@ import {
     UserSessionModel,
     AuthModuleModel,
     PolicyModel,
+    ChangesSubscription,
 } from "@docstack/shared";
 
 import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
@@ -215,7 +216,25 @@ class ClientStack extends Stack {
     }
     patchCount!: number;
 
-    listeners: PouchDB.Core.Changes<{}>[] = [];
+    /**
+     * Every live changes subscription this stack has handed out; released on close.
+     */
+    listeners: ChangesSubscription[] = [];
+
+    /**
+     * The one live feed behind every class-document subscription.
+     *
+     * PouchDB attaches a `destroyed` listener to the database for each
+     * `db.changes({ live: true })` and holds it until that feed is cancelled, so a feed
+     * per watched class crosses Node's ten-listener limit - and prints
+     * `MaxListenersExceededWarning` - on an app with a handful of classes on screen. It
+     * is also wasted work: the local adapter runs every filter over the same change
+     * stream, so N filtered feeds each see every change anyway.
+     */
+    private classDocFeed?: PouchDB.Core.Changes<{}>;
+
+    /** Change handlers by class name. Empty means {@link classDocFeed} can be cancelled. */
+    private classDocSubscribers: Map<string, Set<(change: any) => void>> = new Map();
 
     modelWorker: Worker | null = null;
     /**
@@ -1054,6 +1073,15 @@ class ClientStack extends Stack {
             }
             this.listeners = [];
         }
+
+        // Cancelling each subscription should have emptied this and stopped the shared
+        // feed, but a handle obtained outside `this.listeners` would not have, so close
+        // it out directly.
+        this.classDocSubscribers.clear();
+        if (this.classDocFeed) {
+            this.classDocFeed.cancel();
+            this.classDocFeed = undefined;
+        }
     }
 
     /**
@@ -1164,17 +1192,106 @@ class ClientStack extends Stack {
         }
     }
 
-    onClassDoc = (className: string) => {
-        const onClassDocListener = this.db.changes({
+    /**
+     * Opens the shared class-document feed if it is not already running.
+     *
+     * Dispatch is keyed on the document's `~class`, which is what the per-class filters
+     * used to test. A change with no document therefore cannot be routed and is dropped,
+     * exactly as the filters dropped it: PouchDB hands a filter only `{_id, _rev,
+     * _deleted}` for a hard deletion, so `~class` was already absent. DocStack deletes
+     * are soft - the document arrives with `active: false` - so this is not the delete
+     * path.
+     */
+    private ensureClassDocFeed = () => {
+        if (this.classDocFeed) return;
+
+        this.classDocFeed = this.db.changes({
             since: 'now',
             live: true,
             include_docs: true,
-            filter: (doc) => {
-                return doc["~class"] == className;
+        }).on("change", (change) => {
+            const className = (change.doc as any)?.["~class"];
+            if (!className) return;
+
+            const subscribers = this.classDocSubscribers.get(className);
+            if (!subscribers?.size) return;
+
+            // Copied: a handler is allowed to cancel its subscription while dispatching.
+            for (const subscriber of [...subscribers]) {
+                try {
+                    subscriber(change);
+                } catch (error) {
+                    logger.warn("classDocFeed - subscriber threw", { className, error });
+                }
             }
+        }).on("error", (error) => {
+            logger.error("classDocFeed - feed error", { error });
         });
-        this.listeners.push(onClassDocListener);
-        return onClassDocListener;
+    }
+
+    private addClassDocSubscriber = (className: string, listener: (change: any) => void) => {
+        let subscribers = this.classDocSubscribers.get(className);
+        if (!subscribers) {
+            subscribers = new Set();
+            this.classDocSubscribers.set(className, subscribers);
+        }
+        subscribers.add(listener);
+        this.ensureClassDocFeed();
+    }
+
+    private removeClassDocSubscriber = (className: string, listener: (change: any) => void) => {
+        const subscribers = this.classDocSubscribers.get(className);
+        if (!subscribers) return;
+
+        subscribers.delete(listener);
+        if (!subscribers.size) this.classDocSubscribers.delete(className);
+
+        // Nothing left to serve: give the database its `destroyed` listener back.
+        if (!this.classDocSubscribers.size && this.classDocFeed) {
+            this.classDocFeed.cancel();
+            this.classDocFeed = undefined;
+        }
+    }
+
+    /**
+     * Subscribes to changes on documents of a class.
+     *
+     * Returns a handle onto {@link classDocFeed} rather than a feed of its own, so the
+     * database carries one `destroyed` listener no matter how many classes are watched.
+     * Cancelling releases only this subscriber; the feed stops once the last one goes.
+     *
+     * Prefer {@link subscribeClassDocs}, which routes changes through the decrypting
+     * preparation step (ADR-0020). Whichever is used, the handle must be handed to
+     * {@link releaseListener} when the watcher is done.
+     *
+     * @param className - The class whose documents to watch.
+     * @returns A cancellable subscription handle.
+     */
+    onClassDoc = (className: string): ChangesSubscription => {
+        const owned = new Set<(change: any) => void>();
+        let cancelled = false;
+
+        const subscription: ChangesSubscription = {
+            on: (event: string, listener: (value: any) => void) => {
+                // "complete" never arrives on a live feed, and feed-level errors are
+                // logged centrally; both are accepted so this stays a drop-in for a
+                // PouchDB `Changes`.
+                if (event === "change" && !cancelled) {
+                    owned.add(listener);
+                    this.addClassDocSubscriber(className, listener);
+                }
+                return subscription;
+            },
+            cancel: () => {
+                if (cancelled) return;
+                cancelled = true;
+                for (const listener of owned) this.removeClassDocSubscriber(className, listener);
+                owned.clear();
+            },
+        } as ChangesSubscription;
+
+        this.listeners.push(subscription);
+        return subscription;
     }
 
     /**
@@ -1412,6 +1529,36 @@ class ClientStack extends Stack {
      * @param fresh - If `true`, bypasses the cache and fetches from database
      * @returns The Domain instance, or `null` if not found
      */
+    /**
+     * Reads a class's current stored model without subscribing or caching it.
+     *
+     * The counterpart to {@link getClass} for code that wants a schema rather than a live
+     * view: validation, encryption, and anything else that runs per write or per row.
+     * Two properties matter and pull in opposite directions in {@link getClass}:
+     *
+     * - It is always current. The cache is invalidated by a changes feed, which is
+     *   asynchronous, so during a burst of schema writes - patch application, most
+     *   obviously - the cached instance can still be the previous schema. Validating a
+     *   document against that fails.
+     * - It does not subscribe. A Class built by {@link Class.get} watches its documents
+     *   until closed, so building one per written document leaves live feeds behind and
+     *   PouchDB eventually warns about the `destroyed` listeners they hold.
+     *
+     * The returned instance emits no `doc` events and needs no `close()`.
+     *
+     * @param className - The name or ID of the class.
+     * @returns The class, or `null` if there is no model by that name.
+     *
+     * @example
+     * ```typescript
+     * const classObj = await stack.getClassSnapshot(doc["~class"]);
+     * classObj?.getEncryptedAttributes();
+     * ```
+     */
+    getClassSnapshot = async (className: string): Promise<Class | null> => {
+        return Class.fetch(this, className, { subscribe: false });
+    }
+
     getDomain = async (domainName: string, fresh = false): Promise<Domain | null> => {
         const fnLogger = logger.child({ method: "getDomain", args: { domainName, fresh } });
         if (!fresh) {
@@ -1569,17 +1716,31 @@ class ClientStack extends Stack {
             });
             const readableDocs: T[] = [];
 
+            // Resolved at most once per class per call, and detached. This used to be
+            // `getClass(className, true)` per document, which reads the same stored model
+            // but also subscribes the instance it builds: a five-row read left five live
+            // feeds behind, and the database's `destroyed` listeners crossed Node's limit
+            // within two renders of a live view. The freshness is kept - the cache is
+            // invalidated by a changes feed and so can lag a burst of schema writes - and
+            // only the subscription is dropped.
+            const classesInResult: Map<string, Class | undefined> = new Map();
+            const classFor = async (className: string) => {
+                if (!classesInResult.has(className)) {
+                    classesInResult.set(className, (await this.getClassSnapshot(className)) ?? undefined);
+                }
+                return classesInResult.get(className);
+            };
+
             for (const doc of foundResult.docs as unknown as Document[]) {
                 const canRead = await this.policyEngine.isReadableDocument(doc);
                 if (!canRead) {
                     fnLogger.info("Based on policies, document is not readable", { docId: doc._id, docClass: doc["~class"] });
-                    console.log("Based on policies, document is not readable", { docId: doc._id, docClass: doc["~class"] });
                     continue;
                 }
 
                 const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc as Document);
                 const classObj = encryptedKeys.length || (fields && fields.length)
-                    ? (await this.getClass(doc["~class"], true)) ?? undefined
+                    ? await classFor(doc["~class"])
                     : undefined;
                 const processedDoc = await this.processReadableDocument(doc as Document, classObj, fields, encryptedKeys);
                 if (processedDoc) {
@@ -1775,6 +1936,9 @@ class ClientStack extends Stack {
                     if (existingIndex === -1) {
                         classList.push(classObj);
                     } else {
+                        // The instance leaving the list owns a subscription; the rebuild
+                        // has already made its own.
+                        classList[existingIndex].close();
                         classList[existingIndex] = classObj;
                     }
                     const evt = new CustomEvent("classListChange", { detail: classList });
@@ -1783,6 +1947,7 @@ class ClientStack extends Stack {
                     // remove from classList without altering the array reference
                     const idx = classList.findIndex(c => c.model._id === change.id);
                     if (idx !== -1) {
+                        classList[idx].close();
                         classList.splice(idx, 1);
                         const evt = new CustomEvent("classListChange", { detail: classList });
                         this.dispatchEvent(evt);
@@ -1830,6 +1995,10 @@ class ClientStack extends Stack {
             selector
         });
 
+        // Tracked, so closing the stack cancels it. It used to be left out, which meant
+        // every call to this method leaked a feed.
+        this.listeners.push(listener);
+
         return {
             list: result,
             listener
@@ -1867,6 +2036,7 @@ class ClientStack extends Stack {
                     if (existingIndex === -1) {
                         domainList.push(domain);
                     } else {
+                        domainList[existingIndex].close();
                         domainList[existingIndex] = domain;
                     }
                     const evt = new CustomEvent("domainListChange", { detail: domainList });
@@ -1875,6 +2045,7 @@ class ClientStack extends Stack {
                     // remove from classList without altering the array reference
                     const idx = domainList.findIndex(c => c.model._id === change.id);
                     if (idx !== -1) {
+                        domainList[idx].close();
                         domainList.splice(idx, 1);
                         const evt = new CustomEvent("domainListChange", { detail: domainList });
                         this.dispatchEvent(evt);

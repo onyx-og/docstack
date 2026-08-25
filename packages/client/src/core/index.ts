@@ -716,6 +716,7 @@ export type {
     InternalDocFilterOptions,
     ClassFilterOptions,
 } from "./sync/index.js";
+export type { ClassBuildOptions } from "./class.js";
 export { StackWriteGuardError } from "./guarded-db.js";
 export { StackLockedError } from "../plugins/pouchdb.js";
 /**

@@ -17,6 +17,13 @@
     "noImplicitAny": false,
     "esModuleInterop": true,
     "declaration": true,
+    // Types only: rollup owns every .js in `lib`, tsc owns every .d.ts. They share an
+    // output directory, so without this both write `lib/index.js` and whichever ran last
+    // wins - and `tsc -build` reaches this project through the `references` in
+    // packages/react, so building a *sibling* would silently replace the bundle with a
+    // re-export stub that points at files rollup does not emit. `@docstack/server` does
+    // the same thing for the same reason.
+    "emitDeclarationOnly": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

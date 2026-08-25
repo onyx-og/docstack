@@ -372,6 +372,26 @@ export const isAttributeModel = (object: {[key: string]: any}): object is Attrib
 }
 
 /**
+ * A handle on a live stream of changes.
+ *
+ * A PouchDB `Changes` feed satisfies this, and so does a subscription onto a feed that is
+ * shared with other subscribers. The distinction matters because PouchDB registers a
+ * `destroyed` listener on the database for every `db.changes({ live: true })` and holds it
+ * until that feed is cancelled: one feed per watched class reaches Node's ten-listener
+ * ceiling - and prints `MaxListenersExceededWarning` - on an app that is doing nothing
+ * wrong. Handing back a handle rather than the feed itself lets a stack serve many
+ * subscribers from a single feed.
+ *
+ * `cancel` is the whole contract on the release side, and must be safe to call twice.
+ */
+export interface ChangesSubscription {
+    on(event: "change", listener: (change: any) => void): ChangesSubscription;
+    on(event: "error", listener: (error: any) => void): ChangesSubscription;
+    on(event: "complete", listener: (response: any) => void): ChangesSubscription;
+    cancel(): void;
+}
+
+/**
  * The database methods a stack plugin wraps, captured before it replaces them.
  *
  * Unbound: the plugin forwards with `.call(this, ...)` so the receiver is whichever

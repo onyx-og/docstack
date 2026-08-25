@@ -1,5 +1,5 @@
 import type { Logger } from "../../types.js";
-import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class, RelationDocument } from "../../types";
+import { DomainModel, Document, DomainRelationValidation, DomainRelationParams, Class, RelationDocument, ChangesSubscription } from "../../types";
 import Stack from "./index.js"
 
 abstract class Domain extends EventTarget {
@@ -16,7 +16,25 @@ abstract class Domain extends EventTarget {
     abstract state: "busy" | "idle";
     static logger: Logger;
     abstract logger: Logger;
-    
+
+    /**
+     * This instance's subscription to changes on its relation documents, when it has one.
+     *
+     * Assigned by whatever factory subscribed it; released by {@link close}.
+     */
+    protected docSubscription?: ChangesSubscription;
+
+    /**
+     * Releases this instance's live document subscription.
+     *
+     * The Domain counterpart to `Class.close`: a Domain no longer in use stays subscribed
+     * for the lifetime of the stack until this is called. Safe to call twice.
+     */
+    close = () => {
+        this.stack?.releaseListener(this.docSubscription);
+        this.docSubscription = undefined;
+    }
+
     constructor() {
         super();
     }

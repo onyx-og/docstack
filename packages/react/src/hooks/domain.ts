@@ -131,20 +131,30 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
             return;
         }
 
+        let cancelled = false;
+        let attached: EventListener | null = null;
+
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
                 const stackInstance = docStack!.getStack(stack)!;
                 const initialDomainModelList = await originClass.getCards(selector) as DomainModel[];
                 const initDomainList = await Promise.all(initialDomainModelList.map(async (dm) => await Domain.buildFromModel(stackInstance, dm)));
-                
+
+                if (cancelled) {
+                    // Torn down mid-query; these were built anyway and each holds a live
+                    // subscription until it is closed.
+                    for (const domain of initDomainList) domain.close();
+                    return;
+                }
                 domainListRef.current = initDomainList;
                 setDomainList(domainListRef.current);
             } catch (err: any) {
-                setError(err);
+                if (!cancelled) setError(err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
+            if (cancelled) return;
 
             const changeListener = (change: CustomEvent) => {
                 const doc = change.detail.doc;
@@ -175,14 +185,22 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
                 setDomainList([...domainListRef.current])
             };
 
-            originClass.addEventListener('doc', changeListener as EventListener);
-
-            return () => {
-                originClass.removeEventListener('doc', changeListener as EventListener);
-            };
+            attached = changeListener as EventListener;
+            originClass.addEventListener('doc', attached);
         };
 
         runQueryAndListen();
+
+        // The cleanup used to be returned from `runQueryAndListen`, where React never saw
+        // it: the listener stayed attached and the built domains stayed subscribed.
+        return () => {
+            cancelled = true;
+            if (attached) originClass.removeEventListener('doc', attached);
+            // Guarded: the change handler above pushes the raw document for a domain it
+            // has not seen before, so the list is not uniformly Domain instances.
+            for (const domain of domainListRef.current) domain?.close?.();
+            domainListRef.current = [];
+        };
     }, [originClass, JSON.stringify(selector)]); // Dependency on classObj and query
 
     return { domainList, loading, error };
@@ -333,17 +351,22 @@ export const useDomainRelations = (stack: string, domainName: string, query = {}
             return;
         }
 
+        let cancelled = false;
+        let attached: EventListener | null = null;
+
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
                 const initialDocs = await domain.getRelations(query);
+                if (cancelled) return;
                 docsRef.current = initialDocs;
                 setDocs(docsRef.current);
             } catch (err: any) {
-                setError(err);
+                if (!cancelled) setError(err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
+            if (cancelled) return;
 
             const changeListener = (change: CustomEvent) => {
                 const doc = change.detail.doc;
@@ -377,14 +400,18 @@ export const useDomainRelations = (stack: string, domainName: string, query = {}
                 setDocs([...docsRef.current])
             };
 
-            domain.addEventListener('doc', changeListener as EventListener);
-
-            return () => {
-                domain.removeEventListener('doc', changeListener as EventListener);
-            };
+            attached = changeListener as EventListener;
+            domain.addEventListener('doc', attached);
         };
 
         runQueryAndListen();
+
+        // The cleanup used to be returned from `runQueryAndListen`, so React never
+        // received it and each query change left another listener on the domain.
+        return () => {
+            cancelled = true;
+            if (attached) domain.removeEventListener('doc', attached);
+        };
     }, [domain, JSON.stringify(query)]); // Dependency on classObj and query
 
     return { docs, loading, error };

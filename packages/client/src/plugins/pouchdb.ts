@@ -257,7 +257,10 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     }
                     // Fetch the current (next old) version of the class document.
                     const previousClassDoc = await stack.db.get<ClassModel>(classDocId);
-                    const classObj = await Class.buildFromModel(stack, previousClassDoc);
+                    // Built rather than looked up: this is the class as it was *before*
+                    // this write, which the cache does not hold. Detached, because all it
+                    // is used for is diffing and applying the delta.
+                    const classObj = await Class.buildFromModel(stack, previousClassDoc, { subscribe: false });
                     // const classObj = await stack.getClass(className, true);
                     // if (classObj == null) {
                     //     throw new Error(`Unexpected, can't retrieve class '${className}' (doc '${classDocId}')`);
@@ -269,7 +272,6 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     if (!schemaDelta) {
                         fnLogger.info(`Class '${className}' has no changes on schema.`);
                         continue;
-                        return pouchBulkDocs.call(this, docs, options, postExec);
                     }
 
                     const documents = await classObj.getCards();
@@ -277,7 +279,6 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     if (documents.length === 0) {
                         fnLogger.info(`No documents found for class '${className}' after its update.`);
                         continue;
-                        return pouchBulkDocs.call(this, docs, options, postExec);
                     }
 
                     const updates = await Promise.all(documents.map(async doc => {
@@ -285,7 +286,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         return updatedDoc;
                     }));
 
-                    const result = await stack.db.bulkDocs(updates);
+                    await stack.db.bulkDocs(updates);
                     fnLogger.info('Propagated updates');
                 } else if (isRelation(doc)) {
                     const domain = await stack.getDomain(doc["~domain"]);
@@ -319,7 +320,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     try {
                         let classObj: Class | null;
                         try {
-                            classObj = classCache.get(className) || await stack.getClass(className, true);
+                            classObj = classCache.get(className) || await stack.getClassSnapshot(className);
                         } catch (error) {
                             throw new Error(`Class '${className}' not found for document '${doc._id}'.`);
                         }
@@ -422,7 +423,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             const encryptedDocs = await Promise.all((originalDocs || []).map(async (doc) => {
                 if (isDocument(doc)) {
                     const className = doc["~class"];
-                    const classObj = classCache.get(className) || await stack.getClass(className, true);
+                    const classObj = classCache.get(className) || await stack.getClassSnapshot(className);
                     if (classObj) {
                         const encryptableAttributes = classObj.getEncryptedAttributes();
                         if (!stack.cryptoEngine.isEnabled() || !encryptableAttributes.length) {
@@ -474,7 +475,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                                     const className = doc["~class"];
                                     let classObj = classCache.get(className);
                                     if (!classObj) {
-                                        classObj = await stack.getClass(className, true).catch(() => null) || undefined;
+                                        classObj = await stack.getClassSnapshot(className).catch(() => null) || undefined;
                                         if (classObj) classCache.set(className, classObj);
                                     }
                                     if (classObj && classObj.getEncryptedAttributes().length) {
@@ -504,7 +505,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             const exec = async () => {
                 const result = await pouchGet.call(this, docId, options ?? {});
                 if (result && isDocument(result) && stack.cryptoEngine.isEnabled()) {
-                    const classObj = await stack.getClass(result["~class"], true).catch(() => null);
+                    const classObj = await stack.getClassSnapshot(result["~class"]).catch(() => null);
                     if (classObj && classObj.getEncryptedAttributes().length) {
                         await stack.cryptoEngine.decryptDocument(result as Document, classObj);
                     }
@@ -527,7 +528,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             const exec = async () => {
                 let payload = doc as any;
                 if (isDocument(doc) && stack.cryptoEngine.isEnabled()) {
-                    const classObj = await stack.getClass(doc["~class"], true).catch(() => null);
+                    const classObj = await stack.getClassSnapshot(doc["~class"]).catch(() => null);
                     if (classObj && classObj.getEncryptedAttributes().length) {
                         payload = { ...doc } as Document;
                         await stack.cryptoEngine.encryptDocument(payload as Document, classObj);

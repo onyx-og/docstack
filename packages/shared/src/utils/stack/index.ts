@@ -10,6 +10,7 @@ import {
     UnionAST,
     RelationDocument,
     AuthSessionProof,
+    ChangesSubscription,
 } from "../../types.js";
 
 import Class from "./class/index.js";
@@ -32,7 +33,14 @@ abstract class Stack extends EventTarget {
     } = {}
     public patchCount!: number;
 
-    listeners: PouchDB.Core.Changes<{}>[] = [];
+    /**
+     * Every live changes subscription this stack has handed out.
+     *
+     * Held so {@link removeAllListeners} can release them on close. Entries are removed
+     * by {@link releaseListener}, so a long-lived stack that repeatedly subscribes and
+     * unsubscribes does not grow this array.
+     */
+    listeners: ChangesSubscription[] = [];
 
     modelWorker: Worker | null = null;
     jobEngine?: unknown;
@@ -62,9 +70,9 @@ abstract class Stack extends EventTarget {
 
     abstract onClassModelPropagationStart: (event: CustomEvent<any>) => void;
 
-    abstract onClassLock: (className: string) => PouchDB.Core.Changes<{}>;
+    abstract onClassLock: (className: string) => ChangesSubscription;
 
-    abstract onClassDoc: (className: string) => PouchDB.Core.Changes<{}>;
+    abstract onClassDoc: (className: string) => ChangesSubscription;
 
     /**
      * Prepares a document from the changes feed for delivery to a listener.
@@ -94,7 +102,7 @@ abstract class Stack extends EventTarget {
      * @param classObj - The class, when the caller has one.
      * @returns The underlying changes listener.
      */
-    subscribeClassDocs = (className: string, target: EventTarget, classObj?: Class): PouchDB.Core.Changes<{}> => {
+    subscribeClassDocs = (className: string, target: EventTarget, classObj?: Class): ChangesSubscription => {
         const listener = this.onClassDoc(className);
 
         let queue: Promise<void> = Promise.resolve();
@@ -116,6 +124,30 @@ abstract class Stack extends EventTarget {
         });
 
         return listener;
+    };
+
+    /**
+     * Cancels a subscription and forgets it.
+     *
+     * The counterpart to {@link subscribeClassDocs}: a caller that is done watching must
+     * call this rather than dropping the handle, because the subscription keeps the
+     * underlying feed - and everything the handler closes over - alive on its own.
+     * Safe to call with a handle that is already cancelled, or with nothing at all.
+     *
+     * @param listener - The handle to release.
+     */
+    releaseListener = (listener?: ChangesSubscription | null) => {
+        if (!listener) return;
+
+        const index = this.listeners.indexOf(listener);
+        if (index !== -1) this.listeners.splice(index, 1);
+
+        try {
+            listener.cancel();
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.warn("releaseListener - failed to cancel", { error });
+        }
     };
 
     abstract createDoc: (docId: string | null, type: string,classObj: Class | ClassModel["schema"], params: {}) => Promise<Document | null>;

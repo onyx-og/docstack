@@ -172,7 +172,7 @@ class Domain extends Domain_ {
         // Add listener for new documents of this class type. Relation documents carry no
         // encrypted attributes today, but this shares the class path so that stays true
         // by construction rather than by assumption - see ADR-0020.
-        domain_.stack!.subscribeClassDocs(name, domain_);
+        domain_.docSubscription = domain_.stack!.subscribeClassDocs(name, domain_);
         return domain_;
     }
 

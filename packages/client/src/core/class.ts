@@ -9,6 +9,28 @@ import { z } from "zod";
 import clientLogger from "../utils/logger/index.js";
 
 /**
+ * How a Class instance should be built.
+ *
+ * @example
+ * ```typescript
+ * // Just the schema, for validating one write - no live subscription to release.
+ * const schemaOnly = await Class.fetch(stack, 'Task', { subscribe: false });
+ * ```
+ */
+export type ClassBuildOptions = {
+    /**
+     * Whether the instance watches its documents and emits `doc` events. Defaults to
+     * `true`.
+     *
+     * Set it to `false` for an instance that is only being read for its schema.
+     * Subscribing is not free - the handle lives until it is closed - so a caller that
+     * builds a Class per write or per read row must not subscribe, or the database
+     * accumulates live feeds and PouchDB warns about its `destroyed` listeners.
+     */
+    subscribe?: boolean;
+};
+
+/**
  * Represents a data class (schema definition) in the DocStack database.
  * 
  * A Class defines the structure of documents, including their attributes,
@@ -151,14 +173,17 @@ class Class extends Class_ {
         type: ClassModel["~class"],
         description?: string,
         schema: ClassModel["schema"] = {},
+        options?: ClassBuildOptions,
     ) => {
         const class_ = new Class();
         Class.logger.info("Received schema", { schema })
         class_.init(stack, id, name, type, description, schema);
-        // Add listener for new documents of this class type. The changes feed is not on
-        // the decrypting path, so this goes through the stack rather than dispatching the
-        // raw change - see ADR-0020.
-        class_.stack!.subscribeClassDocs(name, class_, class_);
+        if (options?.subscribe !== false) {
+            // Add listener for new documents of this class type. The changes feed is not
+            // on the decrypting path, so this goes through the stack rather than
+            // dispatching the raw change - see ADR-0020.
+            class_.docSubscription = class_.stack!.subscribeClassDocs(name, class_, class_);
+        }
         return class_;
     }
 
@@ -198,14 +223,14 @@ class Class extends Class_ {
      * @param classModel - The ClassModel document from the database
      * @returns The hydrated Class instance
      */
-    static buildFromModel = async (stack: Stack, classModel: ClassModel) => {
+    static buildFromModel = async (stack: Stack, classModel: ClassModel, options?: ClassBuildOptions) => {
         Class.logger.info("buildFromModel - Instantiate from model", { classModel });
 
         if (classModel._rev) {
             let classObj: Class = Class.get(
                 stack, classModel._id, classModel.name,
                 classModel["~class"], classModel.description,
-                classModel.schema
+                classModel.schema, options
             )
             classObj.setModel(classModel);
             return classObj;
@@ -250,10 +275,10 @@ class Class extends Class_ {
      * }
      * ```
      */
-    static fetch = async (stack: Stack, className: string) => {
+    static fetch = async (stack: Stack, className: string, options?: ClassBuildOptions) => {
         let classModel = await stack.getClassModel(className);
         if (classModel) {
-            return Class.buildFromModel(stack, classModel);
+            return Class.buildFromModel(stack, classModel, options);
         } else {
             return null;
         }

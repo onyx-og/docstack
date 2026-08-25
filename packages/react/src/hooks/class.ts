@@ -128,6 +128,9 @@ export const useClassList = (stack: string, selector: {[key: string]: any}) => {
             return;
         }
 
+        let cancelled = false;
+        let attached: EventListener | null = null;
+
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
@@ -138,13 +141,20 @@ export const useClassList = (stack: string, selector: {[key: string]: any}) => {
                     const classInstance = await Class.buildFromModel(stackInstance!, cls);
                     initialClassList.push(classInstance);
                 }
+                if (cancelled) {
+                    // The effect was torn down mid-query; these were built anyway, and
+                    // each one holds a live subscription until it is closed.
+                    for (const classInstance of initialClassList) classInstance.close();
+                    return;
+                }
                 classListRef.current = initialClassList;
                 setClassList(classListRef.current);
             } catch (err: any) {
-                setError(err);
+                if (!cancelled) setError(err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
+            if (cancelled) return;
 
             const changeListener = (change: CustomEvent) => {
                 const doc = change.detail.doc;
@@ -177,14 +187,23 @@ export const useClassList = (stack: string, selector: {[key: string]: any}) => {
                 setClassList([...classListRef.current])
             };
 
-            originClass.addEventListener('doc', changeListener as EventListener);
-
-            return () => {
-                originClass.removeEventListener('doc', changeListener as EventListener);
-            };
+            attached = changeListener as EventListener;
+            originClass.addEventListener('doc', attached);
         };
 
         runQueryAndListen();
+
+        // The cleanup used to be returned from `runQueryAndListen`, where React never saw
+        // it: the listener stayed attached and the built classes stayed subscribed for
+        // every render that changed the selector.
+        return () => {
+            cancelled = true;
+            if (attached) originClass.removeEventListener('doc', attached);
+            // Guarded: the change handler above pushes the raw document for a class it
+            // has not seen before, so the list is not uniformly Class instances.
+            for (const classInstance of classListRef.current) classInstance?.close?.();
+            classListRef.current = [];
+        };
     }, [originClass, JSON.stringify(selector)]); // Dependency on classObj and query
 
     return { classList, loading, error };
@@ -333,18 +352,23 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
             return;
         }
 
+        let cancelled = false;
+        let attached: EventListener | null = null;
+
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
                 // debugger;
                 const initialDocs = await classObj.getCards(query) as Document[];
+                if (cancelled) return;
                 docsRef.current = initialDocs;
                 setDocs(docsRef.current);
             } catch (err: any) {
-                setError(err);
+                if (!cancelled) setError(err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
+            if (cancelled) return;
 
             const changeListener = (change: CustomEvent) => {
                 const doc = change.detail.doc;
@@ -380,14 +404,18 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
                 setDocs([...docsRef.current])
             };
 
-            classObj.addEventListener('doc', changeListener as EventListener);
-
-            return () => {
-                classObj.removeEventListener('doc', changeListener as EventListener);
-            };
+            attached = changeListener as EventListener;
+            classObj.addEventListener('doc', attached);
         };
 
         runQueryAndListen();
+
+        // The cleanup used to be returned from `runQueryAndListen`, so React never
+        // received it and each query change left another listener on the class.
+        return () => {
+            cancelled = true;
+            if (attached) classObj.removeEventListener('doc', attached);
+        };
     }, [classObj, JSON.stringify(query)]); // Dependency on classObj and query
 
     return { docs, loading, error };
