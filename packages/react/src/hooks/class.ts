@@ -336,7 +336,7 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
         const runQueryAndListen = async () => {
             setLoading(true);
             try {
-                debugger;
+                // debugger;
                 const initialDocs = await classObj.getCards(query) as Document[];
                 docsRef.current = initialDocs;
                 setDocs(docsRef.current);

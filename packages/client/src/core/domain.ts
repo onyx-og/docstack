@@ -169,14 +169,10 @@ class Domain extends Domain_ {
         Domain.logger.info("Received schema", { schema })
         domain_.init(
             stack, id, name, type, relation, sourceClass, targetClass, description);
-        // Add listener for new documents of this class type
-        domain_.stack!.onClassDoc(name)
-            .on("change", (change) => {
-                const evt = new CustomEvent("doc", {
-                    detail: change
-                })
-                domain_.dispatchEvent(evt);
-            })
+        // Add listener for new documents of this class type. Relation documents carry no
+        // encrypted attributes today, but this shares the class path so that stays true
+        // by construction rather than by assumption - see ADR-0020.
+        domain_.stack!.subscribeClassDocs(name, domain_);
         return domain_;
     }
 

@@ -415,7 +415,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     })
                 });
             } else {
-                console.log("Crypto engine enabled, processing encryption.");
+                // console.log("Crypto engine enabled, processing encryption.");
             }
 
             const originalDocs = Array.isArray(docs) ? documentsToProcess : (docs as any).docs;

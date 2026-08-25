@@ -1149,7 +1149,6 @@ const sys_013: Patch = {
                     "name": "ensure-salt",
                     "order": "before",
                     "run": `if (!document.keyDerivationSalt) {
-                        debugger;
                         const salt = stack.cryptoEngine.generateRandomString(32);
                         document.keyDerivationSalt = salt;
                     }
@@ -1158,7 +1157,7 @@ const sys_013: Patch = {
                 {
                     "name": "auto-wrap-document-key",
                     "order": "before",
-                    "run": `debugger; if (document.password && document.keyDerivationSalt && stack.cryptoEngine.getDocumentKey()) {
+                    "run": `if (document.password && document.keyDerivationSalt && stack.cryptoEngine.getDocumentKey()) {
         let shouldRecalculate = true;
         if (document._id) {
             try {

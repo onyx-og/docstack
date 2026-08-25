@@ -66,6 +66,58 @@ abstract class Stack extends EventTarget {
 
     abstract onClassDoc: (className: string) => PouchDB.Core.Changes<{}>;
 
+    /**
+     * Prepares a document from the changes feed for delivery to a listener.
+     *
+     * The base implementation passes it through, which is correct for a stack that does
+     * not encrypt. A stack that does overrides this: the feed bypasses the plugin that
+     * decrypts reads, so a stored encrypted attribute would otherwise reach a consumer as
+     * its raw payload. See ADR-0020.
+     *
+     * @param doc - The document from `change.doc`.
+     * @param classObj - The class, when the caller has one.
+     */
+    prepareChangeDocument = async (doc: Document, classObj?: Class): Promise<Document> => doc;
+
+    /**
+     * Subscribes an event target to a class's document changes.
+     *
+     * Prefer this over wiring {@link onClassDoc} directly. It routes every change through
+     * {@link prepareChangeDocument}, so a subclass that encrypts cannot forget to decrypt
+     * on this path, and it serialises the handlers: preparing a document is asynchronous,
+     * so two rapid changes to one document could otherwise be dispatched in whichever
+     * order their preparation happened to finish. The change's `seq` still rides along
+     * for consumers that want to discard a stale update independently.
+     *
+     * @param className - The class whose documents to watch.
+     * @param target - Receives the `doc` events.
+     * @param classObj - The class, when the caller has one.
+     * @returns The underlying changes listener.
+     */
+    subscribeClassDocs = (className: string, target: EventTarget, classObj?: Class): PouchDB.Core.Changes<{}> => {
+        const listener = this.onClassDoc(className);
+
+        let queue: Promise<void> = Promise.resolve();
+        listener.on("change", (change: any) => {
+            queue = queue
+                .then(async () => {
+                    // A deletion carries no `doc`; forward it untouched.
+                    const detail = change.doc
+                        ? { ...change, doc: await this.prepareChangeDocument(change.doc as Document, classObj) }
+                        : change;
+                    target.dispatchEvent(new CustomEvent("doc", { detail }));
+                })
+                .catch((error: any) => {
+                    // One bad change must not end the subscription - the chain has to
+                    // survive to deliver the next one.
+                    // eslint-disable-next-line no-console
+                    console.error("subscribeClassDocs - failed to deliver change", { className, error });
+                });
+        });
+
+        return listener;
+    };
+
     abstract createDoc: (docId: string | null, type: string,classObj: Class | ClassModel["schema"], params: {}) => Promise<Document | null>;
 
     abstract createDocs: ( docs: {docId: string | null, params: {}}[], type: string, classObj: Class | ClassModel["schema"] ) => Promise<Document[]>;

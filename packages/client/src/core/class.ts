@@ -155,14 +155,10 @@ class Class extends Class_ {
         const class_ = new Class();
         Class.logger.info("Received schema", { schema })
         class_.init(stack, id, name, type, description, schema);
-        // Add listener for new documents of this class type
-        class_.stack!.onClassDoc(name)
-            .on("change", (change) => {
-                const evt = new CustomEvent("doc", {
-                    detail: change
-                })
-                class_.dispatchEvent(evt);
-            })
+        // Add listener for new documents of this class type. The changes feed is not on
+        // the decrypting path, so this goes through the stack rather than dispatching the
+        // raw change - see ADR-0020.
+        class_.stack!.subscribeClassDocs(name, class_, class_);
         return class_;
     }
 

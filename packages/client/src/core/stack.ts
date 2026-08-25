@@ -1177,6 +1177,52 @@ class ClientStack extends Stack {
         return onClassDocListener;
     }
 
+    /**
+     * Prepares a document delivered by the changes feed for a listener.
+     *
+     * The changes feed is the one read path that does not pass through
+     * {@link StackPlugin}: decryption lives in the `bulkGet` wrapper, which is what makes
+     * `getCards` and `findDocuments` transparent, while `include_docs` hands back exactly
+     * what is stored. Every read decrypted except the one that pushed, so a live view
+     * received an `EncryptedPayload` object where it had just rendered a string.
+     *
+     * @param doc - The document from `change.doc`.
+     * @param classObj - The class, when known; without it encrypted values are still
+     * recognised by shape.
+     * @returns A copy safe to hand to a consumer. Never contains an `EncryptedPayload`.
+     *
+     * @example
+     * ```typescript
+     * const doc = await stack.prepareChangeDocument(change.doc, classObj);
+     * doc.ssn; // plaintext, or null when it cannot be opened
+     * ```
+     */
+    public override prepareChangeDocument = async (doc: Document, classObj?: Class): Promise<Document> => {
+        if (!this.cryptoEngine.isEnabled()) return doc;
+
+        const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc, classObj);
+        if (!encryptedKeys.length) return doc;
+
+        const clone = { ...doc } as Document;
+        if (this.cryptoEngine.getDocumentKey()) {
+            await this.cryptoEngine.decryptDocument(clone, classObj, encryptedKeys);
+        }
+
+        // Whatever is still sealed - no key at all, or one this engine no longer holds -
+        // is nulled rather than passed on. That is what a locked *read* returns, so
+        // locked reads and locked change events agree; and it is the defect itself, since
+        // an `EncryptedPayload` reaching a view is what crashes it. Dropping the event
+        // instead would make a locked stack look frozen.
+        for (const key of encryptedKeys) {
+            if (isEncryptedPayload((clone as any)[key])) {
+                (clone as any)[key] = null;
+            }
+        }
+
+        return clone;
+    }
+
+
     // Database initialization should be about making sure that all the documents
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
