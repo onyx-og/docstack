@@ -34,7 +34,9 @@ export const useClassCreate = (stack: string) => {
                 if (!docStack) {
                     // Handle the case where the provider is not yet initialized or missing
                     // You could throw an error or return an empty state.
-                    console.error('useClassCreate must be used within a DocStackProvider.');
+                    // Null until the provider's `ready` event; that is startup,
+                    // not a missing provider. See ADR-0022.
+                    console.warn('useClassCreate - stack not ready yet; the call was ignored.');
                     // setLoading(false);
                     return Promise.resolve(null);
                 }
@@ -94,7 +96,10 @@ export const useClassList = (stack: string, selector: {[key: string]: any}) => {
     useEffect(() => {
         // Only run if the docStack is available and a className is provided
         if (!docStack) {
-            setLoading(false);
+            // Null until the provider's `ready` event: startup, not a missing
+            // provider. Reporting "loaded" here is indistinguishable from a genuinely
+            // empty result. See ADR-0022.
+            setLoading(true);
             return;
         }
 
@@ -239,8 +244,14 @@ export const useClass = (stack: string, className: string) => {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
-            console.error('useClass must be used within a DocStackProvider.');
-            setLoading(false);
+            // The provider publishes `null` into the context until its `ready`
+            // event fires, so this is the normal startup window, not a missing
+            // provider. Reporting it as one sends the reader hunting for a bug
+            // that is not there - and `setLoading(false)` was worse than the
+            // message: it tells a consumer "loaded, and empty" during startup,
+            // which is indistinguishable from a genuinely empty result. See
+            // ADR-0022.
+            setLoading(true);
             return;
         }
 
@@ -317,7 +328,16 @@ export const useClassDocs = (stack: string, className: string, query = {}) => {
 
     useEffect(() => {
         // Only run if the docStack is available and a className is provided
-        if (!docStack || !className) {
+        if (!docStack) {
+            // Null until the provider's `ready` event: startup, not a missing
+            // provider. Reporting "loaded" here is indistinguishable from a genuinely
+            // empty result. See ADR-0022.
+            setLoading(true);
+            return;
+        }
+        if (!className) {
+            // A genuinely absent className is "nothing to load", which is a settled state -
+            // unlike the pre-ready window above.
             setLoading(false);
             return;
         }

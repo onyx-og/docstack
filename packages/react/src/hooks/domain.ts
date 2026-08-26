@@ -37,7 +37,9 @@ export const useDomainCreate = (stack: string) => {
                 if (!docStack) {
                     // Handle the case where the provider is not yet initialized or missing
                     // You could throw an error or return an empty state.
-                    console.error('useDomainCreate must be used within a DocStackProvider.');
+                    // Null until the provider's `ready` event; that is startup,
+                    // not a missing provider. See ADR-0022.
+                    console.warn('useDomainCreate - stack not ready yet; the call was ignored.');
                     // setLoading(false);
                     return Promise.resolve(null);
                 }
@@ -97,7 +99,10 @@ export const useDomainList = (stack: string, selector: {[key: string]: any}) => 
     useEffect(() => {
         // Only run if the docStack is available and a className is provided
         if (!docStack) {
-            setLoading(false);
+            // Null until the provider's `ready` event: startup, not a missing
+            // provider. Reporting "loaded" here is indistinguishable from a genuinely
+            // empty result. See ADR-0022.
+            setLoading(true);
             return;
         }
 
@@ -236,8 +241,14 @@ export const useDomain = (stack: string, domainName: string) => {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
-            console.error('useDomain must be used within a DocStackProvider.');
-            setLoading(false);
+            // The provider publishes `null` into the context until its `ready`
+            // event fires, so this is the normal startup window, not a missing
+            // provider. Reporting it as one sends the reader hunting for a bug
+            // that is not there - and `setLoading(false)` was worse than the
+            // message: it tells a consumer "loaded, and empty" during startup,
+            // which is indistinguishable from a genuinely empty result. See
+            // ADR-0022.
+            setLoading(true);
             return;
         }
 
@@ -316,7 +327,16 @@ export const useDomainRelations = (stack: string, domainName: string, query = {}
 
     useEffect(() => {
         // Only run if the docStack is available and a className is provided
-        if (!docStack || !domainName) {
+        if (!docStack) {
+            // Null until the provider's `ready` event: startup, not a missing
+            // provider. Reporting "loaded" here is indistinguishable from a genuinely
+            // empty result. See ADR-0022.
+            setLoading(true);
+            return;
+        }
+        if (!domainName) {
+            // A genuinely absent domainName is "nothing to load", which is a settled state -
+            // unlike the pre-ready window above.
             setLoading(false);
             return;
         }

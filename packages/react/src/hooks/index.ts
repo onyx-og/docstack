@@ -38,8 +38,14 @@ export const useQuerySQL = (stack: string, sql: string, ...params: any[]) => {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
-            console.error('useClassList must be used within a DocStackProvider.');
-            setLoading(false);
+            // The provider publishes `null` into the context until its `ready`
+            // event fires, so this is the normal startup window, not a missing
+            // provider. Reporting it as one sends the reader hunting for a bug
+            // that is not there - and `setLoading(false)` was worse than the
+            // message: it tells a consumer "loaded, and empty" during startup,
+            // which is indistinguishable from a genuinely empty result. See
+            // ADR-0022.
+            setLoading(true);
             return;
         }
 
@@ -126,8 +132,14 @@ export const useFind = (stack: string, query: {
         if (!docStack) {
             // Handle the case where the provider is not yet initialized or missing
             // You could throw an error or return an empty state.
-            console.error('useFind must be used within a DocStackProvider.');
-            setLoading(false);
+            // The provider publishes `null` into the context until its `ready`
+            // event fires, so this is the normal startup window, not a missing
+            // provider. Reporting it as one sends the reader hunting for a bug
+            // that is not there - and `setLoading(false)` was worse than the
+            // message: it tells a consumer "loaded, and empty" during startup,
+            // which is indistinguishable from a genuinely empty result. See
+            // ADR-0022.
+            setLoading(true);
             return;
         }
 
