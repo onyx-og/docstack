@@ -106,7 +106,19 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             // two, and this method replaces it, so the normalization happens here.
             if (readNewEdits(docs, options) === false) {
                 fnLogger.info("new_edits is false, storing documents verbatim");
-                return pouchBulkDocs.call(this, docs as any, options, callback);
+                // Replication lands class models and policies too; the stack's derived
+                // caches must not outlive them.
+                const verbatimDocs: unknown[] = Array.isArray(docs) ? docs : (docs as any).docs;
+                if (callback) {
+                    const cb = callback as (err: unknown, res?: unknown) => void;
+                    return pouchBulkDocs.call(this, docs as any, options, (err, res) => {
+                        if (!err) stack.invalidateWriteCaches(verbatimDocs);
+                        cb(err, res);
+                    });
+                }
+                const result = await pouchBulkDocs.call(this, docs as any, options);
+                stack.invalidateWriteCaches(verbatimDocs);
+                return result;
             }
 
             let documentsToProcess: typeof docs;
@@ -409,6 +421,9 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         if (err) {
                             reject(err);
                         } else {
+                            // Before after-triggers run: they read back through the
+                            // caches and must see what this batch just wrote.
+                            stack.invalidateWriteCaches(documentsToProcess as unknown[]);
                             await postExec(null, res).then(() => {
                                 resolve(res);
                             }).catch(reject);
@@ -447,6 +462,9 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     if (err) {
                         reject(err);
                     } else {
+                        // Before after-triggers run: they read back through the caches
+                        // and must see what this batch just wrote.
+                        stack.invalidateWriteCaches(documentsToProcess as unknown[]);
                         await postExec(null, res).then(() => {
                             resolve(res);
                         }).catch(reject);

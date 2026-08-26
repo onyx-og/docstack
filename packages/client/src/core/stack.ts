@@ -230,6 +230,35 @@ class ClientStack extends Stack {
     patchCount!: number;
 
     /**
+     * Stored class models, keyed by whatever the caller looked them up with (name or id).
+     *
+     * `getClassModel` runs at least once per document on every read and write path (the
+     * policy engine resolves each document's class through it), and each miss is an
+     * unindexed find. Entries include `null` for names that resolved to nothing - the
+     * caches are cleared whenever a class document is written, so a class created later
+     * evicts its own negative entry.
+     *
+     * Invalidated as a pair with {@link classSnapshotCache}: synchronously by the write
+     * path (StackPlugin calls {@link invalidateWriteCaches} after every batch that
+     * touches a class model) and again by the shared changes feed for writes this stack
+     * did not make itself. Cleared wholesale rather than per-entry because a rename
+     * leaves the old name keyed to a model that no longer answers to it.
+     */
+    private classModelCache: Map<string, ClassModel | null> = new Map();
+
+    /**
+     * Built, non-subscribing Class instances, keyed by class name and pinned to the
+     * model revision they were built from.
+     *
+     * Building a Class rebuilds every Attribute and re-derives the Zod schema, per
+     * attribute - work `getClassSnapshot` used to repeat on every call. The `_rev` pin
+     * means a stale entry can never be served even if invalidation lags: the model is
+     * looked up first (through {@link classModelCache}) and the snapshot is reused only
+     * when its revision still matches.
+     */
+    private classSnapshotCache: Map<string, { rev: string, cls: Class }> = new Map();
+
+    /**
      * Every live changes subscription this stack has handed out; released on close.
      */
     listeners: ChangesSubscription[] = [];
@@ -1380,6 +1409,17 @@ class ClientStack extends Stack {
         fnLogger.info("Setting up class model changes listener");
         const classModelChanges = this.onClassModelChanges();
 
+        // Cache invalidation for writes this instance did not make itself - another tab
+        // on the same IndexedDB, a direct pristine write. Local writes are already
+        // handled synchronously by StackPlugin calling `invalidateWriteCaches`; this
+        // rides the one shared feed (ADR-0021) and so adds no listener of its own.
+        const invalidateFromChange = (change: { doc?: unknown }) => {
+            if (change?.doc) this.invalidateWriteCaches([change.doc]);
+        };
+        for (const watched of ["class", "~self", "~Policy"]) {
+            this.addClassDocSubscriber(ClientStack.subscriberKey("~class", watched), invalidateFromChange);
+        }
+
         /*
         this.modelWorker.onmessage = (event) => {
             const { status, className, message } = event.data;
@@ -1707,6 +1747,68 @@ class ClientStack extends Stack {
     }
 
 
+    /**
+     * Evicts derived caches after documents were written.
+     *
+     * Called synchronously by StackPlugin after every successful `bulkDocs` batch (which
+     * every local write funnels through, `put`/`post`/`remove` and replication included),
+     * and again by the shared changes feed for writes made outside this instance -
+     * another tab on the same database, most commonly. The write-path call is what makes
+     * a policy or schema write visible to the very next read: the changes feed delivers
+     * asynchronously, and a cache invalidated only by the feed would serve stale answers
+     * in that window.
+     *
+     * Class-model writes clear the model and snapshot caches wholesale rather than by
+     * key - a rename leaves the old name keyed to a model that no longer answers to it,
+     * and class writes are rare enough that precision buys nothing.
+     *
+     * @param docs - The documents just written; omit to invalidate everything.
+     */
+    invalidateWriteCaches = (docs?: unknown[]) => {
+        let classTouched = !docs;
+        let policyTouched = !docs;
+        for (const doc of docs ?? []) {
+            if (!doc || typeof doc !== "object") continue;
+            if (isClassModel(doc as { [key: string]: any })) classTouched = true;
+            else if ((doc as { [key: string]: any })["~class"] === "~Policy") policyTouched = true;
+            if (classTouched && policyTouched) break;
+        }
+        if (classTouched) {
+            this.classModelCache.clear();
+            this.classSnapshotCache.clear();
+        }
+        if (policyTouched) {
+            this.policyEngine?.invalidatePolicyCache();
+        }
+    }
+
+    /**
+     * Creates the stack's standing Mango indexes.
+     *
+     * Every `findDocuments` selector carries `~class` and `active`, and without an index
+     * pouchdb-find answers each one with a full `allDocs` scan - linear in database
+     * size, per call. One fixed index serves them all. This replaces the old commented
+     * per-query `createIndex` inside `findDocuments`, which built a fresh index for
+     * every distinct selector shape and buried the database in design documents - the
+     * "breaks find and even db" the comment there warned about.
+     *
+     * Failure is deliberately non-fatal: an index is an optimization, and pouchdb-find
+     * falls back to scanning exactly as before.
+     */
+    private async ensureMangoIndexes() {
+        try {
+            await (this.db as PouchDB.Database).createIndex({
+                index: {
+                    fields: ["~class", "active"],
+                    ddoc: "docstack-indexes",
+                    name: "by-class-active",
+                },
+            });
+        } catch (e: any) {
+            logger.warn("ensureMangoIndexes - could not create index; queries fall back to scans", { error: e?.message || e });
+        }
+    }
+
     // Database initialization should be about making sure that all the documents
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
@@ -1715,6 +1817,7 @@ class ClientStack extends Stack {
         await this.ensureCryptoConfigDocument();
         logger.warn("initdb - crypto config ensured", { "stackName": this.name });
         await this.initIndex();
+        await this.ensureMangoIndexes();
         logger.warn("initdb - index initialized", { "stackName": this.name });
         await this.checkSystem();
         logger.warn("initdb - system checked", { "stackName": this.name });
@@ -1923,7 +2026,23 @@ class ClientStack extends Stack {
      * ```
      */
     getClassSnapshot = async (className: string): Promise<Class | null> => {
-        return Class.fetch(this, className, { subscribe: false });
+        const classModel = await this.getClassModel(className);
+        if (!classModel) return null;
+
+        // Reuse the built instance while the stored model hasn't moved. The `_rev` pin
+        // makes staleness impossible regardless of invalidation timing: the model above
+        // is the current one (cached or fresh), and a snapshot built from any other
+        // revision is rebuilt here rather than served.
+        const cached = this.classSnapshotCache.get(className);
+        if (cached && classModel._rev && cached.rev === classModel._rev) {
+            return cached.cls;
+        }
+
+        const cls = await Class.buildFromModel(this, classModel, { subscribe: false });
+        if (classModel._rev) {
+            this.classSnapshotCache.set(className, { rev: classModel._rev, cls });
+        }
+        return cls;
     }
 
     getDomain = async (domainName: string, fresh = false): Promise<Domain | null> => {
@@ -2071,7 +2190,9 @@ class ClientStack extends Stack {
             }
             if (fields) query["fields"] = fields;
             if (skip) query["skip"] = skip;
-            if (limit) query["limit"] = limit;
+            // Always explicit: pouchdb-find otherwise applies CouchDB's default of 25
+            // and silently truncates every un-limited read to 25 documents.
+            query["limit"] = limit ? limit : 2 ** 31 - 1;
             let foundResult = await this.db.find(query);
             if (selector.hasOwnProperty("username")) {
                 console.log("Found result", { result: foundResult, selector })
@@ -2188,6 +2309,15 @@ class ClientStack extends Stack {
     }
 
     getClassModel = async (className: string) => {
+        // Served from cache when possible: this lookup runs at least once per document
+        // on every read and write (the policy engine resolves each document's class),
+        // and the underlying find is an unindexed scan. `undefined` means never looked
+        // up; a cached `null` is a real answer ("no such class") whose entry is evicted
+        // when any class document is written.
+        if (this.classModelCache.has(className)) {
+            return this.classModelCache.get(className) ?? null;
+        }
+
         // TODO: understand whether to use name of _id field
         let selector = {
             $or: [
@@ -2203,6 +2333,7 @@ class ClientStack extends Stack {
             if (response == null) return null;
             let result: ClassModel = response.docs[0] as unknown as ClassModel
             logger.info("getClassModel - result", { result: result })
+            this.classModelCache.set(className, result ?? null);
             return result;
         } catch (e: any) {
             logger.info("getClassModel - error", e)

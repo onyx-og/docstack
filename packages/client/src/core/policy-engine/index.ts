@@ -46,11 +46,40 @@ export class PolicyEngine {
     private readonly stack: ClientStack;
 
     /**
+     * Every `~Policy` document, loaded once and reused across evaluations.
+     *
+     * `isReadableDocument` runs once per document a read returns, and it used to re-fetch
+     * the policy list from the database each time - the dominant cost of every read path.
+     * The list is invalidated on any write that touches a `~Policy` document: the write
+     * path calls {@link invalidatePolicyCache} synchronously (see StackPlugin), and the
+     * stack's shared changes feed calls it again for out-of-band writes such as another
+     * tab's. `null` means not loaded.
+     */
+    private allPoliciesCache: PolicyModel[] | null = null;
+
+    /**
+     * Compiled policy rules, keyed by their source text.
+     *
+     * A rule is evaluated once per policy per document, and `new Function` is a full
+     * compile each time. The source text is the key - not the policy id - so two policies
+     * sharing a rule share the compilation, and an edited rule is simply a new key.
+     */
+    private compiledRules = new Map<string, (doc: Document | object, sess: AuthSessionProof["session"], groupId: string | string[]) => any>();
+
+    /**
      * Creates a new PolicyEngine instance.
      * @param stack - The parent ClientStack instance
      */
     constructor(stack: ClientStack) {
         this.stack = stack;
+    }
+
+    /**
+     * Drops the cached policy list so the next evaluation re-reads it.
+     * Called by the write path and the changes feed whenever a `~Policy` document lands.
+     */
+    public invalidatePolicyCache() {
+        this.allPoliciesCache = null;
     }
 
     /**
@@ -76,10 +105,20 @@ export class PolicyEngine {
 
     private async loadPolicies(targetClass: string, aliases: string[] = []): Promise<PolicyModel[]> {
         const identifiers = new Set([targetClass, ...aliases]);
-        const result = await this.stack.findDocuments<PolicyModel>(
-            { "~class": "~Policy" }
-        );
-        return result.docs.filter((doc) => {
+        if (this.allPoliciesCache === null) {
+            // Read raw rather than through `findDocuments`: policies are a system class
+            // that bypasses policy evaluation anyway, and going through the read path
+            // here recursed into a policy check per policy document. The selector is the
+            // same one `findDocuments` produced (it injects `active: true`); the explicit
+            // limit is because pouchdb-find otherwise silently caps results at 25, which
+            // for policies means silently not enforcing the 26th.
+            const result = await this.stack.db.find({
+                selector: { "~class": "~Policy", active: true },
+                limit: 2 ** 31 - 1,
+            });
+            this.allPoliciesCache = result.docs as unknown as PolicyModel[];
+        }
+        return this.allPoliciesCache.filter((doc) => {
             if (!Array.isArray(doc.targetClass)) return false;
             return doc.targetClass.some((entry) => identifiers.has(entry));
         });
@@ -117,12 +156,16 @@ export class PolicyEngine {
      * @returns Whether the rule permits access
      */
     private async evaluateRule(policy: PolicyModel, document: Document | null, session: AuthSessionProof): Promise<boolean> {
-        const executor = new Function(
-            "document",
-            "session",
-            "groupId",
-            `"use strict"; ${policy.rule}`
-        ) as (doc: Document | object, sess: AuthSessionProof["session"], groupId: string | string[]) => any;
+        let executor = this.compiledRules.get(policy.rule);
+        if (!executor) {
+            executor = new Function(
+                "document",
+                "session",
+                "groupId",
+                `"use strict"; ${policy.rule}`
+            ) as (doc: Document | object, sess: AuthSessionProof["session"], groupId: string | string[]) => any;
+            this.compiledRules.set(policy.rule, executor);
+        }
 
         const result = executor(document || {}, session.session, session.session.groupId);
         if (result instanceof Promise) {
