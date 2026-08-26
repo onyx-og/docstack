@@ -2913,7 +2913,19 @@ class ClientStack extends Stack {
         let classModel = classObj.getModel();
         fnLogger.info("Got class model", { classModel })
         try {
-            const result = await classOrigin.addCard(classModel) as ClassModel;
+            // Identified by name, the way `addDomain` already identifies a domain, rather
+            // than by a minted id. A class name is the stack's real key for it - documents
+            // carry it as `~class`, and `getClassModel` assumes one model per name - so
+            // deriving the model's id from it is both stable and unique by construction.
+            //
+            // It also has to be stable across devices. Ids used to come from a counter, so
+            // two devices creating the same class produced the same id and collided; they
+            // are random now (ADR-0023), which would instead leave two models for one
+            // class, two default policies, and both copies on both devices after a sync.
+            // A name-derived id converges: the two writes are the same document.
+            const result = await this.createDoc(
+                classModel.name, classOrigin.getName(), classOrigin, classModel
+            ) as ClassModel;
             fnLogger.info("Added class card", { result });
             await this.ensureDefaultPolicyForClass(result);
             return result;

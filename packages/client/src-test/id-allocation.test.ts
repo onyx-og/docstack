@@ -103,4 +103,42 @@ describe("document id allocation", () => {
         // Today both are `IdShared-<same number>`.
         expect(result.first).not.toBe(result.second);
     });
+
+    it("ADR-0023: two instances converge on one class model and one default policy", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "id-converge-host",
+            evaluate: async ({ docStack }) => {
+                const { Class } = (window as any).docstack;
+
+                const openDevice = async (name: string) => {
+                    const stack = await docStack.addStack({ name });
+                    await stack.authenticate({ username: "system", password: "system" });
+                    await Class.create(stack, "ConvergeTask", "class", "Tasks", {
+                        title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
+                    });
+                    const model = await stack.getClassModel("ConvergeTask");
+                    const policies = (await stack.findDocuments({ "~class": { $eq: "~Policy" } })).docs
+                        .filter((d: any) => (d.targetClass || []).includes(model?._id))
+                        .map((d: any) => d._id);
+                    return { classId: model?._id, policies };
+                };
+
+                // Two devices of one application, each building the same class locally.
+                const deviceA = await openDevice("id-converge-a");
+                const deviceB = await openDevice("id-converge-b");
+
+                return { deviceA, deviceB };
+            },
+        });
+
+        // Random document ids are right for documents, which have no natural key. A class
+        // model does have one - its name - and deriving the id from it is what makes two
+        // devices write the *same* document rather than two, so replication merges them
+        // instead of leaving a duplicate class and a duplicate policy on both devices.
+        expect(result.deviceA.classId).toBe("ConvergeTask");
+        expect(result.deviceB.classId).toBe(result.deviceA.classId);
+
+        expect(result.deviceA.policies).toEqual(["Policy-ConvergeTask"]);
+        expect(result.deviceB.policies).toEqual(result.deviceA.policies);
+    });
 });
