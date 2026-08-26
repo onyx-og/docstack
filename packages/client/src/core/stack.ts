@@ -1356,7 +1356,7 @@ class ClientStack extends Stack {
     // TODO: Test if works corrrectly with multiple patch files
     async checkSystem() {
         let systemDoc = await this.getSystem();
-        console.log("System doc rev", {systemDoc});
+        logger.info("checkSystem - system doc rev", { systemDoc });
         let _systemDoc: SystemDoc;
         const dbInfo = await this.getDbInfo();
         logger.info("checkSystem - current system doc", { system: systemDoc })
@@ -1370,7 +1370,7 @@ class ClientStack extends Stack {
             }
             // schemaVersion will be added after applying patches
             let schemaVersion = await this.applyPatches(_systemDoc.schemaVersion);
-            console.log("Applied patches, new schema version:", schemaVersion);
+            logger.info("checkSystem - applied patches", { schemaVersion });
             _systemDoc.schemaVersion = schemaVersion;
         } else {
             logger.info("checkSystem - system doc already exists. Checking for updates", systemDoc)
@@ -1389,7 +1389,7 @@ class ClientStack extends Stack {
             await this.db.put(_systemDoc);
 
         } catch (e: any) {
-            console.log("Got system doc", _systemDoc);
+            logger.info("checkSystem - got system doc", { systemDoc: _systemDoc });
             logger.error("checkSystem - There was a problem while updating system", { error: e })
             throw new Error(e)
         }
@@ -1780,6 +1780,21 @@ class ClientStack extends Stack {
         if (policyTouched) {
             this.policyEngine?.invalidatePolicyCache();
         }
+    }
+
+    /**
+     * Whether a database-level `limit` returns the same rows as limiting in memory.
+     *
+     * `findDocuments` filters per document *after* the query - policy checks drop
+     * unreadable documents, and a locked crypto engine drops documents whose visible
+     * fields are all encrypted. A limit applied before either would under-fill. The
+     * query engine asks this before pushing a SQL LIMIT into the fetch.
+     *
+     * @param className - The class being queried.
+     */
+    canApplyQueryLimitEarly = async (className: string): Promise<boolean> => {
+        if (this.cryptoEngine.isEnabled() && !this.cryptoEngine.getDocumentKey()) return false;
+        return !(await this.policyEngine.hasPoliciesFor(className));
     }
 
     /**
@@ -2194,9 +2209,6 @@ class ClientStack extends Stack {
             // and silently truncates every un-limited read to 25 documents.
             query["limit"] = limit ? limit : 2 ** 31 - 1;
             let foundResult = await this.db.find(query);
-            if (selector.hasOwnProperty("username")) {
-                console.log("Found result", { result: foundResult, selector })
-            }
 
             fnLogger.info("Found", {
                 result: foundResult,
@@ -2558,14 +2570,25 @@ class ClientStack extends Stack {
     };
 
     async incrementLastDocId() {
+        return this.advanceLastDocId(1);
+    }
+
+    /**
+     * Advances the document-id counter by `count` in one database write.
+     *
+     * Batch creation hands out `count` ids from the in-memory counter and commits them
+     * here once, instead of a get+put round-trip per document.
+     */
+    async advanceLastDocId(count: number) {
         let docId = "lastDocId",
             _rev = await this.getDocRevision(docId);
 
         if (_rev) {
+            this.lastDocId += count;
             await this.db.put({
                 _id: "lastDocId",
                 _rev: _rev,
-                value: ++this.lastDocId
+                value: this.lastDocId
             });
             return this.lastDocId;
         }
@@ -2904,6 +2927,11 @@ class ClientStack extends Stack {
         let db = this.db;
         const documents: Document[] = [];
         let newDocsIds: string[] = [];
+        // Advanced locally as ids are handed out, committed once after the write.
+        // Reading `this.lastDocId + 1` per draft instead handed every generated
+        // document in a batch the same id, so a batch of new documents collapsed
+        // into one; and committing per document was two database round-trips each.
+        let nextDocId = this.lastDocId;
 
         for (const draft of docs) {
             let { docId, params } = draft;
@@ -2923,7 +2951,7 @@ class ClientStack extends Stack {
                         doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     }
                 } else {
-                    docId = `${type}-${(this.lastDocId + 1)}`;
+                    docId = `${type}-${(++nextDocId)}`;
                     doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
@@ -2945,11 +2973,13 @@ class ClientStack extends Stack {
         try {
             const response = await db.bulkDocs(documents);
             fnLogger.info("Response after bulkDocs", { "response": response });
-            // Increment lastDocId based on number of new docs created
+            // Commit the counter once for the whole batch rather than once per document.
+            // Ids handed to failed writes are skipped, never reused - uniqueness is what
+            // the counter promises, not density.
             const newDocsCount = response.filter(res => res.id != null && newDocsIds.includes(res.id)).length;
             fnLogger.info(`Successfully created ${newDocsCount} new documents.`);
-            for (let i = 0; i < newDocsCount; i++) {
-                await this.incrementLastDocId();
+            if (newDocsIds.length > 0) {
+                await this.advanceLastDocId(newDocsIds.length);
             }
         } catch (e: any) {
             fnLogger.error("createDocs - Problem while putting docs", {
@@ -3097,6 +3127,8 @@ class ClientStack extends Stack {
         let db = this.db;
         const documents: RelationDocument[] = [];
         let newDocsIds: string[] = [];
+        // See createDocs: per-draft ids off a local counter, committed once below.
+        let nextDocId = this.lastDocId;
 
         for (const draft of docs) {
             let { docId, params } = draft;
@@ -3116,7 +3148,7 @@ class ClientStack extends Stack {
                         doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     }
                 } else {
-                    docId = `${domainObj.name}-${(this.lastDocId + 1)}`;
+                    docId = `${domainObj.name}-${(++nextDocId)}`;
                     doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
@@ -3144,11 +3176,10 @@ class ClientStack extends Stack {
             // console.log("Documents to be created", {documents});
             const response = await db.bulkDocs(documents);
             fnLogger.info("Response after bulkDocs", { "response": response });
-            // Increment lastDocId based on number of new docs created
             const newDocsCount = response.filter(res => res.id != null && newDocsIds.includes(res.id)).length;
             fnLogger.info(`Successfully created ${newDocsCount} new documents.`);
-            for (let i = 0; i < newDocsCount; i++) {
-                await this.incrementLastDocId();
+            if (newDocsIds.length > 0) {
+                await this.advanceLastDocId(newDocsIds.length);
             }
         } catch (e: any) {
             fnLogger.error("createRelationDocs - Problem while putting docs", {
@@ -3209,12 +3240,44 @@ class ClientStack extends Stack {
      * const { rows } = await stack.query('SELECT * FROM Task WHERE priority = ?', 'high');
      * ```
      */
+    /**
+     * Replaces `?` placeholder nodes in a parsed AST with the caller's parameter values.
+     *
+     * Values are restricted to plain scalars: an object here could carry Mango
+     * operators of its own and reach the database as part of a pushed-down selector,
+     * changing what the query matches. Structured values belong in the document
+     * model, not in a comparison.
+     */
+    private static bindQueryParams(node: unknown, params: any[]) {
+        if (Array.isArray(node)) {
+            for (const item of node) ClientStack.bindQueryParams(item, params);
+            return;
+        }
+        if (!node || typeof node !== "object") return;
+        for (const [key, value] of Object.entries(node as { [key: string]: any })) {
+            if (value && typeof value === "object" && (value as any).type === "placeholder") {
+                const index = (value as any).index;
+                if (index >= params.length) {
+                    throw new Error(`Query expects at least ${index + 1} parameter(s), got ${params.length}`);
+                }
+                const bound = params[index];
+                if (bound !== null && !["string", "number", "boolean"].includes(typeof bound)) {
+                    throw new Error(`Query parameter ${index + 1} must be a string, number, boolean or null`);
+                }
+                (node as any)[key] = { type: "param", value: bound };
+            } else {
+                ClientStack.bindQueryParams(value, params);
+            }
+        }
+    }
+
     query = async (sql: string, ...params: any[]) => {
         const fnLogger = logger.child({ method: "query", args: { sql, params } });
         fnLogger.info("Executing query");
         let astList: (SelectAST | UnionAST)[] = [];
         try {
             astList = parse(sql);
+            ClientStack.bindQueryParams(astList, params);
             fnLogger.info("Produced AST", { astList });
         } catch (error: any) {
             error.ast = astList.length > 0 ? astList[0] : null;

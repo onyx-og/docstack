@@ -233,6 +233,23 @@ export class PolicyEngine {
     }
 
     /**
+     * Whether any policy applies to a class - i.e. whether reads of it are filtered.
+     *
+     * Lets the query engine know when a database-level LIMIT is safe: with no
+     * applicable policies, no row fetched within the limit can be dropped afterwards.
+     * Cheap once the policy list is cached.
+     *
+     * @param targetClass - The class name or id.
+     * @returns `true` if at least one policy targets the class.
+     */
+    public async hasPoliciesFor(targetClass: string): Promise<boolean> {
+        const { id: targetId, name: targetName } = await this.resolveClassTarget(targetClass);
+        if (this.shouldBypass(targetName)) return false;
+        const policies = await this.loadPolicies(targetId, this.getTargetIdentifiers(targetId, targetName));
+        return policies.length > 0;
+    }
+
+    /**
      * Ensures write access is allowed for a document of the given class.
      * Throws an error if no policy permits the write operation.
      * 

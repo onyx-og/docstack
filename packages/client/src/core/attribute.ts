@@ -119,11 +119,38 @@ class Attribute extends Attribute_ {
     }
 
     /**
+     * Built Zod fields, shared across attributes with the same type and config.
+     *
+     * An attribute's validator is a pure function of `(type, config)`, and the same
+     * handful of shapes recur across every class build - which happens per snapshot,
+     * per schema propagation, and per cold class fetch. `foreign_key` is the one type
+     * excluded: its refinement closes over the owning instance's class and stack.
+     */
+    private static fieldCache = new Map<string, z.ZodType>();
+
+    /**
      * Builds the Zod validation schema based on attribute type and configuration.
      * Called automatically during construction.
      */
     public setField = () => {
         const { name, type, config } = this.model;
+
+        let cacheKey: string | null = null;
+        if (type !== 'foreign_key') {
+            try {
+                cacheKey = `${type}|${JSON.stringify(config)}`;
+            } catch {
+                cacheKey = null; // config not serializable; build uncached
+            }
+            if (cacheKey) {
+                const cached = Attribute.fieldCache.get(cacheKey);
+                if (cached) {
+                    this.field = cached;
+                    return;
+                }
+            }
+        }
+
         let field: z.ZodType;
 
         switch (type) {
@@ -261,6 +288,9 @@ class Attribute extends Attribute_ {
             field = field.nullable().optional();
         }
 
+        if (cacheKey) {
+            Attribute.fieldCache.set(cacheKey, field);
+        }
         this.field = field;
     }
 

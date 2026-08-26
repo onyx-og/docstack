@@ -431,16 +431,18 @@ class Class extends Class_ {
         if (model.schema) {
             // model.schema = {...this.model.schema, ...model.schema};
             this.attributes = {};
-            this.schemaZOD = z.object({});
+            // Collected into one z.object() call: chaining .extend() per attribute
+            // rebuilds the object schema each time, which is quadratic in attribute
+            // count and ran on every class build.
+            const shape: { [name: string]: z.ZodType } = {};
             for (const [key, attrModel] of Object.entries(model.schema)) {
                 let attribute = new Attribute(
                     this, attrModel.name, attrModel.type, attrModel.description, attrModel.config
                 );
                 this.attributes[attrModel.name] = attribute;
-                this.schemaZOD = this.schemaZOD.extend({
-                    [attrModel.name]: attribute.field
-                });
+                shape[attrModel.name] = attribute.field;
             }
+            this.schemaZOD = z.object(shape);
         }
 
         if (model.triggers) {

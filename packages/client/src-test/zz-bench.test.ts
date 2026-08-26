@@ -114,6 +114,45 @@ it("benchmarks core read/write/query paths", async ({ useDocStack }) => {
             r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b ORDER BY b.value DESC LIMIT 5;"));
             res.sqlOrderLimit = { ms: r.ms, finds: r.finds };
 
+            // --- 6b. Batch write path (addCards) ---
+            r = await countFinds(() => plainClass.addCards(
+                Array.from({ length: 100 }, (_, i) => ({ name: `bulk-${i}`, category: CATS[i % CATS.length], value: 1000 + i }))
+            ));
+            res.addCardsBatch100 = {
+                totalMs: r.ms,
+                perDocMs: +(r.ms / 100).toFixed(1),
+                findCalls: r.finds,
+                created: r.out.length,
+                uniqueIds: new Set(r.out.map((d: any) => d._id)).size,
+            };
+
+            // --- 6c. Query pushdown: string literal, ? params, range, LIMIT ---
+            r = await countFinds(() => stack.query("SELECT b.name, b.value FROM BenchPlain AS b WHERE b.name = 'plain-1';"));
+            res.sqlStringLiteral = { ms: r.ms, finds: r.finds, rows: r.out.rows.length };
+
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b WHERE b.category = ? AND b.value >= ?;", "alpha", 10));
+            res.sqlPlaceholders = { ms: r.ms, finds: r.finds, rows: r.out.rows.length };
+
+            r = await countFinds(() => stack.query("SELECT b.name, b.value FROM BenchPlain AS b WHERE b.value >= 20 AND b.value <= 40;"));
+            res.sqlRangeSameColumn = { ms: r.ms, finds: r.finds, rows: r.out.rows.length };
+
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b LIMIT 5;"));
+            res.sqlLimitPushdown = { ms: r.ms, finds: r.finds, rows: r.out.rows.length };
+
+            // --- diagnostic: what does the class actually contain post-batch? ---
+            {
+                const allPlain = await plainClass.getCards();
+                const byName: any = {};
+                for (const d of allPlain) byName[d.name] = (byName[d.name] || 0) + 1;
+                const dups = Object.entries(byName).filter(([, c]: any) => c > 1).slice(0, 5);
+                const inRange = allPlain.filter((d: any) => d.value >= 20 && d.value <= 40);
+                res.diag = {
+                    totalPlain: allPlain.length,
+                    dupNames: dups,
+                    inRangeCount: inRange.length,
+                };
+            }
+
             // --- 7. Policy overhead: allow-all policy targeting the plain class ---
             const policy = {
                 _id: "Policy-BenchPlain-allow",
@@ -139,5 +178,15 @@ it("benchmarks core read/write/query paths", async ({ useDocStack }) => {
     });
 
     console.log("BENCH RESULTS:\n" + JSON.stringify(results, null, 2));
-    expect(results.findDocsPlain.docs).toBeGreaterThan(0);
+
+    // Correctness gates, so a perf regression can't hide behind a semantics one.
+    expect(results.findDocsPlain.docs).toBe(100);            // no default-limit truncation
+    expect(results.addCardsBatch100.created).toBe(100);
+    expect(results.addCardsBatch100.uniqueIds).toBe(100);    // batch ids don't collide
+    expect(results.sqlStringLiteral.rows).toBe(1);
+    expect(results.sqlPlaceholders.rows).toBe(47);           // 'alpha' & value>=10: 22 originals + 25 bulk
+    expect(results.sqlRangeSameColumn.rows).toBe(21);        // both bounds of the range hold
+    expect(results.sqlLimitPushdown.rows).toBe(5);
+    expect(results.diag.totalPlain).toBe(200);
+    expect(results.diag.dupNames).toEqual([]);
 });

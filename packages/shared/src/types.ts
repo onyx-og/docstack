@@ -209,6 +209,14 @@ export type StackOptions = {
      * ADR-0018.
      */
     documentKey?: string;
+
+    /**
+     * Most verbose level this stack's loggers emit, on console and into the stack's
+     * own log sink alike. `"silent"` turns them off entirely - what a production
+     * build wants. Omitted, the library defaults apply (console shows `warn` and
+     * above, the sink records `info` and above).
+     */
+    logLevel?: "error" | "warn" | "info" | "debug" | "silent";
 } & PouchDB.Configuration.DatabaseConfiguration
 
 export type StackConfig = ({

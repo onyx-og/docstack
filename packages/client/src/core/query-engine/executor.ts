@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { evalExpression, createRowEvaluator, evalAggregatedRowExpression } from './evaluator.js';
 import { createAccumulators } from './accumulators.js';
+import { isPushablePredicate } from './planner.js';
 import ClientStack from '../stack.js';
 
 /**
@@ -21,29 +22,62 @@ async function asyncFilter(arr, predicate) {
  * @param {Array<object>} predicates An array of predicate nodes from the query plan.
  * @returns {object} A Mango selector object for filtering documents.
  */
+const MANGO_OPS = {
+    '=': '$eq',
+    '>': '$gt',
+    '<': '$lt',
+    '>=': '$gte',
+    '<=': '$lte',
+};
+
+/**
+ * Converts pushable predicates into a flat Mango selector: one operator map per column
+ * ({value: {$gte: 20, $lte: 40}}).
+ *
+ * Deliberately never emits `$and`: pouchdb-find was observed returning documents
+ * outside the class filter when a top-level `$and` was combined with top-level field
+ * selectors, so only the canonical flat form is used. Selector output is a *prefilter*
+ * - the executor re-checks every predicate in memory on the fetched rows - so a
+ * predicate this function cannot express (an operator collision on one column, an
+ * unpushable shape) is simply left out and still enforced.
+ */
 function buildSelector(predicates) {
     if (!predicates || predicates.length === 0) return {};
     const selector = {};
     for (const pred of predicates) {
-        // This is a simplified conversion from AST to Mango selector
-        if (pred.type === 'binary_expr' && pred.left.type === 'column_ref') {
-            const key = pred.left.column;
-            const op = {
-                '=': '$eq',
-                '>': '$gt',
-                '<': '$lt',
-                '>=': '$gte',
-                '<=': '$lte',
-            }[pred.operator];
-            if (op && pred.right.type === 'param') {
-                 // For demo, we are assuming numeric/string literals.
-                 let value = pred.right.value;
-                 if(!isNaN(parseFloat(value))) value = parseFloat(value);
-                 selector[key] = { [op]: value };
-            }
-        }
+        if (!isPushablePredicate(pred)) continue;
+        const key = pred.left.column;
+        const op = MANGO_OPS[pred.operator];
+        const existing = selector[key];
+        if (existing && op in existing) continue; // same op twice on one column: the in-memory check keeps the stricter
+        selector[key] = { ...(existing || {}), [op]: pred.right.value };
     }
     return selector;
+}
+
+/**
+ * Merges two flat Mango selectors as a conjunction. On a per-column clash the first
+ * selector's operators win; the dropped ones are still enforced by the in-memory
+ * re-check.
+ */
+function combineSelectors(a, b) {
+    const merged = { ...(b || {}) };
+    for (const [key, ops] of Object.entries(a || {})) {
+        merged[key] = key in merged ? { ...merged[key], ...ops } : ops;
+    }
+    return merged;
+}
+
+/** Flattens a predicate tree of `and` nodes into a list of leaf predicates. */
+function flattenAnd(predicate, out = []) {
+    if (!predicate) return out;
+    if (predicate.type === 'and') {
+        flattenAnd(predicate.left, out);
+        flattenAnd(predicate.right, out);
+        return out;
+    }
+    out.push(predicate);
+    return out;
 }
 
 /**
@@ -219,7 +253,21 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
     if (!fromClass) throw new Error(`Table not found: ${plan.fromTable.table}`);
 
     const leftSelector = buildSelector(plan.filters.left);
-    let leftRows = (await fromClass.getCards(leftSelector)).map(row => ({ [plan.fromTable.as || plan.fromTable.table]: row }));
+
+    // LIMIT rides the database query only when nothing after the fetch can change
+    // which or how many rows survive: no joins, no in-memory filters, no
+    // aggregation/DISTINCT/ORDER BY - and no per-document policy or locked-crypto
+    // filtering, which drop rows after the limit was applied and would under-fill it.
+    const canPushLimit = plan.limit !== null && plan.limit !== undefined
+        && plan.joins.length === 0
+        && plan.filters.residual.length === 0
+        && !plan.aggregation
+        && !plan.distinct
+        && (!plan.orderBy || plan.orderBy.length === 0)
+        && await stack.canApplyQueryLimitEarly(plan.fromTable.table);
+
+    let leftRows = (await fromClass.getCards(leftSelector, undefined, undefined, canPushLimit ? plan.limit : undefined))
+        .map(row => ({ [plan.fromTable.as || plan.fromTable.table]: row }));
 
     // 2. Execute Joins
     let currentResultRows = leftRows;
@@ -230,12 +278,30 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
         const joinAlias = join.as || join.table;
         const fromAlias = plan.fromTable.as || plan.fromTable.table;
 
-        // Combine base table filters with filters from the subquery's WHERE clause
-        const rightBaseSelector = buildSelector(plan.filters.right[join.table] || []);
-        const subqueryFilterSelector = buildSelector(join.filters || []);
-        const finalRightSelector = {...rightBaseSelector, ...subqueryFilterSelector};
+        // Combine base table filters with filters from the subquery's WHERE clause.
+        // The selector is only a prefilter: every predicate - pushed or not - is also
+        // evaluated on the fetched rows, so nothing depends on Mango expressing it
+        // (the previous version silently dropped what buildSelector couldn't say).
+        const rightPredicates = plan.filters.right[join.table] || [];
+        const joinFilterLeaves = (join.filters || []).flatMap(f => flattenAnd(f));
+        const finalRightSelector = combineSelectors(
+            buildSelector(rightPredicates),
+            buildSelector(joinFilterLeaves.filter(isPushablePredicate))
+        );
 
-        const allRightRows = await rightClass.getCards(finalRightSelector);
+        let allRightRows = await rightClass.getCards(finalRightSelector);
+        const rightChecks = [...rightPredicates, ...joinFilterLeaves];
+        if (rightChecks.length > 0) {
+            const joinAlias_ = join.as || join.table;
+            const evaluators = rightChecks.map(predicate => createRowEvaluator(predicate, stack, executePlan, outerRow, null));
+            allRightRows = await asyncFilter(allRightRows, async (rightRow) => {
+                const wrapped = { [joinAlias_]: rightRow };
+                for (const evaluator of evaluators) {
+                    if (!(await evaluator(wrapped))) return false;
+                }
+                return true;
+            });
+        }
         
         if (join.type === 'SEMI' || join.type === 'ANTI') {
             let resultRows;
@@ -331,10 +397,14 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
     }
     let joinedRows = currentResultRows;
     
-    // 3. Apply residual filters
+    // 3. Apply residual filters - and re-check the pushed-down ones. The selector is
+    // treated as a prefilter only: evaluating every WHERE predicate here keeps results
+    // correct even where pouchdb-find's selector matching misbehaves (observed with
+    // $and), at the cost of a comparison per row over rows already in memory.
     let filteredRows = joinedRows;
-    if (plan.filters.residual.length > 0) {
-        const evaluators = plan.filters.residual.map(predicate => createRowEvaluator(predicate, stack, executePlan, outerRow, null));
+    const whereChecks = [...plan.filters.left, ...plan.filters.residual];
+    if (whereChecks.length > 0) {
+        const evaluators = whereChecks.map(predicate => createRowEvaluator(predicate, stack, executePlan, outerRow, null));
         filteredRows = await asyncFilter(joinedRows, async (row) => {
             for (const evaluator of evaluators) {
                 if (!(await evaluator(row))) {

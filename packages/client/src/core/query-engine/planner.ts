@@ -172,21 +172,52 @@ function getReferencedTables(expr, from, joins) {
     return Array.from(tables);
 }
 
+/** Operators `buildSelector` can express in Mango. */
+const PUSHABLE_OPS = new Set(['=', '>', '<', '>=', '<=']);
+
+/**
+ * Column names that must never become Mango selector keys.
+ *
+ * `active` because the read path injects its own `active: true` and pushing a
+ * user-supplied value would silently open soft-deleted documents; the others because
+ * they address an object's prototype machinery rather than a field.
+ */
+const UNPUSHABLE_COLUMNS = new Set(['active', '__proto__', 'constructor', 'prototype']);
+
+/**
+ * Shape of a plain field name. Anything else - quoted identifiers smuggling `$`-prefixed
+ * Mango operators, dotted paths, empty strings - is evaluated in memory instead, where a
+ * column name is only ever an own-property lookup and cannot change query semantics.
+ */
+const PUSHABLE_COLUMN_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 /**
  * Checks if a predicate is a simple binary expression that can be converted
  * directly into a Mango selector by `buildSelector`.
+ *
+ * This is the single authority on pushability - `buildSelector` imports it and refuses
+ * predicates that fail it, so the planner and the executor cannot drift apart and a
+ * predicate classified as pushed can never be silently dropped.
+ *
  * @param {object} predicate The predicate AST node.
  * @returns {boolean} True if the predicate is simple enough for pushdown.
  */
-function isSimplePredicate(predicate) {
-    if (predicate && predicate.type === 'binary_expr' &&
-        predicate.left && predicate.left.type === 'column_ref' &&
-        predicate.right && predicate.right.type === 'param') {
-            // Check for operators supported by buildSelector
-            const supportedOps = ['=', '>', '<', '>=', '<='];
-            return supportedOps.includes(predicate.operator);
-    }
-    return false;
+export function isPushablePredicate(predicate) {
+    if (!predicate || predicate.type !== 'binary_expr') return false;
+    if (!PUSHABLE_OPS.has(predicate.operator)) return false;
+
+    const left = predicate.left;
+    if (!left || left.type !== 'column_ref') return false;
+    if (typeof left.column !== 'string' || !PUSHABLE_COLUMN_RE.test(left.column)) return false;
+    if (UNPUSHABLE_COLUMNS.has(left.column)) return false;
+
+    const right = predicate.right;
+    if (!right || right.type !== 'param') return false;
+    // Only plain scalars become selector values. An object here could carry Mango
+    // operators of its own ({$ne: ...} passed as a ? parameter) and change what the
+    // query matches.
+    const value = right.value;
+    return value === null || ['string', 'number', 'boolean'].includes(typeof value);
 }
 
 function createSingleSelectPlan(ast) {
@@ -234,10 +265,15 @@ function createSingleSelectPlan(ast) {
     for (const predicate of wherePredicates) {
         // Only simple predicates (e.g., col > literal) can be pushed down.
         // Complex predicates involving subqueries or functions become residual.
-        const isSimple = isSimplePredicate(predicate);
+        const isSimple = isPushablePredicate(predicate);
         const referenced = getReferencedTables(predicate, ast.from, ast.joins);
-        
+
         if (isSimple && referenced.length === 1 && referenced[0] === fromTableName) {
+            plan.filters.left.push(predicate);
+        } else if (isSimple && referenced.length === 0 && ast.joins.length === 0 && predicate.left.table == null) {
+            // An unqualified column (`WHERE value >= 50`) references no alias, but with
+            // a single table there is only one place it can live. A predicate naming an
+            // unknown alias stays residual instead.
             plan.filters.left.push(predicate);
         } else if (isSimple && referenced.length === 1 && plan.joins.some(j => j.table === referenced[0])) {
              const join = plan.joins.find(j => j.table === referenced[0]);

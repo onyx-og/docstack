@@ -245,7 +245,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         }
                     } else {
                         // TODO: Consider validating against self after registering the class?
-                        console.log("Class model is of type '~self', skipping parent class validation", { doc });
+                        fnLogger.info("Class model is of type '~self', skipping parent class validation", { doc });
                     }
                     fnLogger.info("Document is class model, following update propagation procedure.");
                     // When a class document is updated, its change must have an effect on its children
@@ -415,7 +415,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             }
 
             if (!stack.cryptoEngine.isEnabled()) {
-                console.log("Crypto engine not enabled, skipping encryption.");
+                fnLogger.debug("Crypto engine not enabled, skipping encryption.");
                 return await new Promise<(PouchDB.Core.Error | PouchDB.Core.Response)[]>((resolve, reject) => {
                     pouchBulkDocs.call(this, docs as any, options, async (err, res) => {
                         if (err) {

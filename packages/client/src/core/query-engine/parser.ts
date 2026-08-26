@@ -9,6 +9,8 @@ import { SelectAST, UnionAST } from "@docstack/shared";
 
 // ---------- Scanner (cursor) ----------
 class Scanner {
+  /** Sequential index handed to `?` placeholders, in the order they appear. */
+  public placeholderCount = 0;
   constructor(public text: string, public pos = 0) {}
   eof() { return this.pos >= this.text.length; }
   rest() { return this.text.slice(this.pos); }
@@ -162,6 +164,55 @@ function parseExpression(scan: Scanner): any {
     return parseColumnExpr(scan);
 }
 
+/**
+ * Parses a literal value - number, 'string', ?, TRUE/FALSE/NULL - or falls back to a
+ * column/function expression. Literals carry their runtime type on the AST node
+ * (`value` is already a number, string, boolean or null), so nothing downstream
+ * guesses types from strings.
+ */
+function parseValueOrExpression(scan: Scanner): any {
+    scan.skipWSAndComments();
+
+    // `?` positional placeholder, resolved against query() params before planning.
+    if (scan.peekChar() === '?') {
+        scan.pos++;
+        return { type: 'placeholder', index: scan.placeholderCount++ };
+    }
+
+    // 'string literal', with '' as the escaped quote.
+    if (scan.peekChar() === "'") {
+        scan.pos++;
+        let value = '';
+        while (!scan.eof()) {
+            const char = scan.peekChar();
+            scan.pos++;
+            if (char === "'") {
+                if (scan.peekChar() === "'") {
+                    value += "'";
+                    scan.pos++;
+                    continue;
+                }
+                return { type: 'param', value };
+            }
+            value += char;
+        }
+        throw new Error('Unterminated string literal');
+    }
+
+    const valMatch = scan.matchRe(/^-?[0-9]+(\.[0-9]+)?/);
+    if (valMatch) {
+        scan.pos += valMatch[0].length;
+        return { type: 'param', value: Number(valMatch[0]) };
+    }
+
+    if (scan.tryKW('TRUE')) return { type: 'param', value: true };
+    if (scan.tryKW('FALSE')) return { type: 'param', value: false };
+    if (scan.tryKW('NULL')) return { type: 'param', value: null };
+
+    // Not a literal: a column reference or function expression.
+    return parseExpression(scan);
+}
+
 function parsePredicate(scan: Scanner): any {
     scan.skipWSAndComments();
 
@@ -208,14 +259,7 @@ function parsePredicate(scan: Scanner): any {
              right = parseColumnExpr(scan);
          }
     } else {
-        const valMatch = scan.matchRe(/^[0-9]+(\.[0-9]+)?/);
-        if (valMatch) {
-            scan.pos += valMatch[0].length;
-            right = { type: 'param', value: valMatch[0] };
-        } else {
-            // Handle right side being a column expression
-            right = parseExpression(scan);
-        }
+        right = parseValueOrExpression(scan);
     }
 
     // A real parser would build a proper expression tree for multiple AND/ORs.

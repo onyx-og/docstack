@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { createPlan } from './planner.js';
 
 /**
  * Creates a function that evaluates a predicate AST node against a row.
@@ -42,8 +43,6 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
     
     switch (expr.type) {
         case 'scalar_subquery': {
-            // Dynamically import planner to avoid circular dependency
-            const { createPlan } = await import('./planner.js');
             const subqueryPlan = createPlan([expr.ast]);
             // Execute the subquery, passing the current row as the outer context for correlation
             const result = await executePlan(stack, subqueryPlan, [], row, null); // Pass outer row, but no aliases
@@ -88,13 +87,7 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
         
         case 'binary_expr': {
             const left = await evalExpression(row, expr.left, fromAlias, joinAliases, stack, executePlan, outerRow, outerAliases);
-            let right;
-            if (expr.right.type === 'param') {
-                right = expr.right.value;
-                if (!isNaN(parseFloat(right))) right = parseFloat(right);
-            } else {
-                right = await evalExpression(row, expr.right, fromAlias, joinAliases, stack, executePlan, outerRow, outerAliases);
-            }
+            const right = await evalExpression(row, expr.right, fromAlias, joinAliases, stack, executePlan, outerRow, outerAliases);
 
             switch (expr.operator) {
                 case '=': return left == right;
@@ -115,10 +108,14 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
             return null;
             
         case 'param':
-            let value = expr.value;
-            if (!isNaN(parseFloat(value))) value = parseFloat(value);
-            return value;
-            
+            // Literals are typed at parse time and `?` values are the caller's own,
+            // so the value is used as-is. The old parseFloat coercion here turned
+            // strings like "123abc" into numbers.
+            return expr.value;
+
+        case 'literal':
+            return expr.value;
+
         case 'star':
             return row; // Represents the whole row for COUNT(*)
 
@@ -159,13 +156,7 @@ export function evalAggregatedRowExpression(row, expr, aggregateAliasMap) {
 
         case 'binary_expr':
             const left = evalAggregatedRowExpression(row, expr.left, aggregateAliasMap);
-            let right;
-            if (expr.right.type === 'param') {
-                right = expr.right.value;
-                if (!isNaN(parseFloat(right))) right = parseFloat(right);
-            } else {
-                right = evalAggregatedRowExpression(row, expr.right, aggregateAliasMap);
-            }
+            const right = evalAggregatedRowExpression(row, expr.right, aggregateAliasMap);
 
             switch (expr.operator) {
                 case '=': return left == right;
@@ -178,9 +169,7 @@ export function evalAggregatedRowExpression(row, expr, aggregateAliasMap) {
             }
 
         case 'param':
-            let value = expr.value;
-            if (!isNaN(parseFloat(value))) value = parseFloat(value);
-            return value;
+            return expr.value;
 
         default:
             throw new Error(`Unsupported expression type in HAVING clause: ${expr.type}`);

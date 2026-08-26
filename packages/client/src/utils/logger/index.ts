@@ -84,15 +84,39 @@ const writeToConsole = (record: LogRecord) => {
     console[CONSOLE_METHOD[record.level]](format(record));
 };
 
-const build = (context: LogFields, sink?: (record: LogRecord) => void): Logger => {
+/**
+ * Reads the level a stack was configured with, at emit time.
+ *
+ * Resolved per record rather than at logger creation because a stack's options are
+ * assigned during initialization, which can run after its first loggers exist.
+ */
+const stackLevel = (stack?: Stack | null): LogLevel | "silent" | undefined => {
+    return (stack as any)?.options?.logLevel;
+};
+
+const build = (context: LogFields, sink?: (record: LogRecord) => void, stack?: Stack | null): Logger => {
     const emit = (level: LogLevel, message: string, fields?: unknown) => {
+        // A stack-bound logger obeys the stack's `logLevel`: "silent" - what a
+        // production build sets - emits nothing at all, and an explicit level caps
+        // console and sink alike (opening the console past its `warn` default when
+        // asked for `info` or `debug`).
+        const configured = stackLevel(stack);
+        if (configured === "silent") return;
+        if (configured !== undefined && LEVEL_ORDER[level] > LEVEL_ORDER[configured]) return;
+
         const record: LogRecord = { level, message, ...context, ...toFields(fields) };
+        if (configured !== undefined) {
+            // eslint-disable-next-line no-console
+            console[CONSOLE_METHOD[record.level]](format(record));
+            if (sink) sink(record);
+            return;
+        }
         writeToConsole(record);
         if (sink && LEVEL_ORDER[level] <= LEVEL_ORDER[SINK_LEVEL]) sink(record);
     };
 
     return {
-        child: (fields: LogFields) => build({ ...context, ...fields }, sink),
+        child: (fields: LogFields) => build({ ...context, ...fields }, sink, stack),
         error: (message, fields) => emit("error", message, fields),
         warn: (message, fields) => emit("warn", message, fields),
         info: (message, fields) => emit("info", message, fields),
@@ -104,11 +128,12 @@ const build = (context: LogFields, sink?: (record: LogRecord) => void): Logger =
  * Creates a logger, optionally recording into a stack.
  *
  * @param stack - When given, log records are also written into the stack's database, the
- * way the winston `PouchDBTransport` did.
+ * way the winston `PouchDBTransport` did, and the stack's `logLevel` option governs how
+ * much this logger emits - `"silent"` for none at all.
  * @returns A logger with no accumulated context; call `.child()` to add some.
  */
 const createLogger = (stack?: Stack | null): Logger => {
-    return build({}, stack ? createStackSink(stack) : undefined);
+    return build({}, stack ? createStackSink(stack) : undefined, stack);
 };
 
 export default createLogger;
