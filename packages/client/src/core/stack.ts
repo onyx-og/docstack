@@ -36,6 +36,19 @@ import { JobEngine } from "./job-engine/index.js";
 import { PolicyEngine } from "./policy-engine/index.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
+import {
+    CONTENT_EXPORT_FORMAT,
+    isContentClassName,
+    stripTransientFields,
+    assertContentExport,
+} from "./content-transfer.js";
+import type {
+    ContentExport,
+    ContentExportOptions,
+    ContentImportOptions,
+    ContentImportReport,
+    ContentImportIssue,
+} from "./content-transfer.js";
 
 const logger = createLogger().child({ module: "stack" });
 
@@ -233,7 +246,14 @@ class ClientStack extends Stack {
      */
     private classDocFeed?: PouchDB.Core.Changes<{}>;
 
-    /** Change handlers by class name. Empty means {@link classDocFeed} can be cancelled. */
+    /**
+     * Change handlers, keyed `"<metaKey>:<name>"`. Empty means {@link classDocFeed} can be
+     * cancelled.
+     *
+     * The meta key is part of the key because classes and domains are separate namespaces:
+     * a relation document is named by `~domain` and carries no `~class`, so routing both
+     * through one keyspace would let a class and a same-named domain hear each other.
+     */
     private classDocSubscribers: Map<string, Set<(change: any) => void>> = new Map();
 
     modelWorker: Worker | null = null;
@@ -620,6 +640,330 @@ class ClientStack extends Stack {
     public dump = async () => {
         const all = await this.db.allDocs({ include_docs: true });
         return all;
+    }
+
+    /**
+     * Lists the content classes and domains this stack holds.
+     *
+     * "Content" means created by an application: DocStack's own classes are `~`-prefixed
+     * and its datamodel documents use the reserved names in `META_CLASSES`.
+     *
+     * @returns The class names and domain names an export would cover.
+     */
+    public getContentClassNames = async (): Promise<{ classes: string[]; domains: string[] }> => {
+        const [classModels, domainModels] = await Promise.all([
+            this.getClassModels(),
+            this.getDomainModels(),
+        ]);
+
+        // A document's `~class` is its class model's `name` - `Class.addCard` passes
+        // `getName()` - while the model's own `_id` is generated (`class-6`). DocStack's
+        // own classes are the exception that proves it: `~User` has `name: "User"` and its
+        // documents carry `~class: "~User"`, the id. So a class counts as content only
+        // when *neither* identifier is `~`-prefixed, and the name is what documents are
+        // queried by. A relation's `~domain` is its domain model's name, where id and name
+        // agree.
+        const classes = classModels.list
+            .filter(model => !String(model._id).startsWith("~"))
+            .map(model => model.name)
+            .filter(isContentClassName);
+        const domains = domainModels.list
+            .map(model => model.name)
+            .filter(isContentClassName);
+
+        return { classes: [...new Set(classes)].sort(), domains: [...new Set(domains)].sort() };
+    }
+
+    /**
+     * Exports this stack's application content, and nothing else.
+     *
+     * Deliberately narrower than {@link dump}, which returns the database verbatim -
+     * class models, patches, users, sessions, policies, design documents, and encrypted
+     * attributes as unreadable payloads. That is a backup of *this* database. This is the
+     * portable one: the documents an application put in, ready for
+     * {@link importContent} to place into a stack whose schema its own patches built and
+     * whose document key is its own.
+     *
+     * What it does **not** do:
+     *
+     * - **It does not bypass encryption.** Documents are read through the decrypting path,
+     *   so encrypted attributes come out as plaintext. That is what makes the export
+     *   portable across keys - and what makes the result as sensitive as the data itself.
+     *   A locked stack cannot decrypt, so the export is refused rather than silently
+     *   emitting `null` where values should be (see `allowLossyWhenLocked`).
+     * - **It does not bypass read policies.** Documents the current session may not read
+     *   are absent, exactly as they are absent from `findDocuments`.
+     * - **It carries no schema, no patches and no system documents.**
+     *
+     * @param options - Which classes and domains to cover; see {@link ContentExportOptions}.
+     * @returns The portable envelope.
+     * @throws Error when the stack is locked and an exported class has encrypted
+     * attributes, unless `allowLossyWhenLocked` is set.
+     *
+     * @example
+     * ```typescript
+     * const payload = await stack.exportContent({ classes: ["Task", "Project"] });
+     * download(new Blob([JSON.stringify(payload)], { type: "application/json" }));
+     * ```
+     */
+    public exportContent = async (options: ContentExportOptions = {}): Promise<ContentExport> => {
+        const fnLogger = logger.child({ method: "exportContent" });
+        const available = await this.getContentClassNames();
+
+        const classes = options.classes
+            ? options.classes.filter(name => available.classes.includes(name))
+            : available.classes;
+        const domains = options.includeRelations === false
+            ? []
+            : options.domains
+                ? options.domains.filter(name => available.domains.includes(name))
+                : available.domains;
+
+        if (options.classes) {
+            const unknown = options.classes.filter(name => !available.classes.includes(name));
+            if (unknown.length) {
+                throw new Error(`exportContent - no such content class: ${unknown.join(", ")}`);
+            }
+        }
+
+        // A locked stack reads encrypted attributes back as `null`. Writing that into an
+        // export would lose data in a way nothing downstream could detect, so it is
+        // refused unless the caller has said they want the rest anyway.
+        if (this.isLocked() && !options.allowLossyWhenLocked) {
+            const encrypted: string[] = [];
+            for (const className of classes) {
+                const classObj = await this.getClassSnapshot(className);
+                if (classObj?.getEncryptedAttributes().length) encrypted.push(className);
+            }
+            if (encrypted.length) {
+                throw new Error(
+                    `exportContent - the stack is locked, so encrypted attributes on ${encrypted.join(", ")} ` +
+                    "would be exported as null. Unlock it with 'stack.unlock(documentKey)', or pass " +
+                    "'allowLossyWhenLocked: true' to accept the loss."
+                );
+            }
+        }
+
+        const keep = (doc: any) => options.includeInactive || doc.active !== false;
+
+        const documents: Document[] = [];
+        for (const className of classes) {
+            const found = await this.findDocuments<Document>({ "~class": { $eq: className } });
+            for (const doc of found.docs) {
+                if (keep(doc)) documents.push(stripTransientFields(doc));
+            }
+        }
+
+        const relations: RelationDocument[] = [];
+        for (const domainName of domains) {
+            const found = await this.findDocuments<RelationDocument>({ "~domain": { $eq: domainName } });
+            for (const doc of found.docs) {
+                if (keep(doc)) relations.push(stripTransientFields(doc));
+            }
+        }
+
+        fnLogger.info("Exported content", {
+            classes: classes.length, documents: documents.length, relations: relations.length,
+        });
+
+        return {
+            format: CONTENT_EXPORT_FORMAT,
+            exportedAt: new Date().toISOString(),
+            source: {
+                stack: this.name,
+                appVersion: this.appVersion,
+                schemaVersion: this.schemaVersion,
+            },
+            classes,
+            domains,
+            documents,
+            relations,
+        };
+    }
+
+    /**
+     * Imports content produced by {@link exportContent} into this stack.
+     *
+     * The counterpart, and it is not symmetric: an export is a read, an import is a
+     * reconciliation. The payload carries data and no schema, so this stack's datamodel
+     * decides what is allowed in.
+     *
+     * - **Reconciled against the datamodel.** Every document's class must already exist
+     *   here; a missing one is reported rather than invented, because the export carries
+     *   no schema to create it from. Attributes the target class does not define are
+     *   dropped by default.
+     * - **Written through the authoring path**, so schema validation, relation checks and
+     *   triggers all run - and so encrypted attributes are **encrypted under this stack's
+     *   document key**, not the one they were exported from.
+     * - **Documents before relations**, because a relation is rejected unless both ends
+     *   already exist.
+     *
+     * Not a transaction: a failure part way through leaves what was already written. The
+     * report says what landed.
+     *
+     * @param payload - An envelope from {@link exportContent}.
+     * @param options - How to reconcile; see {@link ContentImportOptions}.
+     * @returns What was written, skipped, and why.
+     * @throws Error when the payload is not a recognised export, or when a `"fail"` option
+     * is set and the condition it names occurs.
+     *
+     * @example
+     * ```typescript
+     * const report = await stack.importContent(JSON.parse(await file.text()));
+     * report.documents.written; // 128
+     * report.issues;            // [{ docId: "Task-9", kind: "missing-class", ... }]
+     * ```
+     */
+    public importContent = async (
+        payload: ContentExport,
+        options: ContentImportOptions = {}
+    ): Promise<ContentImportReport> => {
+        const fnLogger = logger.child({ method: "importContent" });
+        assertContentExport(payload);
+
+        const onMissingClass = options.onMissingClass ?? "skip";
+        const onUnknownAttribute = options.onUnknownAttribute ?? "strip";
+        const issues: ContentImportIssue[] = [];
+        const report: ContentImportReport = {
+            documents: { written: 0, skipped: 0 },
+            relations: { written: 0, skipped: 0 },
+            issues,
+        };
+
+        // Resolved once per class rather than per document, and detached - these are read
+        // for their schema, not watched.
+        const classes = new Map<string, Class | null>();
+        const classFor = async (className: string) => {
+            if (!classes.has(className)) {
+                classes.set(className, await this.getClassSnapshot(className).catch(() => null));
+            }
+            return classes.get(className) ?? null;
+        };
+
+        const reconcile = async (doc: any, className: string): Promise<Document | null> => {
+            const classObj = await classFor(className);
+            if (!classObj) {
+                const detail = `this stack has no class '${className}'; apply the patch that defines it first`;
+                if (onMissingClass === "fail") throw new Error(`importContent - ${detail}`);
+                issues.push({ docId: doc._id, kind: "missing-class", detail });
+                return null;
+            }
+
+            // `buildSchema()`, not `classObj.schema`: `setModel` hydrates `attributes` and
+            // the zod schema from the stored model and leaves the `schema` field at its
+            // `{}` initial value, so reading it here treats every attribute as unknown -
+            // which strips the mandatory ones and gets the whole document rejected.
+            const known = new Set(Object.keys(classObj.buildSchema() || {}));
+            const candidate = stripTransientFields(doc) as Record<string, unknown>;
+            for (const key of Object.keys(candidate)) {
+                // `_`-prefixed is PouchDB's, `~`-prefixed is DocStack's; neither is a
+                // schema attribute and both are meant to travel.
+                if (key.startsWith("_") || key.startsWith("~") || key === "active") continue;
+                if (known.has(key)) continue;
+
+                const detail = `class '${className}' does not define attribute '${key}'`;
+                if (onUnknownAttribute === "fail") throw new Error(`importContent - ${detail}`);
+                if (onUnknownAttribute === "strip") {
+                    delete candidate[key];
+                    issues.push({ docId: doc._id, kind: "unknown-attribute", detail: `${detail}; dropped` });
+                }
+            }
+            return candidate as unknown as Document;
+        };
+
+        /** Resolves the revision to write at, or `null` to skip this document. */
+        const revisionFor = async (docId: string, kind: "documents" | "relations") => {
+            const existing = await this.db.get(docId).catch(() => null);
+            if (!existing) return undefined;
+            if (!options.overwrite) {
+                issues.push({
+                    docId,
+                    kind: "conflict",
+                    detail: "already present; pass 'overwrite: true' to replace it",
+                });
+                report[kind].skipped += 1;
+                return null;
+            }
+            return (existing as any)._rev as string;
+        };
+
+        const writeBatch = async (drafts: any[], kind: "documents" | "relations") => {
+            if (!drafts.length) return;
+            try {
+                const results = await this.db.bulkDocs(drafts);
+                for (const [index, result] of (results as any[]).entries()) {
+                    if ((result as any)?.error) {
+                        report[kind].skipped += 1;
+                        issues.push({
+                            docId: drafts[index]._id,
+                            kind: "rejected",
+                            detail: (result as any).reason || (result as any).message || String((result as any).error),
+                        });
+                    } else {
+                        report[kind].written += 1;
+                    }
+                }
+            } catch (error: any) {
+                // The plugin refuses a whole batch on a validation failure, so the batch
+                // is written one at a time to find out which document was at fault.
+                if (drafts.length === 1) {
+                    report[kind].skipped += 1;
+                    issues.push({
+                        docId: drafts[0]._id,
+                        kind: "rejected",
+                        detail: error?.message || String(error),
+                    });
+                    return;
+                }
+                for (const draft of drafts) await writeBatch([draft], kind);
+            }
+        };
+
+        const documentDrafts: Document[] = [];
+        for (const doc of payload.documents) {
+            const className = (doc as any)["~class"];
+            if (!isContentClassName(className)) {
+                report.documents.skipped += 1;
+                issues.push({
+                    docId: (doc as any)._id,
+                    kind: "rejected",
+                    detail: `'${String(className)}' is not a content class; only application data is imported`,
+                });
+                continue;
+            }
+            const draft = await reconcile(doc, className);
+            if (!draft) { report.documents.skipped += 1; continue; }
+
+            const rev = await revisionFor((draft as any)._id, "documents");
+            if (rev === null) continue;
+            documentDrafts.push(rev ? ({ ...draft, _rev: rev } as Document) : draft);
+        }
+        await writeBatch(documentDrafts, "documents");
+
+        // Relations only after every document has landed: the plugin rejects a relation
+        // whose source or target is not in the database.
+        const relationDrafts: RelationDocument[] = [];
+        for (const relation of payload.relations) {
+            const domainName = (relation as any)["~domain"];
+            const domain = await this.getDomain(domainName).catch(() => null);
+            if (!domain) {
+                report.relations.skipped += 1;
+                issues.push({
+                    docId: (relation as any)._id,
+                    kind: "missing-domain",
+                    detail: `this stack has no domain '${String(domainName)}'`,
+                });
+                continue;
+            }
+            const draft = stripTransientFields(relation);
+            const rev = await revisionFor((draft as any)._id, "relations");
+            if (rev === null) continue;
+            relationDrafts.push(rev ? ({ ...draft, _rev: rev } as RelationDocument) : draft);
+        }
+        await writeBatch(relationDrafts, "relations");
+
+        fnLogger.info("Imported content", { report });
+        return report;
     }
 
     private async ensureDefaultPolicyForClass(targetClass: ClassModel) {
@@ -1202,6 +1546,26 @@ class ClientStack extends Stack {
      * are soft - the document arrives with `active: false` - so this is not the delete
      * path.
      */
+    /** The subscriber-map key for a name in one of the two namespaces. */
+    private static subscriberKey = (metaKey: "~class" | "~domain", name: string) => `${metaKey}:${name}`;
+
+    /**
+     * Resolves which subscribers a change belongs to.
+     *
+     * A document names its owner in exactly one of two fields - `~class` for a class's
+     * documents, `~domain` for a domain's relation documents - so the routing key comes
+     * from whichever is present. A change with neither cannot be routed and is dropped,
+     * exactly as the per-class filters dropped it: PouchDB hands a filter only
+     * `{_id, _rev, _deleted}` for a hard deletion, so no meta field was there either.
+     * DocStack deletes are soft - the document arrives with `active: false` - so this is
+     * not the delete path.
+     */
+    private static routingKeyFor = (doc: any): string | null => {
+        if (typeof doc?.["~class"] === "string") return ClientStack.subscriberKey("~class", doc["~class"]);
+        if (typeof doc?.["~domain"] === "string") return ClientStack.subscriberKey("~domain", doc["~domain"]);
+        return null;
+    }
+
     private ensureClassDocFeed = () => {
         if (this.classDocFeed) return;
 
@@ -1210,10 +1574,10 @@ class ClientStack extends Stack {
             live: true,
             include_docs: true,
         }).on("change", (change) => {
-            const className = (change.doc as any)?.["~class"];
-            if (!className) return;
+            const key = ClientStack.routingKeyFor(change.doc);
+            if (!key) return;
 
-            const subscribers = this.classDocSubscribers.get(className);
+            const subscribers = this.classDocSubscribers.get(key);
             if (!subscribers?.size) return;
 
             // Copied: a handler is allowed to cancel its subscription while dispatching.
@@ -1221,7 +1585,7 @@ class ClientStack extends Stack {
                 try {
                     subscriber(change);
                 } catch (error) {
-                    logger.warn("classDocFeed - subscriber threw", { className, error });
+                    logger.warn("classDocFeed - subscriber threw", { key, error });
                 }
             }
         }).on("error", (error) => {
@@ -1229,22 +1593,22 @@ class ClientStack extends Stack {
         });
     }
 
-    private addClassDocSubscriber = (className: string, listener: (change: any) => void) => {
-        let subscribers = this.classDocSubscribers.get(className);
+    private addClassDocSubscriber = (key: string, listener: (change: any) => void) => {
+        let subscribers = this.classDocSubscribers.get(key);
         if (!subscribers) {
             subscribers = new Set();
-            this.classDocSubscribers.set(className, subscribers);
+            this.classDocSubscribers.set(key, subscribers);
         }
         subscribers.add(listener);
         this.ensureClassDocFeed();
     }
 
-    private removeClassDocSubscriber = (className: string, listener: (change: any) => void) => {
-        const subscribers = this.classDocSubscribers.get(className);
+    private removeClassDocSubscriber = (key: string, listener: (change: any) => void) => {
+        const subscribers = this.classDocSubscribers.get(key);
         if (!subscribers) return;
 
         subscribers.delete(listener);
-        if (!subscribers.size) this.classDocSubscribers.delete(className);
+        if (!subscribers.size) this.classDocSubscribers.delete(key);
 
         // Nothing left to serve: give the database its `destroyed` listener back.
         if (!this.classDocSubscribers.size && this.classDocFeed) {
@@ -1254,21 +1618,24 @@ class ClientStack extends Stack {
     }
 
     /**
-     * Subscribes to changes on documents of a class.
+     * Subscribes to changes on the documents of a class, or of a domain.
      *
      * Returns a handle onto {@link classDocFeed} rather than a feed of its own, so the
-     * database carries one `destroyed` listener no matter how many classes are watched.
+     * database carries one `destroyed` listener no matter how many are watched.
      * Cancelling releases only this subscriber; the feed stops once the last one goes.
      *
-     * Prefer {@link subscribeClassDocs}, which routes changes through the decrypting
-     * preparation step (ADR-0020). Whichever is used, the handle must be handed to
-     * {@link releaseListener} when the watcher is done.
+     * Prefer {@link subscribeClassDocs} / {@link subscribeDomainDocs}, which route changes
+     * through the decrypting preparation step (ADR-0020). Whichever is used, the handle
+     * must be handed to {@link releaseListener} when the watcher is done.
      *
-     * @param className - The class whose documents to watch.
+     * @param className - The class or domain whose documents to watch.
+     * @param metaKey - Which field names the owner: `~class` (default) for a class's
+     * documents, `~domain` for a domain's relation documents. Separate namespaces.
      * @returns A cancellable subscription handle.
      */
-    onClassDoc = (className: string): ChangesSubscription => {
+    onClassDoc = (className: string, metaKey: "~class" | "~domain" = "~class"): ChangesSubscription => {
         const owned = new Set<(change: any) => void>();
+        const key = ClientStack.subscriberKey(metaKey, className);
         let cancelled = false;
 
         const subscription: ChangesSubscription = {
@@ -1278,14 +1645,14 @@ class ClientStack extends Stack {
                 // PouchDB `Changes`.
                 if (event === "change" && !cancelled) {
                     owned.add(listener);
-                    this.addClassDocSubscriber(className, listener);
+                    this.addClassDocSubscriber(key, listener);
                 }
                 return subscription;
             },
             cancel: () => {
                 if (cancelled) return;
                 cancelled = true;
-                for (const listener of owned) this.removeClassDocSubscriber(className, listener);
+                for (const listener of owned) this.removeClassDocSubscriber(key, listener);
                 owned.clear();
             },
         } as ChangesSubscription;
@@ -2540,8 +2907,31 @@ class ClientStack extends Stack {
                 fnLogger.error("Error, check logs", { "response": response });
                 throw new Error("createDoc - Error, check logs");
             }
-        } catch (e) {
-            fnLogger.error("Error while creating relation document", { error: e });
+        } catch (e: any) {
+            // Rethrown, not swallowed. This used to log and fall through to `return doc`,
+            // handing back the in-memory draft for a write that never landed - so a
+            // relation refused by schema or cardinality validation was indistinguishable
+            // from one that succeeded, and `Domain.addRelation` passed the phantom
+            // straight back to the application. `createDoc`, `createDocs` and
+            // `createRelationDocs` all rethrow; this was the one that did not.
+            //
+            // The message is unpacked rather than logged as `{ error: e }`: an Error's
+            // `message` is not enumerable, so the nested form serialises to whatever
+            // incidental properties the error happens to carry and loses the reason.
+            fnLogger.error("Error while creating relation document", {
+                error: e?.message ?? String(e),
+                name: e?.name,
+                status: e?.status,
+            });
+
+            // A conflict means the relation is already stored, which is the one outcome
+            // the caller asked for anyway. `createDoc` treats it the same way.
+            if (e?.name === "conflict") {
+                fnLogger.info("Conflict - relation already present");
+                return doc;
+            }
+
+            throw e instanceof Error ? e : new Error(`createRelationDoc - ${String(e)}`);
         }
         return doc;
     }

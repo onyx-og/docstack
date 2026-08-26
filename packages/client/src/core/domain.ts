@@ -169,10 +169,12 @@ class Domain extends Domain_ {
         Domain.logger.info("Received schema", { schema })
         domain_.init(
             stack, id, name, type, relation, sourceClass, targetClass, description);
-        // Add listener for new documents of this class type. Relation documents carry no
-        // encrypted attributes today, but this shares the class path so that stays true
-        // by construction rather than by assumption - see ADR-0020.
-        domain_.docSubscription = domain_.stack!.subscribeClassDocs(name, domain_);
+        // Add listener for this domain's relation documents. Not `subscribeClassDocs`:
+        // a relation is named by `~domain` and carries no `~class`, so subscribing it as
+        // a class matches nothing and the domain never emits. Relations carry no
+        // encrypted attributes today, but this still routes through the same preparation
+        // step so that stays true by construction rather than by assumption - ADR-0020.
+        domain_.docSubscription = domain_.stack!.subscribeDomainDocs(name, domain_);
         return domain_;
     }
 

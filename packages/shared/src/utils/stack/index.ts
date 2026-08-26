@@ -72,7 +72,19 @@ abstract class Stack extends EventTarget {
 
     abstract onClassLock: (className: string) => ChangesSubscription;
 
-    abstract onClassDoc: (className: string) => ChangesSubscription;
+    /**
+     * Opens a subscription to the documents of one class, or of one domain.
+     *
+     * `metaKey` selects which field names the document's owner: `~class` for a class's
+     * documents, `~domain` for a domain's relation documents. They are separate
+     * keyspaces - a relation carries `~domain` and no `~class` at all
+     * (`RelationDocument` types it as `"~class"?: never`) - so a subscription for one
+     * never receives the other's documents.
+     *
+     * Prefer {@link subscribeClassDocs} / {@link subscribeDomainDocs}, which route
+     * changes through {@link prepareChangeDocument}.
+     */
+    abstract onClassDoc: (className: string, metaKey?: "~class" | "~domain") => ChangesSubscription;
 
     /**
      * Prepares a document from the changes feed for delivery to a listener.
@@ -103,7 +115,42 @@ abstract class Stack extends EventTarget {
      * @returns The underlying changes listener.
      */
     subscribeClassDocs = (className: string, target: EventTarget, classObj?: Class): ChangesSubscription => {
-        const listener = this.onClassDoc(className);
+        return this.subscribeDocs(className, "~class", target, classObj);
+    };
+
+    /**
+     * Subscribes an event target to a domain's relation documents.
+     *
+     * The Domain counterpart to {@link subscribeClassDocs}, and it needs to be a separate
+     * call rather than the same one: a relation document is named by `~domain` and has no
+     * `~class`, so subscribing it as if it were a class matches nothing and the target
+     * simply never hears anything.
+     *
+     * @param domainName - The domain whose relations to watch.
+     * @param target - Receives the `doc` events.
+     * @returns The underlying subscription.
+     */
+    subscribeDomainDocs = (domainName: string, target: EventTarget): ChangesSubscription => {
+        return this.subscribeDocs(domainName, "~domain", target);
+    };
+
+    /**
+     * Shared delivery for {@link subscribeClassDocs} and {@link subscribeDomainDocs}.
+     *
+     * Every change goes through {@link prepareChangeDocument}, so a subclass that
+     * encrypts cannot forget to decrypt on this path, and handlers are serialised:
+     * preparing a document is asynchronous, so two rapid changes to one document could
+     * otherwise be dispatched in whichever order their preparation happened to finish.
+     * The change's `seq` still rides along for consumers that want to discard a stale
+     * update independently.
+     */
+    private subscribeDocs = (
+        name: string,
+        metaKey: "~class" | "~domain",
+        target: EventTarget,
+        classObj?: Class,
+    ): ChangesSubscription => {
+        const listener = this.onClassDoc(name, metaKey);
 
         let queue: Promise<void> = Promise.resolve();
         listener.on("change", (change: any) => {
@@ -119,7 +166,7 @@ abstract class Stack extends EventTarget {
                     // One bad change must not end the subscription - the chain has to
                     // survive to deliver the next one.
                     // eslint-disable-next-line no-console
-                    console.error("subscribeClassDocs - failed to deliver change", { className, error });
+                    console.error("subscribeDocs - failed to deliver change", { name, metaKey, error });
                 });
         });
 

@@ -717,6 +717,21 @@ export type {
     ClassFilterOptions,
 } from "./sync/index.js";
 export type { ClassBuildOptions } from "./class.js";
+export {
+    CONTENT_EXPORT_FORMAT,
+    META_CLASSES,
+    isContentClassName,
+    isContentDocument,
+    isContentRelation,
+    stripTransientFields,
+} from "./content-transfer.js";
+export type {
+    ContentExport,
+    ContentExportOptions,
+    ContentImportOptions,
+    ContentImportReport,
+    ContentImportIssue,
+} from "./content-transfer.js";
 export { StackWriteGuardError } from "./guarded-db.js";
 export { StackLockedError } from "../plugins/pouchdb.js";
 /**

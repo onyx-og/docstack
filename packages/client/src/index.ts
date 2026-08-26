@@ -36,6 +36,24 @@ export {
 
 export type { EncryptedPayload, ClassBuildOptions } from "./core/index.js";
 
+/**
+ * Moving application content between stacks, without the datamodel that describes it.
+ */
+export {
+    CONTENT_EXPORT_FORMAT,
+    META_CLASSES,
+    isContentClassName,
+    isContentDocument,
+    isContentRelation,
+} from "./core/index.js";
+export type {
+    ContentExport,
+    ContentExportOptions,
+    ContentImportOptions,
+    ContentImportReport,
+    ContentImportIssue,
+} from "./core/index.js";
+
 export type {
     SyncDirection,
     SyncState,
