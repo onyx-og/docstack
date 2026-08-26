@@ -3128,8 +3128,11 @@ class ClientStack extends Stack {
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
             await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
             let response = await db.put(doc_);
-            doc = doc_;
-            // Find me
+            // Stamped from the response, not left as the pre-put draft. A caller cannot
+            // otherwise tell a document that landed from one that did not - which is
+            // exactly the ambiguity that made a colliding id look like a success. See
+            // ADR-0023.
+            doc = { ...doc_, _id: response.id, _rev: response.rev } as Document;
             fnLogger.info("Response after put", { "response": response });
             if (response.ok && isNewDoc) {
                 await this.incrementLastDocId();

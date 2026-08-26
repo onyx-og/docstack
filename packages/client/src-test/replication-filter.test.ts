@@ -130,9 +130,10 @@ describe("replication filter", () => {
 
         expect(result.cardReplicates).toBe(true);
         expect(result.classModelReplicates).toBe(true);
-        // Runtime-created identity travels too - it binds the two instances - but nothing
-        // patch-seeded or device-local does.
-        expect(result.replicatedClasses).toEqual(["FilterTask", "class", "~Group", "~User"]);
+        // Runtime-created identity and authorisation travel too - they bind the two
+        // instances, and `~Policy` here is the default policy created *for this class*,
+        // not a patch-seeded one. Nothing patch-seeded or device-local rides along.
+        expect(result.replicatedClasses).toEqual(["FilterTask", "class", "~Group", "~Policy", "~User"]);
     });
 
     it("ADR-0023: sessions can still be opted back in", async ({ useDocStack }) => {
@@ -149,16 +150,19 @@ describe("replication filter", () => {
 
                 const byDefault = createReplicationFilter();
                 const optedIn = createReplicationFilter({ replicateSessions: true });
-                const everything = createReplicationFilter({ replicateSystemDocuments: true });
+                const seededToo = createReplicationFilter({ replicateSystemDocuments: true });
 
                 return {
                     sessionCount: sessions.length,
                     defaultHolds: sessions.every((d: any) => !byDefault(d)),
-                    // The per-class opt-in has to beat the blanket `~` rule.
                     optInReplicates: sessions.every((d: any) => optedIn(d)),
-                    escapeHatchReplicates: sessions.every((d: any) => everything(d)),
-                    // ...but never the documents that are local by identity.
-                    escapeHatchStillHoldsSystem: !everything({ _id: "~system" }),
+                    // The two opt-ins are independent: `replicateSystemDocuments` releases
+                    // the patch-seeded documents, and says nothing about sessions, which
+                    // are device-local by class rather than by being seeded.
+                    seededOptInReleasesSeeded: seededToo({ _id: "Policy-Admin", "~class": "~Policy" }),
+                    seededOptInStillHoldsSessions: sessions.every((d: any) => !seededToo(d)),
+                    // Never released by anything: this database's own identity.
+                    stillHoldsSystemDoc: !seededToo({ _id: "~system" }),
                 };
             },
         });
@@ -166,7 +170,8 @@ describe("replication filter", () => {
         expect(result.sessionCount).toBeGreaterThan(0);
         expect(result.defaultHolds).toBe(true);
         expect(result.optInReplicates).toBe(true);
-        expect(result.escapeHatchReplicates).toBe(true);
-        expect(result.escapeHatchStillHoldsSystem).toBe(true);
+        expect(result.seededOptInReleasesSeeded).toBe(true);
+        expect(result.seededOptInStillHoldsSessions).toBe(true);
+        expect(result.stillHoldsSystemDoc).toBe(true);
     });
 });
