@@ -308,7 +308,7 @@ function parseSingleFrom(scan: Scanner) {
 function parseSingleSelect(scan: Scanner): SelectAST {
     const ast: SelectAST = {
         type: 'select', distinct: false, columns: [], from: [], joins: [],
-        where: null, groupBy: null, having: null, orderBy: null, limit: null
+        where: null, groupBy: null, having: null, orderBy: null, limit: null, offset: null
     };
 
     const ctx = { scan, ast };
@@ -325,6 +325,7 @@ function parseSingleSelect(scan: Scanner): SelectAST {
     if (HavingHandler.canStart(ctx)) HavingHandler.parse(ctx);
     if (OrderByHandler.canStart(ctx)) OrderByHandler.parse(ctx);
     if (LimitHandler.canStart(ctx)) LimitHandler.parse(ctx);
+    if (OffsetHandler.canStart(ctx)) OffsetHandler.parse(ctx);
 
     return ast;
 }
@@ -474,6 +475,16 @@ const LimitHandler: ClauseHandler = {
   }
 };
 
+const OffsetHandler: ClauseHandler = {
+  id: 'OFFSET',
+  canStart: ({ scan }) => scan.peekKW('OFFSET'),
+  parse: ({ scan, ast }) => {
+    scan.expectKW('OFFSET');
+    const m = scan.consumeRe(/^\s*\d+/, 'Expected integer after OFFSET');
+    ast.offset = parseInt(m[0], 10);
+  }
+};
+
 const UnionHandler: ClauseHandler = {
   id: 'UNION',
   canStart: ({ scan }) => scan.peekKW('UNION'),
@@ -496,7 +507,7 @@ const UnionHandler: ClauseHandler = {
     // As requested, reset the main AST object to prepare for the next SELECT statement.
     setAST({
       type: 'select', distinct: false, columns: [], from: [], joins: [],
-      where: null, groupBy: null, having: null, orderBy: null, limit: null
+      where: null, groupBy: null, having: null, orderBy: null, limit: null, offset: null
     });
   }
 };
@@ -511,12 +522,13 @@ registry.register(GroupByHandler);
 registry.register(HavingHandler);
 registry.register(OrderByHandler);
 registry.register(LimitHandler);
+registry.register(OffsetHandler);
 registry.register(UnionHandler); // Register the union handler
 
 const SEQUENCE = [
   'SELECT', 'FROM', 'JOIN*', 
   'WHERE', 'GROUP BY', 'HAVING', 'ORDER BY',
-  'LIMIT',
+  'LIMIT', 'OFFSET',
 ] as const;
 
 /**
@@ -535,7 +547,7 @@ export function parse(sql: string) {
 
   let ast: SelectAST = {
     type: 'select', distinct: false, columns: [], from: [], joins: [],
-    where: null, groupBy: null, having: null, orderBy: null, limit: null
+    where: null, groupBy: null, having: null, orderBy: null, limit: null, offset: null
   };
 
   const ctx: ClauseCtx = {

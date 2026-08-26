@@ -472,6 +472,7 @@ export type SelectAST = {
   having: any | null;
   orderBy: Array<{ expr: any; order: 'ASC' | 'DESC' }> | null;
   limit: number | null;
+  offset?: number | null;
 };
 
 export type UnionAST = {

@@ -153,6 +153,95 @@ it("benchmarks core read/write/query paths", async ({ useDocStack }) => {
                 };
             }
 
+            // --- 6d. Equi-joins (previously only the IN-array pattern matched) ---
+            const orderClass = await Class.create(stack, "BenchOrder", "class", "bench orders", {
+                buyer: { name: "buyer", type: "string", config: { maxLength: 200 } },
+                amount: { name: "amount", type: "integer", config: { min: 0 } },
+            });
+            await orderClass.addCards(Array.from({ length: 20 }, (_, i) => ({
+                buyer: `plain-${i % 10}`, amount: i,
+            })));
+
+            r = await countFinds(() => stack.query("SELECT o.amount, b.value FROM BenchOrder AS o JOIN BenchPlain AS b ON b.name = o.buyer;"));
+            res.sqlEquiJoinInner = { ms: r.ms, finds: r.finds, rows: r.out.rows.length };
+
+            r = await countFinds(() => stack.query("SELECT b.name, o.amount FROM BenchPlain AS b LEFT JOIN BenchOrder AS o ON o.buyer = b.name;"));
+            res.sqlEquiJoinLeft = { ms: r.ms, finds: r.finds, rows: r.out.rows.length };
+
+            // probe: what does a raw sorted find return?
+            try {
+                await (stack as any).ensureSortIndex("value");
+                const probe = await (stack as any).db.find({
+                    selector: { "~class": { $eq: "BenchPlain" }, active: true, value: { $gte: null } },
+                    sort: [{ "~class": "desc" }, { value: "desc" }],
+                    limit: 5,
+                });
+                res.probeSortedFind = { docs: probe.docs.map((d: any) => d.name), warning: probe.warning };
+            } catch (e: any) {
+                res.probeSortedFind = { error: e.message };
+            }
+
+            // --- 6e. ORDER BY + LIMIT pushdown through an on-demand sort index ---
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b ORDER BY b.value DESC LIMIT 5;"));
+            res.sqlTopK = { ms: r.ms, finds: r.finds, names: r.out.rows.map((x: any) => x.name) };
+
+            // Repeat (index now exists and registry stamp is warm)
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b ORDER BY b.value DESC LIMIT 5;"));
+            res.sqlTopKWarm = { ms: r.ms, finds: r.finds, names: r.out.rows.map((x: any) => x.name) };
+
+            // Soft-delete the current top row; it must vanish and the limit must refill.
+            const bulk99 = (await plainClass.getCards({ name: { $eq: "bulk-99" } }))[0];
+            await plainClass.deleteCard(bulk99._id);
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b ORDER BY b.value DESC LIMIT 5;"));
+            res.sqlTopKAfterDelete = { ms: r.ms, finds: r.finds, names: r.out.rows.map((x: any) => x.name) };
+
+            // --- 6f. Sort-index cleanup round-trip ---
+            const sweep = await (stack as any).cleanupSortIndexes({ olderThanMs: 0 });
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b ORDER BY b.value DESC LIMIT 5;"));
+            res.sortIndexCleanup = { removed: sweep.removed, rowsAfterRecreate: r.out.rows.map((x: any) => x.name) };
+
+            // --- 6g. Projection pushdown on the encrypted class ---
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchItem AS b WHERE b.value >= 90;"));
+            res.sqlProjectionEncrypted = {
+                ms: r.ms, finds: r.finds, rows: r.out.rows.length,
+                rowKeys: r.out.rows.length ? Object.keys(r.out.rows[0]) : [],
+            };
+
+            // --- 6h. OFFSET (windowed pagination) ---
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b ORDER BY b.value DESC LIMIT 5 OFFSET 5;"));
+            res.sqlOffsetPage2 = { ms: r.ms, finds: r.finds, names: r.out.rows.map((x: any) => x.name) };
+
+            r = await countFinds(() => stack.query("SELECT b.name FROM BenchPlain AS b LIMIT 10 OFFSET 195;"));
+            res.sqlOffsetTail = { ms: r.ms, finds: r.finds, rows: r.out.rows.length };
+
+            // --- 6i. Streaming reads ---
+            r = await countFinds(async () => {
+                let count = 0;
+                for await (const row of (stack as any).queryStream("SELECT b.name, b.value FROM BenchPlain AS b WHERE b.value >= 20;")) {
+                    count++;
+                }
+                return count;
+            });
+            res.streamFullScan = { ms: r.ms, finds: r.finds, rows: r.out };
+
+            r = await countFinds(async () => {
+                const rows: any[] = [];
+                for await (const row of (stack as any).queryStream("SELECT b.name FROM BenchPlain AS b WHERE b.value >= 20 LIMIT 7;")) {
+                    rows.push(row);
+                }
+                return rows;
+            });
+            res.streamEarlyStop = { ms: r.ms, finds: r.finds, rows: r.out.length };
+
+            r = await countFinds(async () => {
+                const rows: any[] = [];
+                for await (const row of (stack as any).queryStream("SELECT COUNT(*) AS c FROM BenchPlain AS b;")) {
+                    rows.push(row);
+                }
+                return rows;
+            });
+            res.streamFallbackAgg = { rows: r.out.length, count: r.out[0]?.c };
+
             // --- 7. Policy overhead: allow-all policy targeting the plain class ---
             const policy = {
                 _id: "Policy-BenchPlain-allow",
@@ -189,4 +278,21 @@ it("benchmarks core read/write/query paths", async ({ useDocStack }) => {
     expect(results.sqlLimitPushdown.rows).toBe(5);
     expect(results.diag.totalPlain).toBe(200);
     expect(results.diag.dupNames).toEqual([]);
+    expect(results.sqlEquiJoinInner.rows).toBe(20);          // plain equality joins match
+    expect(results.sqlEquiJoinLeft.rows).toBe(210);          // 20 matched + 190 null-filled
+    expect(results.sqlTopK.names).toEqual(["bulk-99", "bulk-98", "bulk-97", "bulk-96", "bulk-95"]);
+    expect(results.sqlTopKWarm.names).toEqual(["bulk-99", "bulk-98", "bulk-97", "bulk-96", "bulk-95"]);
+    expect(results.sqlTopKAfterDelete.names).toEqual(["bulk-98", "bulk-97", "bulk-96", "bulk-95", "bulk-94"]); // soft-deleted row gone, limit refilled
+    expect(results.sortIndexCleanup.removed).toContain("value");
+    expect(results.sortIndexCleanup.rowsAfterRecreate).toEqual(["bulk-98", "bulk-97", "bulk-96", "bulk-95", "bulk-94"]);
+    expect(results.sqlProjectionEncrypted.rows).toBe(10);
+    expect(results.sqlProjectionEncrypted.rowKeys).toEqual(["name"]);
+    expect(results.sqlOffsetPage2.names).toEqual(["bulk-93", "bulk-92", "bulk-91", "bulk-90", "bulk-89"]); // rows 6-10 of the desc order
+    expect(results.sqlOffsetTail.rows).toBe(4);                // 199 active docs, offset 195
+    expect(results.streamFullScan.rows).toBe(179);             // plain 20..99 (80) + bulk 0..98 (99)
+    expect(results.streamFullScan.finds).toBeLessThanOrEqual(3); // keyset pages, not per-row queries
+    expect(results.streamEarlyStop.rows).toBe(7);
+    expect(results.streamEarlyStop.finds).toBe(1);             // LIMIT stopped the scan after one page
+    expect(results.streamFallbackAgg.rows).toBe(1);
+    expect(results.streamFallbackAgg.count).toBe(199);         // aggregation falls back but still streams the API
 });

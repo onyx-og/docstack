@@ -827,10 +827,10 @@ class Class extends Class_ {
      * const incomplete = await taskClass.getCards({ isComplete: { $eq: false } });
      * ```
      */
-    getCards = async (selector?: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => {
+    getCards = async (selector?: { [key: string]: any }, fields?: string[], skip?: number, limit?: number, sort?: { [field: string]: "asc" | "desc" }[]) => {
         const _selector = { ...(selector || {}), "~class": { $eq: this.name } };
-        this.logger.info("getCards - selector", { selector: _selector, fields, skip, limit })
-        let docs = (await this.stack!.findDocuments<Document>(_selector, fields, skip, limit)).docs
+        this.logger.info("getCards - selector", { selector: _selector, fields, skip, limit, sort })
+        let docs = (await this.stack!.findDocuments<Document>(_selector, fields, skip, limit, sort)).docs
         return docs;
     }
 

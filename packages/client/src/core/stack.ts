@@ -30,7 +30,7 @@ import { createGuardedDb, createReplicationDb } from "./guarded-db.js";
 import { StackSyncHandle } from "./sync/index.js";
 import type { StackSyncOptions, SyncStatus } from "./sync/index.js";
 
-import { parse, createPlan, executePlan } from "./query-engine/index.js";
+import { parse, createPlan, executePlan, executePlanStream } from "./query-engine/index.js";
 import type { SelectAST, UnionAST } from "./query-engine/index.js";
 import { JobEngine } from "./job-engine/index.js";
 import { PolicyEngine } from "./policy-engine/index.js";
@@ -1824,6 +1824,146 @@ class ClientStack extends Stack {
         }
     }
 
+    /** Registry of on-demand sort indexes; a `_local` doc, so per-device and unreplicated. */
+    private static readonly SORT_INDEX_REGISTRY_ID = "_local/docstack-sort-indexes";
+    /** Prefix shared by every sort-index design document this stack creates. */
+    private static readonly SORT_INDEX_DDOC_PREFIX = "docstack-sort-";
+    /** Most sort indexes a stack will maintain; past this, queries sort in memory. */
+    private static readonly MAX_SORT_INDEXES = 20;
+    /** How stale a sort index may go before {@link cleanupSortIndexes} removes it. */
+    private static readonly SORT_INDEX_MAX_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
+    /** Fields whose sort index exists this session; avoids re-running createIndex. */
+    private sortIndexSession = new Map<string, number>();
+
+    private async readSortIndexRegistry(): Promise<{ _id: string, _rev?: string, indexes: { [field: string]: { createdAt: number, lastUsed: number } } }> {
+        try {
+            return await this.db.get(ClientStack.SORT_INDEX_REGISTRY_ID) as any;
+        } catch {
+            return { _id: ClientStack.SORT_INDEX_REGISTRY_ID, indexes: {} };
+        }
+    }
+
+    /**
+     * Creates (or confirms) a Mango index for sorting by `field`, and records the use.
+     *
+     * Indexes are made on demand by the query engine when an ORDER BY can ride the
+     * database, and every index is a standing cost: a view updated on every write from
+     * then on. Three things keep that bounded: a cap ({@link MAX_SORT_INDEXES}) past
+     * which this returns `false` and the caller sorts in memory; a usage registry (a
+     * `_local` document, per device) stamped on each use; and
+     * {@link cleanupSortIndexes}, run at init, dropping indexes idle past
+     * {@link SORT_INDEX_MAX_IDLE_MS}. A dropped index is not an error - the next sorted
+     * query recreates it.
+     *
+     * @param field - The document field to index for sorting (under `~class`).
+     * @returns `true` when the index exists and may be used for a sorted query.
+     */
+    ensureSortIndex = async (field: string): Promise<boolean> => {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(field)) return false;
+
+        // Stamp usage at most every 6 hours - a write per sorted query would be its own
+        // hot-path cost.
+        const now = Date.now();
+        const stamped = this.sortIndexSession.get(field);
+        if (stamped !== undefined && now - stamped < 6 * 60 * 60 * 1000) return true;
+
+        try {
+            const registry = await this.readSortIndexRegistry();
+            if (!registry.indexes[field]) {
+                if (Object.keys(registry.indexes).length >= ClientStack.MAX_SORT_INDEXES) {
+                    logger.warn("ensureSortIndex - sort index cap reached; sorting in memory", { field });
+                    return false;
+                }
+                registry.indexes[field] = { createdAt: now, lastUsed: now };
+            } else {
+                registry.indexes[field].lastUsed = now;
+            }
+
+            await (this.db as PouchDB.Database).createIndex({
+                index: {
+                    fields: ["~class", field],
+                    ddoc: `${ClientStack.SORT_INDEX_DDOC_PREFIX}${field}`,
+                    name: `sort-${field}`,
+                },
+            });
+
+            await this.db.put(registry as any);
+            this.sortIndexSession.set(field, now);
+            return true;
+        } catch (e: any) {
+            logger.warn("ensureSortIndex - could not create sort index; sorting in memory", { field, error: e?.message || e });
+            return false;
+        }
+    }
+
+    /**
+     * Drops sort indexes that have gone unused.
+     *
+     * Covers indexes this device created *and* ones that replicated in as design
+     * documents from a peer: every `_design/docstack-sort-*` doc is considered, and one
+     * with no registry entry is adopted with the current time as first-seen, so it gets
+     * a full idle period before removal. Runs automatically at init; callable directly
+     * for an immediate sweep.
+     *
+     * @param options.olderThanMs - Idle threshold; defaults to {@link SORT_INDEX_MAX_IDLE_MS}.
+     * @returns Which fields were removed and which kept.
+     */
+    cleanupSortIndexes = async (options: { olderThanMs?: number } = {}): Promise<{ removed: string[], kept: string[] }> => {
+        const olderThanMs = options.olderThanMs ?? ClientStack.SORT_INDEX_MAX_IDLE_MS;
+        const now = Date.now();
+        const removed: string[] = [];
+        const kept: string[] = [];
+
+        try {
+            const registry = await this.readSortIndexRegistry();
+
+            // Design docs are replicated; a peer's sort index can land here without a
+            // registry entry. Sweep what actually exists, not just what we recorded.
+            const ddocs = await this.db.allDocs({
+                startkey: `_design/${ClientStack.SORT_INDEX_DDOC_PREFIX}`,
+                endkey: `_design/${ClientStack.SORT_INDEX_DDOC_PREFIX}\ufff0`,
+            });
+            const liveFields = ddocs.rows.map(row => row.id.slice(`_design/${ClientStack.SORT_INDEX_DDOC_PREFIX}`.length));
+
+            for (const field of liveFields) {
+                const entry = registry.indexes[field];
+                if (!entry) {
+                    // Unknown provenance: adopt it and give it a full idle period.
+                    registry.indexes[field] = { createdAt: now, lastUsed: now };
+                    kept.push(field);
+                    continue;
+                }
+                if (now - entry.lastUsed >= olderThanMs) {
+                    await (this.db as any).deleteIndex({
+                        ddoc: `_design/${ClientStack.SORT_INDEX_DDOC_PREFIX}${field}`,
+                        name: `sort-${field}`,
+                    });
+                    delete registry.indexes[field];
+                    this.sortIndexSession.delete(field);
+                    removed.push(field);
+                } else {
+                    kept.push(field);
+                }
+            }
+
+            // Registry entries whose design doc is gone (deleted elsewhere) are noise.
+            for (const field of Object.keys(registry.indexes)) {
+                if (!liveFields.includes(field)) delete registry.indexes[field];
+            }
+
+            await this.db.put(registry as any);
+
+            // deleteIndex removes the design document, but the built view's data stays
+            // on disk until viewCleanup reclaims it.
+            if (removed.length > 0) {
+                await (this.db as PouchDB.Database).viewCleanup().catch(() => undefined);
+            }
+        } catch (e: any) {
+            logger.warn("cleanupSortIndexes - sweep failed; will retry next init", { error: e?.message || e });
+        }
+        return { removed, kept };
+    }
+
     // Database initialization should be about making sure that all the documents
     // representing the base data model for this framework are present
     // perform tasks like applying patches, creating indexes, etc.
@@ -1833,6 +1973,7 @@ class ClientStack extends Stack {
         logger.warn("initdb - crypto config ensured", { "stackName": this.name });
         await this.initIndex();
         await this.ensureMangoIndexes();
+        await this.cleanupSortIndexes();
         logger.warn("initdb - index initialized", { "stackName": this.name });
         await this.checkSystem();
         logger.warn("initdb - system checked", { "stackName": this.name });
@@ -2176,8 +2317,8 @@ class ClientStack extends Stack {
      * console.log('Found tasks:', result.docs.length);
      * ```
      */
-    findDocuments = async <T extends Document | RelationDocument = Document>(selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number) => {
-        const fnLogger = logger.child({ method: "findDocuments", args: { selector, fields, skip, limit } });
+    findDocuments = async <T extends Document | RelationDocument = Document>(selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number, sort?: { [field: string]: "asc" | "desc" }[]) => {
+        const fnLogger = logger.child({ method: "findDocuments", args: { selector, fields, skip, limit, sort } });
 
         // By default request for only active documents
         if (!selector.hasOwnProperty("active")) {
@@ -2205,6 +2346,9 @@ class ClientStack extends Stack {
             }
             if (fields) query["fields"] = fields;
             if (skip) query["skip"] = skip;
+            // A sorted query needs a Mango index carrying the sort fields; callers go
+            // through ensureSortIndex first (the query engine does).
+            if (sort) query["sort"] = sort;
             // Always explicit: pouchdb-find otherwise applies CouchDB's default of 25
             // and silently truncates every un-limited read to 25 documents.
             query["limit"] = limit ? limit : 2 ** 31 - 1;
@@ -2214,39 +2358,7 @@ class ClientStack extends Stack {
                 result: foundResult,
                 selector: selector,
             });
-            const readableDocs: T[] = [];
-
-            // Resolved at most once per class per call, and detached. This used to be
-            // `getClass(className, true)` per document, which reads the same stored model
-            // but also subscribes the instance it builds: a five-row read left five live
-            // feeds behind, and the database's `destroyed` listeners crossed Node's limit
-            // within two renders of a live view. The freshness is kept - the cache is
-            // invalidated by a changes feed and so can lag a burst of schema writes - and
-            // only the subscription is dropped.
-            const classesInResult: Map<string, Class | undefined> = new Map();
-            const classFor = async (className: string) => {
-                if (!classesInResult.has(className)) {
-                    classesInResult.set(className, (await this.getClassSnapshot(className)) ?? undefined);
-                }
-                return classesInResult.get(className);
-            };
-
-            for (const doc of foundResult.docs as unknown as Document[]) {
-                const canRead = await this.policyEngine.isReadableDocument(doc);
-                if (!canRead) {
-                    fnLogger.info("Based on policies, document is not readable", { docId: doc._id, docClass: doc["~class"] });
-                    continue;
-                }
-
-                const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc as Document);
-                const classObj = encryptedKeys.length || (fields && fields.length)
-                    ? await classFor(doc["~class"])
-                    : undefined;
-                const processedDoc = await this.processReadableDocument(doc as Document, classObj, fields, encryptedKeys);
-                if (processedDoc) {
-                    readableDocs.push(processedDoc as unknown as T);
-                }
-            }
+            const readableDocs = await this.processFoundDocuments<T>(foundResult.docs as unknown as Document[], fields);
 
             result = { docs: readableDocs, selector, skip, limit };
             return result;
@@ -2254,6 +2366,120 @@ class ClientStack extends Stack {
             fnLogger.error("findDocument - error", e);
             throw e;
         }
+    }
+
+    /**
+     * Runs raw fetched documents through the read pipeline: per-document policy
+     * check, decryption, and field visibility. Shared by {@link findDocuments} and
+     * {@link findDocumentsIterator} so the two cannot drift.
+     */
+    private async processFoundDocuments<T extends Document | RelationDocument = Document>(docs: Document[], fields?: string[]): Promise<T[]> {
+        const readableDocs: T[] = [];
+
+        // Resolved at most once per class per batch, and detached. This used to be
+        // `getClass(className, true)` per document, which reads the same stored model
+        // but also subscribes the instance it builds: a five-row read left five live
+        // feeds behind, and the database's `destroyed` listeners crossed Node's limit
+        // within two renders of a live view. The freshness is kept - the cache is
+        // invalidated by a changes feed and so can lag a burst of schema writes - and
+        // only the subscription is dropped.
+        const classesInResult: Map<string, Class | undefined> = new Map();
+        const classFor = async (className: string) => {
+            if (!classesInResult.has(className)) {
+                classesInResult.set(className, (await this.getClassSnapshot(className)) ?? undefined);
+            }
+            return classesInResult.get(className);
+        };
+
+        for (const doc of docs) {
+            const canRead = await this.policyEngine.isReadableDocument(doc);
+            if (!canRead) {
+                logger.info("processFoundDocuments - document is not readable by policy", { docId: doc._id, docClass: doc["~class"] });
+                continue;
+            }
+
+            const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc);
+            const classObj = encryptedKeys.length || (fields && fields.length)
+                ? await classFor(doc["~class"])
+                : undefined;
+            const processedDoc = await this.processReadableDocument(doc, classObj, fields, encryptedKeys);
+            if (processedDoc) {
+                readableDocs.push(processedDoc as unknown as T);
+            }
+        }
+        return readableDocs;
+    }
+
+    /**
+     * Reads documents matching a selector as an async stream, in `_id` order.
+     *
+     * Pages through the database with a keyset cursor on `_id` (which the primary
+     * index serves) instead of materializing the full result: peak memory is one
+     * batch, and total work across all pages is the same one scan a single big read
+     * would do. Each batch goes through the same policy/decryption pipeline as
+     * {@link findDocuments}. The cursor advances by the last *fetched* document, not
+     * the last *readable* one, so pages thinned out by policy filtering cannot stall
+     * the iteration.
+     *
+     * @param selector - A Mango selector; `active: true` is injected unless present.
+     * @param options.fields - Projection; `_id` is always included (the cursor needs it).
+     * @param options.batchSize - Documents fetched per page (default 100).
+     *
+     * @example
+     * ```typescript
+     * for await (const doc of stack.findDocumentsIterator({ "~class": "Task" })) {
+     *     render(doc);
+     * }
+     * ```
+     */
+    findDocumentsIterator = <T extends Document | RelationDocument = Document>(
+        selector: { [key: string]: any },
+        options: { fields?: string[], batchSize?: number } = {}
+    ): AsyncGenerator<T, void, void> => {
+        const stack = this;
+        const batchSize = Math.max(1, options.batchSize ?? 100);
+        let fields = options.fields;
+        if (fields && !fields.includes("_id")) fields = [...fields, "_id"];
+
+        const baseSelector: { [key: string]: any } = { ...selector };
+        if (!baseSelector.hasOwnProperty("active")) {
+            baseSelector["active"] = true;
+        }
+
+        async function* iterate(): AsyncGenerator<T, void, void> {
+            let cursor: string | null = null;
+            while (true) {
+                const pageSelector: { [key: string]: any } = { ...baseSelector };
+                if (cursor !== null) {
+                    // Everything at or before the cursor has been fetched already, so
+                    // overwriting a caller's own $gt is safe - the first page honored it.
+                    const existing = pageSelector._id && typeof pageSelector._id === "object"
+                        ? pageSelector._id
+                        : pageSelector._id !== undefined ? { $eq: pageSelector._id } : {};
+                    pageSelector._id = { ...existing, $gt: cursor };
+                } else if (pageSelector._id === undefined) {
+                    // The _id sort requires the field constrained; $gt null matches all.
+                    pageSelector._id = { $gt: null };
+                }
+
+                const raw = await stack.db.find({
+                    selector: pageSelector,
+                    sort: [{ _id: "asc" }],
+                    limit: batchSize,
+                    ...(fields ? { fields } : {}),
+                });
+                const rawDocs = raw.docs as unknown as Document[];
+                if (!rawDocs.length) return;
+
+                cursor = rawDocs[rawDocs.length - 1]._id;
+                const processed = await stack.processFoundDocuments<T>(rawDocs, fields);
+                for (const doc of processed) {
+                    yield doc;
+                }
+                if (rawDocs.length < batchSize) return;
+            }
+        }
+        return iterate();
     }
 
     private async processReadableDocument(doc: Document, classObj?: Class, fields?: string[], precomputedEncryptedKeys?: string[]) {
@@ -2297,7 +2523,11 @@ class ClientStack extends Stack {
             }
         }
 
-        if (!visibleKeys.length) {
+        // A doc with nothing visible is hidden - but only on un-projected reads. When
+        // the caller asked for specific fields, a document that merely lacks them is
+        // still a row (Mango projection semantics, and what SQL expects of projected
+        // columns); dropping it would change row counts under projection pushdown.
+        if (!visibleKeys.length && !(fields && fields.length)) {
             return null;
         }
 
@@ -3300,6 +3530,33 @@ class ClientStack extends Stack {
 
         // Handle case where query is empty or only comments
         return { rows: [], ast: null };
+    }
+
+    /**
+     * Executes a SQL query as an async stream of rows.
+     *
+     * The streaming counterpart to {@link query}: single-table plans without
+     * aggregation, DISTINCT, ORDER BY, or subqueries stream row by row on top of
+     * {@link findDocumentsIterator} - peak memory is one page regardless of result
+     * size, and a LIMIT stops the underlying scan early. More complex plans execute
+     * normally and yield from the materialized result, so the API is uniform.
+     * Row order on the streaming path is `_id` order.
+     *
+     * @param sql - The SQL SELECT statement.
+     * @param params - Values for `?` placeholders.
+     *
+     * @example
+     * ```typescript
+     * for await (const row of stack.queryStream("SELECT t.title FROM Task AS t WHERE t.done = FALSE;")) {
+     *     render(row);
+     * }
+     * ```
+     */
+    queryStream = (sql: string, ...params: any[]): AsyncGenerator<{ [column: string]: any }, void, void> => {
+        const astList = parse(sql);
+        ClientStack.bindQueryParams(astList, params);
+        const plan = createPlan(astList);
+        return executePlanStream(this, plan, params);
     }
 }
 

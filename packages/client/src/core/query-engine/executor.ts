@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { evalExpression, createRowEvaluator, evalAggregatedRowExpression } from './evaluator.js';
 import { createAccumulators } from './accumulators.js';
-import { isPushablePredicate } from './planner.js';
+import { isPushablePredicate, isPushableColumnName } from './planner.js';
 import ClientStack from '../stack.js';
 
 /**
@@ -78,6 +78,61 @@ function flattenAnd(predicate, out = []) {
     }
     out.push(predicate);
     return out;
+}
+
+/**
+ * Collects the plain column names an expression reads. Returns false when the
+ * expression contains anything that makes a field projection unsafe - a star, a
+ * scalar subquery (whose correlation may read arbitrary columns), or a column name
+ * Mango cannot be handed.
+ */
+function collectPushableColumns(expr, out) {
+    if (!expr) return true;
+    switch (expr.type) {
+        case 'column_ref':
+            if (!isPushableColumnName(expr.column)) return false;
+            out.add(expr.column);
+            return true;
+        case 'param':
+        case 'literal':
+            return true;
+        case 'binary_expr':
+        case 'and':
+            return collectPushableColumns(expr.left, out) && collectPushableColumns(expr.right, out);
+        case 'aggr_func': {
+            const arg = expr.args && expr.args.expr;
+            if (!arg || arg.type === 'star') return true;
+            return collectPushableColumns(arg, out);
+        }
+        default:
+            return false;
+    }
+}
+
+/**
+ * Field list to push into the fetch for a single-table plan, or null when the plan
+ * reads anything a projection could hide. System fields ride along: the read path
+ * needs `~class` (class resolution, decryption) and `active`, and rows need identity.
+ */
+function computeProjectionFields(plan) {
+    if (plan.joins.length > 0) return null;
+    const cols = new Set();
+    const exprs = [];
+    if (plan.aggregation) {
+        exprs.push(...(plan.aggregation.groupBy || []));
+        for (const agg of (plan.aggregation.aggregates || [])) exprs.push(agg.expr);
+        if (plan.aggregation.having) exprs.push(plan.aggregation.having);
+    } else {
+        for (const p of plan.projections) exprs.push(p.expr);
+    }
+    exprs.push(...plan.filters.left, ...plan.filters.residual);
+    if (Array.isArray(plan.orderBy)) for (const o of plan.orderBy) exprs.push(o.expr);
+    if (Array.isArray(plan.distinctOn)) exprs.push(...plan.distinctOn);
+
+    for (const expr of exprs) {
+        if (!collectPushableColumns(expr, cols)) return null;
+    }
+    return [...cols, "_id", "_rev", "~class", "active"];
 }
 
 /**
@@ -253,21 +308,83 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
     if (!fromClass) throw new Error(`Table not found: ${plan.fromTable.table}`);
 
     const leftSelector = buildSelector(plan.filters.left);
+    const fromAlias0 = plan.fromTable.as || plan.fromTable.table;
+    const singleTable = plan.joins.length === 0;
 
-    // LIMIT rides the database query only when nothing after the fetch can change
-    // which or how many rows survive: no joins, no in-memory filters, no
-    // aggregation/DISTINCT/ORDER BY - and no per-document policy or locked-crypto
-    // filtering, which drop rows after the limit was applied and would under-fill it.
-    const canPushLimit = plan.limit !== null && plan.limit !== undefined
-        && plan.joins.length === 0
-        && plan.filters.residual.length === 0
-        && !plan.aggregation
-        && !plan.distinct
-        && (!plan.orderBy || plan.orderBy.length === 0)
-        && await stack.canApplyQueryLimitEarly(plan.fromTable.table);
+    // Nothing after the fetch reshapes the row set: no joins, no in-memory filters,
+    // no aggregation or DISTINCT. Required for LIMIT to ride the query.
+    const noReshape = singleTable && plan.filters.residual.length === 0
+        && !plan.aggregation && !plan.distinct;
 
-    let leftRows = (await fromClass.getCards(leftSelector, undefined, undefined, canPushLimit ? plan.limit : undefined))
-        .map(row => ({ [plan.fromTable.as || plan.fromTable.table]: row }));
+    // Per-document policy filtering and locked-crypto hiding both drop rows *after*
+    // the fetch, which would under-fill a pushed LIMIT and starve a projection of the
+    // columns a policy rule reads. One gate covers both pushdowns.
+    const safeEarly = singleTable && await stack.canApplyQueryLimitEarly(plan.fromTable.table);
+
+    // ORDER BY pushdown candidate: exactly one plain column of the from-table.
+    // Multi-column sorts stay in memory - each combination would need its own
+    // compound index, and the standing write cost of an index is only paid where it
+    // buys top-K fetching.
+    let sortField = null, sortDir = 'asc';
+    if (Array.isArray(plan.orderBy) && plan.orderBy.length === 1) {
+        const o = plan.orderBy[0];
+        const col = o && o.expr && o.expr.column;
+        const tbl = o && o.expr && o.expr.table;
+        if (col && isPushableColumnName(col) && (!tbl || tbl === fromAlias0)) {
+            sortField = col;
+            sortDir = o.order === 'DESC' ? 'desc' : 'asc';
+        }
+    }
+
+    const hasOrder = Array.isArray(plan.orderBy) && plan.orderBy.length > 0;
+    const wantLimit = plan.limit !== null && plan.limit !== undefined;
+    const wantOffset = plan.offset !== null && plan.offset !== undefined && plan.offset > 0;
+
+    // The LIMIT/OFFSET window pushes when the row set is final at fetch time - and
+    // when an ORDER BY exists it must push too (through a sort index), or the window
+    // keeps the wrong rows. The index is created on demand; ensureSortIndex caps how
+    // many may exist and refuses past the cap, which simply keeps this query in
+    // memory.
+    let pushSort = false;
+    let canPushWindow = (wantLimit || wantOffset) && noReshape && safeEarly && (!hasOrder || !!sortField);
+    if (canPushWindow && hasOrder) {
+        pushSort = await stack.ensureSortIndex(sortField);
+        if (!pushSort) canPushWindow = false;
+    }
+
+    // Projection pushdown: fetch only the columns the plan reads. Caveat carried on
+    // purpose: a Mango sort index only lists documents that HAVE the sort field, and
+    // a projection only carries fields a document has - schema stamping keeps class
+    // documents complete, so both hold for classed data.
+    const projectionFields = safeEarly ? computeProjectionFields(plan) : null;
+
+    let sortParam;
+    let fetchSelector = leftSelector;
+    if (pushSort) {
+        sortParam = [{ "~class": sortDir }, { [sortField]: sortDir }];
+        // Mango requires every sorted field constrained in the selector; $gte null
+        // matches all values (null collates lowest).
+        if (!(sortField in fetchSelector)) fetchSelector = { ...fetchSelector, [sortField]: { $gte: null } };
+    }
+
+    let windowPushed = canPushWindow;
+    let fetched;
+    try {
+        fetched = await fromClass.getCards(
+            fetchSelector,
+            projectionFields || undefined,
+            canPushWindow && wantOffset ? plan.offset : undefined,
+            canPushWindow ? (plan.limit ?? undefined) : undefined,
+            sortParam
+        );
+    } catch (error) {
+        if (!sortParam) throw error;
+        // A sorted fetch can fail when the index isn't usable (deleted underneath us,
+        // adapter quirk). The query is still answerable - fetch plain, sort in memory.
+        windowPushed = false;
+        fetched = await fromClass.getCards(leftSelector, projectionFields || undefined);
+    }
+    let leftRows = fetched.map(row => ({ [fromAlias0]: row }));
 
     // 2. Execute Joins
     let currentResultRows = leftRows;
@@ -284,12 +401,48 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
         // (the previous version silently dropped what buildSelector couldn't say).
         const rightPredicates = plan.filters.right[join.table] || [];
         const joinFilterLeaves = (join.filters || []).flatMap(f => flattenAnd(f));
-        const finalRightSelector = combineSelectors(
+        let finalRightSelector = combineSelectors(
             buildSelector(rightPredicates),
             buildSelector(joinFilterLeaves.filter(isPushablePredicate))
         );
 
-        let allRightRows = await rightClass.getCards(finalRightSelector);
+        // Identify which side of ON references the joined table, by alias.
+        const refsJoin = (expr) => expr && expr.type === 'column_ref' && expr.table === joinAlias;
+        let rightKeyExpr = null, leftKeyExpr = null;
+        if (join.on && join.on.type === 'binary_expr') {
+            if (refsJoin(join.on.left) && !refsJoin(join.on.right)) { rightKeyExpr = join.on.left; leftKeyExpr = join.on.right; }
+            else if (refsJoin(join.on.right) && !refsJoin(join.on.left)) { rightKeyExpr = join.on.right; leftKeyExpr = join.on.left; }
+        }
+
+        // Semi-join narrowing: only right rows whose join key occurs among the left
+        // rows' keys can ever match, so those keys ride the fetch as an $in - unless
+        // there are too many (the selector would outweigh the fetch) or the join is a
+        // RIGHT join, whose unmatched right rows must all surface. Safe for SEMI and
+        // ANTI too: membership is only ever probed with left-side keys.
+        const KEY_PUSH_CAP = 500;
+        let skipRightFetch = false;
+        if (join.type !== 'RIGHT' && rightKeyExpr && leftKeyExpr
+            && isPushableColumnName(rightKeyExpr.column)
+            && (join.on.operator === '=' || (join.on.operator === 'IN' && rightKeyExpr === join.on.left))) {
+            const keys = new Set();
+            let collectable = true;
+            for (const leftRow of currentResultRows) {
+                const v = await evalExpression(leftRow, leftKeyExpr, fromAlias, {}, stack, executePlan, leftRow);
+                const vals = join.on.operator === 'IN' ? (Array.isArray(v) ? v : []) : [v];
+                for (const k of vals) {
+                    if (k === null || k === undefined) continue;
+                    if (typeof k === 'object') { collectable = false; break; }
+                    keys.add(k);
+                }
+                if (!collectable || keys.size > KEY_PUSH_CAP) { collectable = false; break; }
+            }
+            if (collectable) {
+                if (keys.size === 0) skipRightFetch = true;
+                else finalRightSelector = combineSelectors(finalRightSelector, { [rightKeyExpr.column]: { $in: [...keys] } });
+            }
+        }
+
+        let allRightRows = skipRightFetch ? [] : await rightClass.getCards(finalRightSelector);
         const rightChecks = [...rightPredicates, ...joinFilterLeaves];
         if (rightChecks.length > 0) {
             const joinAlias_ = join.as || join.table;
@@ -349,26 +502,56 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
 
 
         const rightRowMap = new Map(allRightRows.map(r => [r._id, r]));
+
+        // Equi-joins (`ON u._id = t.assigneeId`) hash the right rows by their join key.
+        // Before this existed only the `ON a._id IN m.actors` array pattern matched -
+        // a plain equality join silently produced no rows. NULL keys are skipped on
+        // both sides: in SQL, NULL never equals anything.
+        let rightRowsByKey = null;
+        if (join.on && join.on.operator === '=' && rightKeyExpr && leftKeyExpr) {
+            rightRowsByKey = new Map();
+            for (const rightRow of allRightRows) {
+                const key = await evalExpression({ [joinAlias]: rightRow }, rightKeyExpr, joinAlias, {}, stack, executePlan, null);
+                if (key === null || key === undefined) continue;
+                const bucket = rightRowsByKey.get(key);
+                if (bucket) bucket.push(rightRow); else rightRowsByKey.set(key, [rightRow]);
+            }
+        }
+
         let newResultRows = [];
         const matchedRightIds = new Set();
 
         for(const leftRow of currentResultRows) {
             let matchFoundForLeftRow = false;
-            
-            // This logic is specific to the `ON a._id IN m.actors` pattern
-            const fk_list = await evalExpression(leftRow, join.on.right, fromAlias, {}, stack, executePlan, leftRow);
-            if (join.on.operator === 'IN' && Array.isArray(fk_list)) {
-                for(const fk of fk_list) {
-                    if (rightRowMap.has(fk)) {
-                        newResultRows.push({...leftRow, [joinAlias]: rightRowMap.get(fk)});
+
+            if (join.on.operator === 'IN') {
+                // The `ON a._id IN m.actors` pattern: the left row carries an array of
+                // right-side ids.
+                const fk_list = await evalExpression(leftRow, join.on.right, fromAlias, {}, stack, executePlan, leftRow);
+                if (Array.isArray(fk_list)) {
+                    for(const fk of fk_list) {
+                        if (rightRowMap.has(fk)) {
+                            newResultRows.push({...leftRow, [joinAlias]: rightRowMap.get(fk)});
+                            matchFoundForLeftRow = true;
+                            if (join.type === 'RIGHT') {
+                                matchedRightIds.add(fk);
+                            }
+                        }
+                    }
+                }
+            } else if (rightRowsByKey) {
+                const key = await evalExpression(leftRow, leftKeyExpr, fromAlias, {}, stack, executePlan, leftRow);
+                if (key !== null && key !== undefined) {
+                    for (const rightRow of rightRowsByKey.get(key) || []) {
+                        newResultRows.push({ ...leftRow, [joinAlias]: rightRow });
                         matchFoundForLeftRow = true;
                         if (join.type === 'RIGHT') {
-                            matchedRightIds.add(fk);
+                            matchedRightIds.add(rightRow._id);
                         }
                     }
                 }
             }
-            
+
             if (!matchFoundForLeftRow && join.type === 'LEFT') {
                 const nullRightRow = { [joinAlias]: null };
                 newResultRows.push({ ...leftRow, ...nullRightRow });
@@ -449,25 +632,78 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
         projectedRows = await applyProjections(finalRows, plan.projections, fromAlias, joinAliases, stack, executePlan);
     }
     
-    // 5.5 Apply DISTINCT/DISTINCT ON to final result set if specified
-    let orderedRows = projectedRows;
-    if (plan.distinct && plan.distinctOn) {
-        const distinctColumns = plan.distinctOn.map(expr => expr.column);
-        orderedRows = applyOrderBy(orderedRows, plan.orderBy);
-        orderedRows = applyDistinct(orderedRows, distinctColumns);
-    } else {
-        let distinctRows = projectedRows;
-        if (plan.distinct) {
-            distinctRows = applyDistinct(projectedRows);
-        }
-        orderedRows = applyOrderBy(distinctRows, plan.orderBy);
+    // 5.4 Resolve ORDER BY keys against the *pre-projection* rows. SQL lets ORDER BY
+    // name a column the SELECT list dropped (`SELECT b.name ... ORDER BY b.value`);
+    // sorting the projected rows alone silently kept fetch order for those. Keys that
+    // resolve to nothing here (a SELECT-list alias like `actor_name`) fall back to the
+    // projected row's own value during the sort.
+    let rawSortKeys = null;
+    if (!plan.aggregation && Array.isArray(plan.orderBy) && plan.orderBy.length > 0) {
+        const fromAlias_ = plan.fromTable.as || plan.fromTable.table;
+        const joinAliases_ = plan.joins.reduce((acc, j) => ({ ...acc, [j.as || j.table]: j.table }), {});
+        rawSortKeys = await Promise.all(finalRows.map(row =>
+            Promise.all(plan.orderBy.map(o => evalExpression(row, o.expr, fromAlias_, joinAliases_, stack, executePlan, row)))
+        ));
     }
 
-    // 7. Limit
-    if (plan.limit !== null && plan.limit !== undefined) {
-        return orderedRows.slice(0, plan.limit);
+    const sortPairs = (pairs) => {
+        if (!Array.isArray(plan.orderBy) || plan.orderBy.length === 0) return pairs;
+        return [...pairs].sort((a, b) => {
+            for (let j = 0; j < plan.orderBy.length; j++) {
+                const order = plan.orderBy[j];
+                const key = order.expr.column;
+                const valA = a.keys && a.keys[j] !== null && a.keys[j] !== undefined ? a.keys[j] : a.row[key];
+                const valB = b.keys && b.keys[j] !== null && b.keys[j] !== undefined ? b.keys[j] : b.row[key];
+                let comparison = 0;
+                if (valA < valB) comparison = -1;
+                if (valA > valB) comparison = 1;
+                if (comparison !== 0) {
+                    return order.order === 'DESC' ? -comparison : comparison;
+                }
+            }
+            return 0;
+        });
+    };
+
+    const distinctPairs = (pairs, columns) => {
+        const seen = new Set();
+        const result = [];
+        for (const pair of pairs) {
+            const key = JSON.stringify(
+                columns && columns.length > 0
+                    ? columns.map(col => pair.row[col])
+                    : Object.keys(pair.row).sort().map(k => pair.row[k])
+            );
+            if (!seen.has(key)) {
+                seen.add(key);
+                result.push(pair);
+            }
+        }
+        return result;
+    };
+
+    // 5.5 Apply DISTINCT/DISTINCT ON and ORDER BY
+    let pairs = projectedRows.map((row, i) => ({ row, keys: rawSortKeys ? rawSortKeys[i] : null }));
+    if (plan.distinct && plan.distinctOn) {
+        const distinctColumns = plan.distinctOn.map(expr => expr.column);
+        pairs = sortPairs(pairs);
+        pairs = distinctPairs(pairs, distinctColumns);
+    } else {
+        if (plan.distinct) {
+            pairs = distinctPairs(pairs, null);
+        }
+        pairs = sortPairs(pairs);
     }
-    
+    const orderedRows = pairs.map(pair => pair.row);
+
+    // 7. OFFSET + LIMIT window. When the window already rode the fetch (skip/limit
+    // pushed), applying the offset again here would drop rows twice.
+    const start = windowPushed ? 0 : (plan.offset ?? 0);
+    const end = (plan.limit !== null && plan.limit !== undefined) ? start + plan.limit : undefined;
+    if (start > 0 || end !== undefined) {
+        return orderedRows.slice(start, end);
+    }
+
     return orderedRows;
 }
 
@@ -499,10 +735,12 @@ async function executeUnionPlan(stack, plan, params) {
         }
     }
 
-    // Step 3: Apply final ORDER BY and LIMIT to the fully combined result set.
+    // Step 3: Apply final ORDER BY and the OFFSET/LIMIT window to the combined set.
     let orderedRows = applyOrderBy(combinedRows, plan.orderBy);
-    if (plan.limit !== null && plan.limit !== undefined) {
-        return orderedRows.slice(0, plan.limit);
+    const start = plan.offset ?? 0;
+    const end = (plan.limit !== null && plan.limit !== undefined) ? start + plan.limit : undefined;
+    if (start > 0 || end !== undefined) {
+        return orderedRows.slice(start, end);
     }
     return orderedRows;
 }
@@ -522,11 +760,93 @@ async function executeUnionPlan(stack, plan, params) {
  */
 export async function executePlan(stack: ClientStack, plan, params, outerRow = null, outerAliases = null) {
     if (!plan) return [];
-    
+
     if (plan.type === 'union') {
         return executeUnionPlan(stack, plan, params);
     }
-    
+
     // Default to existing logic for single select plan
     return executeSingleSelectPlan(stack, plan, params, outerRow, outerAliases);
+}
+
+/** True when any node of a predicate/expression tree is a subquery. */
+function containsSubquery(node) {
+    if (!node || typeof node !== 'object') return false;
+    if (node.type === 'scalar_subquery' || node.type === 'subquery' || node.type === 'exists_expr') return true;
+    return Object.values(node).some(value => typeof value === 'object' && containsSubquery(value));
+}
+
+/**
+ * Executes a plan as an async stream of rows.
+ *
+ * A single-table plan with no aggregation, DISTINCT, ORDER BY, or subqueries streams
+ * for real: rows ride `findDocumentsIterator`'s keyset pages, get the WHERE re-check
+ * and projection per row, and honor OFFSET/LIMIT by counting - peak memory is one
+ * batch regardless of result size, and a LIMIT stops the underlying scan early. Any
+ * other plan falls back to `executePlan` and yields from the materialized result, so
+ * the API is uniform even where streaming isn't.
+ */
+export async function* executePlanStream(stack: ClientStack, plan, params) {
+    if (!plan) return;
+
+    const streamable = plan.type === 'select'
+        && plan.joins.length === 0
+        && !plan.aggregation
+        && !plan.distinct
+        && (!plan.orderBy || plan.orderBy.length === 0)
+        && (plan.projections.every(p => p.expr && p.expr.type === 'column_ref')
+            || (plan.projections.length === 1 && plan.projections[0].expr && plan.projections[0].expr.type === 'star'))
+        && !plan.filters.residual.some(containsSubquery)
+        && !plan.projections.some(p => containsSubquery(p.expr));
+
+    if (!streamable) {
+        const rows = await executePlan(stack, plan, params);
+        for (const row of rows) yield row;
+        return;
+    }
+
+    const fromClass = await stack.getClass(plan.fromTable.table);
+    if (!fromClass) throw new Error(`Table not found: ${plan.fromTable.table}`);
+    const fromAlias = plan.fromTable.as || plan.fromTable.table;
+
+    const safeEarly = await stack.canApplyQueryLimitEarly(plan.fromTable.table);
+    const projectionFields = safeEarly ? computeProjectionFields(plan) : null;
+
+    const selector = {
+        ...buildSelector(plan.filters.left),
+        "~class": { $eq: fromClass.getName() },
+    };
+
+    const whereChecks = [...plan.filters.left, ...plan.filters.residual];
+    const evaluators = whereChecks.map(predicate => createRowEvaluator(predicate, stack, executePlan, null, null));
+
+    const isStar = plan.projections.length === 1 && plan.projections[0].expr.type === 'star';
+    const offset = plan.offset ?? 0;
+    const limit = plan.limit ?? null;
+    let skipped = 0;
+    let emitted = 0;
+
+    for await (const doc of stack.findDocumentsIterator(selector, { fields: projectionFields || undefined })) {
+        const row = { [fromAlias]: doc };
+        let matches = true;
+        for (const evaluator of evaluators) {
+            if (!(await evaluator(row))) { matches = false; break; }
+        }
+        if (!matches) continue;
+        if (skipped < offset) { skipped++; continue; }
+
+        if (isStar) {
+            yield { ...doc };
+        } else {
+            const projected = {};
+            for (const p of plan.projections) {
+                const alias = p.as || p.expr.column;
+                projected[alias] = await evalExpression(row, p.expr, fromAlias, {}, stack, executePlan, row);
+            }
+            yield projected;
+        }
+
+        emitted++;
+        if (limit !== null && emitted >= limit) return;
+    }
 }

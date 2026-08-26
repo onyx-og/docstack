@@ -192,6 +192,14 @@ const UNPUSHABLE_COLUMNS = new Set(['active', '__proto__', 'constructor', 'proto
 const PUSHABLE_COLUMN_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
+ * Whether a column name is safe to hand to Mango - as a selector key, a sort field,
+ * or a projection field. See {@link PUSHABLE_COLUMN_RE} and {@link UNPUSHABLE_COLUMNS}.
+ */
+export function isPushableColumnName(name) {
+    return typeof name === 'string' && PUSHABLE_COLUMN_RE.test(name) && !UNPUSHABLE_COLUMNS.has(name);
+}
+
+/**
  * Checks if a predicate is a simple binary expression that can be converted
  * directly into a Mango selector by `buildSelector`.
  *
@@ -208,8 +216,7 @@ export function isPushablePredicate(predicate) {
 
     const left = predicate.left;
     if (!left || left.type !== 'column_ref') return false;
-    if (typeof left.column !== 'string' || !PUSHABLE_COLUMN_RE.test(left.column)) return false;
-    if (UNPUSHABLE_COLUMNS.has(left.column)) return false;
+    if (!isPushableColumnName(left.column)) return false;
 
     const right = predicate.right;
     if (!right || right.type !== 'param') return false;
@@ -239,6 +246,7 @@ function createSingleSelectPlan(ast) {
         aggregation: null,
         orderBy: ast.orderBy,
         limit: ast.limit,
+        offset: ast.offset ?? null,
     };
     
     const fromTableName = ast.from[0].table;
@@ -336,6 +344,7 @@ export function createPlan(astList) {
         unionOps: [],
         orderBy: null,
         limit: null,
+        offset: null,
     };
     
     // Create a map from the SelectAST object to its future index in selectPlans
@@ -373,12 +382,14 @@ export function createPlan(astList) {
     if (lastSelectAst.type === 'select') {
         plan.orderBy = lastSelectAst.orderBy;
         plan.limit = lastSelectAst.limit;
-        
+        plan.offset = lastSelectAst.offset ?? null;
+
         // Remove from individual plan to avoid applying it early
         const lastSelectPlan = plan.selectPlans[plan.selectPlans.length - 1];
         if (lastSelectPlan) {
             lastSelectPlan.orderBy = null;
             lastSelectPlan.limit = null;
+            lastSelectPlan.offset = null;
         }
     }
 

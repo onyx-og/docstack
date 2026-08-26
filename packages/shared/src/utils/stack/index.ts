@@ -215,7 +215,7 @@ abstract class Stack extends EventTarget {
         targetId: string
     }}[], relationName: string, domainObj: Domain ) => Promise<RelationDocument[]>;
 
-    abstract findDocuments: <T extends Document | RelationDocument>(selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number ) => Promise<{
+    abstract findDocuments: <T extends Document | RelationDocument>(selector: {[key: string]: any}, fields?: string[], skip?: number, limit?: number, sort?: { [field: string]: "asc" | "desc" }[] ) => Promise<{
         [key: string]: any;
         docs: T[];
     }>;
