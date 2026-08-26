@@ -469,6 +469,19 @@ export class StackSyncHandle extends EventTarget {
      * which classes replicate would silently resume from the previous configuration's
      * checkpoint and never backfill the newly-admitted documents.
      */
+    /**
+     * The document ids this stack's configured patches seed.
+     *
+     * Empty when the stack was opened without patches, which is the common case.
+     */
+    private seededDocIdsFromPatches(): string[] {
+        const patches = (this.stack.options?.patches ?? []) as { docs?: { _id?: unknown }[] }[];
+        const ids = patches.flatMap(patch => (patch?.docs ?? [])
+            .map(doc => doc?._id)
+            .filter((id): id is string => typeof id === "string"));
+        return [...new Set(ids)];
+    }
+
     private buildFilter(): ((doc: any) => boolean) | undefined {
         const { internalDocs, classes, filter } = this.options;
 
@@ -476,7 +489,19 @@ export class StackSyncHandle extends EventTarget {
         const identities: string[] = [];
 
         if (internalDocs !== false) {
-            const internalFilter = createReplicationFilter(internalDocs || {});
+            // The stack's own patches seed documents on every client that applies them,
+            // exactly as the system patches do, so they are reconstructible everywhere
+            // and need not travel. Folded in here rather than left to the caller: an
+            // application should not have to enumerate its own seeded ids to get correct
+            // replication. See ADR-0023.
+            const configured = internalDocs || {};
+            const internalFilter = createReplicationFilter({
+                ...configured,
+                extraSeededDocIds: [
+                    ...(configured.extraSeededDocIds || []),
+                    ...this.seededDocIdsFromPatches(),
+                ],
+            });
             stages.push(internalFilter);
             identities.push(String(internalFilter));
         }

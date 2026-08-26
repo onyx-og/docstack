@@ -34,6 +34,7 @@ export {
     isEncryptedPayload,
 } from "./core/index.js";
 
+export { SYSTEM_SEEDED_DOC_IDS } from "./core/index.js";
 export type { EncryptedPayload, ClassBuildOptions } from "./core/index.js";
 
 /**

@@ -1,4 +1,5 @@
 import { describeFilter, withFilterIdentity } from "./filter-identity.js";
+import { SYSTEM_SEEDED_DOC_IDS } from "../datamodel/index.js";
 
 /**
  * The taxonomy of documents a DocStack stack keeps for itself.
@@ -39,16 +40,29 @@ export const INTERNAL_DOC_IDS: readonly string[] = [
  * - `_design/` documents are Mango indexes built on demand by
  *   {@link ClientStack.addDesignDocumentPKs}, including the `-temp` variants.
  * - `~lock-` guards an in-flight class-model propagation on *this* device.
+ * - `~log-` is this client's own diagnostic record. Replicating diagnostics costs quota,
+ *   bandwidth and remote storage on every sync, in both directions, and tells a peer
+ *   nothing it can use - `logLevel: 'info'` should not be a network cost. They used to
+ *   carry neither a `~class` nor a recognisable id, so all of them replicated: 111 of
+ *   134 documents on one measured remote. See ADR-0023.
  */
 export const INTERNAL_DOC_ID_PREFIXES: readonly string[] = [
     "_local/",
     "_design/",
     "~lock-",
+    "~log-",
 ];
 
-/** `~class` values whose documents describe device-local state. */
+/**
+ * `~class` values whose documents describe device-local state.
+ *
+ * - `~lock` guards an in-flight class-model propagation on *this* device.
+ * - `~JobRun` records that *this* client ran a job. A peer's execution history is not
+ *   something this one can act on, and both write their own.
+ */
 export const INTERNAL_DOC_CLASSES: readonly string[] = [
     "~lock",
+    "~JobRun",
 ];
 
 /**
@@ -79,6 +93,25 @@ export const OPTIONAL_INTERNAL_DOC_CLASSES = {
 export interface InternalDocFilterOptions {
     /** Replicate `~UserSession` documents. Defaults to `false`. */
     replicateSessions?: boolean;
+    /**
+     * Replicate the documents the system patches seed - the `~*` class models,
+     * `Group-Admin`, `Policy-Admin`, `AuthMod-Classic`, the bootstrap `class` and
+     * `domain`, the `system` user. Defaults to `false`, because every client applies
+     * those patches for itself and so already holds them.
+     *
+     * This does *not* govern documents of DocStack's classes that an application created
+     * - an account, a group, a policy written at runtime. Those bind the synchronised
+     * group together and always replicate.
+     */
+    replicateSystemDocuments?: boolean;
+    /**
+     * Document ids an application's own patches seed, treated like the system-seeded ones.
+     *
+     * Consumer patches are applied on every client too, so the documents they seed are
+     * reconstructible everywhere and need not travel. {@link ClientStack.sync} fills this
+     * in from the stack's configured patches.
+     */
+    extraSeededDocIds?: string[];
     /** Replicate the local `patch` ledger. Defaults to `false`. */
     replicatePatchLedger?: boolean;
     /** Additional exact document ids to keep device-local. */
@@ -107,6 +140,34 @@ export const resolveInternalClasses = (options: InternalDocFilterOptions = {}): 
     if (!options.replicateSessions) classes.push(OPTIONAL_INTERNAL_DOC_CLASSES.sessions);
     if (!options.replicatePatchLedger) classes.push(OPTIONAL_INTERNAL_DOC_CLASSES.patchLedger);
     return classes;
+};
+
+/**
+ * Reports whether a document is one every client seeds for itself.
+ *
+ * The distinction that matters is **not** "is this DocStack's own?" - it is "can the peer
+ * already reconstruct this?". Patches are applied by every client independently, so every
+ * document they seed exists everywhere already: the `~*` class models, `Group-Admin`,
+ * `Group-Default`, `Policy-Admin`, `AuthMod-Classic`, `Job-Auth-Classic`, the bootstrap
+ * `class` and `domain`, the `system` user. Sending them costs quota and invites conflicts
+ * - two devices writing the same id independently - for no information gained.
+ *
+ * What must travel is whatever *binds* the two instances: the documents a synchronised
+ * group cannot derive from its patches. That includes application data and its class
+ * models, and equally an account created at runtime (`user-alice`), a group an
+ * administrator added, a policy an application wrote. Those are `~User`, `~Group` and
+ * `~Policy` documents - DocStack's classes - and holding them back on the strength of
+ * that prefix would break exactly the case replication exists for. Only the *seeded* ones
+ * stay home. See ADR-0023.
+ *
+ * @param id - The document id.
+ * @param options - Filter options; `replicateSystemDocuments` turns this off, and
+ * `extraSeededDocIds` extends the set with an application's own patch-seeded ids.
+ */
+const isSeededEverywhere = (id: string, options: InternalDocFilterOptions): boolean => {
+    if (options.replicateSystemDocuments) return false;
+    if (SYSTEM_SEEDED_DOC_IDS.includes(id)) return true;
+    return Boolean(options.extraSeededDocIds?.includes(id));
 };
 
 /**
@@ -141,7 +202,7 @@ export const isInternalDoc = (
     const docClass = doc && typeof doc["~class"] === "string" ? (doc["~class"] as string) : undefined;
     if (docClass && resolveInternalClasses(options).includes(docClass)) return true;
 
-    return false;
+    return isSeededEverywhere(id, options);
 };
 
 /**
@@ -174,6 +235,7 @@ export const createReplicationFilter = (
         if (prefixes.some(prefix => id.startsWith(prefix))) return false;
         const docClass = doc && typeof doc["~class"] === "string" ? (doc["~class"] as string) : undefined;
         if (docClass && classes.has(docClass)) return false;
+        if (isSeededEverywhere(id, options)) return false;
         return true;
     };
 
@@ -181,6 +243,8 @@ export const createReplicationFilter = (
     return withFilterIdentity(filter, describeFilter("internal", {
         replicateSessions: Boolean(options.replicateSessions),
         replicatePatchLedger: Boolean(options.replicatePatchLedger),
+        replicateSystemDocuments: Boolean(options.replicateSystemDocuments),
+        extraSeededDocIds: options.extraSeededDocIds || [],
         extraDocIds: options.extraDocIds || [],
         extraIdPrefixes: options.extraIdPrefixes || [],
         extraClasses: options.extraClasses || [],

@@ -1310,6 +1310,29 @@ const sys_014: Patch = {
 
 syspatches.push(sys_011, sys_012, sys_013, sys_014);
 
+/**
+ * Every document id the system patches seed.
+ *
+ * Derived from the patches rather than hand-listed, so it cannot drift as the datamodel
+ * grows. Load-bearing for replication: each client applies these patches for itself, so
+ * every one of these documents already exists on every client. Sending them costs quota
+ * and invites conflicts - two devices writing `Policy-Admin` independently - while
+ * telling a peer nothing it did not already know. See ADR-0023.
+ *
+ * @example
+ * ```typescript
+ * SYSTEM_SEEDED_DOC_IDS.includes("Group-Admin"); // true - patch-seeded everywhere
+ * SYSTEM_SEEDED_DOC_IDS.includes("user-alice");  // false - created by an application
+ * ```
+ */
+export const SYSTEM_SEEDED_DOC_IDS: readonly string[] = Object.freeze([
+    ...new Set(
+        syspatches.flatMap(patch => ((patch as any).docs ?? [])
+            .map((doc: any) => doc?._id)
+            .filter((id: unknown): id is string => typeof id === "string"))
+    ),
+]);
+
 export async function getSystemPatches(currentVersion: string) {
     const classicAuthJobHash = await hashContent(classicAuthJobContent);
     const jobAuthClassic = sys_005.docs.find(d => d._id === 'Job-Auth-Classic');

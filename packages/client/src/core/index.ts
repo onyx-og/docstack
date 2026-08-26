@@ -74,6 +74,16 @@ class DocStack extends EventTarget {
     private store!: ClientStack;
     /** Array of all initialized ClientStack instances. */
     stacks: ClientStack[] = [];
+
+    /**
+     * Stacks currently being opened, by name.
+     *
+     * `stacks` only gains an entry once `ClientStack.create` resolves, so it cannot answer
+     * "is this one already on its way?". Without that, {@link addStack}'s guard is a check
+     * followed by an `await` - not atomic - and two concurrent callers each open a handle
+     * on the same database. See ADR-0022.
+     */
+    private pendingStacks: Map<string, Promise<ClientStack>> = new Map();
     /** The handle from the last {@link sync} call. */
     private syncHandle?: DocStackSyncHandle;
     private logger: Logger = createlogger().child({ module: "client" });
@@ -127,18 +137,43 @@ class DocStack extends EventTarget {
      */
     public addStack = async (config: StackConfig): Promise<ClientStack> => {
         const { connection, options } = DocStack.resolveStackConfig(config);
+        const name = options.name || connection;
+        const fnLogger = this.logger.child({ method: "addStack" });
 
-        const existing = this.getStack(options.name || connection);
+        const existing = this.getStack(name);
         if (existing) {
-            this.logger.child({ method: "addStack" }).info("Stack already open", { name: options.name });
+            fnLogger.info("Stack already open", { name });
             return existing;
         }
 
-        const stack = await ClientStack.create(connection, options);
-        this.stacks.push(stack);
-        if (!this.store) this.store = stack;
-        this.dispatchEvent(new CustomEvent("stack-added", { detail: { stack } }));
-        return stack;
+        // Opening one that is still opening. `getStack` alone cannot answer this: it
+        // reads `this.stacks`, which a stack only joins *after* `ClientStack.create`
+        // resolves, so between the check above and that resolution the stack is invisible
+        // and a second caller opens a second handle on the same database. Both then run
+        // `initdb` -> `checkSystem` -> `applyPatches` and collide writing `~sys-0.0.1`
+        // with a 409. See ADR-0022.
+        const pending = this.pendingStacks.get(name);
+        if (pending) {
+            fnLogger.info("Stack already opening; joining that attempt", { name });
+            return pending;
+        }
+
+        // Registered before the first `await`, which is what makes the guard atomic:
+        // nothing else runs between the miss above and this line.
+        const creation = ClientStack.create(connection, options).then(stack => {
+            this.stacks.push(stack);
+            if (!this.store) this.store = stack;
+            this.dispatchEvent(new CustomEvent("stack-added", { detail: { stack } }));
+            return stack;
+        });
+        this.pendingStacks.set(name, creation);
+
+        try {
+            return await creation;
+        } finally {
+            // Cleared on failure too, so a stack that failed to open can be retried.
+            this.pendingStacks.delete(name);
+        }
     }
 
     /**
@@ -732,6 +767,7 @@ export type {
     ContentImportReport,
     ContentImportIssue,
 } from "./content-transfer.js";
+export { SYSTEM_SEEDED_DOC_IDS } from "./datamodel/index.js";
 export { StackWriteGuardError } from "./guarded-db.js";
 export { StackLockedError } from "../plugins/pouchdb.js";
 /**

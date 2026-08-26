@@ -1245,6 +1245,39 @@ class ClientStack extends Stack {
         }
     }
 
+    /**
+     * Mints an identifier for a new document.
+     *
+     * Random, not sequential, and that is the whole point. Ids used to be
+     * `${type}-${lastDocId + 1}`, from a counter that only *local* writes advance: a
+     * document arriving by replication goes through {@link getReplicationHandle}, which
+     * bypasses that path by design, so the counter stood still while ids were consumed.
+     * The next local write then minted an id the database already held, PouchDB resolved
+     * the two as revisions of one document, and the new one was gone - with no error,
+     * because the conflict was swallowed. Two devices did it to each other from their
+     * very first document, both starting at `1`.
+     *
+     * No counter repair fixes that. Feeding replicated documents back into the counter
+     * still leaves two offline devices minting the same id, because a sequence derived
+     * from local state cannot be unique across devices that have not met. The identifier
+     * has to stop being derived from local state at all. See ADR-0023.
+     *
+     * The class prefix stays, so an id still says what it is.
+     *
+     * @param type - The class or domain name, used as the prefix.
+     * @returns An id of the form `Task-9f2c...`, 96 random bits wide.
+     *
+     * @example
+     * ```typescript
+     * stack.generateDocId("Task"); // "Task-3f9a2b7c1d4e5f60a1b2c3d4"
+     * ```
+     */
+    public generateDocId(type: string): string {
+        // 12 bytes - 96 bits - matching the width applications already use for
+        // collision-safe values through `cryptoEngine.generateRandomString`.
+        return `${type}-${this.cryptoEngine.generateRandomString(12)}`;
+    }
+
     async getLastDocId() {
         let lastDocId = 0;
         try {
@@ -3061,7 +3094,7 @@ class ClientStack extends Stack {
                 }
             } else {
                 isNewDoc = true;
-                newDocId = `${type}-${(this.lastDocId + 1)}`;
+                newDocId = this.generateDocId(type);
                 doc = this.prepareDoc(newDocId, type, params, "~class") as Document;
                 fnLogger.info("Generated docId", { newDocId });
             }
@@ -3110,16 +3143,20 @@ class ClientStack extends Stack {
                 throw new Error("createDoc - Error, check logs");
             }
         } catch (e: any) {
-            if (e.name === 'conflict') {
-                fnLogger.info("Conflict! Ignoring..");
-                // TODO: Handle conflict!
-            } else {
-                fnLogger.info("Problem while putting doc", {
-                    "error": e,
-                    "document": doc
-                })
-                throw new Error("createDoc - Problem while putting doc" + e);
-            }
+            // A conflict used to be swallowed here, and `doc` - the in-memory draft,
+            // with no `_rev` - returned as though the write had succeeded. That is how a
+            // colliding id turned into silent data loss: the caller got a
+            // document-shaped value back and no reason to think anything was wrong.
+            // Ids are random now, so a conflict means a genuine concurrent write to the
+            // same id rather than an exhausted counter, and the caller has to hear it.
+            // See ADR-0023.
+            fnLogger.error("Problem while putting doc", {
+                error: e?.message ?? String(e),
+                name: e?.name,
+                status: e?.status,
+                docId: (doc as any)?._id,
+            });
+            throw e instanceof Error ? e : new Error(`createDoc - ${String(e)}`);
         }
         return doc;
     }
@@ -3181,7 +3218,7 @@ class ClientStack extends Stack {
                         doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     }
                 } else {
-                    docId = `${type}-${(++nextDocId)}`;
+                    docId = this.generateDocId(type);
                     doc = this.prepareDoc(docId, type, params, "~class") as Document;
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
@@ -3277,7 +3314,7 @@ class ClientStack extends Stack {
                     doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                 }
             } else {
-                docId = `${domainObj.name}-${(this.lastDocId + 1)}`;
+                docId = this.generateDocId(domainObj.name);
                 doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                 isNewDoc = true;
                 fnLogger.info("Generated docId", docId);
@@ -3378,7 +3415,7 @@ class ClientStack extends Stack {
                         doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     }
                 } else {
-                    docId = `${domainObj.name}-${(++nextDocId)}`;
+                    docId = this.generateDocId(domainObj.name);
                     doc = this.prepareDoc(docId, domainObj.name, params, "~domain");
                     isNewDoc = true;
                     fnLogger.info("Generated docId", docId);
