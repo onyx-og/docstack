@@ -691,6 +691,103 @@ class ClientStack extends Stack {
      *
      * @returns The class names, sorted.
      */
+    /**
+     * The names of classes whose documents are local to one run.
+     *
+     * See {@link ClassModel.ephemeral}. Resolved from the stored models rather than a
+     * hardcoded list, so an application that declares its own ephemeral class - a cache,
+     * a derived view, anything a peer neither needs nor should receive - is covered
+     * without DocStack knowing about it.
+     *
+     * @returns The ephemeral class names, sorted.
+     */
+    /**
+     * Classes declared `simple`, held for synchronous lookup.
+     *
+     * {@link StackPlugin} needs the answer inside `bulkDocs`, before it decides whether to
+     * load the class at all - and loading the class to find out is the very cost the flag
+     * exists to avoid. Refreshed when the datamodel is in place and whenever a class model
+     * changes. See ADR-0028.
+     */
+    private simpleClassNames: Set<string> = new Set();
+
+    /**
+     * Whether a class stores its documents as given.
+     *
+     * See {@link ClassModel.simple}. Answers `false` for a class it has not heard of,
+     * which is the safe direction: an unknown class gets the full authoring path.
+     *
+     * @param className - The `~class` of a document.
+     */
+    public isSimpleClass = (className: unknown): boolean => {
+        return typeof className === "string" && this.simpleClassNames.has(className);
+    }
+
+    /**
+     * Re-reads which classes are `simple`.
+     *
+     * @returns The names, for callers that want them.
+     */
+    public refreshSimpleClasses = async (): Promise<string[]> => {
+        try {
+            const { list } = await this.getClassModels();
+            const names = list
+                .filter(model => (model as any).simple === true)
+                .map(model => model.name)
+                .filter(Boolean);
+            this.simpleClassNames = new Set(names);
+            return [...this.simpleClassNames].sort();
+        } catch {
+            // A stack that cannot read its class models has larger problems; leaving the
+            // set as it was means writes take the full path, which is never unsafe.
+            return [...this.simpleClassNames].sort();
+        }
+    }
+
+    public getEphemeralClassNames = async (): Promise<string[]> => {
+        const { list } = await this.getClassModels();
+        return [...new Set(
+            list.filter(model => (model as any).ephemeral === true).map(model => model.name)
+        )].filter(Boolean).sort();
+    }
+
+    /**
+     * Empties the ephemeral classes.
+     *
+     * Called when the stack opens, which is what "one run" means: contents cover the
+     * session that is starting, a logout leaves them alone, and a crash is cleaned up by
+     * the next open rather than leaving documents on disk forever.
+     *
+     * Failures are logged and swallowed. A stack that cannot clear its scratch data should
+     * still open.
+     *
+     * @returns How many documents were removed.
+     */
+    private async purgeEphemeralDocuments(): Promise<number> {
+        const fnLogger = logger.child({ method: "purgeEphemeralDocuments" });
+        try {
+            const ephemeral = await this.getEphemeralClassNames();
+            if (!ephemeral.length) return 0;
+
+            // `allDocs` rather than the authoring read path: this runs during startup,
+            // before a session exists, and the point is to delete rather than to read.
+            const all = await this.rawDb.allDocs({ include_docs: true });
+            const doomed = all.rows
+                .map(row => row.doc as any)
+                .filter(doc => doc && ephemeral.includes(doc["~class"]))
+                .map(doc => ({ _id: doc._id, _rev: doc._rev, _deleted: true }));
+
+            if (!doomed.length) return 0;
+
+            await this.pristineDbMethods.bulkDocs.call(this.rawDb, doomed, {});
+            fnLogger.warn("Cleared ephemeral documents", { count: doomed.length, classes: ephemeral });
+            return doomed.length;
+        } catch (error: any) {
+            fnLogger.warn("Could not clear ephemeral documents", { error: error?.message ?? String(error) });
+            return 0;
+        }
+    }
+
     public getClassNames = async (): Promise<string[]> => {
         const { list } = await this.getClassModels();
         return [...new Set(list.map(model => model.name).filter(Boolean))].sort();
@@ -1568,6 +1665,9 @@ class ClientStack extends Stack {
                 // Invalidate cached version if present
                 fnLogger.info(`Class model was updated. Clearing '${className}' from cache.`);
                 delete this.cache[className];
+                // A class can gain or lose `simple`, and the plugin reads that set
+                // synchronously on every write.
+                void this.refreshSimpleClasses();
                 fnLogger.info(`Successfully cleared '${className}' from cache.`);
             } else if (doc && isClassModel(doc) && !doc.active) {
                 const className = doc.name;
@@ -2027,6 +2127,11 @@ class ClientStack extends Stack {
         logger.warn("initdb - index initialized", { "stackName": this.name });
         await this.checkSystem();
         logger.warn("initdb - system checked", { "stackName": this.name });
+        // After the patches, so the ephemeral classes they declare are known; before the
+        // listeners, so the clear-out does not arrive as a burst of change events to
+        // whatever has just subscribed.
+        await this.purgeEphemeralDocuments();
+        await this.refreshSimpleClasses();
         this.setListeners();
         logger.warn("initdb - listeners set, initialization complete", { "stackName": this.name });
         return this;
@@ -2670,7 +2775,9 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev'];
+        // `ephemeral` is projected too: without it the models come back with the flag
+        // stripped, and every class looks durable. See ADR-0028.
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev', 'ephemeral', 'simple'];
 
         const response = await this.findDocuments(selector, fields);
         const result: ClassModel[] = response.docs as ClassModel[];
@@ -2768,7 +2875,9 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev'];
+        // `ephemeral` is projected too: without it the models come back with the flag
+        // stripped, and every class looks durable. See ADR-0028.
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev', 'ephemeral', 'simple'];
 
         const response = await this.findDocuments(selector, fields);
         const result: DomainModel[] = response.docs as DomainModel[];
@@ -2987,6 +3096,13 @@ class ClientStack extends Stack {
     addDesignDocumentPKs = async (className: string, pKs: string[], temp = false) => {
         const fnLogger = logger.child({ method: 'addDesignDocumentPKs', args: { className, pKs } });
         // Construct the compound key string dynamically
+        if (!pKs.length) {
+            // `const hasAllKeys = ;` - the emitted map function would not parse. A class
+            // with no primary keys has nothing to check uniqueness on, which is the normal
+            // case for a simple class. See ADR-0028.
+            throw new Error(`addDesignDocumentPKs - class '${className}' has no primary keys to index`);
+        }
+
         const keyString = pKs.map(key => `doc.${key}`).join(', ');
 
         // The 'map' function as a string

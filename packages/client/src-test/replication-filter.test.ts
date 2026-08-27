@@ -36,15 +36,19 @@ describe("replication filter", () => {
                     leakedDeviceLocal: replicated
                         .filter((d: any) => ["~JobRun", "~UserSession", "~lock"].includes(d["~class"]))
                         .map((d: any) => d._id).sort(),
-                    logRecordsHeld: replicated.filter((d: any) => String(d._id).startsWith("~log-")).length,
-                    // There is always some logging by this point.
-                    logRecords: docs.filter((d: any) => String(d._id).startsWith("~log-")).length,
+                    // Nothing shaped like a log record escapes, whatever its id: the
+                    // records that prompted this carried bare UUIDs. See ADR-0027.
+                    logRecordsHeld: replicated.filter((d: any) =>
+                        String(d._id).startsWith("~log-") || (d.log && !d["~class"])).length,
+                    // At the `warn` default a quiet run writes none at all, which is the
+                    // point of that default - so this is reported, not asserted upon.
+                    logRecords: docs.filter((d: any) =>
+                        String(d._id).startsWith("~log-") || (d.log && !d["~class"])).length,
                 };
             },
         });
 
         expect(result.total).toBeGreaterThan(20);
-        expect(result.logRecords).toBeGreaterThan(0);
 
         // Was 23 documents plus every log record.
         expect(result.leakedSeeded).toEqual([]);

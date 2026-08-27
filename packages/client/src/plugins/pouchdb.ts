@@ -329,6 +329,14 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                 } else if (isDocument(doc)) {
                     const className = doc["~class"];
 
+                    // A simple class stores documents as given. Everything below is
+                    // schema-derived - validation, triggers, relation checks, the
+                    // encrypted-attribute test - so there is nothing here to do, and the
+                    // `getClassSnapshot` on the next line is a database round trip per
+                    // document that would buy none of it. Answered from a set held on the
+                    // stack precisely so this decision costs nothing. See ADR-0028.
+                    if (stack.isSimpleClass(className)) continue;
+
                     try {
                         let classObj: Class | null;
                         try {
@@ -438,6 +446,8 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             const encryptedDocs = await Promise.all((originalDocs || []).map(async (doc) => {
                 if (isDocument(doc)) {
                     const className = doc["~class"];
+                    // No schema, so no attribute can be marked encrypted.
+                    if (stack.isSimpleClass(className)) return doc;
                     const classObj = classCache.get(className) || await stack.getClassSnapshot(className);
                     if (classObj) {
                         const encryptableAttributes = classObj.getEncryptedAttributes();
@@ -491,6 +501,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                                 const doc = docResult.ok as Document;
                                 if (isDocument(doc)) {
                                     const className = doc["~class"];
+                                    if (stack.isSimpleClass(className)) continue;
                                     let classObj = classCache.get(className);
                                     if (!classObj) {
                                         classObj = await stack.getClassSnapshot(className).catch(() => null) || undefined;
@@ -522,7 +533,8 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
             const exec = async () => {
                 const result = await pouchGet.call(this, docId, options ?? {});
-                if (result && isDocument(result) && stack.cryptoEngine.isEnabled()) {
+                if (result && isDocument(result) && stack.cryptoEngine.isEnabled()
+                    && !stack.isSimpleClass(result["~class"])) {
                     const classObj = await stack.getClassSnapshot(result["~class"]).catch(() => null);
                     if (classObj && classObj.getEncryptedAttributes().length) {
                         await stack.cryptoEngine.decryptDocument(result as Document, classObj);
@@ -545,7 +557,8 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             }
             const exec = async () => {
                 let payload = doc as any;
-                if (isDocument(doc) && stack.cryptoEngine.isEnabled()) {
+                if (isDocument(doc) && stack.cryptoEngine.isEnabled()
+                    && !stack.isSimpleClass(doc["~class"])) {
                     const classObj = await stack.getClassSnapshot(doc["~class"]).catch(() => null);
                     if (classObj && classObj.getEncryptedAttributes().length) {
                         payload = { ...doc } as Document;

@@ -105,6 +105,14 @@ export interface InternalDocFilterOptions {
      */
     replicateSystemDocuments?: boolean;
     /**
+     * Class names declared `ephemeral`, whose documents describe one run of one client.
+     *
+     * See {@link ClassModel.ephemeral}. {@link ClientStack.sync} fills this in from the
+     * stack's own class models, so a class declared ephemeral is excluded structurally
+     * rather than by the filter recognising a payload shape.
+     */
+    ephemeralClasses?: string[];
+    /**
      * Document ids an application's own patches seed, treated like the system-seeded ones.
      *
      * Consumer patches are applied on every client too, so the documents they seed are
@@ -130,13 +138,46 @@ type MaybeInternalDoc = {
 };
 
 /**
+ * Reports whether a document is one of this client's log records.
+ *
+ * Recognised by shape, not only by the `~log-` id prefix, because the prefix only
+ * identifies records written by a build that has it. Records written before it - and by
+ * any consumer still on an older client - carry a bare UUID for an id, no `~class` and no
+ * `~domain`, so neither the id rules nor the class rules can see them, and they replicate.
+ * They are not rare: on one measured stack, 54 of 56 replicated documents were these.
+ *
+ * That is a confidentiality problem before it is a quota one. A record's fields are
+ * whatever the call site passed - `getCards - selector` carries the query selector - so a
+ * query over user-entered text puts that text on the remote in the clear, outside the
+ * crypto engine, inside a document DocStack otherwise treats as ordinary application data.
+ *
+ * The test is deliberately narrow: application documents always carry `~class`, and
+ * relations carry `~domain`, so requiring neither - plus a `log` object holding the
+ * `level` and `message` every record has - cannot match real data.
+ *
+ * @param doc - The document to classify.
+ */
+const isLogRecord = (doc: MaybeInternalDoc | null | undefined): boolean => {
+    if (!doc || typeof doc !== "object") return false;
+    if (typeof doc["~class"] === "string" || typeof doc["~domain"] === "string") return false;
+
+    const log = doc.log as { level?: unknown; message?: unknown } | undefined;
+    if (!log || typeof log !== "object") return false;
+    return typeof log.level === "string" && typeof log.message === "string";
+};
+
+/**
  * Resolves the full set of device-local classes for a given set of options.
  *
  * @param options - Filter options; defaults keep sessions and the patch ledger local.
  * @returns The `~class` values that should not leave this device.
  */
 export const resolveInternalClasses = (options: InternalDocFilterOptions = {}): string[] => {
-    const classes = [...INTERNAL_DOC_CLASSES, ...(options.extraClasses || [])];
+    const classes = [
+        ...INTERNAL_DOC_CLASSES,
+        ...(options.ephemeralClasses || []),
+        ...(options.extraClasses || []),
+    ];
     if (!options.replicateSessions) classes.push(OPTIONAL_INTERNAL_DOC_CLASSES.sessions);
     if (!options.replicatePatchLedger) classes.push(OPTIONAL_INTERNAL_DOC_CLASSES.patchLedger);
     return classes;
@@ -202,6 +243,8 @@ export const isInternalDoc = (
     const docClass = doc && typeof doc["~class"] === "string" ? (doc["~class"] as string) : undefined;
     if (docClass && resolveInternalClasses(options).includes(docClass)) return true;
 
+    if (isLogRecord(doc)) return true;
+
     return isSeededEverywhere(id, options);
 };
 
@@ -235,6 +278,9 @@ export const createReplicationFilter = (
         if (prefixes.some(prefix => id.startsWith(prefix))) return false;
         const docClass = doc && typeof doc["~class"] === "string" ? (doc["~class"] as string) : undefined;
         if (docClass && classes.has(docClass)) return false;
+        // Checked by shape as well as by id: the prefix only covers records this build
+        // wrote, and the ones already on disk are the problem.
+        if (isLogRecord(doc)) return false;
         if (isSeededEverywhere(id, options)) return false;
         return true;
     };
@@ -244,6 +290,7 @@ export const createReplicationFilter = (
         replicateSessions: Boolean(options.replicateSessions),
         replicatePatchLedger: Boolean(options.replicatePatchLedger),
         replicateSystemDocuments: Boolean(options.replicateSystemDocuments),
+        ephemeralClasses: options.ephemeralClasses || [],
         extraSeededDocIds: options.extraSeededDocIds || [],
         extraDocIds: options.extraDocIds || [],
         extraIdPrefixes: options.extraIdPrefixes || [],

@@ -1308,7 +1308,72 @@ const sys_014: Patch = {
     ]
 };
 
-syspatches.push(sys_011, sys_012, sys_013, sys_014);
+
+/**
+ * Ephemeral classes, and the first of them.
+ *
+ * `ephemeral` on a class model says its documents describe *this run of this client*
+ * rather than the stack's data: they are emptied when the stack next opens, and they never
+ * replicate. That is a property of the class, declared once, rather than a shape the sync
+ * filter has to recognise document by document - which is what log records needed before,
+ * and what any future kind of derived local state would have needed again. See ADR-0028.
+ *
+ * `~Log` is the class the client's own diagnostics move onto. They used to be written as a
+ * bare `{ log }` with no `~class` at all, precisely to skip the authoring path's cost -
+ * which left the sync filter nothing to key on, and put query selectors on remotes in the
+ * clear (ADR-0027).
+ */
+const sys_015: Patch = {
+    "_id": "~sys-0.0.15",
+    "~class": "patch",
+    "version": "0.0.15",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.15\\n#### New attributes: class.ephemeral, class.simple\\n#### New Class: ~Log",
+    "docs": [
+        {
+            "_id": "class",
+            "_rev": "auto",
+            "active": true,
+            "name": "class",
+            "description": "A class document representing a data model class",
+            "~class": "~self",
+            "schema": {
+                "ephemeral": {
+                    "name": "ephemeral",
+                    "type": "boolean",
+                    "description": "Contents are local to one run: emptied when the stack next opens, and never replicated.",
+                    "config": {
+                        "mandatory": false,
+                        "isArray": false,
+                        "defaultValue": false
+                    }
+                },
+                "simple": {
+                    "name": "simple",
+                    "type": "boolean",
+                    "description": "Documents are stored as given: no schema, no validation, no triggers, no relations.",
+                    "config": {
+                        "mandatory": false,
+                        "isArray": false,
+                        "defaultValue": false
+                    }
+                }
+            }
+        },
+        {
+            "_id": "~Log",
+            "active": true,
+            "ephemeral": true,
+            "simple": true,
+            "name": "~Log",
+            "description": "This client's own diagnostic records. Local to one run, stored as given.",
+            "~class": "class",
+            "schema": {}
+        }
+    ]
+};
+
+syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015);
 
 /**
  * Every document id the system patches seed.

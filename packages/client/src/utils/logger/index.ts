@@ -30,8 +30,21 @@ const LEVEL_ORDER: Record<LogLevel, number> = { error: 0, warn: 1, info: 2, debu
  */
 const CONSOLE_LEVEL: LogLevel = "warn";
 
-/** Levels written to the stack, when one is attached. Winston's default logger level. */
-const SINK_LEVEL: LogLevel = "info";
+/**
+ * Levels written to the stack's database when it has not been told otherwise.
+ *
+ * `warn`, not `info`. Records go into the stack's own database, which replicates, and at
+ * `info` this codebase traces routinely enough to drown the data: on one measured stack,
+ * 54 of 56 replicated documents were log records. Their fields are whatever the call site
+ * passed - `getCards - selector` carries the query selector - so a query over
+ * user-entered text was writing that text to the remote in the clear, outside the crypto
+ * engine. The replication filter now holds them back regardless (ADR-0027), but the
+ * default should not have been producing them at that volume in the first place.
+ *
+ * A stack configured with an explicit `logLevel` still gets exactly that level in its
+ * database, so asking for `info` when diagnosing something still works.
+ */
+const SINK_LEVEL: LogLevel = "warn";
 
 /**
  * Coerces whatever a caller passed as context into fields.

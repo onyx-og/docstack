@@ -15,6 +15,15 @@ import type { Stack } from "@docstack/shared";
  */
 export const LOG_RECORD_ID_PREFIX = "~log-";
 
+/**
+ * The ephemeral class log records belong to.
+ *
+ * Declared by system patch `0.0.15`. Diagnostics written before that patch has applied -
+ * during a stack's own startup - cannot be stored and are dropped by the sink's existing
+ * catch; they still reach the console.
+ */
+export const LOG_RECORD_CLASS = "~Log";
+
 /** A locally unique id for one record. Collisions only ever lose a log line. */
 const logRecordId = () => {
     const uuid = (globalThis as any)?.crypto?.randomUUID?.();
@@ -54,9 +63,27 @@ export const createStackSink = (stack: Stack) => {
         // Detached on purpose: a log line must never make its caller wait, and must never
         // reject into it either.
         void Promise.resolve()
-            // `put` with an explicit id rather than `post`: the id is what keeps the
-            // record on this device. See {@link LOG_RECORD_ID_PREFIX}.
-            .then(() => stack.db.put({ _id: logRecordId(), log: record } as any))
+            // A document of the ephemeral `~Log` class. Its class is what keeps it on this
+            // device - not replicated, and emptied when the stack next opens - rather than
+            // a payload shape the sync filter has to recognise. The `~log-` id prefix is
+            // kept alongside it: it costs nothing, states intent at the write site, and
+            // still covers a database holding records written before `~Log` existed.
+            //
+            // `level` and `message` are the class's own attributes; everything the call
+            // site attached goes under `fields`, which is where an unbounded value such as
+            // a query selector belongs - on a class that never leaves the device.
+            // See ADR-0027 and ADR-0028.
+            .then(() => {
+                const { level, message, ...fields } = record;
+                return stack.db.put({
+                    _id: logRecordId(),
+                    "~class": LOG_RECORD_CLASS,
+                    active: true,
+                    level,
+                    message,
+                    fields,
+                } as any);
+            })
             .catch(() => undefined);
     };
 };

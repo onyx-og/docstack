@@ -338,6 +338,13 @@ export class StackSyncHandle extends EventTarget {
                 return this;
             }
 
+            // Resolved here rather than inside the filter: PouchDB calls a filter once per
+            // change and synchronously, while reading the class models is neither. The set
+            // is fixed for this replication and forms part of the filter's identity, so a
+            // class that becomes ephemeral later takes effect on the next `sync()` rather
+            // than silently mid-stream. See ADR-0028.
+            this.ephemeralClasses = await this.stack.getEphemeralClassNames().catch(() => []);
+
             this.replication = this.startReplication(this.remote);
             return this;
         } catch (error: any) {
@@ -474,6 +481,13 @@ export class StackSyncHandle extends EventTarget {
      *
      * Empty when the stack was opened without patches, which is the common case.
      */
+    /**
+     * Class names declared ephemeral, resolved once when replication starts.
+     *
+     * See {@link ClassModel.ephemeral}.
+     */
+    private ephemeralClasses: string[] = [];
+
     private seededDocIdsFromPatches(): string[] {
         const patches = (this.stack.options?.patches ?? []) as { docs?: { _id?: unknown }[] }[];
         const ids = patches.flatMap(patch => (patch?.docs ?? [])
@@ -497,6 +511,10 @@ export class StackSyncHandle extends EventTarget {
             const configured = internalDocs || {};
             const internalFilter = createReplicationFilter({
                 ...configured,
+                ephemeralClasses: [
+                    ...(configured.ephemeralClasses || []),
+                    ...this.ephemeralClasses,
+                ],
                 extraSeededDocIds: [
                     ...(configured.extraSeededDocIds || []),
                     ...this.seededDocIdsFromPatches(),

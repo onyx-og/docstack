@@ -89,6 +89,30 @@ export interface ClassModel extends Document {
     name: string,
     description?: string,
     parentClass?: string,
+    /**
+     * Documents of this class describe *this run of this client* rather than the stack's
+     * data.
+     *
+     * Two consequences, both structural rather than conventional: they are emptied when
+     * the stack next opens, and they never replicate. Declared once on the class instead
+     * of being a shape the sync filter has to recognise document by document - which is
+     * what the client's own log records needed before, and what any other kind of derived
+     * local state would have needed again. See ADR-0028.
+     */
+    ephemeral?: boolean,
+    /**
+     * Documents of this class are stored as given.
+     *
+     * No schema, so no validation, no triggers, no relation checks and no field
+     * encryption - the authoring path is skipped entirely, which is what makes such a
+     * write cost what a plain PouchDB write costs. The point is somewhere to put
+     * documents whose shape is not known in advance, which is what a document database is
+     * for; a class that wants guarantees simply does not set this.
+     *
+     * Reads are unaffected: the query engine keys on `~class` and the class model's name,
+     * never on its attributes, so a simple class is queried like any other. See ADR-0028.
+     */
+    simple?: boolean,
     _rev?: PouchDB.Core.RevisionId | undefined;
     schema: {[name: string]: AttributeModel};
     triggers: TriggerModel[];
