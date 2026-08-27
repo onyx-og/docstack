@@ -679,6 +679,23 @@ class ClientStack extends Stack {
      *
      * @returns The class names and domain names an export would cover.
      */
+    /**
+     * Every class name in this stack, DocStack's own included.
+     *
+     * The fail-open path for a live query: when the classes a query reads cannot be
+     * determined from its AST, watching all of them is wasteful but correct, and watching
+     * none is silently wrong. Cheap to act on - subscriptions share one database
+     * listener, so the cost is a set entry per class rather than a feed. See ADR-0025.
+     *
+     * For the application's classes alone, use {@link getContentClassNames}.
+     *
+     * @returns The class names, sorted.
+     */
+    public getClassNames = async (): Promise<string[]> => {
+        const { list } = await this.getClassModels();
+        return [...new Set(list.map(model => model.name).filter(Boolean))].sort();
+    }
+
     public getContentClassNames = async (): Promise<{ classes: string[]; domains: string[] }> => {
         const [classModels, domainModels] = await Promise.all([
             this.getClassModels(),

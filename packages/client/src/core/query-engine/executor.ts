@@ -477,19 +477,30 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
                     return (join.type === 'SEMI') ? matchFound : !matchFound;
                 });
             } else { // Handle standard equi-join correlations like `a.name = m.title`
+                // The correlation predicate can be written either way round, and
+                // `findCorrelation` accepts both: `EXISTS (SELECT ... WHERE a.name =
+                // b.author)` puts the inner column on the left, while `b.author = a.name`
+                // puts it on the right. Assuming one orientation did not fail loudly - it
+                // evaluated both the map key and the probe against rows that have neither
+                // column, so every key was `null`, `null` matched `null`, and a SEMI join
+                // admitted every row while an ANTI join rejected every row. See ADR-0026.
+                const innerAliasOnLeft = join.on.left?.type === 'column_ref'
+                    && join.on.left.table === joinAlias;
+                const innerKeyExpr = innerAliasOnLeft ? join.on.left : join.on.right;
+                const outerKeyExpr = innerAliasOnLeft ? join.on.right : join.on.left;
+
                 const rightRowMap = new Map();
-                const rightJoinKeyExpr = join.on.right;
-                
+
                 // 1. Build a map from the right-side rows, keyed by their join attribute.
                 await Promise.all(allRightRows.map(async rightRow => {
-                    const key = await evalExpression({ [joinAlias]: rightRow }, rightJoinKeyExpr, fromAlias, { [joinAlias]: join.table }, stack, executePlan, { [joinAlias]: rightRow });
+                    const key = await evalExpression({ [joinAlias]: rightRow }, innerKeyExpr, fromAlias, { [joinAlias]: join.table }, stack, executePlan, { [joinAlias]: rightRow });
                     rightRowMap.set(key, true);
                 }));
         
                 // 2. Filter the left-side rows by probing the map.
                 resultRows = await asyncFilter(currentResultRows, async (leftRow) => {
                     // Evaluate the join key expression (e.g., a.name) on the left row.
-                    const key = await evalExpression(leftRow, join.on.left, fromAlias, {}, stack, executePlan, leftRow);
+                    const key = await evalExpression(leftRow, outerKeyExpr, fromAlias, {}, stack, executePlan, leftRow);
                     const matchFound = rightRowMap.has(key);
         
                     return (join.type === 'SEMI') ? matchFound : !matchFound;

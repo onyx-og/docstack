@@ -54,6 +54,29 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
             return null; // SQL standard: scalar subquery with no rows evaluates to NULL
         }
 
+        case 'subquery': {
+            // The right-hand side of `IN (SELECT ...)`. The parser has produced this node
+            // since the SQL engine landed, but nothing evaluated it, so every such query
+            // failed with "Unsupported expression type: subquery". See ADR-0026.
+            const subqueryPlan = createPlan([expr.ast]);
+            const result = await executePlan(stack, subqueryPlan, [], row, null);
+            // A list of values to test membership against: the first column of every row,
+            // which is what a single-column `SELECT` means as an `IN` operand.
+            return result.map((resultRow) => {
+                if (resultRow == null) return null;
+                const firstColumn = Object.keys(resultRow)[0];
+                return firstColumn === undefined ? null : resultRow[firstColumn];
+            });
+        }
+
+        case 'exists_expr': {
+            // `EXISTS (SELECT ...)` / `NOT EXISTS (...)`. Same gap as `subquery` above.
+            const subqueryPlan = createPlan([expr.subquery]);
+            const result = await executePlan(stack, subqueryPlan, [], row, null);
+            const exists = result.length > 0;
+            return expr.not ? !exists : exists;
+        }
+
         case 'column_ref': {
             const tableAlias = expr.table || fromAlias;
             const tableData = row[tableAlias];
@@ -97,6 +120,12 @@ export async function evalExpression(row, expr, fromAlias, joinAliases, stack, e
                 case '<=': return left <= right;
                 case 'IN': // This is handled specially during join execution
                     return Array.isArray(right) && right.includes(left);
+                case 'NOT IN':
+                    // The parser emits the operator as `NOT IN`, so it needs its own arm;
+                    // without one it reached the `default` below and threw. Written as the
+                    // complement of `IN` rather than mirroring its guard, so `x NOT IN
+                    // <nothing>` is true rather than false.
+                    return !(Array.isArray(right) && right.includes(left));
                 default:
                     throw new Error(`Unsupported operator ${expr.operator}`);
             }
