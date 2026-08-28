@@ -670,6 +670,15 @@ export interface DocStackSyncOptions extends Omit<StackSyncOptions, "remote"> {
      * Which stacks to sync. Defaults to all of them.
      */
     stacks?: string[];
+    /**
+     * The tenant entitlement this replication serves, compiled into per-stack
+     * configuration by {@link deriveTenantScope}: stacks outside the scope are not
+     * synced at all - withheld structurally, not filtered - and stacks holding a mix of
+     * declarations get a class filter. Combines with `stacks` (which pre-narrows the
+     * candidates) but not with `classes`, whose slot the compiled rules occupy; narrow
+     * further with `filter`. See ADR-0030.
+     */
+    tenants?: string[];
 }
 
 /**
@@ -743,4 +752,6 @@ export {
 export type { InternalDocFilterOptions } from "./internal-docs.js";
 export { createClassFilter, hasClassRules, DATA_MODEL_CLASSES } from "./class-filter.js";
 export type { ClassFilterOptions } from "./class-filter.js";
+export { deriveTenantScope, classTenants } from "./tenants.js";
+export type { TenantScope } from "./tenants.js";
 export { withFilterIdentity, describeFilter, composeFilterIdentity } from "./filter-identity.js";

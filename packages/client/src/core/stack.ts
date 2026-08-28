@@ -2775,9 +2775,10 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        // `ephemeral` is projected too: without it the models come back with the flag
-        // stripped, and every class looks durable. See ADR-0028.
-        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev', 'ephemeral', 'simple'];
+        // `ephemeral`, `simple` and `tenants` are projected too: a fixed field list
+        // silently strips any model flag it does not name, so every class would read
+        // as durable, schema-full and tenant-neutral. See ADR-0028, ADR-0030.
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev', 'ephemeral', 'simple', 'tenants'];
 
         const response = await this.findDocuments(selector, fields);
         const result: ClassModel[] = response.docs as ClassModel[];
@@ -2875,9 +2876,10 @@ class ClientStack extends Stack {
                 { description: { $regex: RegExp(search, "i") } }
             ];
         }
-        // `ephemeral` is projected too: without it the models come back with the flag
-        // stripped, and every class looks durable. See ADR-0028.
-        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev', 'ephemeral', 'simple'];
+        // `ephemeral`, `simple` and `tenants` are projected too: a fixed field list
+        // silently strips any model flag it does not name, so every class would read
+        // as durable, schema-full and tenant-neutral. See ADR-0028, ADR-0030.
+        const fields = ['_id', 'name', 'description', 'schema', '~class', '_rev', 'ephemeral', 'simple', 'tenants'];
 
         const response = await this.findDocuments(selector, fields);
         const result: DomainModel[] = response.docs as DomainModel[];

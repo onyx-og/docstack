@@ -1,0 +1,44 @@
+{
+  "name": "@docstack/pouchdb-adapter-channel",
+  "description": "PouchDB replication over a message channel: a driver adapter that presents a remote PouchDB reached through postMessage-style transports, and a host that serves a local PouchDB over the same channel with two-sided scope enforcement.",
+  "version": "0.0.1",
+  "main": "lib/index.js",
+  "module": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "src": "src/index.ts",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "lib",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -build --force ./tsconfig.json",
+    "pretest": "npm run build",
+    "test": "mocha"
+  },
+  "homepage": "https://onyx.ac/docstack",
+  "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
+  "license": "MIT",
+  "keywords": [
+    "pouchdb",
+    "adapter",
+    "replication",
+    "postmessage",
+    "channel",
+    "offline-first",
+    "docstack"
+  ],
+  "devDependencies": {
+    "mocha": "^11.1.0",
+    "pouchdb-adapter-memory": "^9.0.0",
+    "pouchdb-core": "^9.0.0",
+    "pouchdb-replication": "^9.0.0",
+    "typescript": "^5.7.3"
+  }
+}

@@ -113,6 +113,17 @@ export interface ClassModel extends Document {
      * never on its attributes, so a simple class is queried like any other. See ADR-0028.
      */
     simple?: boolean,
+    /**
+     * The tenant spaces this class belongs to.
+     *
+     * A tenant is a stack (ADR-0030): declaring `tenants: ["workspace"]` says documents
+     * of this class live in the workspace tenant's stack, and a replication channel
+     * entitled to that tenant may carry them. A static list on purpose, so partitioning
+     * and channel scopes are derivable before any data exists; dynamic tenant spaces are
+     * dynamic stacks, not resolver-valued declarations. A class with no declaration is
+     * tenant-neutral - it follows its stack, and single-tenant consumers pay nothing.
+     */
+    tenants?: string[],
     _rev?: PouchDB.Core.RevisionId | undefined;
     schema: {[name: string]: AttributeModel};
     triggers: TriggerModel[];

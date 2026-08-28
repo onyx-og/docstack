@@ -1373,7 +1373,70 @@ const sys_015: Patch = {
     ]
 };
 
-syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015);
+/**
+ * Tenancy declared at the datamodel.
+ *
+ * `tenants` on a class model names the tenant spaces the class belongs to. A tenant is a
+ * stack (ADR-0030): the declaration is what a sync channel's entitlement is compiled
+ * against - which stacks the channel is served at all, and which classes travel over a
+ * stack that holds a mix of declarations. A class with no declaration is tenant-neutral
+ * and follows its stack, so a datamodel that never declares one keeps today's behavior
+ * exactly.
+ */
+const sys_016: Patch = {
+    "_id": "~sys-0.0.16",
+    "~class": "patch",
+    "version": "0.0.16",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.16\\n#### New attribute: class.tenants",
+    "docs": [
+        {
+            "_id": "class",
+            "_rev": "auto",
+            "active": true,
+            "name": "class",
+            "description": "A class document representing a data model class",
+            "~class": "~self",
+            // Patch hydration is a shallow merge: this `schema` REPLACES the stored one,
+            // it does not add to it. So a patch to the `class` document must carry the
+            // full attribute set - dropping `ephemeral`/`simple` here silently strips
+            // those flags from every class model on the next validated write.
+            "schema": {
+                "ephemeral": {
+                    "name": "ephemeral",
+                    "type": "boolean",
+                    "description": "Contents are local to one run: emptied when the stack next opens, and never replicated.",
+                    "config": {
+                        "mandatory": false,
+                        "isArray": false,
+                        "defaultValue": false
+                    }
+                },
+                "simple": {
+                    "name": "simple",
+                    "type": "boolean",
+                    "description": "Documents are stored as given: no schema, no validation, no triggers, no relations.",
+                    "config": {
+                        "mandatory": false,
+                        "isArray": false,
+                        "defaultValue": false
+                    }
+                },
+                "tenants": {
+                    "name": "tenants",
+                    "type": "string",
+                    "description": "Tenant spaces this class belongs to; a tenant is a stack. Absent means tenant-neutral.",
+                    "config": {
+                        "mandatory": false,
+                        "isArray": true
+                    }
+                }
+            }
+        }
+    ]
+};
+
+syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015, sys_016);
 
 /**
  * Every document id the system patches seed.

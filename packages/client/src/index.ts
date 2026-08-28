@@ -32,6 +32,8 @@ export {
     StackLockedError,
     deriveKeyId,
     isEncryptedPayload,
+    deriveTenantScope,
+    classTenants,
 } from "./core/index.js";
 
 export { SYSTEM_SEEDED_DOC_IDS, collectQueryClasses } from "./core/index.js";
@@ -65,6 +67,7 @@ export type {
     SyncMetaDoc,
     InternalDocFilterOptions,
     ClassFilterOptions,
+    TenantScope,
 } from "./core/index.js";
 
 /**

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es2019",
+    "module": "esnext",
+    "declaration": true,
+    "sourceMap": true,
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "composite": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "lib": ["ES2020", "DOM"]
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "lib"]
+}

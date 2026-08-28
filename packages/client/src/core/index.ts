@@ -18,7 +18,7 @@ import { JobEngine } from "./job-engine/index.js";
 // import AbstractClass from '../../shared/src//utils/stack/class';
 import Attribute from './attribute.js';
 import { AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions } from "@docstack/shared";
-import { DocStackSyncHandle } from './sync/index.js';
+import { DocStackSyncHandle, deriveTenantScope } from './sync/index.js';
 import type { DocStackSyncOptions } from './sync/index.js';
 import type { Logger } from "../utils/logger/index.js";
 
@@ -224,8 +224,8 @@ class DocStack extends EventTarget {
      * ```
      */
     public sync = async (options: DocStackSyncOptions): Promise<DocStackSyncHandle> => {
-        const { stacks: names, ...stackOptions } = options;
-        const targets = names
+        const { stacks: names, tenants, ...stackOptions } = options;
+        let targets = names
             ? names.map(name => {
                 const stack = this.getStack(name);
                 if (!stack) throw new Error(`Stack '${name}' not found`);
@@ -233,9 +233,28 @@ class DocStack extends EventTarget {
             })
             : this.stacks;
 
+        // A tenant entitlement compiles into per-stack configuration: stacks outside
+        // the scope are not synced at all - withheld structurally, which is a stronger
+        // grant than any filter - and stacks holding a mix of declarations get class
+        // rules. See ADR-0030 and sync/tenants.ts.
+        let scopedClasses: Record<string, import('./sync/index.js').ClassFilterOptions> = {};
+        if (tenants) {
+            if (stackOptions.classes) {
+                throw new Error(
+                    "`tenants` and `classes` cannot be combined: the tenant scope compiles its own " +
+                    "class rules per stack. Narrow further with `filter`, or scope by hand without `tenants`."
+                );
+            }
+            const scope = await deriveTenantScope(targets, tenants);
+            const served = new Set(scope.stacks);
+            targets = targets.filter(stack => served.has(stack.name));
+            scopedClasses = scope.classes;
+        }
+
         const handle = new DocStackSyncHandle();
         for (const stack of targets) {
-            handle.add(stack.name, await stack.sync(stackOptions));
+            const classes = scopedClasses[stack.name];
+            handle.add(stack.name, await stack.sync(classes ? { ...stackOptions, classes } : stackOptions));
         }
         this.syncHandle = handle;
         return handle;
@@ -739,6 +758,8 @@ export {
     INTERNAL_DOC_ID_PREFIXES,
     INTERNAL_DOC_CLASSES,
     OPTIONAL_INTERNAL_DOC_CLASSES,
+    deriveTenantScope,
+    classTenants,
 } from "./sync/index.js";
 export type {
     SyncDirection,
@@ -750,6 +771,7 @@ export type {
     SyncMetaDoc,
     InternalDocFilterOptions,
     ClassFilterOptions,
+    TenantScope,
 } from "./sync/index.js";
 export type { ClassBuildOptions } from "./class.js";
 export {
