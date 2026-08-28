@@ -26,3 +26,11 @@ globalThis.shared = shared;
 globalThis.z = zod;
 globalThis.semver = semver;
 globalThis.jsondiffpatch = jsondiffpatch;
+
+// The channel adapter (ADR-0030), for the browser tests that put a real MessagePort
+// under it - the Node suite in its own package covers semantics over a loopback, the
+// tests here cover the platform. Imported by path so the bundle never depends on
+// workspace symlinks.
+import ChannelPlugin, * as docstackChannel from '../../pouchdb-adapter-channel/lib/index.js';
+
+globalThis.docstackChannel = { ...docstackChannel, ChannelPlugin };
