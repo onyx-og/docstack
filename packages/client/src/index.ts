@@ -3,6 +3,25 @@ import { DocStack } from "./core/index.js";
 export { ClientStack, Class, Domain, Attribute, Trigger, DocStack } from "./core/index.js";
 
 /**
+ * Running jobs unattended.
+ *
+ * `JobEngine` executes a job when asked; `JobScheduler` decides when to ask, under the
+ * constraints a client imposes — an app that is closed most of the time, timers that
+ * freeze, several devices holding replicas of the same `~Job`, and job content that
+ * replicates and is executable. It is mounted at `stack.jobScheduler` and started by the
+ * application, which names the jobs allowed to run with nobody watching.
+ */
+export { JobEngine, JobScheduler, JOB_SCHEDULE_DOC_ID, parseSchedule, nextOccurrence } from "./core/index.js";
+export type {
+    SchedulerOptions,
+    SchedulerHost,
+    JobScheduleState,
+    TickReport,
+    SkipReason,
+    ParsedSchedule,
+} from "./core/index.js";
+
+/**
  * The sync layer: lifecycle, filtering, convergence state and the schema gate.
  *
  * Transport-agnostic on purpose - `remote` is whatever PouchDB database the

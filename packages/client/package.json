@@ -1,7 +1,7 @@
 {
   "name": "@docstack/client",
   "description": "One does not simply stack documents.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",

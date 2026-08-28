@@ -15,6 +15,8 @@ const config: Config.InitialOptions = {
     "^@docstack/shared/(.*)$": "<rootDir>/../shared/src/$1",
     "^jsondiffpatch$": "<rootDir>/test/__mocks__/jsondiffpatch.js"
   },
-  "testPathIgnorePatterns": ["<rootDir>/lib/"]
+  // `src-test/` and `test/` belong to playwright - those suites import its fixtures
+  // and boot real stacks on IndexedDB, neither of which exists under jest.
+  "testPathIgnorePatterns": ["<rootDir>/lib/", "<rootDir>/src-test/", "<rootDir>/test/"]
 };
 export default config;

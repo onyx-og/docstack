@@ -15,6 +15,7 @@ import Class from "./class.js";
 import Domain from './domain.js';
 import { Trigger } from "./trigger/index.js";
 import { JobEngine } from "./job-engine/index.js";
+import { JobScheduler } from "./job-engine/scheduler.js";
 // import AbstractClass from '../../shared/src//utils/stack/class';
 import Attribute from './attribute.js';
 import { AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions } from "@docstack/shared";
@@ -738,7 +739,17 @@ class DocStack extends EventTarget {
  * 
  * @module @docstack/client
  */
-export { ClientStack, Trigger, Class, Attribute, Domain, JobEngine };
+export { ClientStack, Trigger, Class, Attribute, Domain, JobEngine, JobScheduler };
+export { JOB_SCHEDULE_DOC_ID } from "./job-engine/scheduler.js";
+export type {
+    SchedulerOptions,
+    SchedulerHost,
+    JobScheduleState,
+    TickReport,
+    SkipReason,
+} from "./job-engine/scheduler.js";
+export { parseSchedule, nextOccurrence, MIN_PERIOD_MS } from "./job-engine/schedule.js";
+export type { ParsedSchedule } from "./job-engine/schedule.js";
 export {
     StackSyncHandle,
     DocStackSyncHandle,

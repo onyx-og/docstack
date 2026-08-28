@@ -2,7 +2,7 @@
 
 ```typescript
 // Example Job Definition: A simple counter job that increments a value
-// This job can be executed manually or on a schedule (not covered here).
+// This job can be executed manually, or on a schedule — see "Running jobs unattended".
 const counterJob = {
   _id: 'Job-Counter',
   '~class': '~Job',
@@ -40,7 +40,7 @@ The Job Engine brings significant business value by enabling automation, improvi
 *   **Automation of Repetitive Tasks**: Automate routine operations like data cleanup, report generation, or periodic data synchronization, freeing up human resources for more critical tasks.
 *   **Improved System Responsiveness**: Long-running or computationally intensive operations can be offloaded to Jobs, preventing the main application thread from freezing and providing a smoother user experience.
 *   **Enhanced Data Consistency**: Implement complex business rules or data transformations that need to run reliably in the background, ensuring your data always meets required standards.
-*   **Scheduled Operations**: Although not directly covered in this document, the Job Engine forms the foundation for scheduling tasks, allowing you to define when and how often certain business processes should run.
+*   **Scheduled Operations**: Jobs can run on a schedule with nobody watching — see "Running jobs unattended" below for what a client can and cannot promise about *when*.
 *   **Auditable Execution**: Every Job execution is recorded as a "Job Run," providing a clear audit trail of what happened, when, and with what outcome.
 
 ### Common Business Use Cases:
@@ -115,6 +115,150 @@ console.log('Updated Job Model Metadata:', updatedJob.metadata);
 ```
 
 The `executeJob` method returns a `JobRunModel` document, which provides details about the specific execution, including its status, duration, and any error messages.
+
+## Running jobs unattended
+
+`JobEngine` executes a job when something asks it to. `JobScheduler` — `stack.jobScheduler`
+— decides *when* to ask. It is created with the stack and **deliberately not started by
+it**: which jobs may run with nobody watching is the application's decision, not the
+library's.
+
+```typescript
+stack.jobScheduler.start({
+    jobs: ['Job-review-campaign', 'Job-cross-sell'],   // nothing else runs unattended
+    pinnedHashes: { 'Job-review-campaign': '9f2c…' },  // optional; see "Why an allow-list"
+});
+
+// `core/` imports no DOM, so wake signals are yours. `tick()` is idempotent.
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void stack.jobScheduler.tick();
+});
+```
+
+Put the schedule on the job document, in `schedule`:
+
+| Form | Meaning |
+| :--- | :--- |
+| `@every 30m`, `@every 6h`, `@every 7d` | Interval since the last run |
+| `@hourly`, `@daily`, `@weekly` | The local hour, midnight, or Monday |
+| `@daily@09:00`, `@weekly@18:30` | A local wall-clock time |
+
+### Cron is not accepted, on purpose
+
+`parseSchedule` returns `null` for `0 9 * * *`, and the scheduler skips the job and reports
+`unparseable-schedule`. Cron's vocabulary names *occurrences* — "02:15 on the 3rd" — and a
+client cannot promise to be running at one: it is a closed tab, a suspended app, a sleeping
+laptop. Accepting the syntax would promise a precision the runtime cannot keep, and the
+failure would be silent. The forms above say what a client can honour: **not more often
+than this.**
+
+For the same reason, **missed occurrences collapse into a single run.** A device closed for
+a fortnight does not come back to fourteen catch-up runs of a daily job.
+
+### What a scheduled job must do
+
+Two devices will both reach the same due moment, and there is no lock — leader election
+needs a consensus point that two offline replicas do not have. So the guarantee has to live
+in the job:
+
+> **Write documents whose `_id` is derived from what they are about.**
+> `ReviewRequest-<orderId>`, never a fresh UUID.
+
+A second device's sweep then collides into one document instead of sending a second email.
+Two devices that were offline together produce one document with a conflict — still one
+review request.
+
+The pattern that follows is *poll a bounded window, filter against current state, write
+deterministic ids*:
+
+```javascript
+async function execute(stack, params) {
+    const now = Date.now();
+    // Bounded: a first sync carrying two years of orders must not ask for two years of
+    // reviews.
+    const horizon = now - (params.horizonDays ?? 30) * 86400000;
+
+    const due = await stack.db.find({
+        selector: { '~class': 'Order', reviewDueAt: { $gte: horizon, $lte: now } },
+        limit: params.batch ?? 100,
+    });
+
+    const docs = [];
+    for (const order of due.docs) {
+        const id = `ReviewRequest-${order._id}`;              // the dedupe key
+        if (await stack.db.get(id).catch(() => null)) continue;
+        if (order.reviewedAt || order.customerOptedOut) continue;
+        docs.push({ _id: id, '~class': 'ReviewRequest', order: order._id, status: 'due' });
+    }
+    if (docs.length) await stack.db.bulkDocs(docs);
+    return { metadata: { lastSweepAt: now, created: docs.length } };
+}
+```
+
+Note what the job does *not* do: it writes an intent document rather than sending anything.
+Delivery is a separate consumer, which keeps channel credentials off the client and makes
+the campaign testable without contacting anyone.
+
+A `Trigger` pairs well with this. Stamping `reviewDueAt = deliveredAt + 7d` on the write
+that sets `deliveredAt` does the per-entity date arithmetic once, where the information is,
+and leaves the sweep a single indexable range query.
+
+### Why an allow-list
+
+`start()` requires `jobs`, and there is no "all".
+
+`~Job.content` is JavaScript; an application's job documents replicate (the class is in
+`DATA_MODEL_CLASSES`, which an `include` filter keeps regardless); and `Job` hydrates the
+content with `new Function`, which runs with full ambient authority. Until unattended
+execution existed, a human was always behind a run. The allow-list keeps that true: a job
+document arriving over sync cannot become code that runs itself.
+
+`pinnedHashes` goes further for jobs whose code must not change under the application. The
+`hash` stored on the document cannot do this alone — it sits beside the content it
+certifies, so whoever writes one writes the other. It detects corruption, not authorship.
+Pinning the expected value in application code is what gives it meaning.
+
+### Runs that never came back
+
+Every tick first moves `~JobRun` documents left `RUNNING` past a ceiling (15 minutes by
+default) to `CANCELED`. A run's status only changes inside `execute`'s `try`/`catch`, so a
+tab closed mid-run leaves one `RUNNING` for ever — and the singleton check would then skip
+that job on that device permanently.
+
+Failures back off exponentially (5 minutes, doubling, capped at 6 hours), so a job that
+throws on a malformed document does not become a `~JobRun` written every minute.
+
+### `JobScheduler` API
+
+```typescript
+class JobScheduler {
+    /** Begin scheduling, and evaluate once immediately. */
+    start(options: SchedulerOptions): void;
+    /** Evaluate now. Idempotent; concurrent calls share one evaluation. */
+    tick(): Promise<TickReport>;
+    /** Stop. Jobs already dispatched keep running — a hydrated function has no cancel. */
+    stop(): void;
+    /** Resolves when every job this scheduler started has finished. */
+    drain(): Promise<void>;
+    /** What it believes, without a database round-trip. */
+    status(): { running: boolean; inFlight: string[]; jobs: Record<string, JobScheduleState> };
+}
+```
+
+| Option | Default | |
+| :--- | :--- | :--- |
+| `jobs` | — | **Required.** Job ids allowed to run unattended. |
+| `pinnedHashes` | `{}` | Expected `hash` per job. A mismatch fails closed. |
+| `intervalMs` | `60_000` | Floor between automatic ticks (minimum 5s). |
+| `staleRunMs` | `900_000` | A `RUNNING` run older than this is swept. |
+| `backoffBaseMs` / `maxBackoffMs` | `300_000` / `6h` | Retry delay after a failure. |
+| `now` | `Date.now` | Injectable clock. |
+| `onRun` | — | Called with each completed run. |
+
+Schedule state is kept in `_local/docstack-job-schedule`, which never replicates — it is
+per-device state, and `JobModel.nextRunTimestamp` is *not* where it goes: every device
+would write that field on every run and conflict on a document whose `content` is
+executable code.
 
 ## API Reference (For Developers)
 

@@ -33,6 +33,7 @@ import type { StackSyncOptions, SyncStatus } from "./sync/index.js";
 import { parse, createPlan, executePlan, executePlanStream } from "./query-engine/index.js";
 import type { SelectAST, UnionAST } from "./query-engine/index.js";
 import { JobEngine } from "./job-engine/index.js";
+import { JobScheduler } from "./job-engine/scheduler.js";
 import { PolicyEngine } from "./policy-engine/index.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
@@ -299,6 +300,20 @@ class ClientStack extends Stack {
     jobEngine!: JobEngine;
 
     /**
+     * Decides when approved jobs run, and dispatches them.
+     *
+     * Constructed with the stack but deliberately **not started by it**: `~Job.content`
+     * is JavaScript that replicates, so which jobs may run with nobody watching is the
+     * application's decision, named at {@link JobScheduler.start}.
+     *
+     * @example
+     * ```typescript
+     * stack.jobScheduler.start({ jobs: ['Job-review-campaign'] });
+     * ```
+     */
+    jobScheduler!: JobScheduler;
+
+    /**
      * Engine for enforcing read/write access control policies.
      * Policies are evaluated based on user session and document content.
      */
@@ -394,6 +409,7 @@ class ClientStack extends Stack {
             // empty at init
         }
         this.jobEngine = new JobEngine(this);
+        this.jobScheduler = new JobScheduler(this as any);
         this.policyEngine = new PolicyEngine(this);
         this.cryptoEngine = new CryptoEngine(this);
         if (options?.documentKey) {
@@ -2264,6 +2280,9 @@ class ClientStack extends Stack {
      */
     close = () => {
         this.cancelSync();
+        // Before the listeners go: a surviving interval would tick against a database
+        // this stack no longer serves.
+        this.jobScheduler?.stop();
         this.removeAllListeners();
         if (this.modelWorker) this.modelWorker.terminate();
     }

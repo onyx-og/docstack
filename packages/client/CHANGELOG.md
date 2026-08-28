@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.7
+
+### Added
+
+- **`JobScheduler` — jobs that run with nobody watching** (`stack.jobScheduler`). `JobModel`
+  has carried `schedule` and `nextRunTimestamp`, and `JobTriggerType` has allowed
+  `"scheduled"`, since the job engine was written; nothing read or produced any of them.
+  The scheduler does, under the constraints a client imposes rather than the ones cron was
+  designed for: **missed occurrences collapse into one run** instead of replaying a
+  fortnight of them, the grammar (`@every 6h`, `@daily@09:00`) refuses cron because a
+  client cannot promise to be awake at a named occurrence, and schedule state lives in
+  `_local/docstack-job-schedule` rather than on the replicating `~Job` document, whose
+  `content` field is executable code a conflict would fork.
+
+  It is created with the stack and **not started by it**: `start({ jobs: [...] })` is an
+  allow-list with no "all", because job content replicates and `new Function` is not a
+  sandbox. Duplicate work across devices is answered by the jobs themselves, which must
+  write deterministic ids. (ADR-0031)
+
+- **Abandoned runs are reaped.** Every tick moves `~JobRun` documents left `RUNNING` past a
+  ceiling to `CANCELED`. Status only ever changed inside `Job.execute`'s `try`/`catch`, so a
+  tab closed mid-run left one `RUNNING` for ever — and `hasRunningInstance` then skipped
+  that singleton job on that device permanently.
+
 ## 0.1.6 — 2026-08-27
 
 Seven months of work since 0.1.5 (2026-01-14). The headline is a data-loss fix: document
