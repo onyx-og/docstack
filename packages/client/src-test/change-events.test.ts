@@ -72,9 +72,11 @@ describe("class change events", () => {
                 // write a class carrying encrypted attributes (ADR-0018), so there is no
                 // way to *produce* a change event while locked. This exercises the same
                 // preparation the listener performs.
-                const stored = await stack.db.get(
+                // As stored, through the replication handle: `db.get` decrypts since
+                // ADR-0032, so it can no longer show the at-rest ciphertext shape.
+                const stored = await stack.getReplicationHandle().get(
                     (await stack.findDocuments({ "~class": { $eq: "LockedChangeSecret" } })).docs[0]._id
-                );
+                ) as any;
                 const wasEncryptedAtRest = stored.secret?.__enc === true;
 
                 stack.clearAuthSession();

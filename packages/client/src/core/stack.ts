@@ -206,7 +206,7 @@ class ClientStack extends Stack {
      * replaces them.
      * @internal
      */
-    private pristineDbMethods!: { bulkDocs: Function; bulkGet: Function };
+    private pristineDbMethods!: { bulkDocs: Function; bulkGet: Function; get: Function };
     /** Memoised {@link getReplicationHandle} result. @internal */
     private replicationDb?: PouchDB.Database<{}>;
     /** The stack's replication, once {@link sync} has been called. @internal */
@@ -383,7 +383,7 @@ class ClientStack extends Stack {
         // `undefined` and capturing from there silently yields nothing. Replication needs
         // them too - it writes documents verbatim and reads them exactly as stored.
         // Unbound on purpose: StackPlugin forwards with `.call(this, ...)`.
-        this.pristineDbMethods = { bulkDocs: rawDb.bulkDocs, bulkGet: rawDb.bulkGet };
+        this.pristineDbMethods = { bulkDocs: rawDb.bulkDocs, bulkGet: rawDb.bulkGet, get: rawDb.get };
 
         // Built from the pristine methods rather than looking them up: the plugin can no
         // longer be constructed at a moment when its capture would be wrong, because the
@@ -392,6 +392,7 @@ class ClientStack extends Stack {
         (rawDb as any).ping = stackPlugin.ping;
         (rawDb as any).bulkDocs = stackPlugin.bulkDocs;
         (rawDb as any).bulkGet = stackPlugin.bulkGet;
+        (rawDb as any).get = stackPlugin.get;
 
         this.rawDb = rawDb;
         this.replicationDb = undefined;

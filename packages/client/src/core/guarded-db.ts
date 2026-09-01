@@ -167,15 +167,20 @@ export const createGuardedDb = <T extends {}>(db: PouchDB.Database<T>): PouchDB.
  */
 export const createReplicationDb = <T extends {}>(
     db: PouchDB.Database<T>,
-    pristine: { bulkDocs: Function; bulkGet: Function }
+    pristine: { bulkDocs: Function; bulkGet: Function; get: Function }
 ): PouchDB.Database<T> => {
     const bulkDocs = pristine.bulkDocs.bind(db);
     const bulkGet = pristine.bulkGet.bind(db);
+    // `get` restored for the same reason as `bulkGet`: since ADR-0032 the plugin
+    // decrypts single-document reads too, and this handle's whole contract is reading
+    // documents exactly as they are stored.
+    const get = pristine.get.bind(db);
 
     return new Proxy(db, {
         get(target, property) {
             if (property === "bulkDocs") return bulkDocs;
             if (property === "bulkGet") return bulkGet;
+            if (property === "get") return get;
             return forward(target, property);
         },
     }) as PouchDB.Database<T>;

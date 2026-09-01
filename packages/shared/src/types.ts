@@ -443,6 +443,7 @@ export interface ChangesSubscription {
 export type PristineDbMethods = {
     bulkDocs: Function;
     bulkGet: Function;
+    get: Function;
 };
 
 /**

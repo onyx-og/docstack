@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Single-document reads decrypt again.** The plugin's `get` override was commented
+  out in late 2025 inside an unrelated commit - a UMD prototype-capture break was
+  silenced instead of fixed, and no record was made - so `stack.db.get` and
+  `getDocument` returned `{__enc: ...}` payloads while `query` returned plaintext
+  for the same document, and read-merge-write flows re-encrypted ciphertext into the
+  next revision. The override is restored via the pristine-capture pattern
+  (ADR-0019); the replication handle restores the pristine `get` so ciphertext still
+  travels; a class that encrypts nothing pays only a cache lookup. (ADR-0032)
+
+- **A stack added after `sync()` now joins the running replication.** An un-scoped
+  `sync()` used to bind the stacks that existed at the moment of the call and
+  nothing later: a workspace database mounted a second afterwards sat outside
+  replication for the lifetime of the handle, with every status surface reporting
+  healthy - it simply had no entry, and a missing key reads as "nothing to say".
+  Found in a consumer as a workspace that replicated nothing for two days.
+  `addStack` now binds new stacks to the live handle before announcing them; an
+  explicit `stacks: [...]` list keeps its meaning; `cancelSync()` stops the
+  auto-binding; `removeStack` drops the stack from the handle. (ADR-0033/0034)
+
+### Added
+
+- **`DocStack.getSyncCoverage()`** - `{ bound, unbound }` against the open stacks,
+  and **`DocStackSyncHandle.names`** - what a sync covers. An idle stack and an
+  unbound one are opposite problems, and `getStatus()` could not tell them apart.
+
+### Confirmed as design
+
+- **A `~Policy` enforces only while `active: true`.** Raised as a fail-open finding,
+  ruled intended: `active` is the document-wide visibility flag `findDocuments`
+  injects everywhere, and policies are not special. Now stated in the policy loader
+  and pinned by a test proving both directions - a dormant deny-all does not apply,
+  arming it flips the next write. Authors writing policies raw must set
+  `active: true`; the authoring path and system patches already do. (ADR-0032)
+
 ## 0.1.7
 
 ### Added

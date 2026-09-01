@@ -706,6 +706,23 @@ export class DocStackSyncHandle extends EventTarget {
         });
     }
 
+    /** The stacks this handle covers. What is missing from this list is not
+     *  replicating - compare against `DocStack.getStacks()`, or use
+     *  `DocStack.getSyncCoverage()` which does exactly that. */
+    public get names(): string[] {
+        return [...this.handles.keys()];
+    }
+
+    /** @internal - use {@link DocStack.removeStack}. Cancels and drops one stack's
+     *  replication; the rest are untouched. */
+    public remove(name: string): boolean {
+        const handle = this.handles.get(name);
+        if (!handle) return false;
+        handle.cancel();
+        this.handles.delete(name);
+        return true;
+    }
+
     /** Every stack's status, keyed by stack name. */
     public getStatus(): Record<string, SyncStatus> {
         const status: Record<string, SyncStatus> = {};

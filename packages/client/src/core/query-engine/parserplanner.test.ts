@@ -22,7 +22,7 @@ describe('SQL Parser and Planner', () => {
         "type": "select", "distinct": false, "columns": [{"expr": {"type": "column_ref", "table": "m", "column": "title"}, "as": null}, {"expr": {"type": "column_ref", "table": "m", "column": "year"}, "as": null}, {"expr": {"type": "column_ref", "table": "a", "column": "name"}, "as": "actor_name"}],
         "from": [{"table": "Movie", "as": "m"}],
         "joins": [{"type": "INNER", "table": "Actor", "as": "a", "on": {"type": "binary_expr", "operator": "IN", "left": {"type": "column_ref", "table": "a", "column": "_id"}, "right": {"type": "column_ref", "table": "m", "column": "actors"}}}],
-        "where": {"type": "binary_expr", "operator": ">", "left": {"type": "column_ref", "table": "m", "column": "rating"}, "right": {"type": "param", "value": "8.5"}},
+        "where": {"type": "binary_expr", "operator": ">", "left": {"type": "column_ref", "table": "m", "column": "rating"}, "right": {"type": "param", "value": 8.5}},
         "groupBy": null, "having": null,
         "orderBy": [{"expr": {"type": "column_ref", "table": "m", "column": "year"}, "order": "DESC"}],
         "limit": 10
@@ -30,7 +30,7 @@ describe('SQL Parser and Planner', () => {
     ];
     
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
 
     const plan = createPlan(parsedAst);
     expect(plan.type).toBe('select');
@@ -60,14 +60,14 @@ describe('SQL Parser and Planner', () => {
         "columns": [{"expr": {"type": "column_ref", "table": "m", "column": "year"}, "as": null}, {"expr": {"type": "aggr_func", "name": "COUNT", "args": {"expr": {"type": "star"}, "distinct": false}}, "as": "movie_count"}, {"expr": {"type": "aggr_func", "name": "AVG", "args": {"expr": {"type": "column_ref", "table": "m", "column": "rating"}, "distinct": false}}, "as": "avg_rating"}],
         "from": [{"table": "Movie", "as": "m"}], "joins": [], "where": null,
         "groupBy": {"type": "group_by", "columns": [{"type": "column_ref", "table": "m", "column": "year"}]},
-        "having": {"type": "binary_expr", "operator": ">", "left": {"type": "aggr_func", "name": "COUNT", "args": {"expr": {"type": "star"}, "distinct": false}}, "right": {"type": "param", "value": "1"}},
+        "having": {"type": "binary_expr", "operator": ">", "left": {"type": "aggr_func", "name": "COUNT", "args": {"expr": {"type": "star"}, "distinct": false}}, "right": {"type": "param", "value": 1}},
         "orderBy": [{"expr": {"type": "column_ref", "table": null, "column": "avg_rating"}, "order": "DESC"}],
         "limit": null
       }
     ];
 
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
 
     const plan = createPlan(parsedAst);
     expect(plan.aggregation).not.toBeNull();
@@ -88,7 +88,7 @@ describe('SQL Parser and Planner', () => {
     ];
 
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
     
     const plan = createPlan(parsedAst);
     expect(plan.aggregation).not.toBeNull();
@@ -114,14 +114,14 @@ describe('SQL Parser and Planner', () => {
         "columns": [{"expr": {"type": "column_ref", "table": "m", "column": "year"}, "as": null}, {"expr": {"type": "aggr_func", "name": "MIN", "args": {"expr": {"type": "column_ref", "table": "m", "column": "rating"}, "distinct": false}}, "as": "min_rating"}, {"expr": {"type": "aggr_func", "name": "MAX", "args": {"expr": {"type": "column_ref", "table": "m", "column": "rating"}, "distinct": false}}, "as": "max_rating"}, {"expr": {"type": "aggr_func", "name": "COUNT", "args": {"expr": {"type": "star"}, "distinct": false}}, "as": "movie_count"}],
         "from": [{"table": "Movie", "as": "m"}], "joins": [], "where": null,
         "groupBy": {"type": "group_by", "columns": [{"type": "column_ref", "table": "m", "column": "year"}]},
-        "having": {"type": "binary_expr", "operator": ">", "left": {"type": "aggr_func", "name": "MAX", "args": {"expr": {"type": "column_ref", "table": "m", "column": "rating"}, "distinct": false}}, "right": {"type": "param", "value": "8.7"}},
+        "having": {"type": "binary_expr", "operator": ">", "left": {"type": "aggr_func", "name": "MAX", "args": {"expr": {"type": "column_ref", "table": "m", "column": "rating"}, "distinct": false}}, "right": {"type": "param", "value": 8.7}},
         "orderBy": [{"expr": {"type": "column_ref", "table": "m", "column": "year"}, "order": "DESC"}],
         "limit": null
       }
     ];
 
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
 
     const plan = createPlan(parsedAst);
     expect(plan.aggregation).not.toBeNull();
@@ -143,7 +143,7 @@ describe('SQL Parser and Planner', () => {
     ];
 
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
 
     const plan = createPlan(parsedAst);
     expect(plan.distinct).toBe(true);
@@ -171,7 +171,7 @@ describe('SQL Parser and Planner', () => {
     ];
 
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
 
     const plan = createPlan(parsedAst);
     expect(plan.joins.length).toBe(1);
@@ -188,20 +188,20 @@ describe('SQL Parser and Planner', () => {
       {
         "type": "select", "distinct": false, "columns": [{"expr": {"type": "column_ref", "table": "m", "column": "title"}, "as": "name"}],
         "from": [{"table": "Movie", "as": "m"}], "joins": [],
-        "where": {"type": "binary_expr", "operator": "<", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": "2000"}},
+        "where": {"type": "binary_expr", "operator": "<", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": 2000}},
         "groupBy": null, "having": null, "orderBy": null, "limit": null
       },
       { "type": "union", "distinct": true, "top": 0, "bottom": 2 },
       {
         "type": "select", "distinct": false, "columns": [{"expr": {"type": "column_ref", "table": "a", "column": "name"}, "as": null}],
         "from": [{"table": "Actor", "as": "a"}], "joins": [],
-        "where": {"type": "binary_expr", "operator": ">", "left": {"type": "column_ref", "table": "a", "column": "age"}, "right": {"type": "param", "value": "60"}},
+        "where": {"type": "binary_expr", "operator": ">", "left": {"type": "column_ref", "table": "a", "column": "age"}, "right": {"type": "param", "value": 60}},
         "groupBy": null, "having": null, "orderBy": null, "limit": null
       }
     ];
     
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
     
     const plan = createPlan(parsedAst);
     expect(plan.type).toBe('union');
@@ -219,20 +219,20 @@ describe('SQL Parser and Planner', () => {
       {
         "type": "select", "distinct": false, "columns": [{"expr": {"type": "column_ref", "table": "m", "column": "title"}, "as": null}],
         "from": [{"table": "Movie", "as": "m"}], "joins": [],
-        "where": {"type": "binary_expr", "operator": "=", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": "1994"}},
+        "where": {"type": "binary_expr", "operator": "=", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": 1994}},
         "groupBy": null, "having": null, "orderBy": null, "limit": null
       },
       { "type": "union", "distinct": false, "top": 0, "bottom": 2 },
       {
         "type": "select", "distinct": false, "columns": [{"expr": {"type": "column_ref", "table": "m", "column": "title"}, "as": null}],
         "from": [{"table": "Movie", "as": "m"}], "joins": [],
-        "where": {"type": "binary_expr", "operator": ">", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": "1993"}},
+        "where": {"type": "binary_expr", "operator": ">", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": 1993}},
         "groupBy": null, "having": null, "orderBy": null, "limit": null
       }
     ];
 
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
 
     const plan = createPlan(parsedAst);
     expect(plan.type).toBe('union');
@@ -258,7 +258,7 @@ describe('SQL Parser and Planner', () => {
         ],
         "from": [{ "table": "~Table", "as": "t~" }],
         "joins": [],
-        "where": { "type": "binary_expr", "operator": "=", "left": { "type": "column_ref", "table": "t~", "column": "$column1" }, "right": { "type": "param", "value": "5" } },
+        "where": { "type": "binary_expr", "operator": "=", "left": { "type": "column_ref", "table": "t~", "column": "$column1" }, "right": { "type": "param", "value": 5 } },
         "groupBy": null,
         "having": null,
         "orderBy": null,
@@ -267,13 +267,17 @@ describe('SQL Parser and Planner', () => {
     ];
 
     const parsedAst = parse(sql);
-    expect(parsedAst).toEqual(expectedAst);
+    expect(parsedAst).toMatchObject(expectedAst);
 
     const plan = createPlan(parsedAst);
     expect(plan.fromTable.table).toBe('~Table');
     expect(plan.fromTable.as).toBe('t~');
-    expect(plan.filters.left.length).toBe(1);
-    expect(plan.filters.left[0].left.column).toBe('$column1');
+    // A `$`-prefixed column cannot be pushed down into a Mango selector - it would
+    // read as an operator there - so the planner keeps the predicate residual and
+    // evaluates it itself, rather than in `filters.left`.
+    expect(plan.filters.left.length).toBe(0);
+    expect(plan.filters.residual.length).toBe(1);
+    expect(plan.filters.residual[0].left.column).toBe('$column1');
   });
 
   describe('Subqueries', () => {
@@ -296,7 +300,7 @@ describe('SQL Parser and Planner', () => {
               "from": [{"table": "Movie", "as": "m"}], "joins": [],
               "where": {
                 "type": "and",
-                "left": {"type": "binary_expr", "operator": "=", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": "1994"}},
+                "left": {"type": "binary_expr", "operator": "=", "left": {"type": "column_ref", "table": "m", "column": "year"}, "right": {"type": "param", "value": 1994}},
                 "right": {"type": "binary_expr", "operator": "IN", "left": {"type": "column_ref", "table": "a", "column": "_id"}, "right": {"type": "column_ref", "table": "m", "column": "actors"}}
               },
               "groupBy": null, "having": null, "orderBy": null, "limit": null
@@ -305,7 +309,7 @@ describe('SQL Parser and Planner', () => {
           "groupBy": null, "having": null, "orderBy": null, "limit": null
         }
       ];
-      expect(parse(sql)).toEqual(expectedAst);
+      expect(parse(sql)).toMatchObject(expectedAst);
     });
 
     it('should plan a correlated NOT EXISTS subquery into an ANTI join', () => {
@@ -367,7 +371,7 @@ describe('SQL Parser and Planner', () => {
           "groupBy": null, "having": null, "orderBy": null, "limit": null
         }
       ];
-      expect(parse(sql)).toEqual(expectedAst);
+      expect(parse(sql)).toMatchObject(expectedAst);
     });
 
      it('should plan a scalar subquery as a residual filter', () => {

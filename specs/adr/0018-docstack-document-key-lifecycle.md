@@ -238,7 +238,14 @@ them is ambiguous.
 - Stacks may exist in a partially-patched state; `schemaVersion` may legitimately trail the
   newest patch until unlocked.
 - Nothing changes for `disableCryptoEngine: true`, or for stacks opened with `credentials`
-  or a session — both already held a key before the offending branch ran.
+  — those already held a key before the offending branch ran.
+- A stack given a session through `setAuthSession` **did not** hold a key: the method
+  applied only the session half of the proof and dropped `proof.documentKey`, while
+  `clearAuthSession` cleared the engine's key — so a custom flow was left holding a session
+  it could decrypt nothing with, and `isLocked()` stayed true. An earlier revision of this
+  section claimed otherwise. `setAuthSession` now installs the key when the proof carries
+  one, making the pair symmetric; flows with no key of their own should call `unlock()`.
+  Reported in ADR-0019.
 
 ---
 

@@ -87,6 +87,14 @@ class DocStack extends EventTarget {
     private pendingStacks: Map<string, Promise<ClientStack>> = new Map();
     /** The handle from the last {@link sync} call. */
     private syncHandle?: DocStackSyncHandle;
+
+    /**
+     * What the last un-scoped {@link sync} call asked for, kept so a stack added
+     * later can be bound to the same replication. `null` when sync was never
+     * called, was called with an explicit `stacks` list (a caller who named three
+     * databases asked for three), or was cancelled. See ADR-0033.
+     */
+    private syncOptions: DocStackSyncOptions | null = null;
     private logger: Logger = createlogger().child({ module: "client" });
 
     /**
@@ -161,9 +169,18 @@ class DocStack extends EventTarget {
 
         // Registered before the first `await`, which is what makes the guard atomic:
         // nothing else runs between the miss above and this line.
-        const creation = ClientStack.create(connection, options).then(stack => {
+        const creation = ClientStack.create(connection, options).then(async stack => {
             this.stacks.push(stack);
             if (!this.store) this.store = stack;
+            // Bound to any live un-scoped sync BEFORE the stack is announced, so that
+            // when addStack resolves - or a 'stack-added' listener runs - the stack is
+            // already replicating. Without this, a database mounted after sync() sat
+            // outside replication for the lifetime of the handle, with every status
+            // surface reporting healthy: the handle simply had no entry for it, and a
+            // missing key reads as "nothing to say" rather than "not covered". A
+            // workspace registry that lives in one database and names the others makes
+            // that ordering a boot-time coin toss, not an exotic case. See ADR-0033.
+            await this.bindStackToSync(stack);
             this.dispatchEvent(new CustomEvent("stack-added", { detail: { stack } }));
             return stack;
         });
@@ -197,6 +214,9 @@ class DocStack extends EventTarget {
         stack.close();
         this.stacks = this.stacks.filter(s => s !== stack);
         if (this.store === stack) this.store = this.stacks[0];
+        // A removed stack must also leave the sync handle, or getStatus() keeps
+        // reporting a database this instance no longer holds.
+        this.syncHandle?.remove(stack.name);
 
         if (options?.destroy) {
             await stack.destroyDb();
@@ -253,12 +273,66 @@ class DocStack extends EventTarget {
         }
 
         const handle = new DocStackSyncHandle();
+        // Registered before the loop, and the options with it: a stack added while
+        // this loop awaits is bound by addStack through bindStackToSync, and the
+        // has() guards on both paths keep the two from double-binding it.
+        this.syncHandle = handle;
+        this.syncOptions = names ? null : options;
         for (const stack of targets) {
+            if (handle.handles.has(stack.name)) continue;
             const classes = scopedClasses[stack.name];
             handle.add(stack.name, await stack.sync(classes ? { ...stackOptions, classes } : stackOptions));
         }
-        this.syncHandle = handle;
         return handle;
+    }
+
+    /**
+     * Binds one stack to the live sync, if there is one and it was un-scoped.
+     *
+     * Failure here must not fail {@link addStack} - the stack itself opened fine -
+     * but it must not be silent either, silence being this defect's whole shape:
+     * it is logged and dispatched as an `error` event on the sync handle.
+     */
+    private bindStackToSync = async (stack: ClientStack): Promise<void> => {
+        const handle = this.syncHandle;
+        const options = this.syncOptions;
+        if (!handle || !options) return;
+        if (handle.handles.has(stack.name)) return;
+
+        const { stacks: _names, tenants, ...stackOptions } = options;
+        try {
+            let classes: import('./sync/index.js').ClassFilterOptions | undefined;
+            if (tenants) {
+                // The same entitlement the original call compiled, derived for this
+                // stack alone: outside the scope means not synced at all - withheld
+                // structurally, exactly as it would have been at sync() time.
+                const scope = await deriveTenantScope([stack], tenants);
+                if (!scope.stacks.includes(stack.name)) return;
+                classes = scope.classes[stack.name];
+            }
+            if (handle.handles.has(stack.name)) return; // bound while deriving
+            handle.add(stack.name, await stack.sync(classes ? { ...stackOptions, classes } : stackOptions));
+        } catch (error) {
+            this.logger.child({ method: "bindStackToSync" }).error(
+                "Stack opened but could not join replication", { stack: stack.name, error });
+            handle.dispatchEvent(new CustomEvent("error", { detail: { stack: stack.name, error } }));
+        }
+    }
+
+    /**
+     * Which open stacks the current sync covers, and which it does not.
+     *
+     * An idle stack and an unbound one are opposite problems, and `getStatus()`
+     * cannot tell them apart - the unbound one has no key at all. With no sync
+     * running, every open stack is unbound.
+     */
+    public getSyncCoverage = (): { bound: string[]; unbound: string[] } => {
+        const bound = this.syncHandle ? [...this.syncHandle.handles.keys()] : [];
+        const boundSet = new Set(bound);
+        return {
+            bound,
+            unbound: this.stacks.map(s => s.name).filter(name => !boundSet.has(name)),
+        };
     }
 
     /**
@@ -273,6 +347,9 @@ class DocStack extends EventTarget {
      */
     public cancelSync = () => {
         if (this.syncHandle) this.syncHandle.cancel();
+        // A stack added after this point must not start replicating into a handle
+        // whose other members were just stopped.
+        this.syncOptions = null;
     }
 
     private initStacks = async (configs: StackConfig[]) => {

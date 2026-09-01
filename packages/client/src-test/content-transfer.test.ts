@@ -164,7 +164,10 @@ describe("content import", () => {
 
                 const imported = await (await target.getClass("XferRound"))!.getCards();
                 // Read past the decrypting path to prove it really was re-encrypted.
-                const raw = await target.db.get(imported[0]._id);
+                // Read as stored: `db.get` decrypts since ADR-0032 restored the plugin's
+                // `get` override, so the ciphertext shape is only visible on the
+                // replication handle, which reads verbatim by design.
+                const raw = await target.getReplicationHandle().get(imported[0]._id);
 
                 return {
                     report,
@@ -172,7 +175,7 @@ describe("content import", () => {
                     notes: imported.map((d: any) => d.notes).sort(),
                     storedUnderTargetKey: raw.notes?.__enc === true,
                     storedKid: raw.notes?.kid,
-                    sourceKid: (await stack.db.get(payload.documents[0]._id)).notes?.kid,
+                    sourceKid: (await stack.getReplicationHandle().get(payload.documents[0]._id)).notes?.kid,
                 };
             },
         });

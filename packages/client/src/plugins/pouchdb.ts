@@ -79,6 +79,11 @@ export const readNewEdits = (
 export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack, pristine: PristineDbMethods) => {
     const pouchBulkDocs = pristine.bulkDocs;
     const pouchBulkGet = pristine.bulkGet;
+    // Captured from the pristine instance like the two above, and for the same
+    // ADR-0019 reason - `pouch.prototype.get` is not a reliable source under the
+    // plugin-loading shim (it resolves undefined in the UMD build), which is exactly
+    // what got the decrypting `get` override commented out instead of recaptured.
+    const pouchGet = pristine.get;
     return {
         ping: () => {
             return Promise.resolve("pong");
@@ -524,8 +529,16 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             }
             return exec();
         },
-        /*
-        get: async function (docId, options?: PouchDB.Core.GetOptions | null, callback?) {
+        // Single-document reads decrypt, symmetrically with `bulkGet`, `find` and the
+        // query engine: ADR-0020 keeps ciphertext on the *changes feed*, never on
+        // reads. This override spent a while commented out - disabled by a comment
+        // that rode an unrelated refactor commit, with no decision recorded - which
+        // left `stack.getDocument` returning ciphertext while every other read path
+        // decrypted. Re-enabled with a cheaper precheck: the cached class model
+        // answers "does this class encrypt anything?" first, so a class with nothing
+        // encrypted pays a cache lookup here rather than a class snapshot per get.
+        // See ADR-0032.
+        get: async function (docId: PouchDB.Core.DocumentId, options?: PouchDB.Core.GetOptions | null, callback?: any) {
             if (typeof options === "function") {
                 callback = options;
                 options = undefined;
@@ -533,11 +546,24 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
             const exec = async () => {
                 const result = await pouchGet.call(this, docId, options ?? {});
-                if (result && isDocument(result) && stack.cryptoEngine.isEnabled()
+                // Optional-chained on purpose: this override serves `initialize` itself
+                // (`checkSystem` reads `~system` through it), which runs before the
+                // crypto engine is constructed. And gated on the *key*, not just the
+                // engine: without a document key `decryptDocument` can do nothing, so a
+                // keyless stack - initialization, a locked stack, every stack that never
+                // encrypts - skips the branch and pays nothing per get. Only a keyed
+                // stack reading an encrypted class pays the class lookup and decrypt.
+                if (result && isDocument(result) && stack.cryptoEngine?.isEnabled()
+                    && stack.cryptoEngine.getDocumentKey()
                     && !stack.isSimpleClass(result["~class"])) {
-                    const classObj = await stack.getClassSnapshot(result["~class"]).catch(() => null);
-                    if (classObj && classObj.getEncryptedAttributes().length) {
-                        await stack.cryptoEngine.decryptDocument(result as Document, classObj);
+                    const model = await stack.getClassModel(result["~class"]).catch(() => null);
+                    const encrypts = model && Object.values(model.schema ?? {})
+                        .some((attribute: any) => attribute?.config?.encrypted === true);
+                    if (encrypts) {
+                        const classObj = await stack.getClassSnapshot(result["~class"]).catch(() => null);
+                        if (classObj && classObj.getEncryptedAttributes().length) {
+                            await stack.cryptoEngine.decryptDocument(result as Document, classObj);
+                        }
                     }
                 }
                 return result;
@@ -549,7 +575,13 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             }
             return exec();
         },
-        
+
+        /*
+        Deliberately retired, not lost: pouchdb-core routes `put` through `bulkDocs`,
+        and the active `bulkDocs` above already owns encryption - a put override that
+        encrypted too would encrypt twice. Kept for the record beside the `get`
+        override's history. See ADR-0032.
+
         put: async function (doc, options?: PouchDB.Core.PutOptions | null, callback?) {
             if (typeof options === "function") {
                 callback = options;

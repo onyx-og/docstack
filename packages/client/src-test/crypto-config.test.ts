@@ -262,4 +262,47 @@ describe("crypto engine configuration", () => {
 
         expect(result.isEncrypted).toBe(true);
     });
+
+    it("encrypts marked fields at rest and decrypts them on read", async ({ useDocStack }) => {
+        // Ported from the jest crypto-engine suite, which could not open a stack under
+        // Node: the ciphertext shape at rest and the decrypting read are what need a
+        // real database.
+        const result = await useDocStack({
+            name: "crypto-at-rest",
+            username: "vault-user",
+            password: "vault-pass",
+            documentKey: "ab".repeat(32),
+            evaluate: async ({ stack }) => {
+                const { Class } = (window as any).docstack;
+
+                const vault = await Class.create(stack, "Vault", "class", "Encrypted records", {
+                    title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
+                    secret: { name: "secret", type: "string", config: { mandatory: true, encrypted: true } },
+                });
+                const card = await vault.addCard({ title: "visible", secret: "top-secret" });
+
+                // Raw shape, as stored: `allDocs` does not decrypt.
+                const all = await stack.db.allDocs({ include_docs: true });
+                const stored = all.rows.find((row: any) => row.id === card._id)?.doc as any;
+
+                // Every reading path decrypts - single-document get included, since
+                // ADR-0032 restored the plugin's `get` override. Ciphertext is the
+                // changes feed's property (ADR-0020), never a read's.
+                const fetched = await stack.getDocument(card._id) as any;
+                const queried = await stack.query("SELECT secret FROM Vault;");
+
+                return {
+                    storedEnc: stored?.secret?.__enc === true,
+                    storedHasNoPlaintext: JSON.stringify(stored?.secret ?? null).includes("top-secret") === false,
+                    fetchedSecret: fetched?.secret ?? null,
+                    queriedSecret: queried.rows?.[0]?.secret ?? null,
+                };
+            },
+        });
+
+        expect(result.storedEnc).toBe(true);
+        expect(result.storedHasNoPlaintext).toBe(true);
+        expect(result.fetchedSecret).toBe("top-secret");
+        expect(result.queriedSecret).toBe("top-secret");
+    });
 });

@@ -109,9 +109,12 @@ export class PolicyEngine {
             // Read raw rather than through `findDocuments`: policies are a system class
             // that bypasses policy evaluation anyway, and going through the read path
             // here recursed into a policy check per policy document. The selector is the
-            // same one `findDocuments` produced (it injects `active: true`); the explicit
-            // limit is because pouchdb-find otherwise silently caps results at 25, which
-            // for policies means silently not enforcing the 26th.
+            // same one `findDocuments` produced (it injects `active: true`), and that is
+            // the contract, not an accident: a policy enforces only while `active: true`,
+            // exactly as a document is visible only while active - an unflagged or
+            // explicitly inactive policy does not apply (ADR-0032). The explicit limit is
+            // because pouchdb-find otherwise silently caps results at 25, which for
+            // policies means silently not enforcing the 26th.
             const result = await this.stack.db.find({
                 selector: { "~class": "~Policy", active: true },
                 limit: 2 ** 31 - 1,
