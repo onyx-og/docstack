@@ -1397,10 +1397,12 @@ const sys_016: Patch = {
             "name": "class",
             "description": "A class document representing a data model class",
             "~class": "~self",
-            // Patch hydration is a shallow merge: this `schema` REPLACES the stored one,
-            // it does not add to it. So a patch to the `class` document must carry the
-            // full attribute set - dropping `ephemeral`/`simple` here silently strips
-            // those flags from every class model on the next validated write.
+            // Patch hydration merges `schema` attribute by attribute (ADR-0038): an
+            // entry here overlays the stored one, an absent attribute stays as stored,
+            // and an explicit `null` drops it. The restatement of `ephemeral`/`simple`
+            // below predates the merge - hydration used to replace the whole schema, so
+            // a patch had to carry the full set - and is kept: under merge it lands on
+            // identical definitions and changes nothing.
             "schema": {
                 "ephemeral": {
                     "name": "ephemeral",

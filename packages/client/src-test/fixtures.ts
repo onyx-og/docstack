@@ -28,6 +28,8 @@ type UseDocStackOptions<T> = {
   password?: string;
   /** Pass `null` to open the stack locked. Defaults to {@link TEST_DOCUMENT_KEY}. */
   documentKey?: string | null;
+  /** Opens the stack with named write transactions enabled (ADR-0039). */
+  transactions?: boolean;
 };
 /**
  * Fixture for initializing the DocStack client library in the browser.
@@ -74,7 +76,7 @@ export const test = base.extend<DocStackFixture>({
   useDocStack: async ({ docStackPage }, use) => {
     const initDocStack = async <T>(options: UseDocStackOptions<T>) => {
       // The 'evaluate' function is passed as a string to the browser context.
-      return await docStackPage.evaluate(async ({ name, evaluate, patches, username, password, documentKey }) => {
+      return await docStackPage.evaluate(async ({ name, evaluate, patches, username, password, documentKey, transactions }) => {
         // Access the compiled library that was injected
         const docStackLib = (window as any).docstack;
         if (!docStackLib) {
@@ -113,7 +115,7 @@ export const test = base.extend<DocStackFixture>({
         // Initialize DocStack with the provided options
         const { DocStack } = docStackLib;
         const stackName = name || `docstack-test-${Date.now()}`;
-        const docStack = new DocStack({ name: stackName, patches, documentKey: documentKey ?? undefined });
+        const docStack = new DocStack({ name: stackName, patches, documentKey: documentKey ?? undefined, transactions });
 
         // Wait for the ready event
         await new Promise<void>((resolve, reject) => {
@@ -150,6 +152,7 @@ export const test = base.extend<DocStackFixture>({
         password: options.password,
         // `null` asks for a locked stack; anything else falls back to the shared key.
         documentKey: options.documentKey === null ? null : (options.documentKey ?? TEST_DOCUMENT_KEY),
+        transactions: options.transactions,
       });
     };
     

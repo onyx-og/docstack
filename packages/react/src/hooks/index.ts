@@ -184,6 +184,10 @@ export const useFind = (stack: string, query: {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Guards against a slow earlier run overwriting a fast later one - the same
+    // discipline as useQuerySQL's runId above.
+    const runId = useRef(0);
+
     useEffect(() => {
         // Check if the docStack instance is available
         if (!docStack) {
@@ -203,21 +207,22 @@ export const useFind = (stack: string, query: {
         setLoading(true);
 
         const runQuery = async () => {
+            const id = ++runId.current;
             try {
                 const stackInstance = docStack.getStack(stack);
                 if (stackInstance) {
-                    // Run the initial query
-                    const initialDocs = await stackInstance.findDocuments(query.selector, query.fields);
-                    if (initialDocs.docs.length) {
-                        let docs = initialDocs.docs as Document[]; // [TODO] Check types
-                        setDocs(docs);
-                    }
+                    const found = await stackInstance.findDocuments(query.selector, query.fields);
+                    // An empty result is a result. This setter used to be guarded on
+                    // `.docs.length`, so a live list could gain rows but never lose its
+                    // last one - a deleted document stayed on screen until a remount.
+                    // The hazard that guard was standing in for is *staleness*, and the
+                    // counter above owns that. See ADR-0035.
+                    if (id === runId.current) setDocs(found.docs as Document[]);
                 }
-                
             } catch (err: any) {
-                setError(err);
+                if (id === runId.current) setError(err);
             } finally {
-                setLoading(false);
+                if (id === runId.current) setLoading(false);
             }
         };
 

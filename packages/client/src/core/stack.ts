@@ -37,6 +37,8 @@ import { JobScheduler } from "./job-engine/scheduler.js";
 import { PolicyEngine } from "./policy-engine/index.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
+import { TransactionEngine, TransactionHandle, TransactionStage, TransactionCommitReport } from "./transaction-engine/index.js";
+import { stageCoversSelector, mergeStageIntoResults, widenProjection } from "./transaction-engine/overlay.js";
 import {
     CONTENT_EXPORT_FORMAT,
     isContentClassName,
@@ -67,6 +69,8 @@ const DOCSTACK_OPTION_KEYS: readonly string[] = [
     "credentials",
     "disableCryptoEngine",
     "documentKey",
+    "transactions",
+    "logLevel",
 ];
 
 /**
@@ -324,6 +328,11 @@ class ClientStack extends Stack {
      * Handles key derivation (PBKDF2) and AES-GCM encryption.
      */
     cryptoEngine!: CryptoEngine;
+    /**
+     * Named write transactions (ADR-0039). Dormant unless the stack was opened with
+     * `transactions: true`; see {@link beginTransaction}.
+     */
+    transactionEngine!: TransactionEngine;
     schemaVersion: string | undefined;
     /**
      * The current authenticated user session, if any.
@@ -413,6 +422,9 @@ class ClientStack extends Stack {
         this.jobScheduler = new JobScheduler(this as any);
         this.policyEngine = new PolicyEngine(this);
         this.cryptoEngine = new CryptoEngine(this);
+        // Re-created, never carried over: `reset()` re-runs initialize, and a stage
+        // surviving a reset would resurrect uncommitted writes (ADR-0039).
+        this.transactionEngine = new TransactionEngine(this, Boolean(options?.transactions));
         if (options?.documentKey) {
             await this.cryptoEngine.setDocumentKey(options.documentKey);
         }
@@ -1470,6 +1482,22 @@ class ClientStack extends Stack {
                         const existingDoc = await this.db.get(doc._id);
                         if (existingDoc) {
                             doc = { ...existingDoc, ...doc };
+                            // `schema` does not ride the shallow merge above, which would
+                            // replace it wholesale: it merges attribute by attribute. A
+                            // patch states only the attributes it changes, an absent
+                            // attribute stays as stored, and an explicit `null` entry
+                            // drops the attribute - from the model here, and from the
+                            // documents when the write propagates. See ADR-0038.
+                            const incoming = (sourceDoc as any).schema;
+                            const stored = (existingDoc as any).schema;
+                            if (incoming && typeof incoming === "object" && !Array.isArray(incoming)
+                                && stored && typeof stored === "object" && !Array.isArray(stored)) {
+                                const merged: Record<string, unknown> = { ...stored, ...incoming };
+                                for (const name of Object.keys(incoming)) {
+                                    if (incoming[name] === null) delete merged[name];
+                                }
+                                (doc as any).schema = merged;
+                            }
                         }
                     }
                     return doc;
@@ -2280,12 +2308,46 @@ class ClientStack extends Stack {
      * Removes event listeners and terminates background workers.
      */
     close = () => {
+        // First, and before the listeners go, so the discard events can still be
+        // observed: an uncommitted transaction is not real, and close drops it -
+        // database-transaction semantics, by decision (ADR-0039).
+        this.transactionEngine?.discardAll();
         this.cancelSync();
         // Before the listeners go: a surviving interval would tick against a database
         // this stack no longer serves.
         this.jobScheduler?.stop();
         this.removeAllListeners();
         if (this.modelWorker) this.modelWorker.terminate();
+    }
+
+    /**
+     * Opens a named write transaction (ADR-0039). Requires the stack to have been
+     * opened with `transactions: true`.
+     *
+     * Writes through the handle validate at the call site and stage in memory;
+     * reads through it see the staged state overlaid on committed state. Nothing
+     * reaches the database - or replication, or any other reader - until
+     * {@link commit}. `stack.db` stays live and unchanged next to open transactions:
+     * direct writes land immediately, and only touch a transaction by making its
+     * commit refuse when they advance a staged document's revision.
+     */
+    beginTransaction = (): TransactionHandle => {
+        return this.transactionEngine.begin();
+    }
+
+    /**
+     * Flushes a transaction's staged writes as one batch through the authoring
+     * pipeline. On refusal - validation, or a document changed underneath - nothing
+     * is persisted and the transaction stays open. The report says what landed and
+     * on what storage guarantee (`adapter.atomicBatch`).
+     */
+    commit = (t: TransactionHandle | string): Promise<TransactionCommitReport> => {
+        return this.transactionEngine.commit(t);
+    }
+
+    /** Drops a transaction's staged writes. Idempotent. */
+    discardTransaction = (t: TransactionHandle | string): void => {
+        this.transactionEngine.discard(t);
     }
 
     /**
@@ -2493,11 +2555,39 @@ class ClientStack extends Stack {
      * ```
      */
     findDocuments = async <T extends Document | RelationDocument = Document>(selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number, sort?: { [field: string]: "asc" | "desc" }[]) => {
+        return this.findDocumentsForView<T>(undefined, selector, fields, skip, limit, sort);
+    }
+
+    /**
+     * {@link findDocuments} with an optional transaction stage overlaid - the shared
+     * implementation, so a transaction's reads and ordinary reads run the identical
+     * pipeline (policy, decryption, field visibility) and cannot drift (ADR-0039).
+     *
+     * With a stage: the database's index cannot see staged documents, so the
+     * committed query runs unwindowed, staged ids mask their committed rows, staged
+     * matches join the set, and sort/skip/limit apply after the merge. A selector
+     * over a class the stage never touched skips all of that.
+     *
+     * @internal
+     */
+    findDocumentsForView = async <T extends Document | RelationDocument = Document>(stage: TransactionStage | undefined, selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number, sort?: { [field: string]: "asc" | "desc" }[]) => {
         const fnLogger = logger.child({ method: "findDocuments", args: { selector, fields, skip, limit, sort } });
 
         // By default request for only active documents
         if (!selector.hasOwnProperty("active")) {
             selector["active"] = true;
+        }
+
+        if (stage && stageCoversSelector(stage, selector)) {
+            const { queryFields, extras } = widenProjection(fields, sort);
+            const found = await this.db.find({
+                selector,
+                ...(queryFields ? { fields: queryFields } : {}),
+                limit: 2 ** 31 - 1,
+            } as any);
+            const merged = mergeStageIntoResults(stage, selector, found.docs as unknown as Document[], { sort, skip, limit, fields, extras });
+            const readableDocs = await this.processFoundDocuments<T>(merged, fields);
+            return { docs: readableDocs, selector, skip, limit };
         }
 
         let indexFields = Object.keys(selector);
@@ -3709,6 +3799,18 @@ class ClientStack extends Stack {
     }
 
     query = async (sql: string, ...params: any[]) => {
+        return this.runQuery(sql, params, this);
+    }
+
+    /**
+     * {@link query}'s implementation, with the executor's data source as a
+     * parameter: the executor reaches documents only through stack APIs, so a
+     * transaction hands in a facade that routes them at its overlay while everything
+     * else - parsing, binding, planning - stays exactly this code (ADR-0039).
+     *
+     * @internal
+     */
+    runQuery = async (sql: string, params: any[], execStack: ClientStack) => {
         const fnLogger = logger.child({ method: "query", args: { sql, params } });
         fnLogger.info("Executing query");
         let astList: (SelectAST | UnionAST)[] = [];
@@ -3725,7 +3827,7 @@ class ClientStack extends Stack {
         if (astList.length > 0) {
             try {
                 const plan = createPlan(astList);
-                const rows = await executePlan(this, plan, params);
+                const rows = await executePlan(execStack, plan, params);
                 // The AST for the whole query (including unions) is the list
                 fnLogger.info("Query executed successfully", { rows, astList });
                 return { rows, ast: astList };

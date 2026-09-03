@@ -12,10 +12,14 @@ const attributeEffect = async (
     doc: Document
 ) => {
     const attribute = new Attribute(
-        null, model.name, model.type, 
+        null, model.name, model.type,
         model.description, model.config
     );
-    if (operation === "add") {
+    if (operation === "add" && !(attribute.name in doc)) {
+        // Only documents that lack the key get the empty value. A document may
+        // already hold one - a repair patch re-declaring an attribute the model
+        // lost is exactly that case (ADR-0038) - and stamping `getEmpty()` over
+        // it would be data loss; validation below still runs against it.
         doc = {...doc, ...attribute.getEmpty()};
     }
 
@@ -47,36 +51,43 @@ const attributeEffect = async (
 }
 
 export const applySchemaDelta = async (
-    doc: Document, 
-    schemaDelta: jsondiff.AddedDelta | jsondiff.ModifiedDelta | jsondiff.DeletedDelta | jsondiff.ObjectDelta | jsondiff.ArrayDelta | jsondiff.MovedDelta | jsondiff.TextDiffDelta, 
-    classObj: Class): Promise<Document> => {
+    doc: Document,
+    schemaDelta: jsondiff.AddedDelta | jsondiff.ModifiedDelta | jsondiff.DeletedDelta | jsondiff.ObjectDelta | jsondiff.ArrayDelta | jsondiff.MovedDelta | jsondiff.TextDiffDelta,
+    classObj: Class,
+    newSchema?: { [name: string]: AttributeModel }): Promise<Document> => {
     const fnLogger = createLogger().child({method: "applySchemaDelta"});
     let updatedDoc = {...doc};
 
-    const t = Object.entries(schemaDelta);
-    for (const e of t) {
-        fnLogger.debug(`Delta of attribute '${e[0]}'`);
-        if (Array.isArray(e[1])) {
-            // e[1] can represent an addition, a deletion or an edit
-            // it's an addition when the array has only one element
-            if (e[1].length === 1) {
-                const attrModel = e[1][0] as AttributeModel;
-                updatedDoc = await attributeEffect("add", attrModel, classObj, updatedDoc);
+    // Every entry applies - the delta names one attribute per key, and a schema
+    // change routinely touches several. Returning after the first one is how a
+    // two-attribute patch used to stamp only whichever came first (ADR-0036).
+    for (const [name, delta] of Object.entries(schemaDelta)) {
+        fnLogger.debug(`Delta of attribute '${name}'`);
+        if (Array.isArray(delta)) {
+            // jsondiffpatch's array shapes: [new] is an addition, [old, new] a
+            // wholesale replacement, [old, 0, 0] a removal.
+            if (delta.length === 1) {
+                updatedDoc = await attributeEffect("add", delta[0] as AttributeModel, classObj, updatedDoc);
+            } else if (delta.length === 2) {
+                // The *new* model: validating against the one on its way out
+                // would pin every document to the definition being replaced.
+                updatedDoc = await attributeEffect("change", delta[1] as AttributeModel, classObj, updatedDoc);
+            } else if (delta.length === 3) {
+                updatedDoc = await attributeEffect("delete", delta[0] as AttributeModel, classObj, updatedDoc);
             }
-            // it's an edit when it has 2 elements
-            if (e[1].length === 1) {
-                const attrModel = e[1][0] as AttributeModel;
-                updatedDoc = await attributeEffect("change", attrModel, classObj, updatedDoc);
-            }
-
-            // it's a removal when it has 3 elements
-            if (e[1].length === 3) {
-                const attrModel = e[1][0] as AttributeModel;
-                updatedDoc = await attributeEffect("delete", attrModel, classObj, updatedDoc);
-            }
-            return updatedDoc;
         } else {
-            // TODO: The change is nested within the attribute model
+            // A nested delta: jsondiffpatch recurses into object values, so an
+            // attribute model edited in place (one config flag, a description)
+            // lands here rather than in the [old, new] branch above - this is the
+            // ordinary shape of an edit, not an exotic one. The delta carries
+            // only the changed fragment, so the full model to validate against
+            // comes from the schema being written.
+            const attrModel = newSchema?.[name];
+            if (attrModel) {
+                updatedDoc = await attributeEffect("change", attrModel, classObj, updatedDoc);
+            } else {
+                fnLogger.warn(`Unhandled delta shape for attribute '${name}': no new model to validate against`, { delta });
+            }
         }
     }
 

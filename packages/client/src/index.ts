@@ -59,6 +59,26 @@ export { SYSTEM_SEEDED_DOC_IDS, collectQueryClasses } from "./core/index.js";
 export type { EncryptedPayload, ClassBuildOptions } from "./core/index.js";
 
 /**
+ * Named write transactions (ADR-0039).
+ *
+ * Opt-in per stack via `transactions: true`. A handle stages validated writes in
+ * memory and reads its own staged state overlaid on committed state; `commit`
+ * flushes the journal as one batch through the full authoring pipeline, and the
+ * report states the storage adapter's honest atomicity guarantee.
+ */
+export {
+    TransactionEngine,
+    TransactionHandle,
+    TransactionDb,
+    TransactionsDisabledError,
+    TransactionStateError,
+    TransactionValidationError,
+    TransactionConflictError,
+    TransactionUnsupportedDocError,
+} from "./core/index.js";
+export type { TransactionCommitReport, TransactionStatus } from "./core/index.js";
+
+/**
  * Moving application content between stacks, without the datamodel that describes it.
  */
 export {

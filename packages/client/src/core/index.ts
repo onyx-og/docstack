@@ -881,6 +881,17 @@ export { SYSTEM_SEEDED_DOC_IDS } from "./datamodel/index.js";
 export { collectQueryClasses } from "./query-engine/index.js";
 export { StackWriteGuardError } from "./guarded-db.js";
 export { StackLockedError } from "../plugins/pouchdb.js";
+export {
+    TransactionEngine,
+    TransactionHandle,
+    TransactionDb,
+    TransactionsDisabledError,
+    TransactionStateError,
+    TransactionValidationError,
+    TransactionConflictError,
+    TransactionUnsupportedDocError,
+} from "./transaction-engine/index.js";
+export type { TransactionCommitReport, TransactionStatus } from "./transaction-engine/index.js";
 /**
  * Key-identity helpers, for applications that re-key a database.
  *

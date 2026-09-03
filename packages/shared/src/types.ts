@@ -252,6 +252,15 @@ export type StackOptions = {
      * above, the sink records `info` and above).
      */
     logLevel?: "error" | "warn" | "info" | "debug" | "silent";
+
+    /**
+     * Enables named write transactions on this stack (`stack.beginTransaction()`,
+     * `stack.commit(t)`, `stack.discardTransaction(t)`). Off by default. The flag
+     * only unlocks the capability: direct writes stay immediate next to open
+     * transactions, and staged writes live in memory until commit - a reload
+     * discards them. See ADR-0039.
+     */
+    transactions?: boolean;
 } & PouchDB.Configuration.DatabaseConfiguration
 
 export type StackConfig = ({

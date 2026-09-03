@@ -1,6 +1,53 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026/09/03
+
+### Added
+
+- **Named write transactions** (`transactions: true` per stack). A handle from
+  `stack.beginTransaction()` stages validated writes in memory - a write that fails
+  validation, policy, or the locked-stack check stages nothing, and a batch with one
+  bad document unwinds entirely - while reads through the handle
+  (`t.db.get/bulkGet/find`, `t.findDocuments`, `t.query` incl. JOINs) see the staged
+  state overlaid on committed state. Plain reads, other handles, live subscriptions
+  and replication see committed state only. `stack.commit(t)` flushes the journal as
+  ONE batch through the full authoring pipeline (triggers, relations, encryption);
+  a refusal - validation, or a document changed underneath (direct write, another
+  transaction, replication) - persists nothing and leaves the transaction open.
+  `stack.discardTransaction(t)` drops it; so do `close()` and reload - uncommitted
+  is not real. Class models, patches, `_design/` and `_local/` docs are refused in
+  transactions. The commit report states the storage adapter's honest guarantee:
+  `atomicBatch: true` on tauri-sqlite (one `BEGIN IMMEDIATE…COMMIT`), per-document
+  elsewhere, mitigated by a revision pre-flight. Measured (browser, 100 docs):
+  staging 0.43 ms/doc with zero backend queries; commit at parity with the
+  non-transactional batch write; empty-stage overlay reads at parity with plain
+  reads; refused commits ~1 ms. (ADR-0039)
+
+### Fixed
+
+- **A relation written in the same batch as its endpoint no longer fails the
+  endpoint check** - the plugin resolves batch-mates before declaring an endpoint
+  missing. Surfaced by transaction commits, but a fix for plain mixed batches too.
+- **`logLevel` no longer leaks into the PouchDB constructor** (missing from
+  `DOCSTACK_OPTION_KEYS`).
+
+## 0.1.8 - 2026/09/01
+
+### Changed
+
+- **Schema propagation is real, and class patches merge.** `applySchemaDelta`
+  returned from inside its loop, so a class-model change propagated to at most one
+  attribute per document - usually zero - and an attribute edited in place (a nested
+  jsondiffpatch delta) never applied at all. Every delta entry now applies: adds
+  stamp documents that lack the key (held values survive), in-place edits validate
+  documents against the full new model, and a change documents cannot satisfy
+  refuses the patch. Alongside it, a patch's `schema` now **merges attribute by
+  attribute** instead of replacing the stored schema wholesale: an absent attribute
+  stays as stored, and an explicit `"attr": null` drops it - from the model and,
+  through propagation, from every document. A historical patch that dropped an
+  attribute by omission no longer drops it on a fresh replay; restate a deliberate
+  drop as `null`. All system patches are cumulative restatements and are
+  unaffected. (ADR-0036/0037/0038)
 
 ### Fixed
 

@@ -32,6 +32,11 @@ export default {
   plugins: [
     resolve({
       preferBuiltins: false,
+      // Honor package.json "browser" fields: pouchdb-selector-core (and the
+      // pouchdb-utils tree under it) ships Node variants whose isBinaryObject
+      // references Buffer - resolving those into a browser bundle throws
+      // "Buffer is not defined" on the first selector match.
+      browser: true,
        // Explicitly state extensions if we encounter resolution issues
       extensions: ['.mjs', '.js', '.json', '.node', '.ts']
     }),

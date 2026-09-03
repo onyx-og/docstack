@@ -256,24 +256,21 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     // When a class document is updated, its change must have an effect on its children
                     const classDocId = doc._id;
                     const className = typeof doc.name === "string" ? doc.name : classDocId;
+                    // Fetch the version this write replaces. Its *absence* is what
+                    // "just created" means - a revision count is not: a stored class
+                    // at rev 1 receiving its first schema change already has documents
+                    // to propagate to, and the old `_revisions.ids.length == 1` check
+                    // skipped exactly that write (ADR-0038).
+                    let previousClassDoc: ClassModel;
                     try {
-                        // Get the previous version of the class model
-                        const docWithRevs = await stack.db.get(classDocId, { revs: true });
-                        const revisionIDList = docWithRevs._revisions!.ids;
-                        if (revisionIDList.length == 1) {
-                            fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
-                            continue;
-                            return pouchBulkDocs.call(this, docs, options, postExec);
-                        }
+                        previousClassDoc = await stack.db.get<ClassModel>(classDocId);
                     } catch (e: any) {
                         if (e.name === 'not_found') {
                             fnLogger.info(`Class '${className}' (doc '${classDocId}') was just created. Nothing to do.`);
                             continue;
-                            return pouchBulkDocs.call(this, docs, options, postExec);
                         }
+                        throw e;
                     }
-                    // Fetch the current (next old) version of the class document.
-                    const previousClassDoc = await stack.db.get<ClassModel>(classDocId);
                     // Built rather than looked up: this is the class as it was *before*
                     // this write, which the cache does not hold. Detached, because all it
                     // is used for is diffing and applying the delta.
@@ -298,12 +295,27 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         continue;
                     }
 
+                    // The schema being written, captured before the map shadows `doc`:
+                    // an attribute edited in place arrives as a nested delta carrying
+                    // only the changed fragment, and the full new model to validate
+                    // against has to come from here.
+                    const nextSchema = doc.schema as ClassModel["schema"];
                     const updates = await Promise.all(documents.map(async doc => {
-                        const updatedDoc = await applySchemaDelta(doc, schemaDelta, classObj);
+                        const updatedDoc = await applySchemaDelta(doc, schemaDelta, classObj, nextSchema);
                         return updatedDoc;
                     }));
 
-                    await stack.db.bulkDocs(updates);
+                    // PouchDB reports per-document failures in the *resolved* array,
+                    // not by rejecting - awaiting alone would let a conflicted update
+                    // silently drop one document's propagation.
+                    const propagated = await stack.db.bulkDocs(updates) as any[];
+                    const failures = propagated.filter(entry => entry && (entry as any).error);
+                    if (failures.length) {
+                        throw new Error(
+                            `Schema propagation failed for ${failures.length} document(s) of class '${className}': ` +
+                            failures.map((f: any) => `${f.id}: ${f.message ?? f.name}`).join("; ")
+                        );
+                    }
                     fnLogger.info('Propagated updates');
                 } else if (isRelation(doc)) {
                     const domain = await stack.getDomain(doc["~domain"]);
@@ -314,9 +326,18 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         throw new Error(`Relation document classes do not match domain '${domain.name}'.`);
                     }
 
+                    // An endpoint may be a batch-mate rather than stored: a relation
+                    // written together with its documents in one bulkDocs - which is
+                    // exactly what a transaction commit is (ADR-0039) - checks the
+                    // batch before declaring the endpoint missing.
+                    const resolveEndpoint = async (endpointId: string) => {
+                        const stored = await stack.db.get<Document>(endpointId).catch(() => null);
+                        if (stored) return stored;
+                        return documentsToProcess.find((mate: any) => mate?._id === endpointId && !mate?._deleted) ?? null;
+                    };
                     const [sourceDoc, targetDoc] = await Promise.all([
-                        stack.db.get<Document>(doc.sourceId).catch(() => null),
-                        stack.db.get<Document>(doc.targetId).catch(() => null),
+                        resolveEndpoint(doc.sourceId),
+                        resolveEndpoint(doc.targetId),
                     ]);
 
                     if (!sourceDoc) {

@@ -1,7 +1,7 @@
 {
   "name": "@docstack/client",
   "description": "One does not simply stack documents.",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -46,6 +46,7 @@
   "dependencies": {
     "@docstack/shared": "^0.1.0",
     "jsondiffpatch": "^0.7.3",
+    "pouchdb-selector-core": "^9.0.0",
     "semver": "^7.7.3",
     "zod": "^4.1.5"
   },

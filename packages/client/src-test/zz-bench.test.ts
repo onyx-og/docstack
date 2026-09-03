@@ -296,3 +296,127 @@ it("benchmarks core read/write/query paths", async ({ useDocStack }) => {
     expect(results.streamFallbackAgg.rows).toBe(1);
     expect(results.streamFallbackAgg.count).toBe(199);         // aggregation falls back but still streams the API
 });
+
+// Transactions (ADR-0039): staging cost, commit cost against the batch-write
+// baseline, and the overlay's two prices - the empty-stage fast path (must be
+// parity) and the merge path (paid only by queries over a staged class).
+it("benchmarks the transaction write and overlay paths", async ({ useDocStack }) => {
+    const results = await useDocStack({
+        name: `bench-tx-${Date.now()}`,
+        username: "bench-tx-user",
+        password: "bench-tx-pass",
+        transactions: true,
+        evaluate: async ({ stack }) => {
+            const { Class } = (window as any).docstack;
+            const res: any = {};
+            const now = () => performance.now();
+
+            let findCalls = 0;
+            const origFind = (stack as any).db.find.bind((stack as any).db);
+            (stack as any).db.find = (...a: any[]) => { findCalls++; return origFind(...a); };
+            const countFinds = async (fn: () => Promise<any>) => {
+                const before = findCalls;
+                const t0 = now();
+                const out = await fn();
+                return { ms: +(now() - t0).toFixed(1), finds: findCalls - before, out };
+            };
+
+            const N = 100;
+            const CATS = ["alpha", "beta", "gamma", "delta"];
+            const itemClass = await Class.create(stack, "TxBench", "class", "tx bench", {
+                name: { name: "name", type: "string", config: { mandatory: true, primaryKey: true, maxLength: 200 } },
+                category: { name: "category", type: "string", config: { maxLength: 50 } },
+                value: { name: "value", type: "integer", config: { min: 0 } },
+            });
+
+            // --- baseline: the non-transactional batch write, same environment ---
+            let r = await countFinds(() => itemClass.addCards(
+                Array.from({ length: N }, (_, i) => ({ name: `base-${i}`, category: CATS[i % CATS.length], value: i }))
+            ));
+            res.addCardsBatch100 = { totalMs: r.ms, perDocMs: +(r.ms / N).toFixed(2) };
+
+            // --- staging: per-write sweep validation, no I/O beyond rev lookups ---
+            const t = stack.beginTransaction();
+            r = await countFinds(() => t.createDocs(
+                Array.from({ length: N }, (_, i) => ({ docId: null, params: { name: `tx-${i}`, category: CATS[i % CATS.length], value: 1000 + i } })),
+                "TxBench"
+            ));
+            res.txStage100 = { totalMs: r.ms, perDocMs: +(r.ms / N).toFixed(2), findCalls: r.finds };
+
+            // --- overlay reads while 100 documents are staged ---
+            // The merge path: the committed query runs unwindowed and the union is
+            // sorted/windowed in memory.
+            r = await countFinds(() => t.findDocuments({ "~class": { $eq: "TxBench" } }));
+            res.overlayFindStage100 = { ms: r.ms, finds: r.finds, docs: r.out.docs.length };
+
+            r = await countFinds(() => t.query("SELECT b.name FROM TxBench AS b ORDER BY b.value DESC LIMIT 5;"));
+            res.txQueryOverlay = { ms: r.ms, finds: r.finds, names: r.out.rows.map((x: any) => x.name) };
+
+            // The fast path: a second, empty transaction must query at parity - same
+            // number of backend finds as the plain read.
+            const cold = stack.beginTransaction();
+            const plain = await countFinds(() => stack.findDocuments({ "~class": { $eq: "TxBench" } }));
+            const overlayEmpty = await countFinds(() => cold.findDocuments({ "~class": { $eq: "TxBench" } }));
+            res.overlayFindStage0 = {
+                plainMs: plain.ms, overlayMs: overlayEmpty.ms,
+                plainFinds: plain.finds, overlayFinds: overlayEmpty.finds,
+                sameDocs: plain.out.docs.length === overlayEmpty.out.docs.length,
+            };
+            cold.discard();
+
+            // --- commit: one bulkDocs through the full pipeline ---
+            const commitStart = now();
+            const report = await t.commit();
+            res.txCommit100 = {
+                totalMs: +(now() - commitStart).toFixed(1),
+                reportMs: +report.durationMs.toFixed(1),
+                perDocMs: +(report.durationMs / N).toFixed(2),
+                written: report.written.length,
+                failed: report.failed.length,
+                adapter: report.adapter,
+            };
+
+            // --- refused commit: conflict pre-flight, nothing persisted ---
+            const contested = (await itemClass.getCards({ name: { $eq: "base-0" } }))[0];
+            const t2 = stack.beginTransaction();
+            await t2.db.put({ ...(await t2.db.get(contested._id)), value: 9999 });
+            await stack.db.put({ ...(await stack.db.get(contested._id)), value: 8888 });
+            const before = (await (stack as any).db.allDocs()).total_rows;
+            const refuseStart = now();
+            const refusal = await t2.commit().catch((error: any) => error?.name);
+            res.txRefusedCommit = {
+                ms: +(now() - refuseStart).toFixed(1),
+                refusal,
+                docCountUnchanged: (await (stack as any).db.allDocs()).total_rows === before,
+            };
+            t2.discard();
+
+            // --- discard cost ---
+            const t3 = stack.beginTransaction();
+            await t3.createDocs(
+                Array.from({ length: N }, (_, i) => ({ docId: null, params: { name: `drop-${i}`, value: i } })),
+                "TxBench"
+            );
+            const dropStart = now();
+            t3.discard();
+            res.txDiscard100 = { ms: +(now() - dropStart).toFixed(2) };
+
+            const stored = await stack.findDocuments({ "~class": { $eq: "TxBench" } });
+            res.storedAfter = stored.docs.length;
+            return res;
+        },
+    });
+
+    console.log("TX BENCH RESULTS:\n" + JSON.stringify(results, null, 2));
+
+    // Correctness gates, so a perf regression can't hide behind a semantics one.
+    expect(results.txCommit100.written).toBe(100);
+    expect(results.txCommit100.failed).toBe(0);
+    expect(results.overlayFindStage100.docs).toBe(200);            // 100 committed + 100 staged
+    expect(results.txQueryOverlay.names).toEqual(["tx-99", "tx-98", "tx-97", "tx-96", "tx-95"]); // staged rows win the ORDER BY
+    expect(results.overlayFindStage0.overlayFinds).toBe(results.overlayFindStage0.plainFinds); // empty stage = fast path
+    expect(results.overlayFindStage0.sameDocs).toBe(true);
+    expect(results.txRefusedCommit.refusal).toBe("TransactionConflictError");
+    expect(results.txRefusedCommit.docCountUnchanged).toBe(true);  // a refused commit writes nothing
+    expect(results.storedAfter).toBe(200);                          // baseline + committed tx; discarded stage gone
+});
