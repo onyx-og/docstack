@@ -88,6 +88,21 @@ export class TransactionEngine {
         return handle;
     }
 
+    /**
+     * Opens a transaction for DocStack's own machinery - patch application
+     * (ADR-0042). Independent of the `transactions: true` config gate (the flag
+     * governs the consumer feature, not the framework's internals) and permitted to
+     * stage class models: an internal handle claims staged validation and a single
+     * class-write batch, never propagation atomicity.
+     * @internal
+     */
+    beginInternal(): TransactionHandle {
+        const id = `tx-internal-${this.stack.cryptoEngine.generateRandomString(8)}`;
+        const handle = new TransactionHandle(this.stack, this, id, true);
+        this.handles.set(id, handle);
+        return handle;
+    }
+
     private resolve(t: TransactionHandle | string, operation: string): TransactionHandle {
         const handle = typeof t === "string" ? this.handles.get(t) : t;
         if (!handle) throw new TransactionStateError(typeof t === "string" ? t : "(unknown)", "unknown", operation);
@@ -155,7 +170,7 @@ export class TransactionEngine {
         //    can be stale (a policy changed, a class tightened). Zero consequences on
         //    refusal.
         for (const entry of entries) {
-            await sweepEntry(this.stack, stage, entry);
+            await sweepEntry(this.stack, stage, entry, { allowClassModels: handle.internal });
         }
 
         // 2. Rev pre-flight: every staged id's stored winner must still be the

@@ -833,6 +833,7 @@ export {
     SyncSchemaMismatchError,
     SYNC_META_DOC_ID,
     readRemoteSchemaVersion,
+    readRemoteConsumerSchemaVersion,
     publishSchemaVersion,
     createReplicationFilter,
     isInternalDoc,

@@ -567,6 +567,19 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
             const exec = async () => {
                 const result = await pouchGet.call(this, docId, options ?? {});
+                // A revision-addressed read serves the STORED form, never plaintext.
+                // This is not an optimization but the seal on the replication surface
+                // (ADR-0040): PouchDB hard-binds its instance methods at construction,
+                // so the pristine `bulkGet` the sync layer uses cannot be pointed away
+                // from this instance - its shim, and `get`'s own `open_revs` branch,
+                // re-enter THIS override per revision (`{rev}` / `{open_revs}`).
+                // Decrypting those hops pushed every encrypted attribute to remotes in
+                // plaintext under the local revision id. Taxonomically it is the same
+                // line ADR-0020 draws: naming a revision is a replication/forensic
+                // read; the winning-revision read below is the one that decrypts.
+                if ((options as any)?.rev || (options as any)?.open_revs) {
+                    return result;
+                }
                 // Optional-chained on purpose: this override serves `initialize` itself
                 // (`checkSystem` reads `~system` through it), which runs before the
                 // crypto engine is constructed. And gated on the *key*, not just the

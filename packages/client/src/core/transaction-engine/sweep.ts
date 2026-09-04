@@ -14,7 +14,12 @@ import { TransactionUnsupportedDocError, TransactionValidationError } from "./er
  * `bulkDocs`) remains the sole authority - this sweep is a deliberate subset, and a
  * document it passes can still be refused there, atomically for the whole batch.
  */
-export const sweepEntry = async (stack: ClientStack, stage: TransactionStage, entry: StagedEntry): Promise<void> => {
+export const sweepEntry = async (
+    stack: ClientStack,
+    stage: TransactionStage,
+    entry: StagedEntry,
+    options?: { allowClassModels?: boolean }
+): Promise<void> => {
     const doc = entry.doc;
     const docId = doc._id;
 
@@ -26,11 +31,31 @@ export const sweepEntry = async (stack: ClientStack, stage: TransactionStage, en
             throw new TransactionUnsupportedDocError(docId, "design documents are index machinery, not transactional content.");
         }
     }
-    if (isClassModel(doc) || (doc as any)["~class"] === "class" || (doc as any)["~class"] === "~self") {
-        throw new TransactionUnsupportedDocError(
-            docId,
-            "a class-model write propagates to the class's documents mid-pipeline and cannot be staged or rolled back (ADR-0039)."
-        );
+    if (isClassModel(doc)) {
+        // Public transactions refuse class models: a class commit's propagation is a
+        // side effect beyond the batch, and a public handle promises none (ADR-0039).
+        // An INTERNAL handle - patch application, ADR-0042 - claims only staged
+        // validation and a single class-write batch, so it stages them; the parent
+        // validation the pipeline would run at commit runs here instead, where a
+        // refusal still costs nothing.
+        if (!options?.allowClassModels) {
+            throw new TransactionUnsupportedDocError(
+                docId,
+                "a class-model write propagates to the class's documents mid-pipeline and cannot be staged or rolled back (ADR-0039)."
+            );
+        }
+        const parentName = (doc as any)["~class"];
+        if (parentName !== "~self") {
+            const parentClass = await stack.getClass(parentName);
+            if (!parentClass) {
+                throw new TransactionValidationError(`Parent class '${parentName}' not found for class model '${docId}'.`, docId);
+            }
+            const valid = await parentClass.validate(doc);
+            if (!valid) {
+                throw new TransactionValidationError(`Class model '${docId}' is not valid for its parent class '${parentName}'.`, docId);
+            }
+        }
+        return;
     }
     if (isPatch(doc)) {
         throw new TransactionUnsupportedDocError(docId, "patches carry class models and apply through 'applyPatch'.");

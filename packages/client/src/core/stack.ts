@@ -1,5 +1,8 @@
 import PouchDB from "pouchdb-browser";
+import semver from "semver";
+import { diff } from "jsondiffpatch";
 import createLogger from "../utils/logger/index.js";
+import { applySchemaDelta } from "../utils/index.js";
 import Class from "./class.js";
 import Domain from "./domain.js";
 import PouchDBFind from 'pouchdb-find';
@@ -1194,13 +1197,20 @@ class ClientStack extends Stack {
         await stack.initialize(conn, options);
         await stack.initdb()
         if (options?.patches && options.patches.length) {
-            const patches = await stack.findDocuments<Patch>({
-                "~class": { $eq: "patch" }
-            })
+            // Raw find, not findDocuments: `active` carries the ledger's own meaning
+            // (ADR-0041) - `true` is applied, `false` is deferred and must be
+            // re-attempted, absent is a legacy entry from before the flag, treated as
+            // applied. Read through the visibility filter, the dedupe saw nothing at
+            // all and every open re-applied every consumer patch (ADR-0040).
+            const ledger = await stack.db.find({
+                selector: { "~class": "patch" },
+                limit: 2 ** 31 - 1,
+            } as any);
             await stack.applyConsumerPatches(options.patches.filter(
-                p => !patches.docs.find(
+                p => !(ledger.docs as unknown as (Patch & { active?: boolean })[]).find(
                     existing => existing.version === p.version
                     && existing.target === p.target
+                    && existing.active !== false
                 )
             ));
         }
@@ -1224,7 +1234,55 @@ class ClientStack extends Stack {
      *
      * @param patches - Patches not yet present in this stack.
      */
+    /**
+     * The highest consumer patch version this device has applied, from the patch
+     * ledger - `null` when no consumer patch has ever applied (or they are all
+     * deferred, which for the schema gate is the same thing: the schema those
+     * patches install is not here yet). The sync layer folds this into what it
+     * publishes and compares, so consumer-schema skew between devices refuses at
+     * the gate instead of pulling documents this device's schema cannot describe
+     * (ADR-0040).
+     */
+    public async getConsumerSchemaVersion(): Promise<string | null> {
+        // Raw find: ledger documents carry no `active` flag (see the dedupe in
+        // {@link create}).
+        const ledger = await this.db.find({
+            selector: { "~class": "patch" },
+            limit: 2 ** 31 - 1,
+        } as any).catch(() => ({ docs: [] as any[] }));
+        let highest: string | null = null;
+        for (const doc of ledger.docs as unknown as (Patch & { active?: boolean })[]) {
+            if (doc.target === "system") continue;
+            // A dormant entry is a deferral (ADR-0041): the patch is known, its
+            // schema is not here - counting it would tell the sync gate this device
+            // is current and let it pull documents it cannot describe.
+            if (doc.active === false) continue;
+            const version = doc.version;
+            if (typeof version !== "string" || !semver.valid(version)) continue;
+            if (!highest || semver.gt(version, highest)) highest = version;
+        }
+        return highest;
+    }
+
     private async applyConsumerPatches(patches: Patch[]) {
+        if (!patches.length) {
+            this.deferredPatches = [];
+            return;
+        }
+        // The chain protocol (ADR-0042) is scoped to patches carrying class models
+        // only. A chain with data documents falls back to the sequential path: under
+        // chaining, a data document would validate against the committed model
+        // rather than the chain's staged one - the mixed-patch extension ADR-0042
+        // records, not silently a different behavior.
+        const classOnly = patches.every(patch => (patch.docs ?? []).every(doc => isClassModel(doc)));
+        if (classOnly) {
+            return this.applyConsumerPatchChain(patches);
+        }
+        return this.applyConsumerPatchesSequential(patches);
+    }
+
+    /** The pre-ADR-0042 path: one `applyPatch` per patch, each committing on its own. */
+    private async applyConsumerPatchesSequential(patches: Patch[]) {
         const fnLogger = logger.child({ method: "applyConsumerPatches" });
         for (let index = 0; index < patches.length; index++) {
             const patch = patches[index];
@@ -1234,11 +1292,168 @@ class ClientStack extends Stack {
                     from: patch.version,
                     count: this.deferredPatches.length,
                 });
+                // Persisted as dormant ledger entries (`active: false`): the record of
+                // "known, not applied" is what keeps a deferred device honest at the
+                // sync gate, and what the successful replay later arms in place.
+                for (const deferred of this.deferredPatches) {
+                    await this.recordPatchDeferral(deferred);
+                }
                 return;
             }
             await this.applyPatch(patch);
         }
         this.deferredPatches = [];
+    }
+
+    /**
+     * The ADR-0042 protocol: the whole pending chain stages through one internal
+     * transaction - patch N+1 hydrates against the classes patch N staged, so the
+     * ADR-0038 merge composes in memory before anything is real - propagation is
+     * validated dry with nothing kept, and one commit lands every class doc as one
+     * batch through the unchanged pipeline, where real propagation runs. The ledger
+     * (ADR-0041) arms only after that commit; any refusal beforehand persists
+     * nothing and names the patch at fault.
+     */
+    private async applyConsumerPatchChain(patches: Patch[]) {
+        const fnLogger = logger.child({ method: "applyConsumerPatchChain" });
+        this.deferredPatches = [];
+
+        const t = this.transactionEngine.beginInternal();
+        // How the deferral barrier sees the chain: a class staged by an earlier
+        // patch counts as existing, so patch N+1 defers exactly as it would have
+        // when patch N had already committed - "unchanged" (ADR-0042 §2) means
+        // unchanged decisions, not unchanged lookups.
+        const stagedClassSchema = (className: string): ClassModel["schema"] | null => {
+            for (const entry of t.stage.values()) {
+                const doc: any = entry.doc;
+                if (isClassModel(doc) && (doc._id === className || doc.name === className)) {
+                    return doc.schema ?? null;
+                }
+            }
+            return null;
+        };
+        // For the dry-run's error report: which patch last touched a class.
+        const patchByClassId = new Map<string, string>();
+
+        const stagedPatches: Patch[] = [];
+        try {
+            for (let index = 0; index < patches.length; index++) {
+                const patch = patches[index];
+                if (this.isLocked() && await this.patchNeedsDocumentKey(patch, stagedClassSchema)) {
+                    this.deferredPatches = patches.slice(index);
+                    fnLogger.warn("Deferred patches that write encrypted attributes until the stack is unlocked", {
+                        from: patch.version,
+                        count: this.deferredPatches.length,
+                    });
+                    for (const deferred of this.deferredPatches) {
+                        await this.recordPatchDeferral(deferred);
+                    }
+                    break;
+                }
+                try {
+                    await this.stagePatch(t, patch);
+                } catch (error: any) {
+                    // Patch fault or init-state fault (ADR-0042): zero persisted.
+                    throw new Error(`Patch '${patch.version}' refused while staging: ${error?.message ?? error}`);
+                }
+                for (const doc of patch.docs ?? []) {
+                    if (isClassModel(doc)) patchByClassId.set(doc._id, patch.version);
+                }
+                stagedPatches.push(patch);
+            }
+
+            if (!stagedPatches.length) {
+                this.transactionEngine.discard(t);
+                return;
+            }
+
+            await this.validateChainPropagation(t, patchByClassId);
+            // Environment faults from here - a concurrent write between dry-run and
+            // commit, a per-document conflict - reject as they are: nothing recorded,
+            // the chain retries next open.
+            await this.transactionEngine.commit(t);
+            for (const patch of stagedPatches) {
+                await this.recordPatchApplication(patch);
+            }
+            fnLogger.info("Applied patch chain in one commit", { count: stagedPatches.length });
+        } catch (error) {
+            this.transactionEngine.discard(t);
+            throw error;
+        }
+    }
+
+    /**
+     * Stages one patch's documents into the chain transaction. Hydration reads
+     * through the transaction's overlay, so an `_rev: "auto"` document merges onto
+     * what an earlier patch staged - or onto committed state when the chain has not
+     * touched it.
+     */
+    private async stagePatch(t: TransactionHandle, patch: Patch): Promise<void> {
+        for (const sourceDoc of patch.docs ?? []) {
+            let doc: any = { ...sourceDoc };
+            if (doc._rev === "auto") {
+                delete doc._rev;
+                const existingDoc: any = await t.db.get(doc._id);
+                doc = { ...existingDoc, ...doc };
+                ClientStack.mergePatchSchema(sourceDoc, existingDoc, doc);
+                // The overlay hands staged docs back without a revision until one
+                // exists; the stated revision must match what the write replaces.
+                if (existingDoc._rev !== undefined) doc._rev = existingDoc._rev;
+                else delete doc._rev;
+            }
+            await t.db.put(doc);
+        }
+    }
+
+    /**
+     * ADR-0042 §3 - propagation, validated dry: for every class the chain staged
+     * over a committed predecessor, run the schema delta across the class's
+     * committed documents and keep nothing. The point is the refusal - a document
+     * that cannot satisfy the new model fails here, before the first write, naming
+     * the patch, the document and the attribute.
+     */
+    private async validateChainPropagation(t: TransactionHandle, patchByClassId: Map<string, string>): Promise<void> {
+        for (const entry of t.stage.values()) {
+            const staged: any = entry.doc;
+            if (!isClassModel(staged)) continue;
+
+            const previous = await this.db.get<ClassModel>(staged._id).catch((error: any) => {
+                if (error?.name === "not_found" || error?.status === 404) return null;
+                throw error;
+            });
+            // A class the chain creates propagates to nothing.
+            if (!previous) continue;
+
+            const schemaDelta = diff(previous.schema, staged.schema);
+            if (!schemaDelta) continue;
+
+            const classObj = await Class.buildFromModel(this, previous, { subscribe: false });
+            // Raw read, not getCards: patches apply during `create()`, before any
+            // session exists, and the policy-checked read path refuses without one.
+            // The dry-run wants the stored documents; encrypted attributes are
+            // opened explicitly when a key is present (a keyless encrypting class
+            // never reaches here - the deferral barrier held its patch back).
+            const found = await this.db.find({
+                selector: { "~class": classObj.name, active: true },
+                limit: 2 ** 31 - 1,
+            } as any);
+            const decrypts = this.cryptoEngine?.isEnabled()
+                && this.cryptoEngine.getDocumentKey()
+                && classObj.getEncryptedAttributes().length > 0;
+            for (const document of found.docs as unknown as Document[]) {
+                if (decrypts) {
+                    await this.cryptoEngine.decryptDocument(document, classObj);
+                }
+                try {
+                    await applySchemaDelta(document, schemaDelta, classObj, staged.schema);
+                } catch (error: any) {
+                    const version = patchByClassId.get(staged._id);
+                    throw new Error(
+                        `Patch '${version ?? "?"}' cannot apply to class '${classObj.name}': ${error?.message ?? error}`
+                    );
+                }
+            }
+        }
     }
 
     /**
@@ -1251,11 +1466,23 @@ class ClientStack extends Stack {
      * simulate schema evolution ahead of time.
      *
      * @param patch - The patch about to be applied.
+     * @param stagedSchema - Chain staging only (ADR-0042): resolves a class the
+     * current transaction already staged, so patch N+1 defers exactly as it would
+     * have when patch N had committed.
      * @returns `true` if any document in it belongs to a class with encrypted attributes.
      */
-    private async patchNeedsDocumentKey(patch: Patch): Promise<boolean> {
+    private async patchNeedsDocumentKey(
+        patch: Patch,
+        stagedSchema?: (className: string) => ClassModel["schema"] | null
+    ): Promise<boolean> {
         const hasEncryptedAttribute = (schema?: ClassModel["schema"]) =>
             !!schema && Object.values(schema).some((attribute: any) => attribute?.config?.encrypted === true);
+        const knownSchema = async (className: string): Promise<ClassModel["schema"] | undefined> => {
+            const staged = stagedSchema?.(className);
+            if (staged) return staged;
+            const stored = await this.getClassModel(className).catch(() => null);
+            return stored?.schema;
+        };
 
         const schemasInPatch = new Map<string, ClassModel["schema"]>();
         for (const doc of patch.docs) {
@@ -1263,15 +1490,26 @@ class ClientStack extends Stack {
         }
 
         for (const doc of patch.docs) {
-            // Class models describe encryption; they never carry an encrypted value.
-            if (isClassModel(doc)) continue;
+            // A class model carries no encrypted value itself - but *updating* one
+            // triggers propagation over the class's existing documents (ADR-0038),
+            // and when the class encrypts, that propagation both decrypts (getCards)
+            // and re-encrypts (the rewrite): key work on both sides. A locked stack
+            // must defer it or the replay fails on the first document (ADR-0040).
+            // A class that does not exist yet propagates to nothing and stays safe
+            // to apply locked - that is how the schema itself can arrive pre-unlock.
+            if (isClassModel(doc)) {
+                const predecessor = await knownSchema((doc as any).name ?? doc._id);
+                if (predecessor && (hasEncryptedAttribute(predecessor) || hasEncryptedAttribute(doc.schema))) {
+                    return true;
+                }
+                continue;
+            }
             const className = (doc as any)["~class"];
             if (!className) continue;
 
             if (hasEncryptedAttribute(schemasInPatch.get(className))) return true;
 
-            const stored = await this.getClassModel(className).catch(() => null);
-            if (hasEncryptedAttribute(stored?.schema)) return true;
+            if (hasEncryptedAttribute(await knownSchema(className))) return true;
         }
         return false;
     }
@@ -1463,62 +1701,111 @@ class ClientStack extends Stack {
         }
     }
 
+    /**
+     * Finds a patch's ledger entry, raw - ledger documents are read outside the
+     * `active: true` visibility convention because `active` carries the ledger's own
+     * meaning here: `true` is applied, `false` is deferred, absent is a legacy entry
+     * from before the flag (treated as applied). See ADR-0041.
+     */
+    private async findPatchLedgerEntry(patch: Patch): Promise<(Patch & { _id: string; _rev: string; active?: boolean }) | null> {
+        const selector: { [key: string]: any } = { "~class": "patch", version: patch.version };
+        // A targetless patch is legal; `undefined` in a Mango selector is not.
+        if (patch.target !== undefined) selector.target = patch.target;
+        const found = await this.db.find({ selector, limit: 10 } as any).catch(() => ({ docs: [] as any[] }));
+        return (found.docs[0] as any) ?? null;
+    }
+
+    /**
+     * Records a successful application: the ledger entry arms with `active: true` -
+     * flipping the deferral entry in place when one exists, so a replayed patch does
+     * not duplicate its record.
+     */
+    private async recordPatchApplication(patch: Patch): Promise<void> {
+        const existing = await this.findPatchLedgerEntry(patch);
+        if (existing) {
+            if (existing.active === true) return;
+            await this.db.put({ ...existing, active: true, appliedTimestamp: Date.now() });
+            return;
+        }
+        await this.db.post({ createTimestamp: Date.now(), ...patch, active: true });
+    }
+
+    /**
+     * Records a deferral: the patch is known but dormant (`active: false`), waiting
+     * on the document key. The entry is what makes a deferred device honest at the
+     * sync gate - {@link getConsumerSchemaVersion} does not count it.
+     */
+    private async recordPatchDeferral(patch: Patch): Promise<void> {
+        const existing = await this.findPatchLedgerEntry(patch);
+        if (existing) return;
+        await this.db.post({ createTimestamp: Date.now(), ...patch, active: false });
+    }
+
+    /**
+     * The ADR-0038 half of patch hydration: `schema` does not ride the shallow
+     * merge, which would replace it wholesale - it merges attribute by attribute.
+     * A patch states only the attributes it changes, an absent attribute stays as
+     * stored, and an explicit `null` entry drops the attribute - from the model
+     * here, and from the documents when the write propagates. Shared by
+     * {@link applyPatch} and the chain staging of ADR-0042 so the two cannot drift.
+     */
+    private static mergePatchSchema(sourceDoc: any, existingDoc: any, doc: any): void {
+        const incoming = sourceDoc?.schema;
+        const stored = existingDoc?.schema;
+        if (incoming && typeof incoming === "object" && !Array.isArray(incoming)
+            && stored && typeof stored === "object" && !Array.isArray(stored)) {
+            const merged: Record<string, unknown> = { ...stored, ...incoming };
+            for (const name of Object.keys(incoming)) {
+                if (incoming[name] === null) delete merged[name];
+            }
+            doc.schema = merged;
+        }
+    }
+
     applyPatch = async (patch: Patch): Promise<string> => {
         const fnLogger = logger.child({ method: "applyPatch", args: { patch } });
-        return new Promise<string>(async (resolve, reject) => {
-            try {
-                fnLogger.info("Attempting to apply patch", { patch })
-                fnLogger.info("applyPatch - starting to hydrate patch docs", { docCount: patch.docs.length });
-                const hydratedDocs = await Promise.all(patch.docs.map(async sourceDoc => {
-                    // Work on a copy: the patch definition must survive intact. System
-                    // patches are module-level objects shared by every stack in the
-                    // process, so deleting `_rev` from one would strip the "auto" marker
-                    // permanently — the next ClientStack created in the same context
-                    // would then rewrite those documents as fresh inserts, hit a 409,
-                    // and end up without its `class` class model.
-                    let doc = { ...sourceDoc };
-                    if (doc._rev === "auto") {
-                        delete doc._rev;
-                        const existingDoc = await this.db.get(doc._id);
-                        if (existingDoc) {
-                            doc = { ...existingDoc, ...doc };
-                            // `schema` does not ride the shallow merge above, which would
-                            // replace it wholesale: it merges attribute by attribute. A
-                            // patch states only the attributes it changes, an absent
-                            // attribute stays as stored, and an explicit `null` entry
-                            // drops the attribute - from the model here, and from the
-                            // documents when the write propagates. See ADR-0038.
-                            const incoming = (sourceDoc as any).schema;
-                            const stored = (existingDoc as any).schema;
-                            if (incoming && typeof incoming === "object" && !Array.isArray(incoming)
-                                && stored && typeof stored === "object" && !Array.isArray(stored)) {
-                                const merged: Record<string, unknown> = { ...stored, ...incoming };
-                                for (const name of Object.keys(incoming)) {
-                                    if (incoming[name] === null) delete merged[name];
-                                }
-                                (doc as any).schema = merged;
-                            }
-                        }
-                    }
-                    return doc;
-                }));
-                fnLogger.info("applyPatch - hydration complete, calling bulkDocs", { docCount: hydratedDocs.length });
-                await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions).then((result) => {
-                    fnLogger.warn("applyPatch - bulkDocs completed with result", { result });
-                    fnLogger.warn("Successfully processed patch", { version: patch.version });
-                }).catch((error) => {
-                    fnLogger.error("applyPatch - bulkDocs error", { error });
-                    reject(error);
-                });
-                // Store patch itself
-                await this.db.post({createTimestamp: (new Date()).valueOf(), ...patch});
-                fnLogger.info("Successfully stored patch", { version: patch.version, target: patch.target });
-                resolve(patch.version);
-            } catch (e: any) {
-                fnLogger.error("Failed to apply patch", e)
-                reject(new Error(e));
+        fnLogger.info("Attempting to apply patch", { patch })
+        fnLogger.info("applyPatch - starting to hydrate patch docs", { docCount: patch.docs.length });
+        const hydratedDocs = await Promise.all(patch.docs.map(async sourceDoc => {
+            // Work on a copy: the patch definition must survive intact. System
+            // patches are module-level objects shared by every stack in the
+            // process, so deleting `_rev` from one would strip the "auto" marker
+            // permanently — the next ClientStack created in the same context
+            // would then rewrite those documents as fresh inserts, hit a 409,
+            // and end up without its `class` class model.
+            let doc = { ...sourceDoc };
+            if (doc._rev === "auto") {
+                delete doc._rev;
+                const existingDoc = await this.db.get(doc._id);
+                if (existingDoc) {
+                    doc = { ...existingDoc, ...doc };
+                    ClientStack.mergePatchSchema(sourceDoc, existingDoc, doc);
+                }
             }
-        });
+            return doc;
+        }));
+        fnLogger.info("applyPatch - hydration complete, calling bulkDocs", { docCount: hydratedDocs.length });
+        // A failing batch throws here and nothing below runs: the ledger records the
+        // moment of SUCCESSFUL application, never the attempt. The old flow rejected
+        // on failure but kept executing, so a failed patch was recorded as applied
+        // and never retried - a device whose schema trailed forever (ADR-0041).
+        const result = await this.db.bulkDocs(hydratedDocs, { isPatch: true } as PouchDB.Core.BulkDocsOptions);
+        // Per-document failures arrive in the RESOLVED array (the ADR-0038 discipline):
+        // a patch whose batch half-landed must not arm its ledger entry, or the next
+        // open would skip it and apply its dependents against a schema it never
+        // finished installing. The retry converges - hydration re-merges over whatever
+        // did land.
+        const failures = (result as any[]).filter(entry => entry && (entry as any).error);
+        if (failures.length) {
+            throw new Error(
+                `applyPatch - patch '${patch.version}' failed for ${failures.length} document(s): ` +
+                failures.map((f: any) => `${f.id}: ${f.message ?? f.name}`).join("; ")
+            );
+        }
+        fnLogger.info("applyPatch - bulkDocs completed", { result });
+        await this.recordPatchApplication(patch);
+        fnLogger.info("Successfully applied and recorded patch", { version: patch.version, target: patch.target });
+        return patch.version;
     }
 
     private async applyPatches(schemaVersion: string | undefined): Promise<string> {

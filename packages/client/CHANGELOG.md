@@ -2,6 +2,32 @@
 
 ## 0.2.0 - 2026/09/03
 
+### Added (2026/09/04)
+
+- **Class-model patch chains apply through one internal transaction** (ADR-0042).
+  The pending chain stages through a transaction's overlay - patch N+1 hydrates
+  against the classes patch N staged, so the ADR-0038 merge composes in memory -
+  propagation is validated dry with nothing kept, and one commit lands every class
+  doc as a single batch through the unchanged pipeline; the patch ledger
+  (ADR-0041) arms only after. A refusal before commit persists nothing, records
+  nothing, and names the patch, class and attribute at fault; a chain over a fresh
+  class now stores its composed schema as one revision. Patches carrying data
+  documents keep the sequential path (the mixed-patch extension stays recorded in
+  ADR-0042); system patches are untouched.
+
+### Security
+
+- **Replication no longer pushes encrypted attributes in plaintext.** PouchDB
+  hard-binds its instance methods, so the pristine `bulkGet` the sync layer reads
+  through re-entered the plugin's decrypting `get` per revision (its shim and the
+  `open_revs` branch both dispatch through `this.get`) - every push since the
+  decrypt-on-read restoration (0.1.8) delivered plaintext to the remote under the
+  local revision id, while the local database stayed ciphertext. The `get` override
+  now serves the stored form for any revision-addressed read (`{rev}`/`{open_revs}`);
+  winning-revision reads still decrypt. **Remotes written by 0.1.8 should be treated
+  as having held plaintext** and re-created or purged. Pinned by a test asserting
+  remote ciphertext with zero plaintext in the serialized document. (ADR-0040)
+
 ### Added
 
 - **Named write transactions** (`transactions: true` per stack). A handle from
@@ -25,6 +51,25 @@
 
 ### Fixed
 
+- **Sync while locked, three junctions closed** (ADR-0040): the schema gate now
+  publishes and compares the highest applied **consumer** patch version alongside
+  the system version, so a device whose application patches trail the remote
+  (deferred behind the document key, or an older build) refuses with
+  `SyncSchemaMismatchError { scope: "consumer" }` instead of pulling documents its
+  schema cannot describe - and passes after unlock replays the deferral. Class-model
+  patches over a class with encrypted attributes now **defer while locked** like the
+  data patches they propagate onto (propagation decrypts and re-encrypts every
+  document of the class); a class that does not exist yet still applies locked.
+  Propagation's re-encryption of untouched encrypted attributes is now pinned by a
+  test.
+- **Reopening a stack no longer re-applies consumer patches, and the ledger arms on
+  `active`** (ADR-0041): a ledger entry is written with `active: true` at the moment
+  of *successful* application only - the old flow recorded even failed applications
+  as applied, so a refused patch never retried and the device's schema trailed
+  permanently. A patch deferred behind the document key persists as a dormant entry
+  (`active: false`) that the unlock replay arms in place; dormant entries neither
+  satisfy the open-time dedupe nor count toward the sync gate's consumer version.
+  Flagless legacy entries are treated as applied.
 - **A relation written in the same batch as its endpoint no longer fails the
   endpoint check** - the plugin resolves batch-mates before declaring an endpoint
   missing. Surfaced by transaction commits, but a fix for plain mixed batches too.

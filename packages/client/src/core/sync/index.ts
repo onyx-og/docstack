@@ -154,15 +154,22 @@ export class SyncSchemaMismatchError extends Error {
     /** The schema version the remote was last written with. */
     readonly remoteVersion: string;
 
-    constructor(stack: string, localVersion: string | undefined, remoteVersion: string) {
+    /** Which half of the gate refused: the system schema, or the application's consumer patches. */
+    readonly scope: "system" | "consumer";
+
+    constructor(stack: string, localVersion: string | undefined, remoteVersion: string, scope: "system" | "consumer" = "system") {
         super(
-            `Stack '${stack}' cannot sync: the remote was last written with schema version ` +
-            `${remoteVersion}, this device has ${localVersion || "no schema version"}. Update the ` +
-            `application so its patches reach ${remoteVersion} before syncing again.`
+            `Stack '${stack}' cannot sync: the remote was last written with ` +
+            `${scope === "consumer" ? "consumer patch" : "schema"} version ` +
+            `${remoteVersion}, this device has ${localVersion || "none"}. ` +
+            (scope === "consumer"
+                ? `Apply the application's patches up to ${remoteVersion} - a deferred patch applies on unlock - before syncing again.`
+                : `Update the application so its patches reach ${remoteVersion} before syncing again.`)
         );
         this.stack = stack;
         this.localVersion = localVersion;
         this.remoteVersion = remoteVersion;
+        this.scope = scope;
     }
 }
 
@@ -181,6 +188,12 @@ export interface SyncMetaDoc {
     _rev?: string;
     /** Highest schema version any device has pushed to this remote. */
     schemaVersion?: string;
+    /**
+     * Highest *consumer* patch version any device has pushed. The system version
+     * alone cannot see consumer-schema skew - two devices on the same build always
+     * agree on it, whatever their application patches are doing (ADR-0040).
+     */
+    consumerSchemaVersion?: string;
     /** Application version of the device that last wrote it, for diagnostics. */
     appVersion?: string;
     /** When it was last written. */
@@ -213,6 +226,20 @@ export const readRemoteSchemaVersion = async (remote: PouchDB.Database): Promise
 };
 
 /**
+ * Reads the highest consumer patch version recorded on a remote.
+ *
+ * `null` for a remote nobody has written, or one written only by builds that
+ * predate the consumer half of the gate.
+ */
+export const readRemoteConsumerSchemaVersion = async (remote: PouchDB.Database): Promise<string | null> => {
+    const meta = await remote.get<SyncMetaDoc>(SYNC_META_DOC_ID).catch((error: any) => {
+        if (isMissing(error)) return null;
+        throw error;
+    });
+    return meta?.consumerSchemaVersion || null;
+};
+
+/**
  * Records this device's schema version on a remote, if it is the newest seen.
  *
  * @param remote - The remote database.
@@ -222,24 +249,35 @@ export const readRemoteSchemaVersion = async (remote: PouchDB.Database): Promise
 export const publishSchemaVersion = async (
     remote: PouchDB.Database,
     schemaVersion: string | undefined,
-    appVersion?: string
+    appVersion?: string,
+    consumerSchemaVersion?: string | null
 ): Promise<void> => {
-    if (!schemaVersion) return;
+    if (!schemaVersion && !consumerSchemaVersion) return;
 
     const existing = await remote.get<SyncMetaDoc>(SYNC_META_DOC_ID).catch((error: any) => {
         if (isMissing(error)) return null;
         throw error;
     });
 
-    const recorded = existing?.schemaVersion;
-    if (recorded && semver.valid(recorded) && semver.valid(schemaVersion) && !semver.gt(schemaVersion, recorded)) {
+    // Each version field is monotonic on its own: the marker records the highest
+    // either kind has ever reached, whichever device wrote it.
+    const advances = (candidate: string | null | undefined, recorded: string | undefined) =>
+        Boolean(candidate) && (!recorded
+            || !semver.valid(recorded) || !semver.valid(candidate!)
+            || semver.gt(candidate!, recorded));
+    const systemAdvances = advances(schemaVersion, existing?.schemaVersion);
+    const consumerAdvances = advances(consumerSchemaVersion, existing?.consumerSchemaVersion);
+    if (!systemAdvances && !consumerAdvances) {
         return;
     }
 
     const doc: SyncMetaDoc = {
         ...(existing || {}),
         _id: SYNC_META_DOC_ID,
-        schemaVersion,
+        schemaVersion: systemAdvances ? schemaVersion : existing?.schemaVersion,
+        ...(consumerAdvances
+            ? { consumerSchemaVersion: consumerSchemaVersion as string }
+            : (existing?.consumerSchemaVersion ? { consumerSchemaVersion: existing.consumerSchemaVersion } : {})),
         appVersion,
         updatedAt: Date.now(),
     };
@@ -457,11 +495,28 @@ export class StackSyncHandle extends EventTarget {
             }
         }
 
+        // The consumer half of the gate: the system version cannot see consumer-patch
+        // skew - two devices on the same build always agree on it - so a device whose
+        // application patches trail the remote (deferred behind the document key, or
+        // an older build) would pull documents shaped by a schema it does not have,
+        // and the deferred replay would then propagate over them (ADR-0040). The
+        // ledger answers locally; a remote written only by older builds records
+        // nothing and gates nothing.
+        const localConsumer = await this.stack.getConsumerSchemaVersion();
+        const remoteConsumer = await readRemoteConsumerSchemaVersion(remote);
+        if (remoteConsumer && semver.valid(remoteConsumer)) {
+            const ahead = !localConsumer
+                || (Boolean(semver.valid(localConsumer)) && semver.gt(remoteConsumer, localConsumer));
+            if (ahead) {
+                throw new SyncSchemaMismatchError(this.stack.name, localConsumer ?? undefined, remoteConsumer, "consumer");
+            }
+        }
+
         // Only a device that writes to the remote gets to claim its schema version.
         // A pull-only device publishing would lock older peers out of a remote that
         // holds nothing they cannot read.
         if (this.direction !== "pull") {
-            await publishSchemaVersion(remote, localVersion, this.stack.appVersion);
+            await publishSchemaVersion(remote, localVersion, this.stack.appVersion, localConsumer);
         }
     }
 

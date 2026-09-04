@@ -169,6 +169,13 @@ export const createReplicationDb = <T extends {}>(
     db: PouchDB.Database<T>,
     pristine: { bulkDocs: Function; bulkGet: Function; get: Function }
 ): PouchDB.Database<T> => {
+    // Note the limit of what this handle can restore: PouchDB hard-binds instance
+    // methods at construction (`this.bulkGet = adapterFun(...).bind(this)`), so the
+    // pristine functions run against the raw instance no matter what they are bound
+    // to here - and pouchdb-core's `bulkGet`/`open_revs` internals re-enter
+    // `this.get`, which is the plugin's override. The override itself is therefore
+    // the one place that can keep those internal hops raw: it serves the stored form
+    // for any revision-addressed read (ADR-0040).
     const bulkDocs = pristine.bulkDocs.bind(db);
     const bulkGet = pristine.bulkGet.bind(db);
     // `get` restored for the same reason as `bulkGet`: since ADR-0032 the plugin

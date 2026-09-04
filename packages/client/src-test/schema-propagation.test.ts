@@ -180,6 +180,56 @@ describe("schema propagation", () => {
         expect(result.notes).toBe("held");
     });
 
+    it("ADR-0040: propagation re-encrypts what it read decrypted", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "schema-prop-reencrypt",
+            username: "reenc-user",
+            password: "reenc-pass",
+            evaluate: async ({ stack }) => {
+                const { Class } = (window as any).docstack;
+
+                const secretClass = await Class.create(stack, "ReencTask", "class", "Tasks", {
+                    title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
+                    secret: { name: "secret", type: "string", config: { mandatory: true, encrypted: true } },
+                });
+                const card = await secretClass.addCard({ title: "one", secret: "classified" });
+
+                // The propagation driver reads through getCards - a *decrypting* read -
+                // and writes the updates back through the authoring path. If that write
+                // did not re-encrypt, a schema patch would be a silent decrypt-at-rest
+                // of every document it touches.
+                await stack.applyPatch({
+                    "~class": "patch",
+                    version: "1.0.6",
+                    changelog: "add a plain attribute next to an encrypted one",
+                    docs: [{
+                        _id: secretClass.getId(),
+                        "~class": "class",
+                        _rev: "auto",
+                        schema: { flag: { name: "flag", type: "string", config: {} } },
+                    }],
+                });
+
+                const raw: any = await stack.getReplicationHandle().get(card._id);
+                const read: any = await stack.getDocument(card._id);
+
+                return {
+                    propagated: "flag" in raw,
+                    atRestEncrypted: raw.secret?.__enc === true,
+                    plaintextLeaked: JSON.stringify(raw).includes("classified"),
+                    readSecret: read.secret,
+                };
+            },
+        });
+
+        // The rewrite really happened...
+        expect(result.propagated).toBe(true);
+        // ...and the untouched encrypted attribute went back in as ciphertext.
+        expect(result.atRestEncrypted).toBe(true);
+        expect(result.plaintextLeaked).toBe(false);
+        expect(result.readSecret).toBe("classified");
+    });
+
     it("ADR-0036: an in-place model edit arrives as a nested delta and is enforced", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "schema-prop-nested",

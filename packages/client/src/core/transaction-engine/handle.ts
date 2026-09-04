@@ -43,6 +43,12 @@ export class TransactionHandle {
     readonly stage = new TransactionStage();
     /** @internal - ids this handle minted, counted into the id counter after commit. */
     readonly mintedIds = new Set<string>();
+    /**
+     * True for handles DocStack mints for its own machinery (patch application,
+     * ADR-0042). Internal handles may stage class models; public ones refuse them.
+     * @internal
+     */
+    readonly internal: boolean;
 
     private statusValue: TransactionStatus = "open";
     private readonly stack: ClientStack;
@@ -52,10 +58,11 @@ export class TransactionHandle {
     readonly db: TransactionDb;
 
     /** @internal */
-    constructor(stack: ClientStack, engine: TransactionEngine, id: string) {
+    constructor(stack: ClientStack, engine: TransactionEngine, id: string, internal = false) {
         this.stack = stack;
         this.engine = engine;
         this.id = id;
+        this.internal = internal;
         this.db = new TransactionDb(stack, this);
     }
 
@@ -116,7 +123,7 @@ export class TransactionHandle {
             stagedAt: Date.now(),
         };
         delete (entry.doc as any)._rev;
-        await sweepEntry(this.stack, this.stage, entry);
+        await sweepEntry(this.stack, this.stage, entry, { allowClassModels: this.internal });
         this.stage.set(docId, entry);
         return this.stage.get(docId)!;
     }
