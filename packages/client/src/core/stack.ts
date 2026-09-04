@@ -26,8 +26,8 @@ import {
     ChangesSubscription,
 } from "@docstack/shared";
 
-import { SystemDoc, Patch, ClassModel, Document, RelationDocument } from "@docstack/shared";
-import { StackPlugin } from "../plugins/pouchdb.js";
+import { SystemDoc, Patch, PatchJob, ClassModel, Document, RelationDocument } from "@docstack/shared";
+import { StackPlugin, StackLockedError } from "../plugins/pouchdb.js";
 
 import { createGuardedDb, createReplicationDb } from "./guarded-db.js";
 import { StackSyncHandle } from "./sync/index.js";
@@ -40,7 +40,7 @@ import { JobScheduler } from "./job-engine/scheduler.js";
 import { PolicyEngine } from "./policy-engine/index.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
-import { TransactionEngine, TransactionHandle, TransactionStage, TransactionCommitReport } from "./transaction-engine/index.js";
+import { TransactionEngine, TransactionHandle, TransactionStage, TransactionCommitReport, classFromStage } from "./transaction-engine/index.js";
 import { stageCoversSelector, mergeStageIntoResults, widenProjection } from "./transaction-engine/overlay.js";
 import {
     CONTENT_EXPORT_FORMAT,
@@ -1269,48 +1269,167 @@ class ClientStack extends Stack {
             this.deferredPatches = [];
             return;
         }
-        // The chain protocol (ADR-0042) is scoped to patches carrying class models
-        // only. A chain with data documents falls back to the sequential path: under
-        // chaining, a data document would validate against the committed model
-        // rather than the chain's staged one - the mixed-patch extension ADR-0042
-        // records, not silently a different behavior.
-        const classOnly = patches.every(patch => (patch.docs ?? []).every(doc => isClassModel(doc)));
-        if (classOnly) {
-            return this.applyConsumerPatchChain(patches);
-        }
-        return this.applyConsumerPatchesSequential(patches);
+        // EVERY consumer chain - class models, data documents, jobs, mixed - stages
+        // through the one internal transaction (ADR-0042). The original protocol
+        // scoped itself to class-only chains and kept a sequential fallback for the
+        // rest; the mixed extension it recorded turned out to be already built (the
+        // sweep judges data docs by staged models since ADR-0044, and the pipeline
+        // resolves batch-mates regardless of order since ADR-0043), so the fork was
+        // deleted rather than extended. A data-only chain gains the same contract:
+        // all-or-nothing, nothing armed unless the whole chain lands.
+        return this.applyConsumerPatchChain(patches);
     }
 
-    /** The pre-ADR-0042 path: one `applyPatch` per patch, each committing on its own. */
-    private async applyConsumerPatchesSequential(patches: Patch[]) {
-        const fnLogger = logger.child({ method: "applyConsumerPatches" });
-        for (let index = 0; index < patches.length; index++) {
-            const patch = patches[index];
-            if (this.isLocked() && await this.patchNeedsDocumentKey(patch)) {
-                this.deferredPatches = patches.slice(index);
-                fnLogger.warn("Deferred patches that write encrypted attributes until the stack is unlocked", {
-                    from: patch.version,
-                    count: this.deferredPatches.length,
-                });
-                // Persisted as dormant ledger entries (`active: false`): the record of
-                // "known, not applied" is what keeps a deferred device honest at the
-                // sync gate, and what the successful replay later arms in place.
-                for (const deferred of this.deferredPatches) {
-                    await this.recordPatchDeferral(deferred);
-                }
-                return;
+    /**
+     * The stack a patch job executes against (ADR-0044): reads see the chain
+     * transaction's overlay, writes stage into it - so a migration's data
+     * transformation lands in the same commit as the model it prepares, or not at
+     * all. While the stack is locked, class-aware reads of an encrypting class
+     * THROW instead of serving the null convention: a migration wants the refusal
+     * (a `requiresKey: false` job that was declared wrongly must fail loudly, and
+     * the chain converts that failure to a deferral). Raw reads (`db.find`) bypass
+     * the class-aware path by design and stay the author's responsibility.
+     */
+    private createPatchJobStack(t: TransactionHandle): ClientStack {
+        const stack = this;
+        const resolveClass = async (className: string) =>
+            classFromStage(stack, t.stage, className)
+            ?? await stack.getClassSnapshot(className).catch(() => null);
+        const assertReadableWhileLocked = async (className: unknown) => {
+            if (!stack.isLocked() || typeof className !== "string" || !className) return;
+            const classObj = await resolveClass(className);
+            if (classObj && classObj.getEncryptedAttributes().length) {
+                throw new StackLockedError(className);
             }
-            await this.applyPatch(patch);
+        };
+        const selectorClassNames = (selector: any): string[] => {
+            const constraint = selector?.["~class"];
+            if (typeof constraint === "string") return [constraint];
+            if (constraint && typeof constraint === "object") {
+                if (typeof constraint.$eq === "string") return [constraint.$eq];
+                if (Array.isArray(constraint.$in)) return constraint.$in.filter((name: any) => typeof name === "string");
+            }
+            return [];
+        };
+
+        // Reads are SYSTEM-LEVEL: raw overlay plus decrypt-when-keyed, never the
+        // policy-filtered pipeline. A migration runs before any session exists,
+        // and a policy-filtered massage would silently transform only the subset
+        // an absent session could see - the patch path's own direct writes never
+        // pass through policy either.
+        const openWhenKeyed = async (doc: any) => {
+            if (!doc || !stack.cryptoEngine?.isEnabled() || !stack.cryptoEngine.getDocumentKey()) return doc;
+            if (!stack.cryptoEngine.identifyEncryptedKeys(doc).length) return doc;
+            const classObj = await stack.getClassSnapshot(doc["~class"]).catch(() => null);
+            if (classObj) await stack.cryptoEngine.decryptDocument(doc, classObj);
+            return doc;
+        };
+
+        const facade: any = Object.create(stack);
+        facade.findDocuments = async (selector: any, fields?: string[], skip?: number, limit?: number, sort?: any) => {
+            for (const name of selectorClassNames(selector)) await assertReadableWhileLocked(name);
+            const withDefault = selector?.hasOwnProperty("active") ? selector : { ...selector, active: true };
+            const { docs } = await t.db.find({ selector: withDefault, fields, skip, limit, sort });
+            for (const doc of docs) await openWhenKeyed(doc);
+            return { docs, selector: withDefault, skip, limit };
+        };
+        facade.findDocumentsIterator = async function* (selector: any, options: { fields?: string[] } = {}) {
+            const result = await facade.findDocuments(selector, options.fields);
+            for (const doc of result.docs) yield doc;
+        };
+        facade.canApplyQueryLimitEarly = async () => false;
+        facade.ensureSortIndex = async () => false;
+        facade.query = (sql: string, ...params: any[]) => stack.runQuery(sql, params, facade);
+        facade.getDocument = async (docId: string) => {
+            const doc: any = await t.db.get(docId);
+            await assertReadableWhileLocked(doc?.["~class"]);
+            return openWhenKeyed(doc);
+        };
+        facade.createDoc = (docId: string | null, type: string, _classObj: any, params: any) =>
+            t.createDoc(docId, type, params);
+        facade.createDocs = (docs: { docId: string | null; params: any }[], type: string) =>
+            t.createDocs(docs, type);
+        facade.deleteDocument = (docId: string) => t.deleteDocument(docId);
+        facade.getClass = async (name: string, ...rest: any[]) => {
+            // A class an earlier patch staged exists for this job even though it is
+            // not committed yet - the ADR-0043 rule, applied to the chain.
+            const real = classFromStage(stack, t.stage, name) ?? await stack.getClass(name, ...rest);
+            if (!real) return real;
+            const wrapped = Object.create(real);
+            wrapped.getCards = (selector?: any, fields?: string[], skip?: number, limit?: number, sort?: any) =>
+                facade.findDocuments({ ...(selector || {}), "~class": { $eq: (real as any).name } }, fields, skip, limit, sort)
+                    .then((result: any) => result.docs);
+            wrapped.addCard = (params: any) => t.createDoc(null, (real as any).name, params);
+            wrapped.addCards = (cards: any[]) =>
+                t.createDocs(cards.map((params: any) => ({ docId: null, params })), (real as any).name);
+            wrapped.deleteCard = (cardId: string) => t.deleteDocument(cardId);
+            return wrapped;
+        };
+        facade.db = {
+            get: async (docId: string, options?: any) => {
+                const doc: any = await t.db.get(docId, options);
+                await assertReadableWhileLocked(doc?.["~class"]);
+                return openWhenKeyed(doc);
+            },
+            bulkGet: (request: any) => t.db.bulkGet(request),
+            find: (query: any) => t.db.find(query),
+            put: (doc: any, options?: any) => t.db.put(doc, options),
+            post: (doc: any) => t.db.post(doc),
+            remove: (doc: any, rev?: any) => t.db.remove(doc, rev),
+            bulkDocs: (docs: any, options?: any) => t.db.bulkDocs(docs, options),
+        };
+        return facade as ClientStack;
+    }
+
+    /**
+     * Runs one of a patch's one-shot jobs against the transaction facade. The run
+     * receipt is a `~JobRun` with NO `jobId` - patch jobs are deliberately never
+     * persisted as `~Job` documents, so there is no row to point at (`~sys-0.0.17`
+     * made the foreign key optional for exactly this) - carrying the patch
+     * identity in `runtimeArgs`. It writes DIRECTLY, win or lose: a failed
+     * migration's receipt is the troubleshooting trail and must survive the
+     * discard that protects everything else (ADR-0044).
+     */
+    private async runPatchJob(t: TransactionHandle, patch: Patch, phase: "preApply" | "postApply"): Promise<void> {
+        const job = patch[phase]!;
+        const shortPhase = phase === "preApply" ? "pre" : "post";
+        const startTime = Date.now();
+        const receipt: any = {
+            _id: `JobRun-${this.cryptoEngine.generateRandomString(12)}`,
+            "~class": "~JobRun",
+            status: "FAILURE",
+            triggerType: "event",
+            startTime,
+            runtimeArgs: {
+                patchVersion: patch.version,
+                patchTarget: patch.target ?? "app",
+                phase: shortPhase,
+                jobName: job.name,
+            },
+        };
+        try {
+            const facade = this.createPatchJobStack(t);
+            // The ~Job convention, verbatim: content defines execute(stack, params, job).
+            const fn = new Function("stack", "params", "job", `"use strict"; ${job.content}; return execute(stack, params, job);`);
+            await fn(facade, job.params ?? {}, { name: job.name, phase: shortPhase, version: patch.version });
+            receipt.status = "SUCCESS";
+        } catch (error: any) {
+            receipt.errorMessage = String(error?.message ?? error);
+            throw error;
+        } finally {
+            receipt.endTime = Date.now();
+            receipt.durationMs = receipt.endTime - startTime;
+            await this.db.bulkDocs([receipt]).catch(() => undefined);
         }
-        this.deferredPatches = [];
     }
 
     /**
      * The ADR-0042 protocol: the whole pending chain stages through one internal
      * transaction - patch N+1 hydrates against the classes patch N staged, so the
      * ADR-0038 merge composes in memory before anything is real - propagation is
-     * validated dry with nothing kept, and one commit lands every class doc as one
-     * batch through the unchanged pipeline, where real propagation runs. The ledger
+     * validated dry with nothing kept, and one commit lands every staged doc (class
+     * models and data documents alike, since the mixed extension) as one batch
+     * through the unchanged pipeline, where real propagation runs. The ledger
      * (ADR-0041) arms only after that commit; any refusal beforehand persists
      * nothing and names the patch at fault.
      */
@@ -1335,26 +1454,45 @@ class ClientStack extends Stack {
         // For the dry-run's error report: which patch last touched a class.
         const patchByClassId = new Map<string, string>();
 
+        const deferFrom = async (index: number) => {
+            this.deferredPatches = patches.slice(index);
+            fnLogger.warn("Deferred patches until the stack is unlocked", {
+                from: patches[index].version,
+                count: this.deferredPatches.length,
+            });
+            for (const deferred of this.deferredPatches) {
+                await this.recordPatchDeferral(deferred);
+            }
+        };
+
         const stagedPatches: Patch[] = [];
         try {
             for (let index = 0; index < patches.length; index++) {
                 const patch = patches[index];
                 if (this.isLocked() && await this.patchNeedsDocumentKey(patch, stagedClassSchema)) {
-                    this.deferredPatches = patches.slice(index);
-                    fnLogger.warn("Deferred patches that write encrypted attributes until the stack is unlocked", {
-                        from: patch.version,
-                        count: this.deferredPatches.length,
-                    });
-                    for (const deferred of this.deferredPatches) {
-                        await this.recordPatchDeferral(deferred);
-                    }
+                    await deferFrom(index);
                     break;
                 }
+                // One patch's whole staging - pre-apply job writes included - can be
+                // unwound alone: a locked refusal converts this patch to a deferral
+                // while the already-staged prefix goes on to commit.
+                const before = t.stage.snapshot();
                 try {
+                    if (patch.preApply) {
+                        await this.runPatchJob(t, patch, "preApply");
+                    }
                     await this.stagePatch(t, patch);
                 } catch (error: any) {
+                    if (this.isLocked() && error?.name === "StackLockedError") {
+                        // A `requiresKey: false` claimed wrongly (ADR-0044): degrade
+                        // to what a correct declaration would have done, instead of
+                        // failing the open.
+                        t.stage.restore(before);
+                        await deferFrom(index);
+                        break;
+                    }
                     // Patch fault or init-state fault (ADR-0042): zero persisted.
-                    throw new Error(`Patch '${patch.version}' refused while staging: ${error?.message ?? error}`);
+                    throw new Error(`Patch '${patch.version}' refused while ${patch.preApply ? "preparing" : "staging"}: ${error?.message ?? error}`);
                 }
                 for (const doc of patch.docs ?? []) {
                     if (isClassModel(doc)) patchByClassId.set(doc._id, patch.version);
@@ -1372,14 +1510,44 @@ class ClientStack extends Stack {
             // commit, a per-document conflict - reject as they are: nothing recorded,
             // the chain retries next open.
             await this.transactionEngine.commit(t);
-            for (const patch of stagedPatches) {
-                await this.recordPatchApplication(patch);
-            }
-            fnLogger.info("Applied patch chain in one commit", { count: stagedPatches.length });
         } catch (error) {
             this.transactionEngine.discard(t);
             throw error;
         }
+
+        // Post-apply phase (ADR-0044): the models have landed; backfills run in a
+        // second staged transaction, one commit of their own, and the ledger arms
+        // only after. A post failure leaves the chain unarmed: the next open
+        // re-stages to an empty diff and re-runs post - which is why jobs must be
+        // idempotent.
+        if (stagedPatches.some(patch => patch.postApply)) {
+            const post = this.transactionEngine.beginInternal();
+            try {
+                for (const patch of stagedPatches) {
+                    if (!patch.postApply) continue;
+                    await this.runPatchJob(post, patch, "postApply");
+                }
+                await this.transactionEngine.commit(post);
+            } catch (error: any) {
+                this.transactionEngine.discard(post);
+                if (this.isLocked() && error?.name === "StackLockedError") {
+                    // Models landed, backfill needs the key: hold the arming behind
+                    // it. Dormant entries keep the sync gate honest, and the unlock
+                    // replay re-runs the (idempotent) chain and arms.
+                    for (const patch of stagedPatches) {
+                        await this.recordPatchDeferral(patch);
+                    }
+                    this.deferredPatches = [...stagedPatches, ...this.deferredPatches];
+                    return;
+                }
+                throw new Error(`Patch chain post-apply failed: ${error?.message ?? error}`);
+            }
+        }
+
+        for (const patch of stagedPatches) {
+            await this.recordPatchApplication(patch);
+        }
+        fnLogger.info("Applied patch chain", { count: stagedPatches.length });
     }
 
     /**
@@ -1440,8 +1608,16 @@ class ClientStack extends Stack {
             const decrypts = this.cryptoEngine?.isEnabled()
                 && this.cryptoEngine.getDocumentKey()
                 && classObj.getEncryptedAttributes().length > 0;
-            for (const document of found.docs as unknown as Document[]) {
-                if (decrypts) {
+            for (let document of found.docs as unknown as Document[]) {
+                // A committed document superseded in the stage - a pre-apply job's
+                // massage (ADR-0044) - is judged as its staged version: that is what
+                // the commit will actually write. A staged delete leaves nothing to
+                // propagate onto.
+                const supersededBy = t.stage.get(document._id);
+                if (supersededBy) {
+                    if (supersededBy.op === "delete") continue;
+                    document = structuredClone(supersededBy.doc);
+                } else if (decrypts) {
                     await this.cryptoEngine.decryptDocument(document, classObj);
                 }
                 try {
@@ -1475,6 +1651,13 @@ class ClientStack extends Stack {
         patch: Patch,
         stagedSchema?: (className: string) => ClassModel["schema"] | null
     ): Promise<boolean> {
+        // A one-shot job's touch-set cannot be inspected, so the author answers the
+        // barrier's question: unstated defaults to "needs the key" - forgetting the
+        // flag costs latency (the job runs at unlock), never correctness. An
+        // explicit `requiresKey: false` opts into locked execution (ADR-0044).
+        const jobs = [patch.preApply, patch.postApply].filter(Boolean) as PatchJob[];
+        if (jobs.some(job => job.requiresKey !== false)) return true;
+
         const hasEncryptedAttribute = (schema?: ClassModel["schema"]) =>
             !!schema && Object.values(schema).some((attribute: any) => attribute?.config?.encrypted === true);
         const knownSchema = async (className: string): Promise<ClassModel["schema"] | undefined> => {
@@ -1764,6 +1947,14 @@ class ClientStack extends Stack {
 
     applyPatch = async (patch: Patch): Promise<string> => {
         const fnLogger = logger.child({ method: "applyPatch", args: { patch } });
+        if (patch.preApply || patch.postApply) {
+            // Jobs stage through the chain transaction; this path has none, and
+            // silently ignoring them would apply the model without its migration.
+            throw new Error(
+                `applyPatch - patch '${patch.version}' carries one-shot jobs; ` +
+                `job-carrying patches apply through the configured patch chain (ADR-0044).`
+            );
+        }
         fnLogger.info("Attempting to apply patch", { patch })
         fnLogger.info("applyPatch - starting to hydrate patch docs", { docCount: patch.docs.length });
         const hydratedDocs = await Promise.all(patch.docs.map(async sourceDoc => {

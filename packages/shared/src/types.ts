@@ -202,6 +202,26 @@ export interface SystemDoc {
 
 // The idea is to make this patch object be processed
 // storing the version of the patch and the documents contained in it
+/**
+ * A one-shot job carried by a patch (ADR-0044): `preApply` massages data so the
+ * patch's model can validate, `postApply` backfills what needs the model landed.
+ * Never persisted as a `~Job` - a migration is not a schedulable job, and
+ * replicable executable content keeps its one existing surface.
+ */
+export type PatchJob = {
+    name: string;
+    /** Job body, `~Job`-style: must define `execute(stack, params, job)`. */
+    content: string;
+    params?: { [key: string]: any };
+    /**
+     * Whether the job needs the document key. Defaults to `true`: an undeclared
+     * job defers while the stack is locked, which can cost latency but never
+     * correctness. `false` opts into locked execution - the author's explicit
+     * claim that the job touches no encrypted data (ADR-0044).
+     */
+    requiresKey?: boolean;
+};
+
 export interface Patch extends Document {
     "~class": "patch";
     target: string;
@@ -210,6 +230,10 @@ export interface Patch extends Document {
     docs: (PouchDB.Core.ExistingDocument<{
         [key: string]: any
     }> | PouchDB.Core.Document<{[key: string]: any}>)[]
+    /** Runs before this patch's docs stage, writes staged into the chain transaction (ADR-0044). */
+    preApply?: PatchJob;
+    /** Runs after the chain commit, in a second staged transaction, before the ledger arms (ADR-0044). */
+    postApply?: PatchJob;
 }
 
 export interface SystemDoc {

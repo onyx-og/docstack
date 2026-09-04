@@ -10,6 +10,7 @@ export type { TransactionStatus } from "./handle.js";
 export { TransactionStage } from "./stage.js";
 export type { StagedEntry, StagedOp } from "./stage.js";
 export { stageCoversSelector, mergeStageIntoResults, widenProjection } from "./overlay.js";
+export { classFromStage } from "./sweep.js";
 export {
     TransactionsDisabledError,
     TransactionStateError,
@@ -170,7 +171,7 @@ export class TransactionEngine {
         //    can be stale (a policy changed, a class tightened). Zero consequences on
         //    refusal.
         for (const entry of entries) {
-            await sweepEntry(this.stack, stage, entry, { allowClassModels: handle.internal });
+            await sweepEntry(this.stack, stage, entry, { allowClassModels: handle.internal, skipPolicy: handle.internal });
         }
 
         // 2. Rev pre-flight: every staged id's stored winner must still be the

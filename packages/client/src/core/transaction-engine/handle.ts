@@ -123,7 +123,7 @@ export class TransactionHandle {
             stagedAt: Date.now(),
         };
         delete (entry.doc as any)._rev;
-        await sweepEntry(this.stack, this.stage, entry, { allowClassModels: this.internal });
+        await sweepEntry(this.stack, this.stage, entry, { allowClassModels: this.internal, skipPolicy: this.internal });
         this.stage.set(docId, entry);
         return this.stage.get(docId)!;
     }

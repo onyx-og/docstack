@@ -288,7 +288,34 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         continue;
                     }
 
-                    const documents = await classObj.getCards();
+                    // System-level read, not getCards: propagation must see every
+                    // document of the class - a policy-filtered read would rewrite
+                    // only the session's subset - and it runs during create()'s
+                    // patch application, before any session exists (ADR-0044).
+                    // Encrypted attributes are opened explicitly when a key is
+                    // present; a keyless encrypting class never reaches here, its
+                    // patch deferred upstream (ADR-0040).
+                    const rawFetch = await stack.db.find({
+                        selector: { "~class": className, active: true },
+                        limit: 2 ** 31 - 1,
+                    } as any);
+                    const fetched = rawFetch.docs as unknown as Document[];
+                    if (stack.cryptoEngine.isEnabled() && stack.cryptoEngine.getDocumentKey()
+                        && classObj.getEncryptedAttributes().length) {
+                        for (const stored of fetched) {
+                            await stack.cryptoEngine.decryptDocument(stored, classObj);
+                        }
+                    }
+                    // A committed document superseded by a batch-mate belongs to the
+                    // batch, not to propagation (ADR-0044): its batch version - a
+                    // pre-apply job's massage - is validated by the document branch
+                    // against the batch model, and judging or stamping the stale
+                    // committed copy here would refuse (or undo) exactly what the
+                    // massage fixed. A delegation, not a skip.
+                    const superseded = new Set(
+                        documentsToProcess.map((mate: any) => mate?._id).filter((id: any) => typeof id === "string")
+                    );
+                    const documents = fetched.filter(existing => !superseded.has(existing._id));
 
                     if (documents.length === 0) {
                         fnLogger.info(`No documents found for class '${className}' after its update.`);
@@ -365,8 +392,34 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
                     try {
                         let classObj: Class | null;
+                        // The newest statement of a schema may ride this same batch
+                        // (ADR-0043): a patch introduces a class and seeds its first
+                        // document in one docs array. The batch outranks the store even
+                        // for a class that already exists - it is what is about to be
+                        // committed - and the search sees the whole array, so ordering
+                        // within the batch does not matter. The relation branch above
+                        // has made the same decision for its endpoints since ADR-0039.
+                        const batchModel = documentsToProcess.find((mate: any) =>
+                            isClassModel(mate) && !mate._deleted
+                            && ((mate as any).name === className || mate._id === className)) as unknown as ClassModel | undefined;
                         try {
-                            classObj = classCache.get(className) || await stack.getClassSnapshot(className);
+                            // Built DETACHED - `Class.get` + `setModel`, the same path
+                            // `buildFromModel` takes for a stored doc. `buildFromModel`
+                            // itself would route a rev-less model through `Class.create`,
+                            // which writes the class doc and makes the batch's own
+                            // insert conflict with it.
+                            let fromBatch: Class | null = null;
+                            if (batchModel && !classCache.has(className)) {
+                                fromBatch = Class.get(
+                                    stack, batchModel._id, batchModel.name,
+                                    batchModel["~class"], batchModel.description,
+                                    batchModel.schema, { subscribe: false }
+                                );
+                                fromBatch.setModel(batchModel);
+                            }
+                            classObj = classCache.get(className)
+                                || fromBatch
+                                || await stack.getClassSnapshot(className);
                         } catch (error) {
                             throw new Error(`Class '${className}' not found for document '${doc._id}'.`);
                         }

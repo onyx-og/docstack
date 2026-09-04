@@ -1438,7 +1438,33 @@ const sys_016: Patch = {
     ]
 };
 
-syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015, sys_016);
+/**
+ * `~JobRun.jobId` becomes optional (ADR-0044): a patch's one-shot job leaves its
+ * receipt as a `~JobRun`, but patch jobs are deliberately never persisted as
+ * `~Job` documents, so their receipts have no row to point at - they omit
+ * `jobId` and carry the patch identity in `runtimeArgs` instead. A scheduler run
+ * still writes its `jobId`; the foreign key still validates whenever present.
+ * An ADR-0038 merge fragment: one attribute restated, everything else untouched.
+ */
+const sys_017: Patch = {
+    "_id": "~sys-0.0.17",
+    "~class": "patch",
+    "version": "0.0.17",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.17\\n#### ~JobRun.jobId optional (patch job receipts, ADR-0044)",
+    "docs": [
+        {
+            "_id": "~JobRun",
+            "_rev": "auto",
+            "~class": "class",
+            "schema": {
+                "jobId": { "name": "jobId", "type": "foreign_key", "config": { "mandatory": false, "targetClass": "~Job" } }
+            }
+        }
+    ]
+};
+
+syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015, sys_016, sys_017);
 
 /**
  * Every document id the system patches seed.

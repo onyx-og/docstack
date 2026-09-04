@@ -5,7 +5,11 @@ Status: accepted, implemented · Date: 2026-09-03 (implemented 2026-09-04)
 Pinned by `src-test/patch-chain.test.ts`: a two-patch chain composes through the
 overlay and lands as ONE class-doc write (first stored revision carries the full
 chain, both ledger entries armed together), and a dry-run refusal names the patch
-and the class, persists nothing, and records nothing. The deferral-in-chain and
+and the class, persists nothing, and records nothing. The mixed extension (§below)
+adds two: a later patch's invalid seed refuses the whole chain, the earlier
+patch's class and data included; and one patch carrying a tighten, the
+`_rev: "auto"` data update that satisfies it, and a fresh seed lands in one commit
+with the committed document written exactly once. The deferral-in-chain and
 armed-in-place behaviors ride the existing `locked-sync.test.ts` pins. One
 implementation note beyond the protocol: the dry-run reads documents raw (with an
 explicit decrypt when a key is present) rather than through the policy-checked read
@@ -21,8 +25,10 @@ call. With that scope, nothing blocks it today.
 
 ## The protocol
 
-Scope: patches carrying class models — the common consumer patch. Data-only patches
-already stage natively under ADR-0039; mixed patches are a recorded extension (§4).
+Scope: every consumer patch. The protocol was first shipped for class-model-only
+chains with a sequential fallback for the rest; the mixed extension (2026-09-04,
+§Recorded extensions) removed the fork, so class models, data documents, and any
+mix of them stage through the same one transaction.
 
 1. **Open one internal transaction for the pending chain.**
    `TransactionEngine.beginInternal()`: bypasses the `transactions: true` config
@@ -72,11 +78,40 @@ already stage natively under ADR-0039; mixed patches are a recorded extension (�
 
 ## Recorded extensions
 
-- **Mixed patches** (class + data docs): needs the sweep to resolve class
-  snapshots through the overlay so staged models govern staged documents, and
-  class-before-data ordering in the commit batch (the commit already orders
-  documents before relations). Out of scope until asked for.
-- **Data-only patches**: nothing to do - v1 transactions carry them as-is.
+- **Mixed patches** (class + data docs): **landed 2026-09-04, by deletion.** This
+  section originally recorded two requirements; building ADR-0043 and ADR-0044
+  satisfied both as side effects, and the extension reduced to removing the
+  dispatcher's class-only fork and retiring the sequential path entirely.
+  - *"The sweep resolves class snapshots through the overlay"* - `classFromStage`
+    landed with ADR-0044 (a job creates docs of a class an earlier patch staged);
+    the sweep already judged every data doc stage-first.
+  - *"Class-before-data ordering in the commit batch"* - obsoleted by ADR-0043:
+    the pipeline's batch-mate class resolution and propagation's superseded-set
+    both scan the whole batch, so ordering within it is immaterial.
+  - `stagePatch` never filtered doc kinds - it stages the whole `docs` array with
+    `_rev: "auto"` hydration through the overlay, matching `applyPatch` semantics.
+
+  What routing everything through the chain *changes*, deliberately:
+  - **Data-only chains gain all-or-nothing.** The sequential path committed and
+    armed per patch, so a chain could half-apply - patch 1 armed, patch 2 failed.
+    Now nothing lands and nothing arms unless the whole chain does, which is the
+    fault taxonomy above applied uniformly (and the honest answer to "what if a
+    patch requires things applied by a prior patch that failed?").
+  - **The sweep's refusals now apply to consumer data docs**: `_local/` and
+    `_design/` ids and nested `~class: "patch"` documents refuse loudly where the
+    sequential path stored them silently. Patches were never a sanctioned door
+    for device state, index machinery, or hand-seeded ledger entries.
+  - The ADR-0044 job scope guard ("job-carrying patches must be class-model-only")
+    is gone - a patch can carry its model, its seeds, and its jobs at once. A
+    pre-apply job still cannot touch the class its own patch introduces (it runs
+    before that patch stages, by definition of *pre*); seeds and post-apply jobs
+    can.
+  - `applyPatch` (public, direct) and the `~sys` path are untouched - one patch,
+    one batch, the bootstrap `isPatch` locked-write exemption intact. The chain
+    never passes `isPatch: true`: the deferral barrier is its stronger answer to
+    the same locked-encryption question.
+- **Data-only patches**: carried by the chain like everything else (see above;
+  originally "nothing to do - v1 transactions carry them as-is").
 
 ## What replaces ADR-0041's deferral
 

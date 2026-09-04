@@ -187,6 +187,125 @@ describe("DocStack patches", () => {
         expect(result.armed).toBe(true);
     });
 
+    it("ADR-0043: a patch introduces a class and seeds its first document in one batch", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "patch-batch-seed",
+            username: "pbs-user",
+            password: "pbs-pass",
+            evaluate: async ({ stack }) => {
+                // The class model and its first document travel in ONE docs array -
+                // the composition applyPatch always produces, and the one that used
+                // to fail with "Class not found" because class resolution read only
+                // the store, never the batch being written.
+                await stack.applyPatch({
+                    "~class": "patch", version: "4.0.0", target: "app", changelog: "class + seed",
+                    docs: [
+                        {
+                            _id: "SeededSeries", "~class": "class", active: true, name: "SeededSeries",
+                            description: "series",
+                            schema: {
+                                title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
+                            },
+                        },
+                        { _id: "SeededSeries-first", "~class": "SeededSeries", title: "seeded", active: true },
+                    ],
+                });
+                const seeded: any = await stack.getDocument("SeededSeries-first");
+
+                // The batch is judged as one: a seed document that fails validation
+                // against the class born beside it refuses the whole patch, class
+                // included, and records nothing (ADR-0041).
+                let refused = false;
+                try {
+                    await stack.applyPatch({
+                        "~class": "patch", version: "4.1.0", target: "app", changelog: "bad seed",
+                        docs: [
+                            {
+                                _id: "BadSeed", "~class": "class", active: true, name: "BadSeed", description: "x",
+                                schema: {
+                                    title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
+                                },
+                            },
+                            { _id: "BadSeed-first", "~class": "BadSeed", active: true }, // no title
+                        ],
+                    });
+                } catch {
+                    refused = true;
+                }
+                const badClass = await stack.db.get("BadSeed").catch(() => null);
+                const badLedger = (await (stack as any).db.find({
+                    selector: { "~class": "patch", version: "4.1.0" }, limit: 10,
+                })).docs;
+
+                return {
+                    seededTitle: seeded?.title,
+                    refused,
+                    badClassLanded: badClass !== null,
+                    badRecorded: badLedger.length,
+                };
+            },
+        });
+
+        expect(result.seededTitle).toBe("seeded");
+        expect(result.refused).toBe(true);
+        expect(result.badClassLanded).toBe(false);
+        expect(result.badRecorded).toBe(0);
+    });
+
+    it("ADR-0043: a drop-and-carry batch behaves the same whether the model change is in the batch or stored", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "patch-batch-drop",
+            username: "pbd-user",
+            password: "pbd-pass",
+            evaluate: async ({ stack }) => {
+                const { Class } = (window as any).docstack;
+
+                // Two identical classes; both drop `tag` (ADR-0038 null); each then
+                // receives a document still carrying it - one in the same batch as
+                // the drop, one after the drop is stored.
+                for (const name of ["DropInBatch", "DropStored"]) {
+                    await Class.create(stack, name, "class", "x", {
+                        title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
+                        tag: { name: "tag", type: "string", config: {} },
+                    });
+                }
+
+                await stack.applyPatch({
+                    "~class": "patch", version: "5.0.0", target: "app", changelog: "drop in batch",
+                    docs: [
+                        {
+                            _id: (await stack.getClass("DropInBatch")).getId(), "~class": "class", _rev: "auto",
+                            schema: { tag: null },
+                        },
+                        { _id: "DropInBatch-carrier", "~class": "DropInBatch", title: "one", tag: "stowaway", active: true },
+                    ],
+                });
+
+                await stack.applyPatch({
+                    "~class": "patch", version: "5.1.0", target: "app", changelog: "drop first",
+                    docs: [{
+                        _id: (await stack.getClass("DropStored")).getId(), "~class": "class", _rev: "auto",
+                        schema: { tag: null },
+                    }],
+                });
+                await stack.db.put({ _id: "DropStored-carrier", "~class": "DropStored", title: "one", tag: "stowaway", active: true } as any);
+
+                const inBatch: any = await stack.db.get("DropInBatch-carrier");
+                const stored: any = await stack.db.get("DropStored-carrier");
+                return {
+                    inBatchHasTag: "tag" in inBatch,
+                    storedHasTag: "tag" in stored,
+                    sameValue: inBatch.tag === stored.tag,
+                };
+            },
+        });
+
+        // The pin is equivalence, not a particular answer: the batch-resolved model
+        // and the stored model must judge the carried attribute identically.
+        expect(result.inBatchHasTag).toBe(result.storedHasTag);
+        expect(result.sameValue).toBe(true);
+    });
+
     it("seeds the system user with the admin group through system patches", async ({ docStackPage }) => {
         const result = await docStackPage.evaluate(async () => {
             const { DocStack } = (window as any).docstack;

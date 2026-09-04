@@ -1,8 +1,31 @@
 import { Document, isClassModel, isRelation, isPatch } from "@docstack/shared";
 import { StackLockedError } from "../../plugins/pouchdb.js";
+import Class from "../class.js";
 import type ClientStack from "../stack.js";
 import { TransactionStage, StagedEntry } from "./stage.js";
 import { TransactionUnsupportedDocError, TransactionValidationError } from "./errors.js";
+
+/**
+ * Resolves a class from the transaction's own stage: the ADR-0043 rule
+ * (the batch outranks the store - it is what is about to be committed) applied to
+ * staging. A patch chain's job can create documents of a class an earlier patch
+ * staged (ADR-0044), and the sweep must judge them by that staged model, not by a
+ * committed predecessor or a not-found. Built DETACHED - `Class.get` + `setModel`,
+ * never `buildFromModel`, which writes rev-less models (ADR-0043).
+ */
+export const classFromStage = (stack: ClientStack, stage: TransactionStage, className: string): Class | null => {
+    for (const entry of stage.values()) {
+        const doc: any = entry.doc;
+        if (entry.op !== "delete" && isClassModel(doc) && (doc._id === className || doc.name === className)) {
+            const built = Class.get(
+                stack, doc._id, doc.name, doc["~class"], doc.description, doc.schema, { subscribe: false }
+            );
+            built.setModel(doc);
+            return built;
+        }
+    }
+    return null;
+};
 
 /**
  * The validation sweep - the transaction's atomicity boundary in practice.
@@ -18,7 +41,7 @@ export const sweepEntry = async (
     stack: ClientStack,
     stage: TransactionStage,
     entry: StagedEntry,
-    options?: { allowClassModels?: boolean }
+    options?: { allowClassModels?: boolean; skipPolicy?: boolean }
 ): Promise<void> => {
     const doc = entry.doc;
     const docId = doc._id;
@@ -62,10 +85,12 @@ export const sweepEntry = async (
     }
 
     // A hard delete carries no content to validate; write access is still the
-    // author's to prove.
+    // author's to prove - unless this is DocStack's own machinery (an internal
+    // handle: patch application runs before any session exists, and the patch
+    // path's direct writes never pass through policy either - ADR-0044).
     if (entry.op === "delete") {
         const type = (doc as any)["~class"];
-        if (typeof type === "string") {
+        if (typeof type === "string" && !options?.skipPolicy) {
             await stack.policyEngine.ensureWriteAllowed(type, doc as Document);
         }
         return;
@@ -99,7 +124,8 @@ export const sweepEntry = async (
 
     if (stack.isSimpleClass(type)) return;
 
-    const classObj = await stack.getClassSnapshot(type).catch(() => null);
+    const classObj = classFromStage(stack, stage, type)
+        ?? await stack.getClassSnapshot(type).catch(() => null);
     if (!classObj) {
         throw new TransactionValidationError(`Class '${type}' not found for document '${docId}'.`, docId);
     }
@@ -118,5 +144,7 @@ export const sweepEntry = async (
         );
     }
 
-    await stack.policyEngine.ensureWriteAllowed(type, doc as Document);
+    if (!options?.skipPolicy) {
+        await stack.policyEngine.ensureWriteAllowed(type, doc as Document);
+    }
 };

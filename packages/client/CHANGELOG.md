@@ -2,6 +2,51 @@
 
 ## 0.2.0 - 2026/09/03
 
+### Changed (2026/09/04) — every consumer patch chain is transactional
+
+- **Mixed and data-only patch chains apply through the ADR-0042 internal
+  transaction** - the class-only scope and its sequential fallback are gone. The
+  extension landed by deletion: the sweep already judges data docs by staged
+  models (ADR-0044) and the pipeline resolves batch-mates regardless of order
+  (ADR-0043), so the dispatcher fork was removed. Consequences: a chain is
+  all-or-nothing (a later patch's failure persists and arms NOTHING, including
+  earlier valid patches - previously they committed one by one); a patch can
+  carry class models, `_rev: "auto"` data massages, seeds, and one-shot jobs at
+  once (the ADR-0044 "class-model-only" job guard is lifted); consumer patch
+  docs now meet the sweep's refusals (`_local/`, `_design/`, nested patch docs -
+  previously stored silently). `applyPatch` and system patches are untouched.
+
+### Added (2026/09/04) — one-shot jobs in patches
+
+- **A patch can carry una-tantum migration jobs** (ADR-0044): `preApply` massages
+  data through the chain transaction's facade - staged, so massage and model land
+  in ONE commit or not at all, making refused migrations (tightening, type
+  conversion, the honest rename, foreign-key backfill) actionable for the first
+  time; `postApply` backfills after the models land, in a second staged
+  transaction; the ledger arms only after both. Jobs follow the `~Job` content
+  convention (`execute(stack, params, job)`), are never persisted as `~Job`, and
+  leave `~JobRun` receipts without a `jobId` (`~sys-0.0.17` makes the foreign key
+  optional; patch identity rides `runtimeArgs`) win or lose - a failed
+  migration's trail survives the discard.
+  Undeclared jobs defer while locked; `requiresKey: false` opts into locked
+  execution behind two nets: locked reads of encrypting classes throw, and a
+  locked refusal converts the patch to a deferral instead of failing the open.
+  Patch machinery reads system-level (policy-free, decrypt-when-keyed) - a
+  policy-filtered migration or propagation would silently transform only a
+  session's subset.
+
+### Fixed (2026/09/04)
+
+- **A patch can introduce a class and seed its first document in one batch**
+  (ADR-0043). `bulkDocs` resolved class models from cache and store only, so the
+  composition every `applyPatch` produces - a class model and a document of it in
+  one `docs` array - failed with "Class not found", permanently under the truthful
+  ledger (correctly dormant, retried on every unlock, never able to succeed). Class
+  resolution now checks the batch being written first: a model riding the batch is
+  the newest statement of the schema. Built detached - the naive
+  `Class.buildFromModel` route writes rev-less models and would have made the
+  batch conflict with itself.
+
 ### Added (2026/09/04)
 
 - **Class-model patch chains apply through one internal transaction** (ADR-0042).
@@ -11,9 +56,9 @@
   doc as a single batch through the unchanged pipeline; the patch ledger
   (ADR-0041) arms only after. A refusal before commit persists nothing, records
   nothing, and names the patch, class and attribute at fault; a chain over a fresh
-  class now stores its composed schema as one revision. Patches carrying data
-  documents keep the sequential path (the mixed-patch extension stays recorded in
-  ADR-0042); system patches are untouched.
+  class now stores its composed schema as one revision. (Shipped class-model-only
+  with a sequential fallback; the mixed extension above removed the fork the same
+  day.) System patches are untouched.
 
 ### Security
 

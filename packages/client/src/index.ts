@@ -130,6 +130,7 @@ export type {
     Document,
     RelationDocument,
     Patch,
+    PatchJob,
     SelectAST,
     UnionAST,
     ClientCredentials,

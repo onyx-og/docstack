@@ -87,6 +87,23 @@ export class TransactionStage {
         }
     }
 
+    /**
+     * A point-in-time copy of the journal, for {@link restore}. Used by the patch
+     * chain (ADR-0044) to unwind exactly one patch's staging - a pre-apply job's
+     * writes included - when a locked refusal converts that patch to a deferral
+     * while the already-staged prefix goes on to commit.
+     */
+    snapshot(): Map<string, StagedEntry> {
+        return new Map(this.entries);
+    }
+
+    restore(snapshot: Map<string, StagedEntry>) {
+        this.clear();
+        for (const [id, entry] of snapshot) {
+            this.set(id, entry);
+        }
+    }
+
     remove(id: string) {
         const entry = this.entries.get(id);
         if (!entry) return;

@@ -63,8 +63,6 @@ and it is acceptable for a rendezvous with no server.
   transaction-scoped pipeline facade - triggers reading the tx view at commit,
   public class-model staging with propagation recomputed at commit, streaming
   (`findDocumentsIterator`) overlay, `allDocs` overlay, class-level sugar.
-- **Mixed patches in the internal transaction** (ADR-0042): overlay-aware class
-  snapshots in the sweep, class-before-data batch ordering.
 - **Native bridge atomic batch** (ADR-0039 adapter table): `bulkWrite` is one round
   trip but per-op optimistic; true `atomicBatch` needs a Kotlin-side contract
   change in docstack-store.
