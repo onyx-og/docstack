@@ -10,3 +10,6 @@
 [submodule "android/docstack-store"]
 	path = android/docstack-store
 	url = git@github.com:onyx-ac/docstack-store.git
+[submodule "packages/pouchdb-adapter-tauri-sqlite"]
+	path = packages/pouchdb-adapter-tauri-sqlite
+	url = git@github.com:onyx-ac/pouchdb-adapter-tauri-sqlite.git
