@@ -1,13 +1,42 @@
 {
     "name": "@docstack/abe",
     "version": "0.1.0",
-    "main": "lib/index.js",
-    "src": "src/index.ts",
+    "description": "CP-ABE (AC17) primitives for DocStack cryptographic access scopes: rabe compiled to WASM, policy normalization, CEK wrap/unwrap (ADR-0045)",
     "type": "module",
+    "main": "lib/index.js",
+    "types": "lib/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./lib/index.d.ts",
+            "import": "./lib/index.js",
+            "default": "./lib/index.js"
+        }
+    },
+    "files": [
+        "lib",
+        "README.md",
+        "LICENSE"
+    ],
+    "sideEffects": false,
+    "engines": {
+        "node": ">=20"
+    },
+    "src": "src/index.ts",
     "publishConfig": {
         "access": "public"
     },
-    "description": "CP-ABE (AC17) primitives for DocStack cryptographic access scopes: rabe compiled to WASM, policy normalization, CEK wrap/unwrap (ADR-0045)",
+    "scripts": {
+        "build": "npx tsc -build --force ./tsconfig.json && node scripts/copy-wasm.mjs",
+        "build:wasm": "bash scripts/build-wasm.sh",
+        "test": "node scripts/smoke.mjs",
+        "prepublishOnly": "npm run build"
+    },
+    "keywords": [
+        "cp-abe",
+        "attribute-based-encryption",
+        "docstack",
+        "access-control"
+    ],
     "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
     "homepage": "https://onyx.ac/docstack",
     "license": "CC-BY-SA-4.0",
@@ -17,16 +46,5 @@
     "repository": {
         "type": "git",
         "url": "git+https://github.com/onyx-og/docstack.git"
-    },
-    "scripts": {
-        "build": "npx tsc -build --force ./tsconfig.json && node scripts/copy-wasm.mjs",
-        "build:wasm": "bash scripts/build-wasm.sh",
-        "test": "node scripts/smoke.mjs"
-    },
-    "keywords": [
-        "cp-abe",
-        "attribute-based-encryption",
-        "docstack",
-        "access-control"
-    ]
+    }
 }

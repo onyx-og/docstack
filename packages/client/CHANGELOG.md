@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.2.0 - 2026/09/03
+## 0.3.0 - 2026/09/07
+
+Breaking: the `~Policy` rule engine is removed and `@docstack/abe` becomes a
+dependency (installed automatically, loaded lazily when a stack declares scopes).
 
 ### Added (2026/09/06) — cryptographic access control (ADR-0045)
 
@@ -37,6 +40,8 @@
   and query-auth suites assert the seal where they once asserted the throw.
   Behavioral/UI rules move to application code; conditional access
   ("published ⇒ public") is write-time scope labeling.
+
+## 0.2.0 - 2026/09/03
 
 ### Changed (2026/09/04) — every consumer patch chain is transactional
 
