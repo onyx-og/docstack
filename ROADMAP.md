@@ -4,6 +4,42 @@ Standing work the ADRs have accepted or flagged but that is not yet implemented.
 Each entry points at the decision record that owns the details; this file is the
 index, not the design.
 
+## Cryptographic access (ADR-0045, specs/02-crypto-access.md)
+
+**Integration LANDED 2026-09-06** (ADR-0045 implemented; spec 02 §5 checklist
+done). Shipped: `@docstack/abe` (rabe AC17 → WASM + policy normalizer with the
+AND-chain balancer), the crypto-engine keyring (kid dispatch, per-scope canary
+admission, scope-AAD label binding), `~AccessScope` + `~sys-0.0.18`, the
+`accessKeys` consumer contract with `unlockScopes`, per-scope partial locks and
+patch deferral, the induced-downgrade guard, and full policy-engine retirement.
+TS-FAME remains in `spikes/abe` as the behavioral cross-validation reference.
+
+Still open on the track:
+
+1. **Authority tooling as its own package.** `@docstack/abe` carries the
+   authority helpers (`setup`/`keygen`/`wrapCek`) today; splitting the
+   authority-only surface into a separate package the consumer's controlled
+   environment runs (later the docstack-server package) keeps master-key code
+   out of any client dependency graph.
+2. **Deferred within the track**: per-document policy strings (spec §8), ABE
+   attribute revocation (attribute versioning, the scheme's known weak point),
+   scope-aware channel grants, **writer authentication** (revision signatures -
+   label tampering is contained by spec §2.3, never disclosed, but not
+   prevented without them), and a **security audit before any production
+   claim** - the WASM backend (`rabe-bn`, BN254 ~100-bit) is unaudited by
+   construction, and the audit re-opens the curve-margin question the gate
+   deferred.
+
+## Dropped: client-side policy enforcement (ADR-0045 deferred section)
+
+The JS-rule enforcement design (opt-in flag, policy-aware handle, wildcard
+admin bucket, `withSystemSession`, `operations` field) is **dropped by the
+single-vocabulary ruling**, not parked: client gates cannot bind the device
+owner, and DocStack keeps one access language. The analysis stays recorded in
+ADR-0045 (it documents the engine being retired), and the standing findings -
+react changes-feed splice leak, `~Job` executing against the real stack,
+`setAuthSession` publicness - remain live concerns independent of it.
+
 ## Under evaluation
 
 ### Datamodel-hash gate for replication between divergent clients

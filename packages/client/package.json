@@ -44,6 +44,7 @@
   },
   "homepage": "https://onyx.ac/docstack",
   "dependencies": {
+    "@docstack/abe": "^0.1.0",
     "@docstack/shared": "^0.1.0",
     "jsondiffpatch": "^0.7.3",
     "pouchdb-selector-core": "^9.0.0",

@@ -1,0 +1,19 @@
+[package]
+name = "abe-rabe-wasm"
+version = "0.0.0"
+edition = "2021"
+description = "Spike: rabe AC17 CP-ABE behind wasm-bindgen (ADR-0045). Never shipped."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rabe = "0.4"
+wasm-bindgen = "0.2"
+serde_json = "1"
+# rand in wasm32-unknown-unknown needs the js entropy backend
+getrandom = { version = "0.2", features = ["js"] }
+
+[profile.release]
+opt-level = 3
+lto = true

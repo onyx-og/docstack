@@ -22,11 +22,10 @@ import {
     UserModel,
     UserSessionModel,
     AuthModuleModel,
-    PolicyModel,
     ChangesSubscription,
 } from "@docstack/shared";
 
-import { SystemDoc, Patch, PatchJob, ClassModel, Document, RelationDocument } from "@docstack/shared";
+import { SystemDoc, Patch, PatchJob, ClassModel, Document, RelationDocument, AccessScopeModel, isRelation } from "@docstack/shared";
 import { StackPlugin, StackLockedError } from "../plugins/pouchdb.js";
 
 import { createGuardedDb, createReplicationDb } from "./guarded-db.js";
@@ -37,7 +36,7 @@ import { parse, createPlan, executePlan, executePlanStream } from "./query-engin
 import type { SelectAST, UnionAST } from "./query-engine/index.js";
 import { JobEngine } from "./job-engine/index.js";
 import { JobScheduler } from "./job-engine/scheduler.js";
-import { PolicyEngine } from "./policy-engine/index.js";
+import { scopeAad, encryptWithAesGcm, importAesKeyFromHex, deriveKeyId } from "./crypto-engine/utils.js";
 import { CryptoEngine } from "./crypto-engine/index.js";
 import { isEncryptedPayload } from "./crypto-engine/utils.js";
 import { TransactionEngine, TransactionHandle, TransactionStage, TransactionCommitReport, classFromStage } from "./transaction-engine/index.js";
@@ -73,6 +72,7 @@ const DOCSTACK_OPTION_KEYS: readonly string[] = [
     "disableCryptoEngine",
     "documentKey",
     "transactions",
+    "accessKeys",
     "logLevel",
 ];
 
@@ -324,7 +324,20 @@ class ClientStack extends Stack {
      * Engine for enforcing read/write access control policies.
      * Policies are evaluated based on user session and document content.
      */
-    policyEngine!: PolicyEngine;
+    /**
+     * The access-scope registry: every `~AccessScope` document, grouped by
+     * `scopeId` (ADR-0045). Built from the database, independent of which CEKs
+     * the keyring actually holds - the registry knows a scope's key ids even
+     * when the session cannot open them, which is what the label↔kid mismatch
+     * guard needs (spec 02 §2.3 rule 2).
+     */
+    private accessScopeRegistry: Map<string, {
+        scopeId: string;
+        kids: Set<string>;
+        winningVersion: number;
+        docs: AccessScopeModel[];
+    }> | null = null;
+    private accessScopeRegistryDirty = true;
 
     /**
      * Engine for field-level encryption and decryption.
@@ -423,7 +436,6 @@ class ClientStack extends Stack {
         }
         this.jobEngine = new JobEngine(this);
         this.jobScheduler = new JobScheduler(this as any);
-        this.policyEngine = new PolicyEngine(this);
         this.cryptoEngine = new CryptoEngine(this);
         // Re-created, never carried over: `reset()` re-runs initialize, and a stage
         // surviving a reset would resurrect uncommitted writes (ADR-0039).
@@ -589,6 +601,9 @@ class ClientStack extends Stack {
     public clearAuthSession() {
         this.authSession = undefined;
         this.cryptoEngine.setDocumentKey(null);
+        // Scope CEKs are session material too: what the attribute key opened
+        // closes with it. Re-adoption goes through `unlockScopes`.
+        this.cryptoEngine.dropScopeKeys();
     }
 
     /**
@@ -661,6 +676,162 @@ class ClientStack extends Stack {
 
         this.dispatchEvent(new CustomEvent("unlocked", { detail: { stackName: this.name } }));
         return this;
+    }
+
+    /**
+     * The access-scope registry, loaded from `~AccessScope` documents and
+     * refreshed whenever one is written (ADR-0045). Raw read: scope docs are
+     * the machinery that DECIDES readability - they cannot sit behind it.
+     */
+    private async getAccessScopeRegistry() {
+        if (!this.accessScopeRegistry || this.accessScopeRegistryDirty) {
+            const registry = new Map<string, { scopeId: string; kids: Set<string>; winningVersion: number; docs: AccessScopeModel[] }>();
+            const found = await this.db.find({
+                selector: { "~class": "~AccessScope", active: true },
+                limit: 2 ** 31 - 1,
+            } as any).catch(() => ({ docs: [] }));
+            for (const raw of (found.docs as unknown as AccessScopeModel[])) {
+                if (typeof raw.scopeId !== "string" || typeof raw.kid !== "string") continue;
+                let entry = registry.get(raw.scopeId);
+                if (!entry) {
+                    entry = { scopeId: raw.scopeId, kids: new Set(), winningVersion: -Infinity, docs: [] };
+                    registry.set(raw.scopeId, entry);
+                }
+                entry.kids.add(raw.kid);
+                entry.docs.push(raw);
+                if (typeof raw.version === "number" && raw.version > entry.winningVersion) entry.winningVersion = raw.version;
+            }
+            this.accessScopeRegistry = registry;
+            this.accessScopeRegistryDirty = false;
+        }
+        return this.accessScopeRegistry;
+    }
+
+    /**
+     * The scope a document's write seals under: its own `~scope` label, else
+     * its class's `defaultScope` (spec 02 §2.2 - the document's value wins).
+     */
+    public resolveScopeLabel(doc: unknown, classModel?: { defaultScope?: string } | null): string | undefined {
+        const own = (doc as any)?.["~scope"];
+        if (typeof own === "string" && own) return own;
+        const fallback = classModel?.defaultScope;
+        return typeof fallback === "string" && fallback ? fallback : undefined;
+    }
+
+    /** Every key id belonging to a scope, across rotation versions - or null for an unknown scope. */
+    public async getAccessScopeKids(scopeId: string): Promise<Set<string> | null> {
+        const registry = await this.getAccessScopeRegistry();
+        return registry.get(scopeId)?.kids ?? null;
+    }
+
+    /** Whether a declared scope's CEK is absent from the keyring - its content is sealed. */
+    public isScopeLocked(scopeId: string): boolean {
+        return !this.cryptoEngine.isScopeWritable(scopeId);
+    }
+
+    /** Declared scopes whose CEK the keyring lacks. Loaded scopes only - call after open. */
+    public async lockedScopeIds(): Promise<string[]> {
+        const registry = await this.getAccessScopeRegistry();
+        return [...registry.keys()].filter(scopeId => !this.cryptoEngine.isScopeWritable(scopeId));
+    }
+
+    /**
+     * Attempts every declared access scope with the session's attribute key
+     * (ADR-0045): the ABE decryption either yields a scope's CEK - verified
+     * against the scope's canary, then admitted to the keyring - or fails,
+     * and the scope stays locked. There is no gate to ask; this IS the access
+     * decision. Idempotent: a later call with better material unlocks more.
+     * Deferred patches that were waiting on a scope replay after.
+     */
+    public async unlockScopes(attributeKey: string): Promise<{ unlocked: string[]; locked: string[] }> {
+        if (!this.cryptoEngine.isEnabled()) {
+            throw new Error("Stack was opened with the crypto engine disabled; there are no scopes to unlock.");
+        }
+        if (!attributeKey) throw new Error("unlockScopes requires the session's attribute key.");
+        const fnLogger = logger.child({ method: "unlockScopes" });
+
+        this.accessScopeRegistryDirty = true;
+        const registry = await this.getAccessScopeRegistry();
+        if (!registry.size) return { unlocked: [], locked: [] };
+
+        const { decryptCek } = await import("@docstack/abe");
+        const unlocked: string[] = [];
+        const locked: string[] = [];
+        for (const entry of registry.values()) {
+            let opened = false;
+            for (const scopeDoc of entry.docs) {
+                if (this.cryptoEngine.getReadableKeyIds().includes(scopeDoc.kid)) { opened = true; continue; }
+                const cekBytes = await decryptCek(attributeKey, scopeDoc.abeWrappedCek).catch(() => null);
+                if (!cekBytes) continue;
+                const cekHex = Array.from(cekBytes as Uint8Array, (b: number) => b.toString(16).padStart(2, "0")).join("");
+                // The scope doc's stated kid and canary are both admission tests: a
+                // corrupted or tampered scope doc is an error here, not garbage later.
+                if (await deriveKeyId(cekHex) !== scopeDoc.kid) {
+                    fnLogger.warn("Scope CEK does not match the scope document's kid; refusing admission", { scopeId: entry.scopeId, version: scopeDoc.version });
+                    continue;
+                }
+                if (!(await this.cryptoEngine.verifyScopeCek(entry.scopeId, cekHex, scopeDoc.encryptedMarker))) {
+                    fnLogger.warn("Scope CEK does not verify against the scope's canary; refusing admission", { scopeId: entry.scopeId, version: scopeDoc.version });
+                    continue;
+                }
+                const mode = scopeDoc.version === entry.winningVersion ? "read-write" as const : "read-only" as const;
+                await this.cryptoEngine.admitScopeKey(entry.scopeId, cekHex, scopeDoc.version, mode);
+                opened = true;
+                this.dispatchEvent(new CustomEvent("scopeUnlocked", { detail: { stackName: this.name, scopeId: entry.scopeId, version: scopeDoc.version, mode } }));
+            }
+            (opened ? unlocked : locked).push(entry.scopeId);
+        }
+
+        if (unlocked.length && this.deferredPatches.length) {
+            // A patch held back by a sealed scope replays now - the per-scope
+            // half of the ADR-0018/0040 deferral discipline.
+            const deferred = this.deferredPatches;
+            this.deferredPatches = [];
+            await this.applyConsumerPatches(deferred);
+        }
+        fnLogger.info("Scope unlock attempted", { unlocked, locked });
+        return { unlocked, locked };
+    }
+
+    /**
+     * AUTHORITY-side helper: assembles a complete `~AccessScope` document from
+     * a fresh (or supplied) CEK - ABE-sealing it under the policy, stamping the
+     * kid, minting the per-scope canary. Runs wherever the application controls
+     * (its server, an admin ceremony, tests); it needs the authority PUBLIC key
+     * only, never the master secret. The document is returned, not written -
+     * publishing it (and distributing attribute keys) is the consumer's act.
+     */
+    public static async buildAccessScope(input: {
+        scopeId: string;
+        policyString: string;
+        /** The authority public key (`@docstack/abe` setup().pk). */
+        pk: string;
+        /** 32-byte CEK as hex; minted when absent. */
+        cekHex?: string;
+        version?: number;
+    }): Promise<AccessScopeModel & { _id: string }> {
+        const { wrapCek, normalizePolicy } = await import("@docstack/abe");
+        const cekHex = input.cekHex ?? Array.from(crypto.getRandomValues(new Uint8Array(32)), (b: number) => b.toString(16).padStart(2, "0")).join("");
+        if (!/^[0-9a-f]{64}$/.test(cekHex)) throw new Error("buildAccessScope needs a 32-byte hex CEK.");
+        const cekBytes = new Uint8Array(cekHex.match(/.{2}/g)!.map(h => parseInt(h, 16)));
+        const kid = await deriveKeyId(cekHex);
+        const key = await importAesKeyFromHex(cekHex);
+        const marker = await encryptWithAesGcm(
+            JSON.stringify({ nonce: Array.from(crypto.getRandomValues(new Uint8Array(12)), (b: number) => b.toString(16).padStart(2, "0")).join("") }),
+            key, kid, scopeAad(input.scopeId, kid)
+        );
+        const version = input.version ?? 1;
+        return {
+            _id: `~scope-${input.scopeId}-v${version}`,
+            "~class": "~AccessScope",
+            active: true,
+            scopeId: input.scopeId,
+            policyString: normalizePolicy(input.policyString),
+            abeWrappedCek: await wrapCek(input.pk, input.policyString, cekBytes),
+            kid,
+            version,
+            encryptedMarker: marker,
+        } as AccessScopeModel & { _id: string };
     }
 
     /**
@@ -901,21 +1072,33 @@ class ClientStack extends Stack {
             }
         }
 
-        // A locked stack reads encrypted attributes back as `null`. Writing that into an
-        // export would lose data in a way nothing downstream could detect, so it is
-        // refused unless the caller has said they want the rest anyway.
-        if (this.isLocked() && !options.allowLossyWhenLocked) {
+        // A sealed payload reads back as `null` - a locked legacy key, or a
+        // scope the keyring cannot open. Writing that into an export would lose
+        // data in a way nothing downstream could detect, so it is refused
+        // unless the caller has said they want the rest anyway, naming what is
+        // sealed (spec 02 §5: lossy per locked scope, and the report says which).
+        if (!options.allowLossyWhenLocked) {
             const encrypted: string[] = [];
             for (const className of classes) {
                 const classObj = await this.getClassSnapshot(className);
                 if (classObj?.getEncryptedAttributes().length) encrypted.push(className);
             }
             if (encrypted.length) {
-                throw new Error(
-                    `exportContent - the stack is locked, so encrypted attributes on ${encrypted.join(", ")} ` +
-                    "would be exported as null. Unlock it with 'stack.unlock(documentKey)', or pass " +
-                    "'allowLossyWhenLocked: true' to accept the loss."
-                );
+                const sealedScopes = this.cryptoEngine.isEnabled() ? await this.lockedScopeIds() : [];
+                if (this.isLocked()) {
+                    throw new Error(
+                        `exportContent - the stack is locked, so encrypted attributes on ${encrypted.join(", ")} ` +
+                        "would be exported as null. Unlock it with 'stack.unlock(documentKey)', or pass " +
+                        "'allowLossyWhenLocked: true' to accept the loss."
+                    );
+                }
+                if (sealedScopes.length) {
+                    throw new Error(
+                        `exportContent - scopes ${sealedScopes.join(", ")} are sealed, so their encrypted attributes ` +
+                        "would be exported as null. Unlock them with 'stack.unlockScopes(attributeKey)', or pass " +
+                        "'allowLossyWhenLocked: true' to accept the loss."
+                    );
+                }
             }
         }
 
@@ -1141,33 +1324,6 @@ class ClientStack extends Stack {
         return report;
     }
 
-    private async ensureDefaultPolicyForClass(targetClass: ClassModel) {
-        const fnLogger = logger.child({ method: "ensureDefaultPolicyForClass", targetClass: targetClass._id });
-        const existingPolicy = await this.findDocument<PolicyModel>({
-            "~class": { $eq: "~Policy" },
-            targetClass: { $elemMatch: { $eq: targetClass._id } }
-        });
-        if (existingPolicy) {
-            return;
-        }
-
-        const policyDoc: PolicyModel = {
-            _id: `Policy-${targetClass._id}`,
-            "~class": "~Policy",
-            active: true,
-            rule: "return session && session.sessionStatus === 'active';",
-            description: `Default policy for ${targetClass.name || targetClass._id}`,
-            targetClass: [targetClass._id],
-        };
-
-        fnLogger.info("Creating default policy", { policyDoc });
-        try {
-            await this.db.bulkDocs([policyDoc as any]);
-        } catch (error: any) {
-            throw new Error(`Failed to create default policy for ${targetClass._id}: ${error?.message || error}`);
-        }
-    }
-
     /**
      * Creates and initializes a new ClientStack instance.
      * This is the primary way to instantiate a stack - the constructor is private.
@@ -1213,6 +1369,23 @@ class ClientStack extends Stack {
                     && existing.active !== false
                 )
             ));
+        }
+        // Scope material is attempted AFTER patches: a consumer patch may carry
+        // the very `~AccessScope` docs the key opens, and a patch deferred on a
+        // sealed scope replays inside `unlockScopes`. Adoption discipline is the
+        // consumer's (spec 02 §4): the stack stores nothing of the key.
+        if (options?.accessKeys && stack.cryptoEngine.isEnabled()) {
+            let { attributeKey } = options.accessKeys;
+            if (attributeKey) {
+                await stack.unlockScopes(attributeKey);
+            }
+            const stillLocked = await stack.lockedScopeIds();
+            if (stillLocked.length && options.accessKeys.requestAttributeKey) {
+                const fetched = await options.accessKeys.requestAttributeKey(stillLocked).catch(() => null);
+                if (fetched) {
+                    await stack.unlockScopes(fetched);
+                }
+            }
         }
         if (options?.credentials) {
             await stack.authenticate(options.credentials);
@@ -1469,7 +1642,7 @@ class ClientStack extends Stack {
         try {
             for (let index = 0; index < patches.length; index++) {
                 const patch = patches[index];
-                if (this.isLocked() && await this.patchNeedsDocumentKey(patch, stagedClassSchema)) {
+                if (await this.patchBlockedByLock(patch, stagedClassSchema)) {
                     await deferFrom(index);
                     break;
                 }
@@ -1647,6 +1820,45 @@ class ClientStack extends Stack {
      * have when patch N had committed.
      * @returns `true` if any document in it belongs to a class with encrypted attributes.
      */
+    /**
+     * The deferral barrier, generalized per scope (spec 02 §5): a patch is
+     * blocked when the legacy half applies (stack locked and the patch needs
+     * the document key) OR any document it carries writes into a declared
+     * scope whose CEK the keyring lacks - sealing under the wrong key is never
+     * a fallback, so the patch waits for `unlockScopes` exactly as key-needing
+     * patches wait for `unlock`.
+     */
+    private async patchBlockedByLock(
+        patch: Patch,
+        stagedSchema?: (className: string) => ClassModel["schema"] | null
+    ): Promise<boolean> {
+        if (this.isLocked() && await this.patchNeedsDocumentKey(patch, stagedSchema)) return true;
+        if (!this.cryptoEngine.isEnabled()) return false;
+
+        const hasEncrypted = (schema?: ClassModel["schema"]) =>
+            !!schema && Object.values(schema).some((attribute: any) => attribute?.config?.encrypted === true);
+        const classModelsInPatch = new Map<string, ClassModel>();
+        for (const doc of patch.docs ?? []) {
+            if (isClassModel(doc)) classModelsInPatch.set((doc as any).name ?? doc._id, doc as ClassModel);
+        }
+        for (const doc of patch.docs ?? []) {
+            if (isClassModel(doc) || isRelation(doc as any)) continue;
+            const className = (doc as any)["~class"];
+            if (typeof className !== "string" || !className) continue;
+            const inPatch = classModelsInPatch.get(className);
+            const stored = inPatch ? null : await this.getClassModel(className).catch(() => null);
+            const label = this.resolveScopeLabel(doc, (inPatch ?? stored) as any);
+            if (!label) continue;
+            const schema = inPatch?.schema ?? stagedSchema?.(className) ?? stored?.schema;
+            if (hasEncrypted(schema) && !this.cryptoEngine.isScopeWritable(label)) {
+                // Only a DECLARED scope defers - an unknown label is a patch
+                // fault the chain should refuse loudly, not wait on forever.
+                if ((await this.getAccessScopeRegistry()).has(label)) return true;
+            }
+        }
+        return false;
+    }
+
     private async patchNeedsDocumentKey(
         patch: Patch,
         stagedSchema?: (className: string) => ClassModel["schema"] | null
@@ -2439,35 +2651,41 @@ class ClientStack extends Stack {
      */
     invalidateWriteCaches = (docs?: unknown[]) => {
         let classTouched = !docs;
-        let policyTouched = !docs;
+        let scopeTouched = !docs;
         for (const doc of docs ?? []) {
             if (!doc || typeof doc !== "object") continue;
             if (isClassModel(doc as { [key: string]: any })) classTouched = true;
-            else if ((doc as { [key: string]: any })["~class"] === "~Policy") policyTouched = true;
-            if (classTouched && policyTouched) break;
+            else if ((doc as { [key: string]: any })["~class"] === "~AccessScope") scopeTouched = true;
+            if (classTouched && scopeTouched) break;
         }
         if (classTouched) {
             this.classModelCache.clear();
             this.classSnapshotCache.clear();
         }
-        if (policyTouched) {
-            this.policyEngine?.invalidatePolicyCache();
+        if (scopeTouched) {
+            this.accessScopeRegistryDirty = true;
         }
     }
 
     /**
      * Whether a database-level `limit` returns the same rows as limiting in memory.
      *
-     * `findDocuments` filters per document *after* the query - policy checks drop
-     * unreadable documents, and a locked crypto engine drops documents whose visible
-     * fields are all encrypted. A limit applied before either would under-fill. The
-     * query engine asks this before pushing a SQL LIMIT into the fetch.
+     * `findDocuments` drops a document whose visible fields are all sealed - a
+     * locked legacy key, or a scope the keyring cannot open. A limit applied
+     * before that filter would under-fill. So pushdown is allowed exactly when
+     * no row of this class can drop: the class has no encrypted attributes, or
+     * every key that might seal one is held (the legacy key, and every declared
+     * scope - a document may carry any label). The query engine asks this
+     * before pushing a SQL LIMIT into the fetch.
      *
      * @param className - The class being queried.
      */
     canApplyQueryLimitEarly = async (className: string): Promise<boolean> => {
-        if (this.cryptoEngine.isEnabled() && !this.cryptoEngine.getDocumentKey()) return false;
-        return !(await this.policyEngine.hasPoliciesFor(className));
+        if (!this.cryptoEngine.isEnabled()) return true;
+        const classObj = await this.getClassSnapshot(className).catch(() => null);
+        if (!classObj || !classObj.getEncryptedAttributes().length) return true;
+        if (!this.cryptoEngine.getDocumentKey()) return false;
+        return (await this.lockedScopeIds()).length === 0;
     }
 
     /**
@@ -3135,12 +3353,6 @@ class ClientStack extends Stack {
         };
 
         for (const doc of docs) {
-            const canRead = await this.policyEngine.isReadableDocument(doc);
-            if (!canRead) {
-                logger.info("processFoundDocuments - document is not readable by policy", { docId: doc._id, docClass: doc["~class"] });
-                continue;
-            }
-
             const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc);
             const classObj = encryptedKeys.length || (fields && fields.length)
                 ? await classFor(doc["~class"])
@@ -3236,14 +3448,19 @@ class ClientStack extends Stack {
         }
 
         const clone: Document = { ...doc } as Document;
-        const hasDocumentKey = Boolean(this.cryptoEngine.getDocumentKey());
 
-        if (hasDocumentKey && encryptedKeys.length) {
+        // Per payload, not per stack (spec 02 §5): the keyring opens what it
+        // can - legacy key, retired keys, unlocked scope CEKs - and whatever
+        // stays sealed (a locked scope, a missing legacy key, a payload whose
+        // label fails its AAD) reads as `null`, the locked-read convention
+        // applied at the granularity the keyring actually has.
+        let sealedCount = 0;
+        if (encryptedKeys.length) {
             await this.cryptoEngine.decryptDocument(clone, classObj, encryptedKeys);
-        } else if (encryptedKeys.length) {
             for (const key of encryptedKeys) {
-                if ((clone as any)[key] !== undefined) {
+                if (isEncryptedPayload((clone as any)[key])) {
                     (clone as any)[key] = null;
+                    sealedCount++;
                 }
             }
         }
@@ -3259,7 +3476,9 @@ class ClientStack extends Stack {
             return (clone as any)[key] !== undefined;
         });
 
-        if (!hasDocumentKey && encryptedKeySet.size) {
+        if (sealedCount > 0) {
+            // A document whose every visible field stayed sealed is hidden -
+            // there is nothing of it this keyring can show.
             const nonEncryptedVisible = visibleKeys.filter((key) => !encryptedKeySet.has(key));
             if (!nonEncryptedVisible.length) {
                 return null;
@@ -3643,7 +3862,6 @@ class ClientStack extends Stack {
                 classModel.name, classOrigin.getName(), classOrigin, classModel
             ) as ClassModel;
             fnLogger.info("Added class card", { result });
-            await this.ensureDefaultPolicyForClass(result);
             return result;
         } catch (e) {
             fnLogger.error("Error adding class card", { error: e })
@@ -3861,7 +4079,6 @@ class ClientStack extends Stack {
                 // console.log("Doc after merge", { doc_ })
             }
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
-            await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
             let response = await db.put(doc_);
             // Stamped from the response, not left as the pre-put draft. A caller cannot
             // otherwise tell a document that landed from one that did not - which is
@@ -3964,7 +4181,6 @@ class ClientStack extends Stack {
                 fnLogger.info("Doc BEFORE elaboration (i.e. merge)", { doc, params });
                 const doc_ = withoutEmptyRev({ ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() });
                 fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
-                await this.policyEngine.ensureWriteAllowed(type, doc_ as Document);
                 documents.push(doc_);
                 if (isNewDoc) newDocsIds.push(docId);
             } catch (e: any) {
@@ -4206,8 +4422,6 @@ class ClientStack extends Stack {
         const doc = await this.db.get<Document>(_id);
         if (doc) {
             try {
-                const targetClass = (doc as any)["~class"] as string;
-                await this.policyEngine.ensureWriteAllowed(targetClass, doc);
                 await this.db.put({ ...doc, active: false });
                 return true;
             } catch (e: any) {

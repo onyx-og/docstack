@@ -2,6 +2,42 @@
 
 ## 0.2.0 - 2026/09/03
 
+### Added (2026/09/06) — cryptographic access control (ADR-0045)
+
+- **Access is now cryptographic, not a rule that runs.** Content belongs to an
+  `~AccessScope` whose content key is ABE-sealed (CP-ABE / AC17) under a monotone
+  attribute policy - `("role:manager" and "dept:sales") or "clearance:secret"`.
+  A session supplies its attribute key through the new `accessKeys` option
+  (adopt-then-store, consumer-held, like `documentKey`); `stack.unlockScopes(key)`
+  attempts each scope, admitting only CEKs that pass a per-scope canary. A
+  document labels itself with `~scope` (or inherits a class `defaultScope`); the
+  scope decides *under which key* its `encrypted: true` fields seal, the schema
+  still decides *what*. A key that does not satisfy a scope's policy reads its
+  fields as `null` - denial is decryption failure, binding the device owner too.
+  New package `@docstack/abe` carries the WASM primitive and the authority
+  helpers (`setup`/`keygen`/`wrapCek`), which run where the application controls
+  them, never in the client's public surface. The keyring generalizes the single
+  document key (dispatch by `kid`, per-scope read-write/read-only modes, partial
+  locks). Label integrity: `~scope`/`kid` is bound into every sealed payload as
+  GCM additional data, and a write whose label disagrees with its ciphertext's
+  key is refused (`StackScopeMismatchError`) rather than re-sealed - the
+  induced-downgrade guard. `StackLockedError` now carries the sealed `scopeId`.
+  Pinned by `src-test/access-scopes.test.ts`.
+
+### Removed (2026/09/06) — the JS-rule policy engine (ADR-0045)
+
+- **The `~Policy` JavaScript-rule engine is deleted.** Client-side rule
+  evaluation could never bind the holder of the device (IndexedDB inspector,
+  console) - it was a facade, and one access-control language replaces it. The
+  five enforcement call sites, the per-class default-policy seeder, and the
+  pre-auth "not authenticated for policy evaluation" throw are gone;
+  `~sys-0.0.18` deactivates the three seeded policies, and `~Policy` the class
+  stays inert for legacy data. Losing read access now SEALS encrypted fields to
+  `null` (the ADR-0020 locked-read convention) instead of throwing - the crypto
+  and query-auth suites assert the seal where they once asserted the throw.
+  Behavioral/UI rules move to application code; conditional access
+  ("published ⇒ public") is write-time scope labeling.
+
 ### Changed (2026/09/04) — every consumer patch chain is transactional
 
 - **Mixed and data-only patch chains apply through the ADR-0042 internal

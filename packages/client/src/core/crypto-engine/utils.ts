@@ -104,12 +104,23 @@ export const deriveKeyId = async (hexKey: string): Promise<string> => {
         .join("");
 };
 
-export const encryptWithAesGcm = async (plaintext: string, key: CryptoKey, kid?: string): Promise<EncryptedPayload> => {
+/**
+ * The additional-authenticated-data string binding a scope-sealed payload to
+ * its label (spec 02 §2.3 rule 3): decryption derives it from the DOCUMENT's
+ * `~scope` at read time, so a tampered or stripped label does not merely look
+ * inconsistent - the GCM authentication fails and the payload stays sealed.
+ * Legacy-key payloads pass no AAD, keeping pre-scope ciphertext readable.
+ */
+export const scopeAad = (scopeId: string, kid: string): string => `${scopeId}|${kid}`;
+
+export const encryptWithAesGcm = async (plaintext: string, key: CryptoKey, kid?: string, aad?: string): Promise<EncryptedPayload> => {
     const cryptoObj = getCrypto();
     const iv = new Uint8Array(12);
     (cryptoObj as any).getRandomValues(iv);
     const ivBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength);
-    const ciphertext = await cryptoObj.subtle.encrypt({ name: "AES-GCM", iv: ivBuffer } as any, key, encoder.encode(plaintext));
+    const params: any = { name: "AES-GCM", iv: ivBuffer };
+    if (aad) params.additionalData = encoder.encode(aad);
+    const ciphertext = await cryptoObj.subtle.encrypt(params, key, encoder.encode(plaintext));
     const payload: EncryptedPayload = {
         __enc: true,
         iv: toBase64(iv),
@@ -120,14 +131,16 @@ export const encryptWithAesGcm = async (plaintext: string, key: CryptoKey, kid?:
     return payload;
 };
 
-export const decryptWithAesGcm = async (payload: EncryptedPayload, key: CryptoKey): Promise<string> => {
+export const decryptWithAesGcm = async (payload: EncryptedPayload, key: CryptoKey, aad?: string): Promise<string> => {
     const cryptoObj = getCrypto();
     const ivBytes = fromBase64(payload.iv);
     const dataBytes = fromBase64(payload.data);
     const ivBuffer = ivBytes.buffer.slice(ivBytes.byteOffset, ivBytes.byteOffset + ivBytes.byteLength);
     const dataBuffer = dataBytes.buffer.slice(dataBytes.byteOffset, dataBytes.byteOffset + dataBytes.byteLength);
+    const params: any = { name: "AES-GCM", iv: ivBuffer };
+    if (aad) params.additionalData = encoder.encode(aad);
     const decrypted = await cryptoObj.subtle.decrypt(
-        { name: "AES-GCM", iv: ivBuffer } as any,
+        params,
         key,
         dataBuffer as BufferSource,
     );
@@ -136,7 +149,9 @@ export const decryptWithAesGcm = async (payload: EncryptedPayload, key: CryptoKe
 
 export const wrapDocumentKey = async (documentKey: string, derivedKeyHex: string): Promise<string> => {
     const key = await importAesKeyFromHex(derivedKeyHex);
-    const payload = await encryptWithAesGcm(documentKey, key);
+    // Stamped with the WRAPPED key's id, so wrapped key material is
+    // self-identifying (spec 02 §3): a user record can say which key it holds.
+    const payload = await encryptWithAesGcm(documentKey, key, await deriveKeyId(documentKey));
     return JSON.stringify(payload);
 };
 

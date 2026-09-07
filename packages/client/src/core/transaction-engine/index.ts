@@ -171,7 +171,7 @@ export class TransactionEngine {
         //    can be stale (a policy changed, a class tightened). Zero consequences on
         //    refusal.
         for (const entry of entries) {
-            await sweepEntry(this.stack, stage, entry, { allowClassModels: handle.internal, skipPolicy: handle.internal });
+            await sweepEntry(this.stack, stage, entry, { allowClassModels: handle.internal });
         }
 
         // 2. Rev pre-flight: every staged id's stored winner must still be the

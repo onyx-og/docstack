@@ -1,0 +1,24 @@
+{
+  "name": "abe-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dual CP-ABE spike (ADR-0045): rabe->WASM vs TS-FAME over @noble/curves. Never published, never a client dependency. Lives outside packages/* deliberately - the workspace glob must not swallow it.",
+  "type": "module",
+  "scripts": {
+    "test": "tsx bench/correctness.ts",
+    "bench:ts": "tsx bench/node.ts",
+    "bench:rabe": "tsx bench/rabe-node.ts",
+    "probe:rabe": "tsx bench/rabe-probe.ts",
+    "bundle:browser": "esbuild bench/browser-entry.ts --bundle --format=esm --outfile=bench/dist/bundle.js",
+    "bench:browser": "npm run bundle:browser && tsx bench/browser-driver.ts"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

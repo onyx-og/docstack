@@ -20,6 +20,10 @@ export default {
       name: 'docstack',
       entryFileNames: 'index.js',
       chunkFileNames: '[name].js',
+      // The lazy `import("@docstack/abe")` would otherwise ask for a chunk,
+      // which the single-file UMD format cannot carry. The ES output keeps the
+      // split, so module consumers only load the WASM when scopes are used.
+      inlineDynamicImports: true,
     },
     {
       // Browser-ready ES module for direct import

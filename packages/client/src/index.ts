@@ -50,6 +50,7 @@ export {
     OPTIONAL_INTERNAL_DOC_CLASSES,
     StackWriteGuardError,
     StackLockedError,
+    StackScopeMismatchError,
     deriveKeyId,
     isEncryptedPayload,
     deriveTenantScope,
