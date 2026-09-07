@@ -3,20 +3,18 @@ import { test as it, expect } from './fixtures';
 const describe = it.describe;
 
 describe("query authentication", () => {
-    it("allows querying when authenticated and rejects when session is cleared", async ({ useDocStack }) => {
+    // Access control is cryptographic since ADR-0045: losing the key SEALS the
+    // data, it does not throw. Clearing the session drops the document key, so a
+    // query over an all-encrypted class returns nothing readable rather than
+    // raising - the graceful locked-read convention (ADR-0020), now the whole
+    // access story.
+    it("seals encrypted reads when the session (and its key) is cleared", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "query-auth",
             username: "query-user",
             password: "query-pass",
             evaluate: async ({ stack }) => {
                 const { Class } = (window as any).docstack;
-
-                // Generate a random 32-byte hex key in the browser
-                // const array = new Uint8Array(32);
-                // crypto.getRandomValues(array);
-                // const documentKey = Array.from(array).map(b => b.toString(16).padStart(2, "0")).join("");
-
-                // await stack.cryptoEngine.setDocumentKey(documentKey);
 
                 const secureClass = await Class.create(stack, "SecureItem", "class", "Secured items", {
                     title: { name: "title", type: "string", config: { mandatory: true, encrypted: true } },
@@ -27,32 +25,24 @@ describe("query authentication", () => {
                 const { rows: authenticatedRows } = await stack.query("SELECT title FROM SecureItem;");
 
                 stack.clearAuthSession();
-                // await stack.cryptoEngine.setDocumentKey(null);
 
                 let threwWhenCleared = false;
-                let unauthenticatedRows: any[] = [];
-                let errorMessage = "";
+                let sealedRows: any[] = [];
                 try {
                     let { rows } = await stack.query("SELECT title FROM SecureItem;");
-                    unauthenticatedRows = rows;
+                    sealedRows = rows;
                 } catch (e: any) {
                     threwWhenCleared = true;
-                    errorMessage = e.message || "";
                 }
-                
 
-                return {
-                    authenticatedRows,
-                    unauthenticatedRows,
-                    threwWhenCleared,
-                    errorMessage,
-                };
+                return { authenticatedRows, sealedRows, threwWhenCleared };
             },
         });
 
-        expect(result.unauthenticatedRows).toEqual([]);
         expect(result.authenticatedRows).toEqual([{ title: "secret" }]);
-        expect(result.threwWhenCleared).toBe(true);
-        expect(result.errorMessage).toContain("authenticated");
+        // `title` is the only field and it is encrypted: with no key it seals to
+        // null, the row has nothing visible, and it drops out. Empty, not an error.
+        expect(result.sealedRows).toEqual([]);
+        expect(result.threwWhenCleared).toBe(false);
     });
 });

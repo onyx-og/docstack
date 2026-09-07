@@ -104,7 +104,7 @@ describe("document id allocation", () => {
         expect(result.first).not.toBe(result.second);
     });
 
-    it("ADR-0023: two instances converge on one class model and one default policy", async ({ useDocStack }) => {
+    it("ADR-0023: two instances converge on one class model", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "id-converge-host",
             evaluate: async ({ docStack }) => {
@@ -117,10 +117,7 @@ describe("document id allocation", () => {
                         title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
                     });
                     const model = await stack.getClassModel("ConvergeTask");
-                    const policies = (await stack.findDocuments({ "~class": { $eq: "~Policy" } })).docs
-                        .filter((d: any) => (d.targetClass || []).includes(model?._id))
-                        .map((d: any) => d._id);
-                    return { classId: model?._id, policies };
+                    return { classId: model?._id };
                 };
 
                 // Two devices of one application, each building the same class locally.
@@ -134,11 +131,8 @@ describe("document id allocation", () => {
         // Random document ids are right for documents, which have no natural key. A class
         // model does have one - its name - and deriving the id from it is what makes two
         // devices write the *same* document rather than two, so replication merges them
-        // instead of leaving a duplicate class and a duplicate policy on both devices.
+        // instead of leaving a duplicate class on both devices.
         expect(result.deviceA.classId).toBe("ConvergeTask");
         expect(result.deviceB.classId).toBe(result.deviceA.classId);
-
-        expect(result.deviceA.policies).toEqual(["Policy-ConvergeTask"]);
-        expect(result.deviceB.policies).toEqual(result.deviceA.policies);
     });
 });

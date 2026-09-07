@@ -10,8 +10,22 @@ import {
     encryptWithAesGcm,
     importAesKeyFromHex,
     isEncryptedPayload,
+    scopeAad,
     unwrapDocumentKey,
 } from "./utils.js";
+
+/**
+ * One admitted scope CEK (spec 02 §3). `mode` follows the retired-keys
+ * discipline: the winning version of a scope writes, older versions admitted
+ * during lazy rotation only read.
+ */
+type ScopeKeyEntry = {
+    kid: string;
+    cryptoKey: CryptoKey;
+    scopeId: string;
+    version: number;
+    mode: "read-write" | "read-only";
+};
 
 /**
  * Engine for handling document-level encryption and decryption.
@@ -53,6 +67,18 @@ export class CryptoEngine {
      * interrupted, and resumed.
      */
     private retiredKeys = new Map<string, CryptoKey>();
+    /**
+     * Scope CEKs admitted by {@link admitScopeKey}, by key id (ADR-0045).
+     *
+     * The keyring the single document key generalizes into: reads dispatch by a
+     * payload's `kid` across the legacy key, retired keys, and these; writes
+     * into a scope-labeled document select through {@link scopeWriteKeys}. A
+     * scope whose CEK is absent here is simply LOCKED - its payloads stay
+     * sealed, which is the access decision.
+     */
+    private scopeKeys = new Map<string, ScopeKeyEntry>();
+    /** The read-write entry per scope id - the CEK that seals new writes. */
+    private scopeWriteKeys = new Map<string, ScopeKeyEntry>();
     private readonly logger = createLogger().child({ module: "crypto-engine" });
     /** Reference to the parent stack. */
     private readonly stack: ClientStack;
@@ -144,7 +170,93 @@ export class CryptoEngine {
         return [
             ...(this.documentKeyId ? [this.documentKeyId] : []),
             ...this.retiredKeys.keys(),
+            ...this.scopeKeys.keys(),
         ];
+    }
+
+    /**
+     * Admits a scope's CEK into the keyring after its canary verified
+     * (spec 02 §2.1 - admission is the caller's `verifyScopeCek` first, this
+     * second). The winning version of a scope enters read-write and becomes
+     * the key new writes into the scope seal under; older versions enter
+     * read-only, the retired-keys discipline applied per scope.
+     *
+     * @returns The admitted key's id.
+     */
+    public async admitScopeKey(scopeId: string, cekHex: string, version: number, mode: "read-write" | "read-only"): Promise<string> {
+        if (!this.enabled) throw new Error("Crypto engine is disabled");
+        const kid = await deriveKeyId(cekHex);
+        const entry: ScopeKeyEntry = {
+            kid,
+            cryptoKey: await importAesKeyFromHex(cekHex, mode === "read-write" ? ["encrypt", "decrypt"] : ["decrypt"]),
+            scopeId,
+            version,
+            mode,
+        };
+        this.scopeKeys.set(kid, entry);
+        if (mode === "read-write") {
+            const current = this.scopeWriteKeys.get(scopeId);
+            if (!current || current.version <= version) {
+                if (current && current.kid !== kid) {
+                    // Superseded by a higher rotation version: keep it readable.
+                    this.scopeKeys.set(current.kid, { ...current, mode: "read-only" });
+                }
+                this.scopeWriteKeys.set(scopeId, entry);
+            } else {
+                // A lower version arriving late reads, never writes.
+                this.scopeKeys.set(kid, { ...entry, mode: "read-only" });
+            }
+        }
+        return kid;
+    }
+
+    /**
+     * Tests a candidate CEK against a scope's canary WITHOUT admitting it -
+     * the ADR-0018 admission discipline per scope: a corrupted or
+     * rotated-away ciphertext is an error at unlock, not garbage later. The
+     * marker's AAD binds it to the scope and key it was minted for.
+     */
+    public async verifyScopeCek(scopeId: string, cekHex: string, marker: unknown): Promise<boolean> {
+        if (!this.enabled) return false;
+        if (!isEncryptedPayload(marker)) return false;
+        try {
+            const kid = await deriveKeyId(cekHex);
+            const key = await importAesKeyFromHex(cekHex, ["decrypt"]);
+            await decryptWithAesGcm(marker, key, scopeAad(scopeId, kid));
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /** Whether new writes into this scope can seal - a read-write CEK is held. */
+    public isScopeWritable(scopeId: string): boolean {
+        return this.enabled && this.scopeWriteKeys.has(scopeId);
+    }
+
+    /** Scope ids holding a read-write CEK. */
+    public unlockedScopeIds(): string[] {
+        return this.enabled ? [...this.scopeWriteKeys.keys()] : [];
+    }
+
+    /** The key id new writes into a scope seal under, when the scope is open. */
+    public getScopeWriteKeyId(scopeId: string): string | undefined {
+        return this.scopeWriteKeys.get(scopeId)?.kid;
+    }
+
+    /** The scope a held key id belongs to, if it is a scope key. */
+    public scopeOfKid(kid: string): string | undefined {
+        return this.scopeKeys.get(kid)?.scopeId;
+    }
+
+    /**
+     * Drops every admitted scope CEK - the session's material is gone, the
+     * scopes are locked again. Mirrors what clearing the document key does for
+     * the legacy path.
+     */
+    public dropScopeKeys(): void {
+        this.scopeKeys.clear();
+        this.scopeWriteKeys.clear();
     }
 
     /**
@@ -245,42 +357,62 @@ export class CryptoEngine {
     }
 
     /**
-     * Chooses the key that can open a payload.
+     * Chooses the keyring entry that can open a payload.
      *
      * A payload names its key, so an old field found mid-re-key is decrypted with the key
      * it was actually written under instead of failing against the current one. Payloads
-     * from before identifiers existed name nothing, and are tried against the current key
-     * - which is what they meant when only one key could exist.
+     * from before identifiers existed name nothing, and are tried against the LEGACY
+     * document key only (spec 02 §3): under multiple keys, falling back to "whatever is
+     * current" would silently mis-route - a scope key never answers for an unnamed
+     * payload.
      */
-    private async resolveKeyFor(payload: EncryptedPayload, fallback: CryptoKey | null) {
-        if (!payload.kid) return fallback;
-        if (payload.kid === this.documentKeyId) return fallback;
-        return this.retiredKeys.get(payload.kid) ?? null;
+    private async resolveEntryFor(payload: EncryptedPayload): Promise<{ key: CryptoKey; scope?: ScopeKeyEntry } | null> {
+        if (!payload.kid || payload.kid === this.documentKeyId) {
+            const legacy = await this.getCryptoKey();
+            return legacy ? { key: legacy } : null;
+        }
+        const retired = this.retiredKeys.get(payload.kid);
+        if (retired) return { key: retired };
+        const scope = this.scopeKeys.get(payload.kid);
+        if (scope) return { key: scope.cryptoKey, scope };
+        return null;
     }
 
-    private async encryptValue(value: unknown, key: CryptoKey | null): Promise<EncryptedPayload | unknown> {
+    private async encryptValue(value: unknown, key: CryptoKey | null, kid?: string, aad?: string): Promise<EncryptedPayload | unknown> {
         if (!this.enabled) return value;
         if (!key) return value;
         if (value === undefined || value === null) return value;
         if (isEncryptedPayload(value)) return value;
         const serialized = JSON.stringify(value);
-        return encryptWithAesGcm(serialized, key, this.documentKeyId);
+        return encryptWithAesGcm(serialized, key, kid ?? this.documentKeyId, aad);
     }
 
-    private async decryptValue(value: unknown, key: CryptoKey | null): Promise<unknown> {
+    /**
+     * @param label - The document's `~scope` at read time. A scope-sealed
+     * payload authenticates against it (AAD, spec 02 §2.3 rule 3): a tampered
+     * or stripped label fails the GCM authentication and the payload stays
+     * sealed - the mismatch is detected, never silently honored.
+     */
+    private async decryptValue(value: unknown, label?: string): Promise<unknown> {
         if (!this.enabled) return value;
-        if (!key) return value;
         if (!isEncryptedPayload(value)) return value;
-        const resolved = await this.resolveKeyFor(value, key);
+        const resolved = await this.resolveEntryFor(value);
         if (!resolved) {
             this.logger.warn("No held key matches this payload; leaving it encrypted", { kid: value.kid });
             return value;
         }
+        const aad = resolved.scope ? scopeAad(label ?? "", value.kid!) : undefined;
         try {
-            const decrypted = await decryptWithAesGcm(value, resolved);
+            const decrypted = await decryptWithAesGcm(value, resolved.key, aad);
             return JSON.parse(decrypted);
         } catch (error: any) {
-            this.logger.error("Failed to decrypt value", { error: error?.message || error });
+            if (resolved.scope) {
+                this.logger.warn("Scope payload does not authenticate against the document's label; leaving it sealed", {
+                    kid: value.kid, scopeOfKey: resolved.scope.scopeId, label: label ?? null,
+                });
+            } else {
+                this.logger.error("Failed to decrypt value", { error: error?.message || error });
+            }
             return value;
         }
     }
@@ -317,21 +449,43 @@ export class CryptoEngine {
      * @param document - The document to encrypt
      * @param classObj - The class defining which fields to encrypt
      */
-    public async encryptDocument(document: Document, classObj: Class) {
+    /**
+     * @param scopeId - The document's resolved scope label. When present, the
+     * scope's read-write CEK seals every attribute (stamped with its `kid`,
+     * bound to the label via AAD); the caller has already refused the write if
+     * the scope is not open. Absent, the legacy document key path applies
+     * unchanged.
+     */
+    public async encryptDocument(document: Document, classObj: Class, scopeId?: string) {
         if (!this.enabled) return;
         const encryptableAttributes = classObj.getEncryptedAttributes();
         if (!encryptableAttributes.length) return;
 
-        const key = await this.getCryptoKey();
-        if (!key) {
-            this.logger.warn("Document key is not available; skipping encryption", { className: classObj.getName?.() ?? classObj.model?.name });
-            return;
+        let key: CryptoKey | null;
+        let kid: string | undefined;
+        let aad: string | undefined;
+        if (scopeId) {
+            const entry = this.scopeWriteKeys.get(scopeId);
+            if (!entry) {
+                // The plugin refuses scope writes before reaching here; this is the
+                // engine's own last line - sealing under the wrong key is never a fallback.
+                throw new Error(`Scope '${scopeId}' holds no read-write key; cannot encrypt.`);
+            }
+            key = entry.cryptoKey;
+            kid = entry.kid;
+            aad = scopeAad(scopeId, entry.kid);
+        } else {
+            key = await this.getCryptoKey();
+            if (!key) {
+                this.logger.warn("Document key is not available; skipping encryption", { className: classObj.getName?.() ?? classObj.model?.name });
+                return;
+            }
         }
 
         for (const attribute of encryptableAttributes) {
             const name = attribute.getName();
             if (!(name in document)) continue;
-            const encrypted = await this.encryptValue((document as any)[name], key);
+            const encrypted = await this.encryptValue((document as any)[name], key, kid, aad);
             (document as any)[name] = encrypted;
         }
     }
@@ -349,14 +503,13 @@ export class CryptoEngine {
         const encryptedAttributes = encryptedKeys ?? this.identifyEncryptedKeys(document, classObj);
         if (!encryptedAttributes.length) return;
 
-        const key = await this.getCryptoKey();
-        if (!key) {
-            this.logger.warn("Document key is not available; returning encrypted payload", { className: classObj?.getName?.() ?? classObj?.model?.name });
-            return;
-        }
-
+        // No early bail on a missing legacy key: the keyring dispatches per
+        // payload, and a scope key can open what the document key cannot. A
+        // payload nothing opens stays sealed - which IS the (per-scope) locked
+        // read, handled by the read paths' null convention.
+        const label = (document as any)["~scope"];
         for (const name of encryptedAttributes) {
-            const decrypted = await this.decryptValue((document as any)[name], key);
+            const decrypted = await this.decryptValue((document as any)[name], typeof label === "string" ? label : undefined);
             (document as any)[name] = decrypted;
         }
     }

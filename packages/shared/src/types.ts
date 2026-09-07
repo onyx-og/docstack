@@ -124,6 +124,16 @@ export interface ClassModel extends Document {
      * tenant-neutral - it follows its stack, and single-tenant consumers pay nothing.
      */
     tenants?: string[],
+    /**
+     * The access scope documents of this class default into (spec 02 §2.2).
+     *
+     * Applied at write time when a document states no `~scope` of its own; the
+     * document's own label always wins. The scope decides *under which key* the
+     * class's `encrypted: true` attributes seal - the schema still decides
+     * *what* encrypts. A class with neither declaration follows the legacy
+     * document key. See ADR-0045.
+     */
+    defaultScope?: string,
     _rev?: PouchDB.Core.RevisionId | undefined;
     schema: {[name: string]: AttributeModel};
     triggers: TriggerModel[];
@@ -285,6 +295,26 @@ export type StackOptions = {
      * discards them. See ADR-0039.
      */
     transactions?: boolean;
+
+    /**
+     * The consumer key contract for cryptographic access scopes (ADR-0045,
+     * spec 02 §4). DocStack never runs the authority and never invents key
+     * material: the application adopts the session's attribute key from its
+     * own infrastructure (its server, a Drive grant, Firebase) and persists it
+     * consumer-side, exactly as it provisions {@link documentKey} today.
+     */
+    accessKeys?: {
+        /** The session's ABE attribute secret key, serialized (opaque blob from `@docstack/abe` keygen). */
+        attributeKey?: string;
+        /**
+         * Called once at open when active scopes remain locked after the
+         * supplied material was attempted. The consumer may fetch newer
+         * material and return it - it is attempted immediately - or return
+         * null to stay partially locked (later adoption goes through
+         * `stack.unlockScopes(key)`).
+         */
+        requestAttributeKey?: (lockedScopes: string[]) => Promise<string | null>;
+    };
 } & PouchDB.Configuration.DatabaseConfiguration
 
 export type StackConfig = ({
@@ -358,6 +388,12 @@ export interface JobRunModel extends Document {
     workerId?: string;
 }
 
+/**
+ * @deprecated The JS-rule policy engine retired with ADR-0045's
+ * single-vocabulary ruling: the attribute formula on an {@link AccessScopeModel}
+ * is DocStack's one access-control language, enforced by encryption. `~Policy`
+ * documents are inert legacy data - nothing evaluates them.
+ */
 export interface PolicyModel extends Document {
     "~class": "~Policy";
     userId?: string;
@@ -365,6 +401,28 @@ export interface PolicyModel extends Document {
     rule: string;
     description?: string;
     targetClass: string[];
+}
+
+/**
+ * An access scope (ADR-0045, spec 02 §2.1): a named set of content whose
+ * encrypted attributes seal under one CEK, itself ABE-encrypted under the
+ * scope's attribute policy. Replicates with the data; a device whose attribute
+ * key does not satisfy `policyString` holds the blob and cannot open it.
+ */
+export interface AccessScopeModel extends Document {
+    "~class": "~AccessScope";
+    /** The label documents carry in `~scope` (and classes in `defaultScope`). */
+    scopeId: string;
+    /** Monotone attribute formula, e.g. `("role:manager" and "dept:sales") or "clearance:secret"`. Public by design. */
+    policyString: string;
+    /** The scope's 32-byte CEK, ABE-sealed under `policyString`. Opaque blob - never parsed. */
+    abeWrappedCek: string;
+    /** Key id of the CEK (first 8 bytes of SHA-256), matching payload stamping. */
+    kid: string;
+    /** Increments on rotation; the highest active version's CEK writes, older ones read (spec 02 §7). */
+    version: number;
+    /** Per-scope canary: AES-GCM over a random nonce under the CEK (ADR-0018 discipline, per scope). */
+    encryptedMarker: unknown;
 }
 
 export interface AuthModuleModel extends Document {

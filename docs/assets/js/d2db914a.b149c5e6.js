@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunk_docstack_docs=self.webpackChunk_docstack_docs||[]).push([["6185"],{20916(e){e.exports=JSON.parse('{"metadata":{"permalink":"/docstack/blog","page":1,"postsPerPage":10,"totalPages":1,"totalCount":3,"blogDescription":"Release notes for the @docstack packages.","blogTitle":"Release notes"}}')}}]);

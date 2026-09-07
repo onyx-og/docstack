@@ -4,7 +4,7 @@
 
 # @docstack/react
 
-**React bindings for [DocStack](https://github.com/onyx-og/docstack) — an offline-first embedded database with schemas, SQL, policies and encryption.**
+**React bindings for [DocStack](https://github.com/onyx-og/docstack) — an offline-first embedded database with schemas, SQL, access scopes and encryption.**
 
 A provider that owns the database lifecycle, and hooks that are **live by default**. Every hook subscribes to the local database, so when a document changes — because the user edited it, because a background job wrote it, or because it arrived over sync — the components reading it re-render. There is no fetching layer, no cache to invalidate, and no staleness to reason about.
 
@@ -216,7 +216,7 @@ Every hook takes the stack name as its first argument, so switching workspaces i
 
 If you have used `useLiveQuery` in [Dexie](https://dexie.org/) or the reactive queries in [RxDB](https://rxdb.info/), the reactivity model here will feel familiar: a query that re-runs when its data changes, backed by local storage.
 
-What differs is what sits underneath the hook. A `useQuerySQL` call resolves against an engine that already applies schema validation, access policies and field-level decryption, and the SQL it runs supports joins, aggregation and subqueries rather than a selector API. And because DocStack replicates to any PouchDB-compatible remote — including a folder in the end user's own Google Drive — `useSyncStatus` can describe a sync you never had to run a server for.
+What differs is what sits underneath the hook. A `useQuerySQL` call resolves against an engine that already applies schema validation, access scopes and field-level decryption, and the SQL it runs supports joins, aggregation and subqueries rather than a selector API. And because DocStack replicates to any PouchDB-compatible remote — including a folder in the end user's own Google Drive — `useSyncStatus` can describe a sync you never had to run a server for.
 
 ## 📖 Documentation
 

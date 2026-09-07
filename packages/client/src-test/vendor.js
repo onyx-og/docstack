@@ -15,6 +15,12 @@ import PouchDBBrowser from 'pouchdb-browser';
 import PouchDBFind from 'pouchdb-find';
 import * as shared from "@docstack/shared"
 
+// The ABE AUTHORITY functions (setup/keygen), for tests that mint attribute
+// keys. Deliberately test-only: the authority runs where the application
+// controls it (ADR-0045), never in the client's public API. buildAccessScope
+// and unlockScopes reach the same @docstack/abe through the client bundle.
+import * as docstackAbe from "@docstack/abe";
+
 // Utilities
 import * as zod from 'zod';
 import * as semver from 'semver';
@@ -23,6 +29,7 @@ import * as jsondiffpatch from 'jsondiffpatch';
 globalThis.PouchDB = PouchDBBrowser;
 globalThis.PouchDBFind = PouchDBFind;
 globalThis.shared = shared;
+globalThis.docstackAbe = docstackAbe;
 globalThis.z = zod;
 globalThis.semver = semver;
 globalThis.jsondiffpatch = jsondiffpatch;

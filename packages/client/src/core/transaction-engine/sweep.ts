@@ -41,7 +41,7 @@ export const sweepEntry = async (
     stack: ClientStack,
     stage: TransactionStage,
     entry: StagedEntry,
-    options?: { allowClassModels?: boolean; skipPolicy?: boolean }
+    options?: { allowClassModels?: boolean }
 ): Promise<void> => {
     const doc = entry.doc;
     const docId = doc._id;
@@ -84,15 +84,8 @@ export const sweepEntry = async (
         throw new TransactionUnsupportedDocError(docId, "patches carry class models and apply through 'applyPatch'.");
     }
 
-    // A hard delete carries no content to validate; write access is still the
-    // author's to prove - unless this is DocStack's own machinery (an internal
-    // handle: patch application runs before any session exists, and the patch
-    // path's direct writes never pass through policy either - ADR-0044).
+    // A hard delete carries no content to validate.
     if (entry.op === "delete") {
-        const type = (doc as any)["~class"];
-        if (typeof type === "string" && !options?.skipPolicy) {
-            await stack.policyEngine.ensureWriteAllowed(type, doc as Document);
-        }
         return;
     }
 
@@ -130,10 +123,18 @@ export const sweepEntry = async (
         throw new TransactionValidationError(`Class '${type}' not found for document '${docId}'.`, docId);
     }
 
-    // Same refusal the plugin makes (ADR-0018): a locked stack cannot encrypt, and
-    // committing later while still locked would land the fields in the clear.
-    if (classObj.getEncryptedAttributes().length && stack.isLocked()) {
-        throw new StackLockedError(type);
+    // Same refusal the plugin makes (ADR-0018, per scope since ADR-0045): a
+    // sealed key cannot encrypt, and committing later while still sealed would
+    // land the fields in the clear - or under the wrong key, which is worse.
+    if (classObj.getEncryptedAttributes().length) {
+        const label = stack.resolveScopeLabel(doc, (classObj as any).model);
+        if (label) {
+            if (!stack.cryptoEngine.isScopeWritable(label)) {
+                throw new StackLockedError(type, label);
+            }
+        } else if (stack.isLocked()) {
+            throw new StackLockedError(type);
+        }
     }
 
     const valid = await classObj.validate(doc);
@@ -142,9 +143,5 @@ export const sweepEntry = async (
             `Document '${docId}' does not validate against class '${type}'.`,
             docId
         );
-    }
-
-    if (!options?.skipPolicy) {
-        await stack.policyEngine.ensureWriteAllowed(type, doc as Document);
     }
 };

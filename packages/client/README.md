@@ -7,7 +7,7 @@
 
 **One does not simply stack documents.**
 
-An **offline-first embedded database for the browser**, built on PouchDB and IndexedDB. It brings the things you would otherwise build yourself — **schema validation, a SQL query engine, triggers, background jobs, role-based access policies, field-level encryption, versioned migrations and named write transactions** — into the client, where your application actually runs. When a connection exists, everything replicates to any PouchDB- or CouchDB-compatible remote, including the user's own Google Drive.
+An **offline-first embedded database for the browser**, built on PouchDB and IndexedDB. It brings the things you would otherwise build yourself — **schema validation, a SQL query engine, triggers, background jobs, cryptographic access scopes, field-level encryption, versioned migrations and named write transactions** — into the client, where your application actually runs. When a connection exists, everything replicates to any PouchDB- or CouchDB-compatible remote, including the user's own Google Drive.
 
 No server required. No network round trip on the read path. TypeScript throughout.
 
@@ -24,7 +24,7 @@ No server required. No network round trip on the read path. TypeScript throughou
 ### What it means for you building it
 
 * **Skip the backend for a whole class of app.** Validation, access control, migrations and background work usually justify a server. Here they are engine features, so a genuinely useful application can ship with no backend to run, secure, scale or pay for.
-* **Logic as data.** Triggers, jobs and policies are documents. Change a validation rule or a business process by writing a document — no redeploy, and the change replicates to every device like any other data.
+* **Logic as data.** Triggers, jobs, migrations and access scopes are documents. Change a validation rule or a business process by writing a document — no redeploy, and the change replicates to every device like any other data.
 * **Migrations you can trust.** Schema changes are declarative patch documents with a semver ledger: applied exactly once, all-or-nothing, and gated at sync so a device with an older model cannot pull documents its schema can't describe.
 * **Encryption you don't have to hand-roll.** Mark an attribute `encrypted` and it is ciphertext on disk and on the remote, transparently decrypted on read for the session that holds the key.
 * **SQL instead of map/reduce.** Joins, aggregation, subqueries and pagination against local documents, with index pushdown where the planner can prove it is safe.
@@ -35,7 +35,7 @@ No server required. No network round trip on the read path. TypeScript throughou
 npm install @docstack/client pouchdb-browser pouchdb-find
 ```
 
-`pouchdb-browser` and `pouchdb-find` are **peer dependencies** — DocStack does not bundle the storage layer, so you control its version.
+`pouchdb-browser` and `pouchdb-find` are **peer dependencies** — DocStack does not bundle the storage layer, so you control its version. `@docstack/abe`, the CP-ABE primitive behind access scopes, is installed as a dependency and loaded lazily, only when a stack declares scopes.
 
 ## ⚡ Quick start
 
@@ -95,7 +95,7 @@ const { rows: busy } = await stack.query(`
 `);
 ```
 
-`WHERE`, `ORDER BY … LIMIT` and range predicates push down into the index where the planner can prove the result is identical; encryption and policies are consulted first, because a filter applied to ciphertext would answer the wrong question.
+`WHERE`, `ORDER BY … LIMIT` and range predicates push down into the index where the planner can prove the result is identical; encryption is consulted first, because a filter applied to ciphertext would answer the wrong question.
 
 For results too large to materialise, stream them — the scan pages by keyset and stops early when a `LIMIT` is satisfied:
 
@@ -164,8 +164,8 @@ const handle = await stack.sync({
     classes: { exclude: ['Draft'] },         // what travels
 });
 
-handle.addEventListener('sync-status', () => {
-    const status = stack.getSyncStatus();
+handle.addEventListener('status', (event) => {
+    const status = event.detail;   // also `stack.getSyncStatus()`, or `sync-status` on the stack
     // `lastConvergedAt` is the honest "last synced": a cycle finished with nothing
     // left to send. `lastActiveAt` only says documents moved.
     render(status.state, status.lastConvergedAt);
@@ -210,7 +210,7 @@ try {
 }
 ```
 
-A write that fails validation, policy or the locked-stack check stages nothing, and a batch with one bad document unwinds entirely. Commit re-runs that sweep against the current world and refuses with `TransactionConflictError` if a document changed underneath — persisting nothing and leaving the transaction open to retry.
+A write that fails validation or the locked-stack check stages nothing, and a batch with one bad document unwinds entirely. Commit re-runs that sweep against the current world and refuses with `TransactionConflictError` if a document changed underneath — persisting nothing and leaving the transaction open to retry.
 
 **Atomicity is reported, not assumed.** Every commit report carries the storage adapter's honest answer in `adapter.atomicBatch`: adapters that commit a batch as one storage transaction report `true`; on IndexedDB, results are per-document, and a revision pre-flight shrinks — but does not eliminate — the window. A partial commit leaves `status: "partial"` with only the failed entries retained, so a raced document conflicts on retry instead of being silently overwritten.
 
@@ -236,6 +236,16 @@ console.log(post.slug); // 'hello-world'
 `JobEngine` executes a job when asked. `JobScheduler` decides when to ask, under the constraints a client actually imposes — an app that is closed most of the time, timers that freeze, and several devices holding replicas of the same job.
 
 ```typescript
+const content = `
+    async function execute(stack, params) {
+        const { rows } = await stack.query("SELECT _id FROM Task WHERE isComplete = true");
+        return { metadata: { archivedCount: rows.length } };
+    }
+`;
+// `hash` is mandatory: the SHA-256 of `content`, verified before every run.
+const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
+const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+
 await stack.db.bulkDocs([{
     _id: 'Job-ArchiveOldTasks',
     '~class': '~Job',
@@ -243,12 +253,8 @@ await stack.db.bulkDocs([{
     type: 'user',
     workerPlatform: 'client',
     isEnabled: true,
-    content: `
-        async function execute(stack, params) {
-            const { rows } = await stack.query("SELECT _id FROM Task WHERE isComplete = true");
-            return { metadata: { archivedCount: rows.length } };
-        }
-    `,
+    content,
+    hash,
 }]);
 
 // Run it now
@@ -264,29 +270,36 @@ stack.jobScheduler.start({
 
 There is deliberately no "run everything": job content replicates and is executable, so unattended execution is an allow-list. `pinnedHashes` lets the application pin the code it expects a job to have.
 
-### 7. Access policies
+### 7. Access scopes
 
-Rule-based read and write control, evaluated per session against the document in question.
+Access is a property of the ciphertext, not a rule that runs. Content belongs to a **scope** whose content key is sealed under an **attribute policy** (CP-ABE, the AC17 scheme, through [`@docstack/abe`](https://github.com/onyx-og/docstack/blob/main/packages/abe/README.md)). A device whose attribute key satisfies the policy opens the scope; one whose key does not holds the same ciphertext and reads `null`. There is no client-side check to bypass, so the guarantee holds against the device owner too.
 
 ```typescript
-await stack.db.bulkDocs([
-    {
-        _id: 'Policy-Article-EditorsWrite',
-        '~class': '~Policy',
-        targetClass: ['Class-Article'],
-        groupId: 'Group-Editors',
-        rule: `return session && session.sessionStatus === 'active';`,
-    },
-    {
-        _id: 'Policy-Article-PublicRead',
-        '~class': '~Policy',
-        targetClass: ['Class-Article'],
-        rule: `if (document.status === 'published') return true;`,
-    },
-]);
+// Authority side — your server, an admin ceremony. Master keys never reach a device.
+import { setup, keygen } from '@docstack/abe';
+
+const { pk, msk } = await setup();
+const hrScope = await ClientStack.buildAccessScope({
+    scopeId: 'hr',
+    policyString: '"role:hr" or "clearance:exec"',
+    pk,
+});
+const aliceKey = await keygen(msk, ['role:hr']);
+// Ship `hrScope` in an application patch; hand `aliceKey` to Alice's devices.
+
+// Device side.
+const stack = await ClientStack.create('my-app', {
+    documentKey,
+    accessKeys: { attributeKey: aliceKey },   // or later: await stack.unlockScopes(aliceKey)
+});
+
+await salaryClass.add({ who: 'alice', amount: '100000', '~scope': 'hr' });   // seals under hr's key
+stack.isScopeLocked('hr');   // false for Alice; true for a device whose key does not satisfy the policy
 ```
 
-Because policies are documents scoped by group and user, one database can serve multiple tenants without per-tenant application code — and the query engine consults them before deciding whether a filter can be pushed down.
+A document joins a scope with the reserved `~scope` field, or inherits its class's `defaultScope`. The scope decides *under which key* the class's `encrypted: true` attributes seal; the schema still decides *which* attributes. Writing into a scope the session cannot open throws `StackLockedError` with `scopeId` set, and a write whose label disagrees with its payload's key is refused with `StackScopeMismatchError` rather than re-sealed. Revoking a member is publishing a new scope version with a policy the departed key no longer satisfies.
+
+Conditional access is write-time labeling ("published means public" is the write choosing the scope), and behavioural rules stay application code. The formula language, the guarantees and the limits, stated plainly, are in the [access control](https://onyx-og.github.io/docstack/docs/concepts/access-control/) section of the documentation.
 
 ### 8. Field-level encryption
 
@@ -294,7 +307,7 @@ Because policies are documents scoped by group and user, one database can serve 
 await Attribute.create(userClass, 'socialSecurityNumber', 'string', 'SSN', { encrypted: true });
 ```
 
-The value is encrypted with a document key (PBKDF2-derived, AES-GCM) before it reaches storage. It is ciphertext on disk **and on every remote it replicates to** — decrypted only on the way out, for a session holding the key.
+The value is AES-GCM ciphertext before it reaches storage, under the stack's document key or, for a document labeled with a scope, that scope's key. It is ciphertext on disk **and on every remote it replicates to** — decrypted only on the way out, for a session holding the key.
 
 DocStack never invents that key: one generated per session could not outlive it, and a second device would generate a different one. Supply it at open time, or open **locked** and unlock later:
 
@@ -373,7 +386,7 @@ Against raw PouchDB — the honest baseline, since DocStack is built on it:
 | Querying | Mango selectors, hand-written map/reduce | ✅ SQL — joins, aggregation, subqueries, pushdown |
 | Business logic on write | application code | ✅ triggers, stored as data |
 | Background work | application code | ✅ job engine + unattended scheduler |
-| Access control | none | ✅ policy engine, per class and session |
+| Access control | none | ✅ cryptographic scopes: attribute policies enforced by decryption |
 | Field-level encryption | build it | ✅ transparent, opaque to the remote |
 | Schema migrations | build it | ✅ versioned patches with a ledger and a sync gate |
 | Multi-document atomicity | none | ✅ staged transactions, with reported guarantees |
@@ -382,7 +395,7 @@ Against raw PouchDB — the honest baseline, since DocStack is built on it:
 
 What distinguishes DocStack is a narrower bet than "a better local database":
 
-* **Logic as data.** Triggers, jobs and policies are documents that replicate and can change at runtime, rather than code compiled into a release. Behaviour ships like data.
+* **Logic as data.** Triggers, jobs, migrations and scopes are documents that replicate and can change at runtime, rather than code compiled into a release. Behaviour ships like data.
 * **Encryption the remote cannot read.** Field-level encryption is applied before storage and before replication, so the sync target is a place to keep bytes, not a party you trust.
 * **Bring your own remote.** Replication targets any PouchDB-compatible database — including a folder in the end user's own Drive, which makes "we don't hold your data" an architecture rather than a promise.
 
@@ -396,12 +409,12 @@ Pick accordingly: these are different bets, not rankings.
 | **Schema Engine** | Zod-backed validation, class hydration, schema propagation |
 | **Query Engine** | SQL parser, planner and executor |
 | **Job Engine** | Background jobs, runs, and the unattended scheduler |
-| **Crypto Engine** | PBKDF2 key derivation and AES-GCM field encryption |
-| **Policy Engine** | Read/write rules per class, group and session |
+| **Crypto Engine** | AES-GCM field encryption under a keyring: the document key, retired keys and admitted scope keys |
+| **Access scopes** | CP-ABE-sealed content keys (`@docstack/abe`), attribute-key admission, per-scope locks |
 | **Transaction Engine** | Staged writes, overlay reads, one-batch commit |
 | **Sync Layer** | Lifecycle, replication filters, convergence state, schema gate |
 
-Every one of these is pinned by the Playwright suite in [`src-test/`](https://github.com/onyx-og/docstack/tree/main/packages/client/src-test) — transactions and their overlay, crypto-aware queries, policy enforcement, subqueries, replication filters, late-joining stacks, patch chains.
+Every one of these is pinned by the Playwright suite in [`src-test/`](https://github.com/onyx-og/docstack/tree/main/packages/client/src-test) — transactions and their overlay, crypto-aware queries, access scopes, subqueries, replication filters, late-joining stacks, patch chains.
 
 ## 💾 Storage and sync transports
 

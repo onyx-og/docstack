@@ -43,7 +43,10 @@
     "test:client": "npm run -w packages/client test",
     "build:react": "npm run -w packages/react build",
     "start:docs": "npm run -w packages/docs start",
-    "build:docs": "npm run -w packages/docs build"
+    "build:docs": "npm run -w packages/docs build",
+    "sync:docs:wp": "npm run -w packages/docs wp:sync --",
+    "publish:docs": "npm run -w packages/docs wp:sync",
+    "publish:docs:dry": "npm run -w packages/docs wp:sync:dry"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
@@ -110,6 +113,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typedoc": "^0.28.10",
+    "typedoc-docusaurus-theme": "^1.4.2",
     "typedoc-plugin-markdown": "^4.8.1",
     "typescript": "^5.3.3",
     "url": "^0.11.3",

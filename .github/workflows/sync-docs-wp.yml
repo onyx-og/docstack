@@ -1,0 +1,102 @@
+name: Publish Docs to onyx.ac
+
+# Mirrors the hand-written documentation (the `docs` sidebar) to WordPress as
+# native Gutenberg pages with pterodoc. Docusaurus stays the source of truth.
+#
+# Repository settings this needs:
+#   vars.WP_URL              https://onyx.ac
+#   secrets.WP_USER          a WordPress user
+#   secrets.WP_APP_PASSWORD  one of that user's Application Passwords
+#   vars.PTERODOC_WP_ROOT    optional; overrides target.root in pterodoc.config.mjs
+#   vars.WP_LANG             optional; Polylang language code
+#
+# Without the secrets the run still renders every page and uploads the plan,
+# but changes nothing on the site.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/docs/docs/**'
+      - 'packages/docs/static/**'
+      - 'packages/docs/sidebars.ts'
+      - 'packages/docs/docusaurus.config.ts'
+      - 'packages/docs/pterodoc.config.mjs'
+      - '.github/workflows/sync-docs-wp.yml'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Plan and render only; change nothing on the site'
+        type: boolean
+        default: true
+      prune:
+        description: 'Also trash WordPress pages whose source document is gone'
+        type: boolean
+        default: false
+      status:
+        description: 'Status for every synced page'
+        type: choice
+        options: [publish, draft, private]
+        default: publish
+      root:
+        description: 'Override the WordPress root path (for example /products/docstack)'
+        type: string
+        required: false
+
+concurrency:
+  group: publish-docs-wp
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The adapter workspaces are submodules; npm ci needs their package.json.
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check configuration, credentials and permissions
+        working-directory: packages/docs
+        env:
+          WP_URL: ${{ vars.WP_URL }}
+          WP_USER: ${{ secrets.WP_USER }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          PTERODOC_WP_ROOT: ${{ inputs.root || vars.PTERODOC_WP_ROOT }}
+          WP_LANG: ${{ vars.WP_LANG }}
+        run: npx pterodoc doctor
+
+      - name: Publish
+        working-directory: packages/docs
+        env:
+          WP_URL: ${{ vars.WP_URL }}
+          WP_USER: ${{ secrets.WP_USER }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          PTERODOC_WP_ROOT: ${{ inputs.root || vars.PTERODOC_WP_ROOT }}
+          WP_STATUS: ${{ inputs.status }}
+          WP_LANG: ${{ vars.WP_LANG }}
+        run: >-
+          npx pterodoc sync
+          ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+          ${{ inputs.prune && '--prune' || '' }}
+
+      - name: Upload the plan and the rendered pages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pterodoc-plan
+          path: packages/docs/.pterodoc
+          if-no-files-found: ignore

@@ -34,7 +34,11 @@ describe("crypto-engine queries", () => {
         expect(result.rows).toEqual([{ title: "visible", secret: "classified", category: "general" }]);
     });
 
-    it("rejects queries on encrypted classes once the session is cleared", async ({ useDocStack }) => {
+    // ADR-0045: clearing the key seals encrypted fields to `null` per the
+    // locked-read convention, per payload. A row keeps whatever is NOT
+    // encrypted; a row whose every visible field was encrypted drops out. No
+    // throw - access denial is the seal, not an exception.
+    it("seals encrypted fields per row once the key is cleared", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "crypto-query-absent",
             username: "crypto-query-user2",
@@ -58,38 +62,18 @@ describe("crypto-engine queries", () => {
 
                 stack.clearAuthSession();
 
-                let partialThrew = false;
-                let partialErrorMessage = "";
-                try {
-                    await stack.query("SELECT title, secret FROM PartialSecureItem;");
-                } catch (e: any) {
-                    partialThrew = true;
-                    partialErrorMessage = e.message || "";
-                }
+                // A visible non-encrypted column keeps the row; `secret` seals to null.
+                const { rows: partialRows } = await stack.query("SELECT title, secret FROM PartialSecureItem;");
+                // Only the encrypted column projected: it seals, nothing visible remains,
+                // and the row drops.
+                const { rows: sealedProjection } = await stack.query("SELECT secret FROM FullyLockedItem;");
 
-                let lockedThrew = false;
-                let lockedErrorMessage = "";
-                try {
-                    await stack.query("SELECT secret FROM FullyLockedItem;");
-                } catch (e: any) {
-                    lockedThrew = true;
-                    lockedErrorMessage = e.message || "";
-                }
-
-                return {
-                    withKeyRows,
-                    partialThrew,
-                    partialErrorMessage,
-                    lockedThrew,
-                    lockedErrorMessage,
-                };
+                return { withKeyRows, partialRows, sealedProjection };
             },
         });
 
         expect(result.withKeyRows).toEqual([{ title: "partially-visible", secret: "semi" }]);
-        expect(result.partialThrew).toBe(true);
-        expect(result.partialErrorMessage).toContain("authenticated");
-        expect(result.lockedThrew).toBe(true);
-        expect(result.lockedErrorMessage).toContain("authenticated");
+        expect(result.partialRows).toEqual([{ title: "partially-visible", secret: null }]);
+        expect(result.sealedProjection).toEqual([]);
     });
 });

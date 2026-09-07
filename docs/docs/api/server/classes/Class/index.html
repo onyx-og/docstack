@@ -1,0 +1,1004 @@
+<!doctype html><html lang=en dir=ltr class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-api/server/classes/Class" data-has-hydrated=false><head><meta charset=UTF-8><meta name=generator content="Docusaurus v3.10.2"><title data-rh=true>Class: Class | DocStack</title><meta data-rh=true name=viewport content="width=device-width, initial-scale=1.0"/><meta data-rh=true property=og:image content=https://onyx-og.github.io/docstack/img/social-card.png /><meta data-rh=true name=twitter:image content=https://onyx-og.github.io/docstack/img/social-card.png /><meta data-rh=true property=og:url content=https://onyx-og.github.io/docstack/docs/api/server/classes/Class /><meta data-rh=true property=og:locale content=en /><meta data-rh=true name=docusaurus_locale content=en /><meta data-rh=true name=docsearch:language content=en /><meta data-rh=true name=keywords content="offline-first, embedded database, browser database, pouchdb, sql, encryption, sync, google drive, react, typescript"/><meta data-rh=true name=twitter:card content=summary_large_image /><meta data-rh=true name=twitter:site content=@onyx-og /><meta data-rh=true property=og:type content=website /><meta data-rh=true name=docusaurus_version content=current /><meta data-rh=true name=docusaurus_tag content=docs-default-current /><meta data-rh=true name=docsearch:version content=current /><meta data-rh=true name=docsearch:docusaurus_tag content=docs-default-current /><meta data-rh=true property=og:title content="Class: Class | DocStack"/><meta data-rh=true name=description content="Defined in20"/><meta data-rh=true property=og:description content="Defined in20"/><link data-rh=true rel=icon href=/docstack/img/favicon.ico /><link data-rh=true rel=canonical href=https://onyx-og.github.io/docstack/docs/api/server/classes/Class /><link data-rh=true rel=alternate href=https://onyx-og.github.io/docstack/docs/api/server/classes/Class hreflang=en /><link data-rh=true rel=alternate href=https://onyx-og.github.io/docstack/docs/api/server/classes/Class hreflang=x-default /><script data-rh=true type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://onyx-og.github.io/docstack/docs/api/server/classes/Class","name":"Class: Class","position":1}]}</script><link rel=alternate type=application/rss+xml href=/docstack/blog/rss.xml title="DocStack RSS Feed"><link rel=alternate type=application/atom+xml href=/docstack/blog/atom.xml title="DocStack Atom Feed"><link rel=stylesheet href=/docstack/assets/css/styles.89c5d8e8.css /><script src=/docstack/assets/js/runtime~main.79c2ac19.js defer></script><script src=/docstack/assets/js/main.2c27474b.js defer></script></head><body><svg style="display: none;"><defs>
+<symbol id=theme-svg-external-link viewBox="0 0 24 24"><path fill=currentColor d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme-b58")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")),document.documentElement.setAttribute("data-theme-choice",t||"system")}(),function(){try{for(var[t,e]of new URLSearchParams(window.location.search).entries())if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id=__docusaurus><link rel=preload as=image href=/docstack/img/logo.svg /><div role=region aria-label="Skip to main content"><a class=skipToContent_G6ar href=#__docusaurus_skipToContent_fallback>Skip to main content</a></div><nav aria-label=Main class="theme-layout-navbar navbar navbar--fixed-top"><div class=navbar__inner><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded=false class="navbar__toggle clean-btn" type=button><svg width=30 height=30 viewBox="0 0 30 30" aria-hidden=true><path stroke=currentColor stroke-linecap=round stroke-miterlimit=10 stroke-width=2 d="M4 7h22M4 15h22M4 23h22"/></svg></button><a class=navbar__brand href=/docstack/><div class=navbar__logo><img src=/docstack/img/logo.svg alt=DocStack class="themedComponent_DHUr themedComponent--light_DIHH"/><img src=/docstack/img/logo.svg alt=DocStack class="themedComponent_DHUr themedComponent--dark_Bv2M"/></div><b class="navbar__title text--truncate">DocStack</b></a><a class="navbar__item navbar__link" href=/docstack/docs/>Docs</a><div class="navbar__item dropdown dropdown--hoverable"><a href=# aria-haspopup=true aria-expanded=false role=button class=navbar__link>API</a><ul class=dropdown__menu><li><a class=dropdown__link href=/docstack/docs/api/client/classes/Attribute>@docstack/client</a><li><a class=dropdown__link href=/docstack/docs/api/react/functions/StackProvider>@docstack/react</a><li><a class=dropdown__link href=/docstack/docs/api/abe/functions/decryptCek>@docstack/abe</a><li><a aria-current=page class="dropdown__link dropdown__link--active" href=/docstack/docs/api/server/classes/Attribute>@docstack/server (preview)</a></ul></div><a class="navbar__item navbar__link" href=/docstack/blog>Releases</a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><a href=/docstack/app/index.html target=_blank rel="noopener noreferrer" class="navbar__item navbar__link">Workbench<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a><a href=https://github.com/onyx-og/docstack target=_blank rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a><div class="toggle_OLSw colorModeToggle_Hg9V"><button class="clean-btn toggleButton_wYmb toggleButtonDisabled_vaDU" type=button disabled title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width=24 height=24 aria-hidden=true class="toggleIcon_KEbZ lightToggleIcon_Sxwe"><path fill=currentColor d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"/></svg><svg viewBox="0 0 24 24" width=24 height=24 aria-hidden=true class="toggleIcon_KEbZ darkToggleIcon_Yem1"><path fill=currentColor d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"/></svg><svg viewBox="0 0 24 24" width=24 height=24 aria-hidden=true class="toggleIcon_KEbZ systemToggleIcon_txm5"><path fill=currentColor d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"/></svg></button></div><div class=navbarSearchContainer_bmvg><div class="navbar__search searchBarContainer_YZIh" dir=ltr><svg aria-hidden=true class=searchIcon_E11u focusable=false viewBox="0 0 16 16"><path fill=currentColor d="M6.02945 10.20327a4.17382 4.17382 0 1 1 4.17382-4.17382 4.15609 4.15609 0 0 1-4.17382 4.17382Zm9.69195 4.2199-4.8225-4.82338A5.88021 5.88021 0 0 0 12.058 6.02856 6.00467 6.00467 0 1 0 9.59979 10.8989l4.82338 4.82338a.89729.89729 0 0 0 1.29912 0 .89749.89749 0 0 0-.00087-1.29909Z"/></svg><input placeholder=Search aria-label=Search class="navbar__search-input searchInput_eCKk" value="" /><div class="loadingRing_pJhT searchBarLoadingRing_NsvA"><div></div><div></div><div></div><div></div></div></div></div></div></div><div role=presentation class=navbar-sidebar__backdrop></div></nav><div id=__docusaurus_skipToContent_fallback class="theme-layout-main main-wrapper mainWrapper_UyTV"><div class=docsWrapper_XLvK><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_z1FD" type=button></button><div class=docRoot_HciC><aside class="theme-doc-sidebar-container docSidebarContainer_e5ai"><div class=sidebarViewport_N8x0><div class=sidebar_vJCc><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_qiME"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class=menu__list-item-collapsible><a class="categoryLink_d9ci menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role=button aria-expanded=true href=/docstack/docs/api/server/classes/Attribute><span class=categoryLinkLabel_Oe72>classes</span></a></div><ul class=menu__list><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class=menu__link tabindex=0 href=/docstack/docs/api/server/classes/Attribute><span class=linkLabel_PuAu>Class: Attribute</span></a><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link menu__link--active" aria-current=page tabindex=0 href=/docstack/docs/api/server/classes/Class><span class=linkLabel_PuAu>Class: Class</span></a><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class=menu__link tabindex=0 href=/docstack/docs/api/server/classes/DocStack><span class=linkLabel_PuAu>Class: DocStack</span></a><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class=menu__link tabindex=0 href=/docstack/docs/api/server/classes/Stack><span class=linkLabel_PuAu>Class: Stack</span></a></ul><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class=menu__list-item-collapsible><a class="categoryLink_d9ci menu__link menu__link--sublist menu__link--sublist-caret" role=button aria-expanded=false href=/docstack/docs/api/server/functions/getLogger><span class=categoryLinkLabel_Oe72>functions</span></a></div><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class=menu__link href=/docstack/docs/api/server/><span class=linkLabel_PuAu>@docstack/server</span></a></ul></nav><button type=button title="Collapse sidebar" aria-label="Collapse sidebar" class="button button--secondary button--outline collapseSidebarButton_Ftvb"><svg width=20 height=20 aria-hidden=true class=collapseSidebarButtonIcon_c4WT><g fill=#7a7a7a><path d="M9.992 10.023c0 .2-.062.399-.172.547l-4.996 7.492a.982.982 0 01-.828.454H1c-.55 0-1-.453-1-1 0-.2.059-.403.168-.551l4.629-6.942L.168 3.078A.939.939 0 010 2.528c0-.548.45-.997 1-.997h2.996c.352 0 .649.18.828.45L9.82 9.472c.11.148.172.347.172.55zm0 0"/><path d="M19.98 10.023c0 .2-.058.399-.168.547l-4.996 7.492a.987.987 0 01-.828.454h-3c-.547 0-.996-.453-.996-1 0-.2.059-.403.168-.551l4.625-6.942-4.625-6.945a.939.939 0 01-.168-.55 1 1 0 01.996-.997h3c.348 0 .649.18.828.45l4.996 7.492c.11.148.168.347.168.55zm0 0"/></g></svg></button></div></div></aside><main class=docMainContainer_namt><div class="container padding-top--md padding-bottom--lg"><div class=row><div class="col docItemCol_YAwJ"><div class=docItemContainer_Rv5Z><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_zCmv" aria-label=Breadcrumbs><ul class=breadcrumbs><li class=breadcrumbs__item><a aria-label="Home page" class=breadcrumbs__link href=/docstack/><svg viewBox="0 0 24 24" class=breadcrumbHomeIcon_JFrk><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill=currentColor /></svg></a><li class=breadcrumbs__item><span class=breadcrumbs__link>classes</span><li class="breadcrumbs__item breadcrumbs__item--active"><span class=breadcrumbs__link>Class: Class</span></ul></nav><div class="tocCollapsible_O_Qc theme-doc-toc-mobile tocMobile_tjDr"><button type=button class="clean-btn tocCollapsibleButton_htYj">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>Class: Class</h1></header>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L20 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:20</a></p>
+<h2 class="anchor anchorTargetStickyNavbar_SAay" id=extends>Extends<a href=#extends class=hash-link aria-label="Direct link to Extends" title="Direct link to Extends" translate=no>​</a></h2>
+<ul>
+<li class=""><code>Class</code></li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_SAay" id=properties>Properties<a href=#properties class=hash-link aria-label="Direct link to Properties" title="Direct link to Properties" translate=no>​</a></h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Property<th>Modifier<th>Type<th>Default value<th>Overrides<th>Inherited from<th>Defined in<tbody><tr><td><a id=addcards class=anchorTargetStickyNavbar_SAay></a> <code>addCards</code><td><code>abstract</code><td>(<code>paramsArray</code>) => <code>Promise</code>&lt;<code>Document</code>[]><td><code>undefined</code><td>-<td><code>Class_.addCards</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L157 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:157</a><tr><td><a id=attributes class=anchorTargetStickyNavbar_SAay></a> <code>attributes</code><td><code>public</code><td><code>object</code><td><code>{}</code><td><code>Class_.attributes</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L27 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:27</a><tr><td><a id=bulkuniquecheck class=anchorTargetStickyNavbar_SAay></a> <code>bulkUniqueCheck</code><td><code>abstract</code><td>(<code>pks</code>) => <code>Promise</code>&lt;<code>boolean</code>><td><code>undefined</code><td>-<td><code>Class_.bulkUniqueCheck</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L122 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:122</a><tr><td><a id=description class=anchorTargetStickyNavbar_SAay></a> <code>description?</code><td><code>public</code><td><code>string</code><td><code>undefined</code><td><code>Class_.description</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L26 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:26</a><tr><td><a id=getbyprimarykeys class=anchorTargetStickyNavbar_SAay></a> <code>getByPrimaryKeys</code><td><code>abstract</code><td>(<code>params</code>) => <code>Promise</code>&lt;<code>Document</code>><td><code>undefined</code><td>-<td><code>Class_.getByPrimaryKeys</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L116 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:116</a><tr><td><a id=getencryptedattributes class=anchorTargetStickyNavbar_SAay></a> <code>getEncryptedAttributes</code><td><code>abstract</code><td>() => <code>Attribute</code>[]<td><code>undefined</code><td>-<td><code>Class_.getEncryptedAttributes</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L147 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:147</a><tr><td><a id=getstack class=anchorTargetStickyNavbar_SAay></a> <code>getStack</code><td><code>abstract</code><td>() => <code>Stack</code><td><code>undefined</code><td>-<td><code>Class_.getStack</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L108 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:108</a><tr><td><a id=id class=anchorTargetStickyNavbar_SAay></a> <code>id?</code><td><code>public</code><td><code>string</code><td><code>undefined</code><td><code>Class_.id</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L30 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:30</a><tr><td><a id=logger class=anchorTargetStickyNavbar_SAay></a> <code>logger</code><td><code>public</code><td><code>Logger</code><td><code>undefined</code><td><code>Class_.logger</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L35 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:35</a><tr><td><a id=model class=anchorTargetStickyNavbar_SAay></a> <code>model</code><td><code>public</code><td><code>ClassModel</code><td><code>undefined</code><td><code>Class_.model</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L32 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:32</a><tr><td><a id=modifyattribute class=anchorTargetStickyNavbar_SAay></a> <code>modifyAttribute</code><td><code>abstract</code><td>(<code>name</code>, <code>attribute</code>) => <code>Promise</code>&lt;<code>Class</code>><td><code>undefined</code><td>-<td><code>Class_.modifyAttribute</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L143 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:143</a><tr><td><a id=name class=anchorTargetStickyNavbar_SAay></a> <code>name</code><td><code>public</code><td><code>string</code><td><code>undefined</code><td><code>Class_.name</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L23 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:23</a><tr><td><a id=push class=anchorTargetStickyNavbar_SAay></a> <code>push</code><td><code>abstract</code><td>(<code>params</code>, <code>cardId?</code>) => <code>Promise</code>&lt;<code>Document</code>><td><code>undefined</code><td>-<td><code>Class_.push</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L160 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:160</a><tr><td><a id=removeattribute class=anchorTargetStickyNavbar_SAay></a> <code>removeAttribute</code><td><code>abstract</code><td>(<code>name</code>) => <code>Promise</code>&lt;<code>Class</code>><td><code>undefined</code><td>-<td><code>Class_.removeAttribute</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L145 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:145</a><tr><td><a id=schema class=anchorTargetStickyNavbar_SAay></a> <code>schema</code><td><code>public</code><td><code>object</code><td><code>{}</code><td><code>Class_.schema</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L28 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:28</a><tr><td><a id=schemazod class=anchorTargetStickyNavbar_SAay></a> <code>schemaZOD</code><td><code>public</code><td><code>ZodObject</code><td><code>undefined</code><td><code>Class_.schemaZOD</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L29 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:29</a><tr><td><a id=space class=anchorTargetStickyNavbar_SAay></a> <code>space</code><td><code>public</code><td><code>Stack</code><td><code>undefined</code><td>-<td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L21 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:21</a><tr><td><a id=stack class=anchorTargetStickyNavbar_SAay></a> <code>stack</code><td><code>public</code><td><code>Stack</code><td><code>undefined</code><td>-<td><code>Class_.stack</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L14 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:14</a><tr><td><a id=state class=anchorTargetStickyNavbar_SAay></a> <code>state</code><td><code>public</code><td><code>"busy"</code> | <code>"idle"</code><td><code>"idle"</code><td><code>Class_.state</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L33 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:33</a><tr><td><a id=triggers class=anchorTargetStickyNavbar_SAay></a> <code>triggers</code><td><code>public</code><td><code>Trigger</code>[]<td><code>[]</code><td><code>Class_.triggers</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L36 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:36</a><tr><td><a id=type class=anchorTargetStickyNavbar_SAay></a> <code>type</code><td><code>public</code><td><code>string</code><td><code>undefined</code><td><code>Class_.type</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L25 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:25</a><tr><td><a id=uniquecheck class=anchorTargetStickyNavbar_SAay></a> <code>uniqueCheck</code><td><code>abstract</code><td>(<code>doc</code>) => <code>Promise</code>&lt;<code>boolean</code>><td><code>undefined</code><td>-<td><code>Class_.uniqueCheck</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L120 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:120</a><tr><td><a id=validate class=anchorTargetStickyNavbar_SAay></a> <code>validate</code><td><code>abstract</code><td>(<code>data</code>) => <code>Promise</code>&lt;<code>boolean</code>><td><code>undefined</code><td>-<td><code>Class_.validate</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L118 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:118</a><tr><td><a id=fetchbyid class=anchorTargetStickyNavbar_SAay></a> <code>fetchById</code><td><code>static</code><td>(<code>stack</code>, <code>classId</code>) => <code>Promise</code>&lt;<code>Class</code>><td><code>undefined</code><td>-<td><code>Class_.fetchById</code><td><a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L99 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:99</a><tr><td><a id=logger-1 class=anchorTargetStickyNavbar_SAay></a> <code>logger</code><td><code>static</code><td><code>Logger</code><td><code>undefined</code><td><code>Class_.logger</code><td>-<td><a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L34 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:34</a></table>
+<h2 class="anchor anchorTargetStickyNavbar_SAay" id=methods>Methods<a href=#methods class=hash-link aria-label="Direct link to Methods" title="Direct link to Methods" translate=no>​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=add>add()<a href=#add class=hash-link aria-label="Direct link to add()" title="Direct link to add()" translate=no>​</a></h3>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=call-signature>Call Signature<a href=#call-signature class=hash-link aria-label="Direct link to Call Signature" title="Direct link to Call Signature" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">abstract</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">add</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">params</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L149 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:149</a></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=parameters>Parameters<a href=#parameters class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h5>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>params</code><td>{ [<code>key</code>: <code>string</code>]: <code>any</code>; }</table>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=returns>Returns<a href=#returns class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h5>
+<p><code>Promise</code>&lt;<code>Document</code>></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=inherited-from>Inherited from<a href=#inherited-from class=hash-link aria-label="Direct link to Inherited from" title="Direct link to Inherited from" translate=no>​</a></h5>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">add</span><br/></div></code></pre></div></div>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=call-signature-1>Call Signature<a href=#call-signature-1 class=hash-link aria-label="Direct link to Call Signature" title="Direct link to Call Signature" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">abstract</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">add</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token operator">...</span><span class="token plain">paramsArray</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document</span><span class="token punctuation" style="color:rgb(248, 248, 242)">[</span><span class="token punctuation" style="color:rgb(248, 248, 242)">]</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L150 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:150</a></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-1>Parameters<a href=#parameters-1 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h5>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td>...<code>paramsArray</code><td><code>object</code>[]</table>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=returns-1>Returns<a href=#returns-1 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h5>
+<p><code>Promise</code>&lt;<code>Document</code>[]></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=inherited-from-1>Inherited from<a href=#inherited-from-1 class=hash-link aria-label="Direct link to Inherited from" title="Direct link to Inherited from" translate=no>​</a></h5>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">add</span><br/></div></code></pre></div></div>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=call-signature-2>Call Signature<a href=#call-signature-2 class=hash-link aria-label="Direct link to Call Signature" title="Direct link to Call Signature" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">abstract</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">add</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token operator">...</span><span class="token plain">paramsArray</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document </span><span class="token operator">|</span><span class="token plain"> Document</span><span class="token punctuation" style="color:rgb(248, 248, 242)">[</span><span class="token punctuation" style="color:rgb(248, 248, 242)">]</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L151 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:151</a></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-2>Parameters<a href=#parameters-2 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h5>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td>...<code>paramsArray</code><td><code>object</code>[]</table>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=returns-2>Returns<a href=#returns-2 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h5>
+<p><code>Promise</code>&lt;<code>Document</code> | <code>Document</code>[]></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=inherited-from-2>Inherited from<a href=#inherited-from-2 class=hash-link aria-label="Direct link to Inherited from" title="Direct link to Inherited from" translate=no>​</a></h5>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">add</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=addattribute>addAttribute()<a href=#addattribute class=hash-link aria-label="Direct link to addAttribute()" title="Direct link to addAttribute()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">addAttribute</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">attribute</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Class</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L308 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:308</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-3>Parameters<a href=#parameters-3 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>attribute</code><td><a class="" href=/docstack/docs/api/server/classes/Attribute><code>Attribute</code></a></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-3>Returns<a href=#returns-3 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Class</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides>Overrides<a href=#overrides class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">addAttribute</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=addcard>addCard()<a href=#addcard class=hash-link aria-label="Direct link to addCard()" title="Direct link to addCard()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">addCard</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">params</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L341 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:341</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-4>Parameters<a href=#parameters-4 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>params</code><td>{ [<code>key</code>: <code>string</code>]: <code>any</code>; }</table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-4>Returns<a href=#returns-4 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Document</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-1>Overrides<a href=#overrides-1 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">addCard</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=addorupdatecard>addOrUpdateCard()<a href=#addorupdatecard class=hash-link aria-label="Direct link to addOrUpdateCard()" title="Direct link to addOrUpdateCard()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">addOrUpdateCard</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">params</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> cardId</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L345 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:345</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-5>Parameters<a href=#parameters-5 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>params</code><td>{ [<code>key</code>: <code>string</code>]: <code>any</code>; }<tr><td><code>cardId?</code><td><code>string</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-5>Returns<a href=#returns-5 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Document</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-2>Overrides<a href=#overrides-2 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">addOrUpdateCard</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=addtrigger>addTrigger()<a href=#addtrigger class=hash-link aria-label="Direct link to addTrigger()" title="Direct link to addTrigger()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">addTrigger</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">name</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> model</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Class</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L414 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:414</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-6>Parameters<a href=#parameters-6 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>name</code><td><code>string</code><tr><td><code>model</code><td><code>TriggerModel</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-6>Returns<a href=#returns-6 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Class</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-3>Overrides<a href=#overrides-3 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">addTrigger</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=build>build()<a href=#build class=hash-link aria-label="Direct link to build()" title="Direct link to build()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">build</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Class</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L54 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:54</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-7>Returns<a href=#returns-7 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Class</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-4>Overrides<a href=#overrides-4 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">build</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=buildschema>buildSchema()<a href=#buildschema class=hash-link aria-label="Direct link to buildSchema()" title="Direct link to buildSchema()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">buildSchema</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> object</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L196 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:196</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-8>Returns<a href=#returns-8 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>object</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-5>Overrides<a href=#overrides-5 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">buildSchema</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=close>close()<a href=#close class=hash-link aria-label="Direct link to close()" title="Direct link to close()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">close</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">void</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L55 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:55</a></p>
+<p>Releases this instance's live document subscription.</p>
+<p>Subscribing is not free: the handle keeps its handler - and everything that handler
+closes over - reachable for as long as the stack lives. Close a Class that was
+built outside the stack's cache (<code>getClass(name, true)</code>, or an entry a class list
+has replaced) once it is no longer needed. Afterwards the instance stops emitting
+<code>doc</code> events; its data methods still work. Safe to call twice.</p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-9>Returns<a href=#returns-9 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>void</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=example>Example<a href=#example class=hash-link aria-label="Direct link to Example" title="Direct link to Example" translate=no>​</a></h4>
+<div class="language-typescript codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-typescript codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">const</span><span class="token plain"> snapshot </span><span class="token operator">=</span><span class="token plain"> </span><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">await</span><span class="token plain"> stack</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token function" style="color:rgb(80, 250, 123)">getClass</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token string" style="color:rgb(255, 121, 198)">'Task'</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><span class="token boolean">true</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><span class="token plain"></span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain"></span><span class="token comment" style="color:rgb(98, 114, 164)">// ...</span><span class="token plain"></span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">snapshot</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token function" style="color:rgb(80, 250, 123)">close</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=inherited-from-3>Inherited from<a href=#inherited-from-3 class=hash-link aria-label="Direct link to Inherited from" title="Direct link to Inherited from" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">close</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=deletecard>deleteCard()<a href=#deletecard class=hash-link aria-label="Direct link to deleteCard()" title="Direct link to deleteCard()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">deleteCard</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">cardId</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token builtin" style="color:rgb(189, 147, 249)">boolean</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L396 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:396</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-7>Parameters<a href=#parameters-7 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>cardId</code><td><code>string</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-10>Returns<a href=#returns-10 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>boolean</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-6>Overrides<a href=#overrides-6 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">deleteCard</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=get>get()<a href=#get class=hash-link aria-label="Direct link to get()" title="Direct link to get()" translate=no>​</a></h3>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=call-signature-3>Call Signature<a href=#call-signature-3 class=hash-link aria-label="Direct link to Call Signature" title="Direct link to Call Signature" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">abstract</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">get</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">cardId</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L164 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:164</a></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-8>Parameters<a href=#parameters-8 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h5>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>cardId</code><td><code>string</code></table>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=returns-11>Returns<a href=#returns-11 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h5>
+<p><code>Promise</code>&lt;<code>Document</code>></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=inherited-from-4>Inherited from<a href=#inherited-from-4 class=hash-link aria-label="Direct link to Inherited from" title="Direct link to Inherited from" translate=no>​</a></h5>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">get</span><br/></div></code></pre></div></div>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=call-signature-4>Call Signature<a href=#call-signature-4 class=hash-link aria-label="Direct link to Call Signature" title="Direct link to Call Signature" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">abstract</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">get</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token operator">...</span><span class="token plain">cardId</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document</span><span class="token punctuation" style="color:rgb(248, 248, 242)">[</span><span class="token punctuation" style="color:rgb(248, 248, 242)">]</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L165 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:165</a></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-9>Parameters<a href=#parameters-9 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h5>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td>...<code>cardId</code><td><code>string</code>[]</table>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=returns-12>Returns<a href=#returns-12 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h5>
+<p><code>Promise</code>&lt;<code>Document</code>[]></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=inherited-from-5>Inherited from<a href=#inherited-from-5 class=hash-link aria-label="Direct link to Inherited from" title="Direct link to Inherited from" translate=no>​</a></h5>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">get</span><br/></div></code></pre></div></div>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=call-signature-5>Call Signature<a href=#call-signature-5 class=hash-link aria-label="Direct link to Call Signature" title="Direct link to Call Signature" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">abstract</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">get</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token operator">...</span><span class="token plain">cardId</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document </span><span class="token operator">|</span><span class="token plain"> Document</span><span class="token punctuation" style="color:rgb(248, 248, 242)">[</span><span class="token punctuation" style="color:rgb(248, 248, 242)">]</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/shared/src/utils/stack/class/index.ts#L166 target=_blank rel="noopener noreferrer" class="">shared/src/utils/stack/class/index.ts:166</a></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-10>Parameters<a href=#parameters-10 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h5>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td>...<code>cardId</code><td><code>string</code>[]</table>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=returns-13>Returns<a href=#returns-13 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h5>
+<p><code>Promise</code>&lt;<code>Document</code> | <code>Document</code>[]></p>
+<h5 class="anchor anchorTargetStickyNavbar_SAay" id=inherited-from-6>Inherited from<a href=#inherited-from-6 class=hash-link aria-label="Direct link to Inherited from" title="Direct link to Inherited from" translate=no>​</a></h5>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">get</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getattributes>getAttributes()<a href=#getattributes class=hash-link aria-label="Direct link to getAttributes()" title="Direct link to getAttributes()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getAttributes</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token operator">...</span><span class="token plain">names</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> object</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L263 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:263</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-11>Parameters<a href=#parameters-11 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td>...<code>names</code><td><code>string</code>[]</table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-14>Returns<a href=#returns-14 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>object</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-7>Overrides<a href=#overrides-7 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getAttributes</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getcards>getCards()<a href=#getcards class=hash-link aria-label="Direct link to getCards()" title="Direct link to getCards()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getCards</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain"></span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   selector</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   fields</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   skip</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">limit</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">Document </span><span class="token operator">|</span><span class="token plain"> RelationDocument</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token punctuation" style="color:rgb(248, 248, 242)">[</span><span class="token punctuation" style="color:rgb(248, 248, 242)">]</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L407 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:407</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-12>Parameters<a href=#parameters-12 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>selector?</code><td>{ [<code>key</code>: <code>string</code>]: <code>any</code>; }<tr><td><code>fields?</code><td><code>string</code>[]<tr><td><code>skip?</code><td><code>number</code><tr><td><code>limit?</code><td><code>number</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-15>Returns<a href=#returns-15 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;(<code>Document</code> | <code>RelationDocument</code>)[]></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-8>Overrides<a href=#overrides-8 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getCards</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getdescription>getDescription()<a href=#getdescription class=hash-link aria-label="Direct link to getDescription()" title="Direct link to getDescription()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getDescription</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">string</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L184 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:184</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-16>Returns<a href=#returns-16 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>string</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-9>Overrides<a href=#overrides-9 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getDescription</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getid>getId()<a href=#getid class=hash-link aria-label="Direct link to getId()" title="Direct link to getId()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getId</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">string</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L192 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:192</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-17>Returns<a href=#returns-17 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>string</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-10>Overrides<a href=#overrides-10 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getId</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getmodel>getModel()<a href=#getmodel class=hash-link aria-label="Direct link to getModel()" title="Direct link to getModel()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getModel</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> ClassModel</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L204 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:204</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-18>Returns<a href=#returns-18 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>ClassModel</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-11>Overrides<a href=#overrides-11 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getModel</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getname>getName()<a href=#getname class=hash-link aria-label="Direct link to getName()" title="Direct link to getName()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getName</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">string</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L176 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:176</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-19>Returns<a href=#returns-19 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>string</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-12>Overrides<a href=#overrides-12 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getName</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getprimarykeys>getPrimaryKeys()<a href=#getprimarykeys class=hash-link aria-label="Direct link to getPrimaryKeys()" title="Direct link to getPrimaryKeys()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getPrimaryKeys</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">string</span><span class="token punctuation" style="color:rgb(248, 248, 242)">[</span><span class="token punctuation" style="color:rgb(248, 248, 242)">]</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L258 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:258</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-20>Returns<a href=#returns-20 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>string</code>[]</p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-13>Overrides<a href=#overrides-13 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getPrimaryKeys</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=getspace>getSpace()<a href=#getspace class=hash-link aria-label="Direct link to getSpace()" title="Direct link to getSpace()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getSpace</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> Stack</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L180 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:180</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-21>Returns<a href=#returns-21 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Stack</code></p>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=gettype>getType()<a href=#gettype class=hash-link aria-label="Direct link to getType()" title="Direct link to getType()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">getType</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">string</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L188 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:188</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-22>Returns<a href=#returns-22 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>string</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-14>Overrides<a href=#overrides-14 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">getType</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=hasallattributes>hasAllAttributes()<a href=#hasallattributes class=hash-link aria-label="Direct link to hasAllAttributes()" title="Direct link to hasAllAttributes()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">hasAllAttributes</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token operator">...</span><span class="token plain">names</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">boolean</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L282 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:282</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-13>Parameters<a href=#parameters-13 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td>...<code>names</code><td><code>string</code>[]</table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-23>Returns<a href=#returns-23 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>boolean</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-15>Overrides<a href=#overrides-15 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">hasAllAttributes</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=hasanyattributes>hasAnyAttributes()<a href=#hasanyattributes class=hash-link aria-label="Direct link to hasAnyAttributes()" title="Direct link to hasAnyAttributes()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">hasAnyAttributes</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token operator">...</span><span class="token plain">names</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">boolean</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L292 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:292</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-14>Parameters<a href=#parameters-14 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td>...<code>names</code><td><code>string</code>[]</table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-24>Returns<a href=#returns-24 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>boolean</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-16>Overrides<a href=#overrides-16 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">hasAnyAttributes</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=hasattribute>hasAttribute()<a href=#hasattribute class=hash-link aria-label="Direct link to hasAttribute()" title="Direct link to hasAttribute()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">hasAttribute</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">name</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">boolean</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L303 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:303</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-15>Parameters<a href=#parameters-15 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>name</code><td><code>string</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-25>Returns<a href=#returns-25 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>boolean</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-17>Overrides<a href=#overrides-17 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">hasAttribute</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=init>init()<a href=#init class=hash-link aria-label="Direct link to init()" title="Direct link to init()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">init</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain"></span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   space</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   name</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   type</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   description</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   schema</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">void</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L76 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:76</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-16>Parameters<a href=#parameters-16 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>space</code><td><code>Stack</code><tr><td><code>name</code><td><code>string</code><tr><td><code>type</code><td><code>string</code><tr><td><code>description?</code><td><code>string</code><tr><td><code>schema?</code><td>{ [<code>name</code>: <code>string</code>]: <code>AttributeModel</code>; }</table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-26>Returns<a href=#returns-26 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>void</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-18>Overrides<a href=#overrides-18 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">init</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=removetrigger>removeTrigger()<a href=#removetrigger class=hash-link aria-label="Direct link to removeTrigger()" title="Direct link to removeTrigger()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">removeTrigger</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">name</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Class</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L431 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:431</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-17>Parameters<a href=#parameters-17 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>name</code><td><code>string</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-27>Returns<a href=#returns-27 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Class</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-19>Overrides<a href=#overrides-19 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">removeTrigger</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=setid>setId()<a href=#setid class=hash-link aria-label="Direct link to setId()" title="Direct link to setId()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">setId</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">id</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">void</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L172 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:172</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-18>Parameters<a href=#parameters-18 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>id</code><td><code>string</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-28>Returns<a href=#returns-28 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>void</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-20>Overrides<a href=#overrides-20 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">setId</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=setmodel>setModel()<a href=#setmodel class=hash-link aria-label="Direct link to setModel()" title="Direct link to setModel()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">setModel</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">model</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">void</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L228 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:228</a></p>
+<p>It hydrates attributes and triggers from given model</p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-19>Parameters<a href=#parameters-19 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<th>Description<tbody><tr><td><code>model?</code><td><code>ClassModel</code><td></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-29>Returns<a href=#returns-29 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>void</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-21>Overrides<a href=#overrides-21 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">setModel</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=updatecard>updateCard()<a href=#updatecard class=hash-link aria-label="Direct link to updateCard()" title="Direct link to updateCard()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token function" style="color:rgb(80, 250, 123)">updateCard</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">cardId</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> params</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Document</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L384 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:384</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-20>Parameters<a href=#parameters-20 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>cardId</code><td><code>string</code><tr><td><code>params</code><td>{ [<code>key</code>: <code>string</code>]: <code>any</code>; }</table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-30>Returns<a href=#returns-30 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Document</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-22>Overrides<a href=#overrides-22 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">updateCard</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=buildfrommodel>buildFromModel()<a href=#buildfrommodel class=hash-link aria-label="Direct link to buildFromModel()" title="Direct link to buildFromModel()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">static</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">buildFromModel</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">space</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> classModel</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Class</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L141 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:141</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-21>Parameters<a href=#parameters-21 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>space</code><td><code>Stack</code><tr><td><code>classModel</code><td><code>ClassModel</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-31>Returns<a href=#returns-31 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Class</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-23>Overrides<a href=#overrides-23 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">buildFromModel</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=create>create()<a href=#create class=hash-link aria-label="Direct link to create()" title="Direct link to create()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">static</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">create</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain"></span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   space</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   name</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   type</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   description</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">schema</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Class</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L128 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:128</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-22>Parameters<a href=#parameters-22 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<th>Default value<tbody><tr><td><code>space</code><td><code>Stack</code><td><code>undefined</code><tr><td><code>name</code><td><code>string</code><td><code>undefined</code><tr><td><code>type</code><td><code>string</code><td><code>"class"</code><tr><td><code>description?</code><td><code>string</code><td><code>undefined</code><tr><td><code>schema?</code><td>{ [<code>name</code>: <code>string</code>]: <code>AttributeModel</code>; }<td><code>{}</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-32>Returns<a href=#returns-32 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Class</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-24>Overrides<a href=#overrides-24 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">create</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=fetch>fetch()<a href=#fetch class=hash-link aria-label="Direct link to fetch()" title="Direct link to fetch()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">static</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">fetch</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain">space</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> className</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> </span><span class="token builtin" style="color:rgb(189, 147, 249)">Promise</span><span class="token operator">&lt;</span><span class="token plain">Class</span><span class="token operator">></span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L161 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:161</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-23>Parameters<a href=#parameters-23 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<tbody><tr><td><code>space</code><td><code>Stack</code><tr><td><code>className</code><td><code>string</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-33>Returns<a href=#returns-33 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Promise</code>&lt;<code>Class</code>></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-25>Overrides<a href=#overrides-25 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">fetch</span><br/></div></code></pre></div></div>
+<hr/>
+<h3 class="anchor anchorTargetStickyNavbar_SAay" id=get-1>get()<a href=#get-1 class=hash-link aria-label="Direct link to get()" title="Direct link to get()" translate=no>​</a></h3>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token keyword" style="color:rgb(189, 147, 249);font-style:italic">static</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">get</span><span class="token punctuation" style="color:rgb(248, 248, 242)">(</span><span class="token plain"></span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   space</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   name</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   type</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   description</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">,</span><span class="token plain"> </span><br/></div><div class=token-line style=color:#F8F8F2><span class="token plain">   schema</span><span class="token operator">?</span><span class="token punctuation" style="color:rgb(248, 248, 242)">)</span><span class="token operator">:</span><span class="token plain"> Class</span><span class="token punctuation" style="color:rgb(248, 248, 242)">;</span><br/></div></code></pre></div></div>
+<p>Defined in: <a href=https://github.com/onyx-og/docstack/blob/main/packages/server/src/utils/stack/class.ts#L107 target=_blank rel="noopener noreferrer" class="">server/src/utils/stack/class.ts:107</a></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=parameters-24>Parameters<a href=#parameters-24 class=hash-link aria-label="Direct link to Parameters" title="Direct link to Parameters" translate=no>​</a></h4>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Parameter<th>Type<th>Default value<tbody><tr><td><code>space</code><td><code>Stack</code><td><code>undefined</code><tr><td><code>name</code><td><code>string</code><td><code>undefined</code><tr><td><code>type</code><td><code>string</code><td><code>"class"</code><tr><td><code>description?</code><td><code>string</code><td><code>undefined</code><tr><td><code>schema?</code><td>{ [<code>name</code>: <code>string</code>]: <code>AttributeModel</code>; }<td><code>{}</code></table>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=returns-34>Returns<a href=#returns-34 class=hash-link aria-label="Direct link to Returns" title="Direct link to Returns" translate=no>​</a></h4>
+<p><code>Class</code></p>
+<h4 class="anchor anchorTargetStickyNavbar_SAay" id=overrides-26>Overrides<a href=#overrides-26 class=hash-link aria-label="Direct link to Overrides" title="Direct link to Overrides" translate=no>​</a></h4>
+<div class="language-ts codeBlockContainer_ZGJx theme-code-block" style=--prism-color:#F8F8F2;--prism-background-color:#282A36><div class=codeBlockContent_kX1v><pre tabindex=0 class="prism-code language-ts codeBlock_TAPP thin-scrollbar" style=color:#F8F8F2;background-color:#282A36><code class=codeBlockLines_AdAo><div class=token-line style=color:#F8F8F2><span class="token plain">Class_</span><span class="token punctuation" style="color:rgb(248, 248, 242)">.</span><span class="token plain">get</span><br/></div></code></pre></div></div></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col noPrint_HJkF"><a href=https://github.com/onyx-og/docstack/tree/main/packages/docs/docs/api/server/classes/Class.md target=_blank rel="noopener noreferrer" class=theme-edit-this-page><svg fill=currentColor height=20 width=20 viewBox="0 0 40 40" class=iconEdit_UohW aria-hidden=true><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"/></g></svg>Edit this page</a></div><div class="col lastUpdated_g62E"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href=/docstack/docs/api/server/classes/Attribute><div class=pagination-nav__sublabel>Previous</div><div class=pagination-nav__label>Class: Attribute</div></a><a class="pagination-nav__link pagination-nav__link--next" href=/docstack/docs/api/server/classes/DocStack><div class=pagination-nav__sublabel>Next</div><div class=pagination-nav__label>Class: DocStack</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_TN1Q thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href=#extends class="table-of-contents__link toc-highlight">Extends</a><li><a href=#properties class="table-of-contents__link toc-highlight">Properties</a><li><a href=#methods class="table-of-contents__link toc-highlight">Methods</a><ul><li><a href=#add class="table-of-contents__link toc-highlight">add()</a><ul><li><a href=#call-signature class="table-of-contents__link toc-highlight">Call Signature</a><li><a href=#call-signature-1 class="table-of-contents__link toc-highlight">Call Signature</a><li><a href=#call-signature-2 class="table-of-contents__link toc-highlight">Call Signature</a></ul><li><a href=#addattribute class="table-of-contents__link toc-highlight">addAttribute()</a><ul><li><a href=#parameters-3 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-3 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#addcard class="table-of-contents__link toc-highlight">addCard()</a><ul><li><a href=#parameters-4 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-4 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-1 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#addorupdatecard class="table-of-contents__link toc-highlight">addOrUpdateCard()</a><ul><li><a href=#parameters-5 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-5 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-2 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#addtrigger class="table-of-contents__link toc-highlight">addTrigger()</a><ul><li><a href=#parameters-6 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-6 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-3 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#build class="table-of-contents__link toc-highlight">build()</a><ul><li><a href=#returns-7 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-4 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#buildschema class="table-of-contents__link toc-highlight">buildSchema()</a><ul><li><a href=#returns-8 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-5 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#close class="table-of-contents__link toc-highlight">close()</a><ul><li><a href=#returns-9 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#example class="table-of-contents__link toc-highlight">Example</a><li><a href=#inherited-from-3 class="table-of-contents__link toc-highlight">Inherited from</a></ul><li><a href=#deletecard class="table-of-contents__link toc-highlight">deleteCard()</a><ul><li><a href=#parameters-7 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-10 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-6 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#get class="table-of-contents__link toc-highlight">get()</a><ul><li><a href=#call-signature-3 class="table-of-contents__link toc-highlight">Call Signature</a><li><a href=#call-signature-4 class="table-of-contents__link toc-highlight">Call Signature</a><li><a href=#call-signature-5 class="table-of-contents__link toc-highlight">Call Signature</a></ul><li><a href=#getattributes class="table-of-contents__link toc-highlight">getAttributes()</a><ul><li><a href=#parameters-11 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-14 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-7 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#getcards class="table-of-contents__link toc-highlight">getCards()</a><ul><li><a href=#parameters-12 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-15 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-8 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#getdescription class="table-of-contents__link toc-highlight">getDescription()</a><ul><li><a href=#returns-16 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-9 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#getid class="table-of-contents__link toc-highlight">getId()</a><ul><li><a href=#returns-17 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-10 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#getmodel class="table-of-contents__link toc-highlight">getModel()</a><ul><li><a href=#returns-18 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-11 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#getname class="table-of-contents__link toc-highlight">getName()</a><ul><li><a href=#returns-19 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-12 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#getprimarykeys class="table-of-contents__link toc-highlight">getPrimaryKeys()</a><ul><li><a href=#returns-20 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-13 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#getspace class="table-of-contents__link toc-highlight">getSpace()</a><ul><li><a href=#returns-21 class="table-of-contents__link toc-highlight">Returns</a></ul><li><a href=#gettype class="table-of-contents__link toc-highlight">getType()</a><ul><li><a href=#returns-22 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-14 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#hasallattributes class="table-of-contents__link toc-highlight">hasAllAttributes()</a><ul><li><a href=#parameters-13 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-23 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-15 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#hasanyattributes class="table-of-contents__link toc-highlight">hasAnyAttributes()</a><ul><li><a href=#parameters-14 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-24 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-16 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#hasattribute class="table-of-contents__link toc-highlight">hasAttribute()</a><ul><li><a href=#parameters-15 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-25 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-17 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#init class="table-of-contents__link toc-highlight">init()</a><ul><li><a href=#parameters-16 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-26 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-18 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#removetrigger class="table-of-contents__link toc-highlight">removeTrigger()</a><ul><li><a href=#parameters-17 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-27 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-19 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#setid class="table-of-contents__link toc-highlight">setId()</a><ul><li><a href=#parameters-18 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-28 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-20 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#setmodel class="table-of-contents__link toc-highlight">setModel()</a><ul><li><a href=#parameters-19 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-29 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-21 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#updatecard class="table-of-contents__link toc-highlight">updateCard()</a><ul><li><a href=#parameters-20 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-30 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-22 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#buildfrommodel class="table-of-contents__link toc-highlight">buildFromModel()</a><ul><li><a href=#parameters-21 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-31 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-23 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#create class="table-of-contents__link toc-highlight">create()</a><ul><li><a href=#parameters-22 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-32 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-24 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#fetch class="table-of-contents__link toc-highlight">fetch()</a><ul><li><a href=#parameters-23 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-33 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-25 class="table-of-contents__link toc-highlight">Overrides</a></ul><li><a href=#get-1 class="table-of-contents__link toc-highlight">get()</a><ul><li><a href=#parameters-24 class="table-of-contents__link toc-highlight">Parameters</a><li><a href=#returns-34 class="table-of-contents__link toc-highlight">Returns</a><li><a href=#overrides-26 class="table-of-contents__link toc-highlight">Overrides</a></ul></ul></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer footer--dark"><div class="container container-fluid"><div class="row footer__links"><div class="theme-layout-footer-column col footer__col"><div class=footer__title>Docs</div><ul class="footer__items clean-list"><li class=footer__item><a class=footer__link-item href=/docstack/docs/>Introduction</a><li class=footer__item><a class=footer__link-item href=/docstack/docs/get-started/quickstart>Quickstart</a><li class=footer__item><a class=footer__link-item href=/docstack/docs/guides/model-your-data>Guides</a><li class=footer__item><a class=footer__link-item href=/docstack/docs/concepts/core-concepts>Concepts</a><li class=footer__item><a class=footer__link-item href=/docstack/docs/reference/class-and-attribute-options>Reference</a></ul></div><div class="theme-layout-footer-column col footer__col"><div class=footer__title>Packages</div><ul class="footer__items clean-list"><li class=footer__item><a href=https://www.npmjs.com/package/@docstack/client target=_blank rel="noopener noreferrer" class=footer__link-item>@docstack/client<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a><li class=footer__item><a href=https://www.npmjs.com/package/@docstack/react target=_blank rel="noopener noreferrer" class=footer__link-item>@docstack/react<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a><li class=footer__item><a href=https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive target=_blank rel="noopener noreferrer" class=footer__link-item>@docstack/pouchdb-adapter-googledrive<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a><li class=footer__item><a href=/docstack/app/index.html target=_blank rel="noopener noreferrer" class=footer__link-item>Workbench<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a></ul></div><div class="theme-layout-footer-column col footer__col"><div class=footer__title>Community</div><ul class="footer__items clean-list"><li class=footer__item><a href=https://github.com/onyx-og/docstack target=_blank rel="noopener noreferrer" class=footer__link-item>GitHub<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a><li class=footer__item><a class=footer__link-item href=/docstack/blog>Release notes</a><li class=footer__item><a href=https://x.com/onyx-og target=_blank rel="noopener noreferrer" class=footer__link-item>X<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a><li class=footer__item><a href=https://onyx.ac target=_blank rel="noopener noreferrer" class=footer__link-item>onyx.ac<svg width=13.5 height=13.5 aria-label="(opens in new tab)" class=iconExternalLink_awgD><use href=#theme-svg-external-link /></svg></a></ul></div></div><div class="footer__bottom text--center"><div class=footer__copyright>© 2026 Onyx AC, LLC · CC-BY-SA-4.0</div></div></div></footer></div></body>

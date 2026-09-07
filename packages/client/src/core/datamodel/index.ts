@@ -1464,7 +1464,44 @@ const sys_017: Patch = {
     ]
 };
 
-syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015, sys_016, sys_017);
+/**
+ * Cryptographic access scopes arrive; the JS-rule policy engine retires
+ * (ADR-0045, spec 02). `~AccessScope` is the carrier of the ONE access-control
+ * language: a scope's CEK travels ABE-sealed under its attribute formula, and
+ * denial is decryption failure - nothing evaluates rules anymore. The three
+ * seeded `~Policy` documents are deactivated in place: nothing reads them, and
+ * an inert-but-active policy would misstate what governs access. Their class
+ * stays for legacy data.
+ */
+const sys_018: Patch = {
+    "_id": "~sys-0.0.18",
+    "~class": "patch",
+    "version": "0.0.18",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.18\\n#### New Class: ~AccessScope (cryptographic access, ADR-0045)\\n#### Deactivated: seeded ~Policy documents (policy engine retired)",
+    "docs": [
+        {
+            "_id": "~AccessScope",
+            "~class": "class",
+            "active": true,
+            "name": "AccessScope",
+            "description": "A named set of content sealed under one CEK, itself ABE-encrypted under the scope's attribute policy (ADR-0045)",
+            "schema": {
+                "scopeId": { "name": "scopeId", "type": "string", "config": { "mandatory": true } },
+                "policyString": { "name": "policyString", "type": "string", "config": { "mandatory": true } },
+                "abeWrappedCek": { "name": "abeWrappedCek", "type": "string", "config": { "mandatory": true } },
+                "kid": { "name": "kid", "type": "string", "config": { "mandatory": true, "maxLength": 16 } },
+                "version": { "name": "version", "type": "integer", "config": { "mandatory": true } },
+                "encryptedMarker": { "name": "encryptedMarker", "type": "object", "config": { "mandatory": true } }
+            }
+        },
+        { "_id": "Policy-System-Classes", "_rev": "auto", "~class": "~Policy", "active": false },
+        { "_id": "Policy-Admin", "_rev": "auto", "~class": "~Policy", "active": false },
+        { "_id": "Policy-User-SelfAccess", "_rev": "auto", "~class": "~Policy", "active": false }
+    ]
+};
+
+syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015, sys_016, sys_017, sys_018);
 
 /**
  * Every document id the system patches seed.

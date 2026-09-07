@@ -1,19 +1,12 @@
-facebook:
-  label: Facebook
-  permalink: /facebook
-  description: Facebook tag description
-
-hello:
-  label: Hello
-  permalink: /hello
-  description: Hello tag description
-
-docusaurus:
-  label: Docusaurus
-  permalink: /docusaurus
-  description: Docusaurus tag description
-
-hola:
-  label: Hola
-  permalink: /hola
-  description: Hola tag description
+release:
+  label: Release
+  permalink: /release
+  description: A published version of a DocStack package.
+client:
+  label: "@docstack/client"
+  permalink: /client
+  description: Release notes for the engine package.
+react:
+  label: "@docstack/react"
+  permalink: /react
+  description: Release notes for the React bindings.

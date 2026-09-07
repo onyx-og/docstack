@@ -134,10 +134,11 @@ describe("replication filter", () => {
 
         expect(result.cardReplicates).toBe(true);
         expect(result.classModelReplicates).toBe(true);
-        // Runtime-created identity and authorisation travel too - they bind the two
-        // instances, and `~Policy` here is the default policy created *for this class*,
-        // not a patch-seeded one. Nothing patch-seeded or device-local rides along.
-        expect(result.replicatedClasses).toEqual(["FilterTask", "class", "~Group", "~Policy", "~User"]);
+        // Runtime-created identity travels too - it binds the two instances.
+        // No `~Policy` any more: the JS-rule engine retired (ADR-0045), and no
+        // per-class default policy is created. Nothing patch-seeded or
+        // device-local rides along.
+        expect(result.replicatedClasses).toEqual(["FilterTask", "class", "~Group", "~User"]);
     });
 
     it("ADR-0023: sessions can still be opted back in", async ({ useDocStack }) => {

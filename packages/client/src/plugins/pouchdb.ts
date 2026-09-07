@@ -30,13 +30,42 @@ export class StackLockedError extends Error {
     override name = "StackLockedError";
     /** The class the refused document belongs to. */
     readonly className: string;
+    /** The sealed scope, when the refusal is a scope's rather than the legacy key's (ADR-0045). */
+    readonly scopeId?: string;
 
-    constructor(className: string) {
-        super(
-            `Stack is locked: '${className}' has encrypted attributes and no document key has been supplied, ` +
-            `so writing it would store those fields in the clear. Call 'stack.unlock(documentKey)' first.`
+    constructor(className: string, scopeId?: string) {
+        super(scopeId
+            ? `Scope '${scopeId}' is sealed: '${className}' has encrypted attributes and the keyring holds no ` +
+              `read-write key for the scope, so writing would seal under the wrong key or none. ` +
+              `Call 'stack.unlockScopes(attributeKey)' first.`
+            : `Stack is locked: '${className}' has encrypted attributes and no document key has been supplied, ` +
+              `so writing it would store those fields in the clear. Call 'stack.unlock(documentKey)' first.`
         );
         this.className = className;
+        this.scopeId = scopeId;
+    }
+}
+
+/**
+ * A write whose `~scope` label disagrees with its sealed payloads' key ids
+ * (spec 02 §2.3 rule 2). Refused, never repaired: re-sealing content the
+ * writer could not open under the labeled scope's key is exactly the
+ * induced-downgrade attack a tampered label is fishing for. A legitimate
+ * relabel opens the original scope first, so its payloads arrive as plaintext.
+ */
+export class StackScopeMismatchError extends Error {
+    override name = "StackScopeMismatchError";
+    readonly docId: string;
+    readonly scopeId: string;
+
+    constructor(docId: string, scopeId: string, kid: string | undefined) {
+        super(
+            `Document '${docId}' is labeled scope '${scopeId}' but carries a sealed payload under key ` +
+            `'${kid ?? "(unstamped)"}' that does not belong to the scope. Refusing to write: relabeling ` +
+            `requires the original scope open, and a mismatch is quarantined, never re-sealed (ADR-0045).`
+        );
+        this.docId = docId;
+        this.scopeId = scopeId;
     }
 }
 
@@ -430,14 +459,43 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
                         classCache.set(className, classObj);
                         const encryptableAttributes = classObj.getEncryptedAttributes();
-                        // A locked stack has no key, so encrypting is impossible and the
-                        // fields would land in the clear. Refuse instead of degrading:
-                        // silent plaintext is the failure mode ADR-0018 exists to remove.
-                        // Bootstrap patches are the documented exception - the seed system
+                        // A sealed key cannot encrypt. Refuse instead of degrading:
+                        // silent plaintext is the failure mode ADR-0018 exists to remove,
+                        // and sealing under the WRONG key is its ADR-0045 sibling. A
+                        // scope-labeled document answers to its scope's CEK; an
+                        // unlabeled one to the legacy document key. Bootstrap patches
+                        // are the documented legacy-path exception - the seed system
                         // user has to exist before any key can be recovered, and
                         // `rekeyBootstrapDocuments` encrypts it once one arrives.
-                        if (encryptableAttributes.length && stack.isLocked() && !(options as any)?.isPatch) {
-                            throw new StackLockedError(className);
+                        if (encryptableAttributes.length && stack.cryptoEngine.isEnabled()) {
+                            const scopeLabel = stack.resolveScopeLabel(doc, (classObj as any).model);
+                            if (scopeLabel) {
+                                if (!stack.cryptoEngine.isScopeWritable(scopeLabel)) {
+                                    throw new StackLockedError(className, scopeLabel);
+                                }
+                                // The label↔kid mismatch guard (spec 02 §2.3 rule 2),
+                                // checked here beside the lock refusal so both are the
+                                // same pre-write rejection: a payload already sealed
+                                // under a key OUTSIDE the labeled scope is a relabel the
+                                // writer could not have performed legitimately (it never
+                                // opened the source), so it is refused - never re-sealed
+                                // under the labeled key, which is the induced downgrade.
+                                const scopeKids = await stack.getAccessScopeKids(scopeLabel);
+                                if (!scopeKids) {
+                                    throw new StackScopeMismatchError((doc as any)._id, scopeLabel, undefined);
+                                }
+                                for (const attribute of encryptableAttributes) {
+                                    const value = (doc as any)[attribute.getName()];
+                                    if (value && typeof value === "object" && (value as any).__enc === true) {
+                                        const kid = (value as any).kid as string | undefined;
+                                        if (!kid || !scopeKids.has(kid)) {
+                                            throw new StackScopeMismatchError((doc as any)._id, scopeLabel, kid);
+                                        }
+                                    }
+                                }
+                            } else if (stack.isLocked() && !(options as any)?.isPatch) {
+                                throw new StackLockedError(className);
+                            }
                         }
                         if (stack.cryptoEngine.isEnabled() && encryptableAttributes.length) {
                             await stack.cryptoEngine.decryptDocument(doc as Document, classObj);
@@ -535,7 +593,11 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         }
                         classCache.set(className, classObj);
                         const clone = { ...doc } as Document;
-                        await stack.cryptoEngine.encryptDocument(clone, classObj);
+                        // The label was validated in the pre-write guard above
+                        // (scope known, writable, no foreign-kid payloads); here it
+                        // only selects the sealing key.
+                        const scopeLabel = stack.resolveScopeLabel(clone, (classObj as any).model);
+                        await stack.cryptoEngine.encryptDocument(clone, classObj, scopeLabel);
                         return clone;
                     }
                 }
