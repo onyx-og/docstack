@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunk_docstack_docs=self.webpackChunk_docstack_docs||[]).push([["3220"],{1912(s){s.exports=JSON.parse('{"blogBasePath":"/docstack/blog","blogTitle":"Release notes","authorsListPath":"/docstack/blog/authors"}')}}]);

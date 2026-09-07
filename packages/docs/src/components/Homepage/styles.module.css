@@ -1,0 +1,249 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 5.5rem 0 4rem;
+  color: #f4f4f6;
+  background:
+    radial-gradient(60% 70% at 15% 10%, rgba(98, 0, 238, 0.45), transparent 60%),
+    radial-gradient(50% 60% at 85% 20%, rgba(0, 103, 79, 0.55), transparent 60%),
+    radial-gradient(40% 50% at 60% 100%, rgba(136, 231, 136, 0.18), transparent 60%),
+    radial-gradient(circle at 50% 30%, #1a1a1a, #000 75%);
+}
+
+.heroInner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 3rem;
+  align-items: center;
+}
+
+@media (max-width: 996px) {
+  .hero {
+    padding: 3.5rem 0 2.5rem;
+  }
+  .heroInner {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.brand img {
+  width: 64px;
+  height: 64px;
+}
+
+.brand h1 {
+  font-size: 2.75rem;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+  color: #ffffff;
+}
+
+.lede {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #d5d5dc;
+  max-width: 44rem;
+  margin: 0 0 1.75rem;
+}
+
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.ctaPrimary {
+  background: var(--docstack-green);
+  color: #0b0b0d !important;
+  border: none;
+  font-weight: 700;
+}
+.ctaPrimary:hover {
+  background: #a2eca2;
+}
+
+.ctaSecondary {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.ctaSecondary:hover {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.install {
+  max-width: 34rem;
+}
+
+.install :global(.theme-code-block) {
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.taste :global(.theme-code-block) {
+  box-shadow: none;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.badges img {
+  height: 20px;
+}
+
+.section {
+  padding: 3.5rem 0;
+}
+
+.sectionAlt {
+  background: var(--ifm-background-surface-color);
+}
+
+.sectionTitle {
+  font-size: 1.9rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.sectionLede {
+  color: var(--ifm-color-emphasis-700);
+  max-width: 46rem;
+  margin-bottom: 2rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  display: block;
+  padding: 1.25rem 1.25rem 1.1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  background: var(--ifm-background-color);
+  color: inherit;
+  text-decoration: none !important;
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.5);
+}
+
+.cardIcon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  margin-bottom: 0.75rem;
+  color: var(--ifm-color-primary);
+  background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+}
+
+.card h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.4rem;
+}
+
+.card p {
+  margin: 0;
+  color: var(--ifm-color-emphasis-800);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.audience {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem 2rem;
+}
+
+.audience li {
+  list-style: none;
+  padding-left: 1.4rem;
+  position: relative;
+  line-height: 1.55;
+}
+
+.audience li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--docstack-violet), var(--docstack-green));
+}
+
+.packages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.package {
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  background: var(--ifm-background-color);
+}
+
+.package h3 {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.95rem;
+  margin-bottom: 0.35rem;
+}
+
+.package p {
+  font-size: 0.92rem;
+  color: var(--ifm-color-emphasis-800);
+  margin-bottom: 0.6rem;
+}
+
+.package img {
+  height: 20px;
+}
+
+.status {
+  border-left: 4px solid var(--ifm-color-primary);
+  padding: 0.25rem 0 0.25rem 1.25rem;
+  max-width: 52rem;
+  color: var(--ifm-color-emphasis-800);
+}
+
+.tasteGrid {
+  display: grid;
+  /* Two columns only when each can show a full code line; stacked otherwise. */
+  grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+  gap: 1.25rem;
+}
+
+.tasteGrid h3 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}

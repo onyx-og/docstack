@@ -1,0 +1,12 @@
+release:
+  label: Release
+  permalink: /release
+  description: A published version of a DocStack package.
+client:
+  label: "@docstack/client"
+  permalink: /client
+  description: Release notes for the engine package.
+react:
+  label: "@docstack/react"
+  permalink: /react
+  description: Release notes for the React bindings.

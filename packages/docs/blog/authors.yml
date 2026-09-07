@@ -1,0 +1,10 @@
+onyx:
+  name: Onyx
+  title: Maintainer, DocStack
+  url: https://onyx.ac
+  email: hello@onyx.ac
+  image_url: https://github.com/onyx-og.png
+  page: true
+  socials:
+    github: onyx-og
+    x: onyx-og

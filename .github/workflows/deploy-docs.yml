@@ -28,6 +28,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          # The adapter workspaces are submodules; npm ci needs their package.json to
+          # match the root lockfile. All submodule repositories are public over HTTPS.
+          submodules: recursive
+          # Full history: the docs render "last updated" from git.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

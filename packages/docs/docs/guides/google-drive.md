@@ -1,14 +1,14 @@
+---
+title: "Google Drive"
+description: "Sync and back up a stack to the user's own Google Drive with the published adapter; your application owns the OAuth token, DocStack owns the lifecycle."
+sidebar_position: 9
+---
+
 # Google Drive
 
 Sync and back up a stack to the user's own Google Drive. DocStack supplies the
 lifecycle; `@docstack/pouchdb-adapter-googledrive` supplies the transport; your
 application supplies the OAuth token.
-
-:::note
-Packages are not yet published to a registry — see
-[Installation](../get-started/installation.md). The usage below is what the API
-looks like today.
-:::
 
 ## The shape of it
 
@@ -144,8 +144,8 @@ try {
 
 ## Encrypted attributes
 
-Attributes flagged `encrypted: true` reach Drive as ciphertext. The key derives
-from the user's credentials and stays on the device, so the folder holds data
+Attributes flagged `encrypted: true` reach Drive as ciphertext. The document key is
+supplied by the application and stays on the device, so the folder holds data
 neither Google nor you can read. No configuration — replication reads the database
 as stored rather than through the decrypting path your queries use.
 
@@ -165,7 +165,7 @@ to actually be flagged.
 * **Drive is per Google account**, so it syncs one person's devices. It is not a
   team transport, and sharing a folder is not a substitute for one.
 * **No attachments yet.** Documents only.
-* **Filtering is not access control** — see [What replicates](./filtering.md).
+* **Filtering is not access control** — see [Filter what replicates](./filtering.md).
 * An **end-to-end two-device run against real Drive** is still outstanding on the
   DocStack sync layer, though the adapter's own replication is verified against
   production Drive.

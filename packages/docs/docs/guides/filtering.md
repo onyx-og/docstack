@@ -1,3 +1,10 @@
+---
+title: "Filter what replicates"
+description: "Narrow replication by class or with a predicate, understand why changing a filter re-replicates, and what filters deliberately do not do."
+sidebar_position: 10
+sidebar_label: "Filter what replicates"
+---
+
 # What replicates
 
 By default, a stack replicates its data and its data model, and keeps its own
@@ -29,8 +36,10 @@ stack.sync({
 });
 ```
 
-Classes, domains, policies, users and groups **do** replicate — they are authored
-data model, and a peer needs them to make sense of anything else.
+Classes, domains, users, groups and the rest of the data model **do** replicate:
+they are authored data model, and a peer needs them to make sense of anything
+else. The complete list of what stays local, and the options that change it, is
+in [What stays on the device](../reference/internal-documents.md).
 
 ## Filtering by class
 
@@ -46,8 +55,8 @@ Two things this does that a hand-written predicate would not:
 
 **An allow-list keeps the data model.** `include: ['Task']` taken literally would
 produce a remote holding Task documents and no Task class model — a database the
-next device could not open. Class models, domains, policies, users, groups and auth
-modules ride along automatically. `includeDataModel: false` turns that off, for a
+next device could not open. Class models, domains, users, groups, auth modules and
+job definitions (`DATA_MODEL_CLASSES`) ride along automatically. `includeDataModel: false` turns that off, for a
 remote that is not meant to be a readable replica.
 
 **Relations are judged by their endpoints.** A relation document carries `~domain`
