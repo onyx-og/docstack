@@ -2,11 +2,38 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://onyx-og.github.io/docstack/blog</id>
     <title>DocStack Blog</title>
-    <updated>2026-09-04T00:00:00.000Z</updated>
+    <updated>2026-09-07T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://onyx-og.github.io/docstack/blog"/>
     <subtitle>DocStack Blog</subtitle>
     <icon>https://onyx-og.github.io/docstack/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[@docstack/client 0.3.0: access is a property of the ciphertext]]></title>
+        <id>https://onyx-og.github.io/docstack/blog/docstack-client-0-3-0</id>
+        <link href="https://onyx-og.github.io/docstack/blog/docstack-client-0-3-0"/>
+        <updated>2026-09-07T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Cryptographic access scopes replace the rule-based policy engine, with @docstack/abe carrying the CP-ABE primitive.]]></summary>
+        <content type="html"><![CDATA[<p><code>@docstack/client</code> 0.3.0 makes access control cryptographic. Content belongs to a <strong>scope</strong> whose content key is sealed under an <strong>attribute policy</strong>, and a session's attribute key either satisfies the formula, opening the scope, or does not, in which case the same ciphertext reads <code>null</code>. Denial is decryption failure, not a check, so it binds the device owner too. The JavaScript-rule policy engine is gone, and a new package, <code>@docstack/abe</code>, carries the primitive.</p>
+<!-- -->
+<h2 class="anchor anchorTargetStickyNavbar_SAay" id="access-scopes">Access scopes<a href="https://onyx-og.github.io/docstack/blog/docstack-client-0-3-0#access-scopes" class="hash-link" aria-label="Direct link to Access scopes" title="Direct link to Access scopes" translate="no">​</a></h2>
+<p>A scope is an <code>~AccessScope</code> document: a 32-byte content key sealed with CP-ABE (the AC17 scheme, rabe compiled to WASM) under a monotone formula such as <code>("role:manager" and "dept:sales") or "clearance:secret"</code>, plus the key's id and a per-scope canary. The authority half, <code>setup</code>, <code>keygen</code> and <code>wrapCek</code> from <code>@docstack/abe</code>, runs wherever the application controls it; <code>ClientStack.buildAccessScope</code> assembles the document, and an application patch ships it to every device.</p>
+<p>A device supplies its attribute key through the new <code>accessKeys</code> option at open, or later through <code>stack.unlockScopes(key)</code>, which attempts every declared scope and admits only content keys that match the scope's key id and open its canary. Documents join a scope with a <code>~scope</code> label or inherit their class's <code>defaultScope</code>; the scope decides under which key a document's <code>encrypted: true</code> attributes seal, and the schema still decides which attributes. <code>isScopeLocked</code>, <code>lockedScopeIds</code> and the <code>scopeUnlocked</code> event report the per-scope state.</p>
+<p>The crypto engine's single document key became a keyring dispatched by key id: the document key, retired keys, and admitted scope keys in read-write or read-only mode, which is what makes rotation lazy and revocation a new scope version. Every scope-sealed payload is bound to its label as AES-GCM additional data, and a write whose label disagrees with its payload's key is refused with <code>StackScopeMismatchError</code> rather than re-sealed, closing the induced-downgrade attack a tampered label is fishing for. Writing into a sealed scope throws <code>StackLockedError</code> with <code>scopeId</code> set; a patch that touches a sealed scope defers until the scope opens.</p>
+<p>The guide is <a class="" href="https://onyx-og.github.io/docstack/docs/guides/access-scopes">Scope your data</a>; the model and its limits are in <a class="" href="https://onyx-og.github.io/docstack/docs/concepts/access-control/">Access control</a>. The reasoning is <a href="https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md" target="_blank" rel="noopener noreferrer" class="">ADR-0045</a>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_SAay" id="the-policy-engine-is-removed">The policy engine is removed<a href="https://onyx-og.github.io/docstack/blog/docstack-client-0-3-0#the-policy-engine-is-removed" class="hash-link" aria-label="Direct link to The policy engine is removed" title="Direct link to The policy engine is removed" translate="no">​</a></h2>
+<p>Client-side rule evaluation could never bind the holder of the device, so DocStack no longer presents it as access control. The five enforcement call sites, the per-class default-policy seeder and the pre-authentication throw are gone; system patch <code>~sys-0.0.18</code> deactivates the three seeded <code>~Policy</code> documents, and the class stays inert for legacy data. Losing read access now seals encrypted fields to <code>null</code> instead of throwing. Behavioural rules move to application code; conditional access, "published means public", is write-time scope labeling.</p>
+<h2 class="anchor anchorTargetStickyNavbar_SAay" id="upgrading">Upgrading<a href="https://onyx-og.github.io/docstack/blog/docstack-client-0-3-0#upgrading" class="hash-link" aria-label="Direct link to Upgrading" title="Direct link to Upgrading" translate="no">​</a></h2>
+<div class="language-bash codeBlockContainer_ZGJx theme-code-block" style="--prism-color:#F8F8F2;--prism-background-color:#282A36"><div class="codeBlockContent_kX1v"><pre tabindex="0" class="prism-code language-bash codeBlock_TAPP thin-scrollbar" style="color:#F8F8F2;background-color:#282A36"><code class="codeBlockLines_AdAo"><div class="token-line" style="color:#F8F8F2"><span class="token function" style="color:rgb(80, 250, 123)">npm</span><span class="token plain"> </span><span class="token function" style="color:rgb(80, 250, 123)">install</span><span class="token plain"> @docstack/client@0.3.0 pouchdb-browser pouchdb-find</span><br></div></code></pre></div></div>
+<p><code>@docstack/abe</code> is installed as a dependency and loaded lazily, only when a stack declares scopes. Applications that wrote <code>~Policy</code> documents keep them as inert data; nothing reads them. <code>@docstack/react</code> 0.1.2 updates its dependency range to this release and is otherwise unchanged.</p>
+<p>The cryptography is experimental pending audit: rabe's BN254 backend carries roughly a 100-bit modern margin, and an audit gates any production claim. The <a class="" href="https://onyx-og.github.io/docstack/docs/concepts/access-control/threat-model">threat model</a> states what is guaranteed, to whom, and what is not.</p>]]></content>
+        <author>
+            <name>Onyx</name>
+            <email>hello@onyx.ac</email>
+            <uri>https://onyx.ac</uri>
+        </author>
+        <category label="Release" term="Release"/>
+        <category label="@docstack/client" term="@docstack/client"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[@docstack/client 0.2.0: named transactions, transactional patch chains, one-shot migration jobs]]></title>
         <id>https://onyx-og.github.io/docstack/blog/docstack-client-0-2-0</id>

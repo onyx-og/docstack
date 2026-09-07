@@ -5,7 +5,6 @@ description: "Cryptographic access scopes replace the rule-based policy engine, 
 authors: [onyx]
 tags: [release, client]
 date: 2026-09-07
-draft: true
 ---
 
 `@docstack/client` 0.3.0 makes access control cryptographic. Content belongs to a **scope** whose content key is sealed under an **attribute policy**, and a session's attribute key either satisfies the formula, opening the scope, or does not, in which case the same ciphertext reads `null`. Denial is decryption failure, not a check, so it binds the device owner too. The JavaScript-rule policy engine is gone, and a new package, `@docstack/abe`, carries the primitive.
