@@ -12,7 +12,11 @@
     "serve": "docusaurus serve --dir ../../docs",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "wp:doctor": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc doctor",
+    "wp:render": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc render",
+    "wp:sync": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc sync",
+    "wp:sync:dry": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc sync --dry-run"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",

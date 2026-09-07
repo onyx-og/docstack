@@ -44,7 +44,9 @@
     "build:react": "npm run -w packages/react build",
     "start:docs": "npm run -w packages/docs start",
     "build:docs": "npm run -w packages/docs build",
-    "sync:docs:wp": "npm run -w packages/docs wp:sync --"
+    "sync:docs:wp": "npm run -w packages/docs wp:sync --",
+    "publish:docs": "npm run -w packages/docs wp:sync",
+    "publish:docs:dry": "npm run -w packages/docs wp:sync:dry"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

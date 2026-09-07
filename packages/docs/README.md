@@ -82,6 +82,26 @@ Each page is a two-column block layout: a core page list rooted at the docs page
 
 Pushing to `main` runs the `Sync Docs to WordPress` workflow, which needs the repository secrets `WP_USER` and `WP_APP_PASSWORD` and the variables `WP_URL` and `WP_ROOT_PATH`. It can also be dispatched by hand with dry-run, prune and root inputs, and always uploads the plan as an artefact.
 
+## Publishing to onyx.ac
+
+The hand-written documentation (the `docs` sidebar, 42 pages) is mirrored to onyx.ac as native Gutenberg pages by [pterodoc](https://github.com/onyx-ac/pterodoc). Docusaurus stays the source of truth; WordPress is a mirror. Where the tree hangs and how pages are laid out is in `pterodoc.config.mjs`; credentials come from the environment only.
+
+```bash
+cp .env.example .env          # fill in WP_USER and WP_APP_PASSWORD; .env is git-ignored
+npm run wp:doctor             # config, credentials and permissions
+npm run wp:render             # render every page into .pterodoc/, contacts nothing
+npm run wp:sync:dry           # plan against the live site, change nothing
+npm run wp:sync               # create and update pages
+```
+
+`npm run publish:docs` and `publish:docs:dry` at the repository root run the same two commands. Without credentials every command still renders and reports what it would have done, and `.pterodoc/plan.json` lists each action.
+
+Pages mirror the documentation URLs: `/docs/guides/sync` becomes `/docstack/docs/guides/sync/` on WordPress, a sidebar category becomes a page of its own, and a page is identified by its parent and slug, so a second run reports everything as unchanged. The generated API reference is not mirrored; links into it point back at this site. A page that disappears from the source is left in place unless the sync runs with `--prune`.
+
+The `Publish Docs to onyx.ac` workflow runs the same sync on every push to `main` that touches the docs, and on demand with a dry-run default. It needs the repository variable `WP_URL` and the secrets `WP_USER` and `WP_APP_PASSWORD`; `PTERODOC_WP_ROOT` and `WP_LANG` are optional variables. Until the secrets exist, a push only renders and uploads the plan.
+
+pterodoc is not on npm yet, so the scripts fetch and build it from its `v0.1.0` tag through `npx`; once it is published it becomes an ordinary devDependency.
+
 ## The workbench bundle
 
 `static/app/` is the production build of `packages/ui`, copied in by hand and served at `/docstack/app/`. Rebuild it with `npm run build:ui` from the root and copy `packages/ui/build/*` over it when the workbench changes.
