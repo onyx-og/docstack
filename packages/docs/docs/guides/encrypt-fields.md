@@ -91,6 +91,6 @@ Encrypt what must not be readable by whoever holds the storage: the remote, a st
 
 ## Which key: scopes
 
-The document key is the default. To seal a document under a key that only holders of certain attributes can open, give it a `~scope` label (or give its class a `defaultScope`) and publish the scope: its content key travels ABE-sealed under an attribute policy, and a session either satisfies the policy or reads `null`. The flag on the attribute still decides *which* fields seal; the scope decides *under which key*. The API is in [Scope your data](./access-scopes.md).
+The document key is the default. To seal a document under a key that only holders of certain attributes can open, give it a `~scope` label (or give its class a `defaultScope`) and ship the scope in a patch: its content key travels ABE-sealed under an attribute policy, and a session either satisfies the policy or reads `null`. The flag on the attribute still decides *which* fields seal; the scope decides *under which key*. The API is in [Scope your data](./access-scopes.md).
 
 How the engine fits together, what decrypts and what does not, and how scopes are constructed beside it are in [Crypto engine](../concepts/crypto-engine.md) and [Scopes and keys](../concepts/access-control/crypto-access.md).

@@ -1001,9 +1001,9 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | Path | Package | Role | Published |
 | :--- | :--- | :--- | :--- |
 | `packages/shared` | `@docstack/shared` | Types and abstract bases shared by every package: document, class, domain, trigger and patch models, `StackOptions`, the `Stack` and `Class` abstractions. | 0.1.0 |
-| `packages/client` | `@docstack/client` | The engine. | 0.2.0 |
-| `packages/react` | `@docstack/react` | Provider and hooks. | 0.1.1 |
-| `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | With the next client release |
+| `packages/client` | `@docstack/client` | The engine. | 0.3.0 |
+| `packages/react` | `@docstack/react` | Provider and hooks. | 0.1.2 |
+| `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | 0.1.0, with client 0.3.0 |
 | `packages/ui` | `@docstack/ui` | The workbench application. Built with Webpack; its bundle is copied into `packages/docs/static/app` and hosted from this site. | Not a library; hosted |
 | `packages/server` | `@docstack/server` | The server preview. | No |
 | `packages/docs` | `@docstack/docs` | This site (Docusaurus). Builds into the repository's root `docs/` folder, which GitHub Pages serves. | Site |
@@ -1471,7 +1471,7 @@ An access scope is a named set of content whose encrypted fields seal under one 
 Scopes decide *under which key* a document's `encrypted: true` fields seal. The schema still decides *which fields*; see [Encrypt fields](./encrypt-fields.md). The model, its formula language and its limits are in [Access control](../concepts/access-control/index.md); this page is the API.
 
 :::info Version
-Scopes ship in `@docstack/client` from the release after 0.2.0 (they are on `main`). `@docstack/abe`, the CP-ABE primitive, is installed as a dependency of the client and is never imported by application code on a device. The cryptography is experimental pending audit; see the [threat model](../concepts/access-control/threat-model.md).
+Scopes ship in `@docstack/client` 0.3.0. `@docstack/abe`, the CP-ABE primitive, is installed as a dependency of the client and is never imported by application code on a device; its authority half runs on your server. The cryptography is experimental pending audit; see the [threat model](../concepts/access-control/threat-model.md).
 :::
 
 ### 1. Mint a scope where you control it
@@ -1494,13 +1494,14 @@ const hrScope = await ClientStack.buildAccessScope({
 });
 ```
 
-`buildAccessScope` needs the authority *public* key only and returns the document without writing it. Publish it into the database from any stack you control, or ship it in a [patch](./patches.md):
+`buildAccessScope` needs the authority *public* key only and returns the document without writing it. Ship it in an application [patch](./patches.md): every device applies the patch, so every device holds the scope document, the same way it holds the class models.
 
 ```typescript
-await stack.db.bulkDocs([hrScope]);
+{ '~class': 'patch', _id: 'my-app-0.4.0', version: '0.4.0', target: 'my-app', active: true,
+  changelog: 'The hr scope.', docs: [hrScope] }
 ```
 
-The document replicates with the data, so every device receives it. That is safe by design: the policy is public, the content key inside it is sealed, and the canary lets a device verify a key it opens before trusting it.
+That is safe by design: the policy is public, the content key inside it is sealed, and the canary lets a device verify a key it opens before trusting it. A scope written at runtime through `stack.db.bulkDocs` from a stack you control works too and replicates like any other document.
 
 ```json
 {
@@ -1592,14 +1593,14 @@ const hrV2 = await ClientStack.buildAccessScope({
     pk,
     version: 2,
 });
-await stack.db.bulkDocs([hrV2]);
+// Ship hrV2 in the next application patch, beside the version-1 document it supersedes.
 ```
 
 A device whose key satisfies the new policy admits version 2 as its **read-write** key and keeps version 1 read-only, so documents re-seal under the new key as they are next written and old ones stay readable in the meantime. A device that satisfied only the old policy keeps what it could already read; no cryptosystem un-reads data. Attribute-level revocation, shrinking a key rather than a scope, is the scheme's known weak point and is on the [roadmap](../contributing/roadmap.md).
 
 ### 9. Replication
 
-Scope documents are ordinary documents of the `~AccessScope` class and replicate with the data. A remote holds sealed keys and public policies, nothing it can open. If you replicate with a `classes.include` allow-list, add `~AccessScope` to it: the class is not part of the data-model set that rides along automatically, and a replica without the scope documents has nothing to unlock. See [Filter what replicates](./filtering.md).
+A scope document shipped in a patch is seeded on every device by that patch, like the class models, so it never needs to travel and stays out of replication with the rest of the seeded model. A scope written at runtime replicates as an ordinary `~AccessScope` document. Either way a remote holds a sealed key and a public policy, nothing it can open. See [What stays on the device](../reference/internal-documents.md).
 
 ### 10. What this does not do
 
@@ -1712,7 +1713,7 @@ Encrypt what must not be readable by whoever holds the storage: the remote, a st
 
 ### Which key: scopes
 
-The document key is the default. To seal a document under a key that only holders of certain attributes can open, give it a `~scope` label (or give its class a `defaultScope`) and publish the scope: its content key travels ABE-sealed under an attribute policy, and a session either satisfies the policy or reads `null`. The flag on the attribute still decides *which* fields seal; the scope decides *under which key*. The API is in [Scope your data](./access-scopes.md).
+The document key is the default. To seal a document under a key that only holders of certain attributes can open, give it a `~scope` label (or give its class a `defaultScope`) and ship the scope in a patch: its content key travels ABE-sealed under an attribute policy, and a session either satisfies the policy or reads `null`. The flag on the attribute still decides *which* fields seal; the scope decides *under which key*. The API is in [Scope your data](./access-scopes.md).
 
 How the engine fits together, what decrypts and what does not, and how scopes are constructed beside it are in [Crypto engine](../concepts/crypto-engine.md) and [Scopes and keys](../concepts/access-control/crypto-access.md).
 
@@ -3217,9 +3218,10 @@ The [Quickstart](./get-started/quickstart.md) walks through both, including how 
 
 | Package | What it is | Status |
 | :--- | :--- | :--- |
-| [`@docstack/client`](https://www.npmjs.com/package/@docstack/client) | The engine: schema, SQL, triggers, jobs, encryption, patches, transactions, sync. Runs in the browser. | 0.2.0 on npm |
-| [`@docstack/react`](https://www.npmjs.com/package/@docstack/react) | Provider and live hooks over the client. Every query is a subscription. | 0.1.1 on npm |
-| [`@docstack/pouchdb-adapter-googledrive`](https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive) | The user's own Google Drive folder as a PouchDB remote. Maintained in [its own repository](https://github.com/onyx-ac/docstack-pouchdb-adapter-gdrive). | 0.1.9 on npm |
+| [`@docstack/client`](https://www.npmjs.com/package/@docstack/client) | The engine: schema, SQL, triggers, jobs, access scopes, encryption, patches, transactions, sync. Runs in the browser. | [![npm](https://img.shields.io/npm/v/@docstack/client)](https://www.npmjs.com/package/@docstack/client) |
+| [`@docstack/react`](https://www.npmjs.com/package/@docstack/react) | Provider and live hooks over the client. Every query is a subscription. | [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react) |
+| [`@docstack/abe`](https://www.npmjs.com/package/@docstack/abe) | The CP-ABE primitive behind access scopes. Installed with the client; its authority half runs where you control it. | [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) |
+| [`@docstack/pouchdb-adapter-googledrive`](https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive) | The user's own Google Drive folder as a PouchDB remote. Maintained in [its own repository](https://github.com/onyx-ac/docstack-pouchdb-adapter-gdrive). | [![npm](https://img.shields.io/npm/v/@docstack/pouchdb-adapter-googledrive)](https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive) |
 | [Workbench](pathname:///app/index.html) | Browse a database, edit its schema, run queries and view the entity-relation diagram, in the browser. | Hosted application |
 | `@docstack/server` | The same engine deployed server-side: a sync hub, shared workspaces, server-side jobs. | Preview, not published |
 
@@ -3249,7 +3251,7 @@ Pre-1.0 and moving. `@docstack/client` and `@docstack/react` are published and i
 - [Installation](./get-started/installation.md), then the [Quickstart](./get-started/quickstart.md).
 - The [Guides](./guides/model-your-data.md) for task-shaped answers.
 - The [Concepts](./concepts/core-concepts.md) for how the engines fit together.
-- The [Reference](./reference/class-and-attribute-options.md) for every option, and the generated [API reference](/docs/api/client/).
+- The [Reference](./reference/class-and-attribute-options.md) for every option, and the generated API reference for the [client](/docs/api/client/), [react](/docs/api/react/) and [abe](/docs/api/abe/) packages.
 
 ---
 
@@ -3396,7 +3398,7 @@ Every stack writes documents that describe *this device's copy* of the database 
 
 Patches are applied by every client independently, so every document they seed already exists on every client: DocStack's own class models, `Group-Admin`, `AuthMod-Classic`, the bootstrap `class` and `domain` models, the `system` user. Sending them costs quota and invites conflicts, two devices writing the same id independently, for no information gained. Their ids are derived from the system patches at build time (`SYSTEM_SEEDED_DOC_IDS`) and kept local; the ids seeded by the application's own patches are added the same way when `stack.sync()` runs.
 
-The distinction that matters is not "is this DocStack's own?" but "can the peer already reconstruct this?". A user created at runtime, a group an administrator added, an access scope the authority published, an application-created document of any of DocStack's classes: those bind two instances together and always replicate. An `~AccessScope` document carries a sealed key and a public policy, nothing a remote can open.
+The distinction that matters is not "is this DocStack's own?" but "can the peer already reconstruct this?". A user created at runtime, a group an administrator added, an application-created document of any of DocStack's classes: those bind two instances together and always replicate. Access scope documents follow the same rule: shipped in a patch they are seeded everywhere and stay home, written at runtime they travel, and in either case they carry a sealed key and a public policy, nothing a remote can open.
 
 ### Local by default, replicable on request
 
@@ -3763,7 +3765,7 @@ A subquery must have a `FROM` clause. `IN (SELECT …)` inside a `HAVING` clause
 | :--- | :--- | :--- |
 | `include` | all | Replicate only these classes. Matched against `~class` and against a relation's `sourceClass`/`targetClass`. |
 | `exclude` | none | Never replicate documents of these classes. Applied after `include`. The class models themselves still replicate; add a model's id to `internalDocs.extraDocIds` to keep it local too. |
-| `includeDataModel` | `true` | Keep `DATA_MODEL_CLASSES` (`class`, `~self`, `domain`, `~User`, `~Group`, `~AuthModule`, `~Job` and the rest) when `include` is set. `~AccessScope` is not in that set: add it to `include` when the replica must be able to open scopes. |
+| `includeDataModel` | `true` | Keep `DATA_MODEL_CLASSES` (`class`, `~self`, `domain`, `~User`, `~Group`, `~AuthModule`, `~Job` and the rest) when `include` is set. |
 
 #### `InternalDocFilterOptions`
 

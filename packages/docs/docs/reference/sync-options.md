@@ -28,7 +28,7 @@ sidebar_label: "Sync options & status"
 | :--- | :--- | :--- |
 | `include` | all | Replicate only these classes. Matched against `~class` and against a relation's `sourceClass`/`targetClass`. |
 | `exclude` | none | Never replicate documents of these classes. Applied after `include`. The class models themselves still replicate; add a model's id to `internalDocs.extraDocIds` to keep it local too. |
-| `includeDataModel` | `true` | Keep `DATA_MODEL_CLASSES` (`class`, `~self`, `domain`, `~User`, `~Group`, `~AuthModule`, `~Job` and the rest) when `include` is set. `~AccessScope` is not in that set: add it to `include` when the replica must be able to open scopes. |
+| `includeDataModel` | `true` | Keep `DATA_MODEL_CLASSES` (`class`, `~self`, `domain`, `~User`, `~Group`, `~AuthModule`, `~Job` and the rest) when `include` is set. |
 
 ### `InternalDocFilterOptions`
 

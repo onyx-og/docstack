@@ -88,9 +88,10 @@ The [Quickstart](./get-started/quickstart.md) walks through both, including how 
 
 | Package | What it is | Status |
 | :--- | :--- | :--- |
-| [`@docstack/client`](https://www.npmjs.com/package/@docstack/client) | The engine: schema, SQL, triggers, jobs, encryption, patches, transactions, sync. Runs in the browser. | 0.2.0 on npm |
-| [`@docstack/react`](https://www.npmjs.com/package/@docstack/react) | Provider and live hooks over the client. Every query is a subscription. | 0.1.1 on npm |
-| [`@docstack/pouchdb-adapter-googledrive`](https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive) | The user's own Google Drive folder as a PouchDB remote. Maintained in [its own repository](https://github.com/onyx-ac/docstack-pouchdb-adapter-gdrive). | 0.1.9 on npm |
+| [`@docstack/client`](https://www.npmjs.com/package/@docstack/client) | The engine: schema, SQL, triggers, jobs, access scopes, encryption, patches, transactions, sync. Runs in the browser. | [![npm](https://img.shields.io/npm/v/@docstack/client)](https://www.npmjs.com/package/@docstack/client) |
+| [`@docstack/react`](https://www.npmjs.com/package/@docstack/react) | Provider and live hooks over the client. Every query is a subscription. | [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react) |
+| [`@docstack/abe`](https://www.npmjs.com/package/@docstack/abe) | The CP-ABE primitive behind access scopes. Installed with the client; its authority half runs where you control it. | [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) |
+| [`@docstack/pouchdb-adapter-googledrive`](https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive) | The user's own Google Drive folder as a PouchDB remote. Maintained in [its own repository](https://github.com/onyx-ac/docstack-pouchdb-adapter-gdrive). | [![npm](https://img.shields.io/npm/v/@docstack/pouchdb-adapter-googledrive)](https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive) |
 | [Workbench](pathname:///app/index.html) | Browse a database, edit its schema, run queries and view the entity-relation diagram, in the browser. | Hosted application |
 | `@docstack/server` | The same engine deployed server-side: a sync hub, shared workspaces, server-side jobs. | Preview, not published |
 
@@ -120,4 +121,4 @@ Pre-1.0 and moving. `@docstack/client` and `@docstack/react` are published and i
 - [Installation](./get-started/installation.md), then the [Quickstart](./get-started/quickstart.md).
 - The [Guides](./guides/model-your-data.md) for task-shaped answers.
 - The [Concepts](./concepts/core-concepts.md) for how the engines fit together.
-- The [Reference](./reference/class-and-attribute-options.md) for every option, and the generated [API reference](/docs/api/client/).
+- The [Reference](./reference/class-and-attribute-options.md) for every option, and the generated API reference for the [client](/docs/api/client/), [react](/docs/api/react/) and [abe](/docs/api/abe/) packages.

@@ -124,6 +124,7 @@ const config: Config = {
   plugins: [
     typedocInstance('client'),
     typedocInstance('react'),
+    typedocInstance('abe'),
     // The server package is a preview and does not compile cleanly; document what it exports anyway.
     typedocInstance('server', { skipErrorChecking: true }),
     [
@@ -231,6 +232,7 @@ const config: Config = {
           items: [
             { type: 'docSidebar', sidebarId: 'apiClient', label: '@docstack/client' },
             { type: 'docSidebar', sidebarId: 'apiReact', label: '@docstack/react' },
+            { type: 'docSidebar', sidebarId: 'apiAbe', label: '@docstack/abe' },
             { type: 'docSidebar', sidebarId: 'apiServer', label: '@docstack/server (preview)' },
           ],
         },

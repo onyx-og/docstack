@@ -10,7 +10,7 @@ An access scope is a named set of content whose encrypted fields seal under one 
 Scopes decide *under which key* a document's `encrypted: true` fields seal. The schema still decides *which fields*; see [Encrypt fields](./encrypt-fields.md). The model, its formula language and its limits are in [Access control](../concepts/access-control/index.md); this page is the API.
 
 :::info Version
-Scopes ship in `@docstack/client` from the release after 0.2.0 (they are on `main`). `@docstack/abe`, the CP-ABE primitive, is installed as a dependency of the client and is never imported by application code on a device. The cryptography is experimental pending audit; see the [threat model](../concepts/access-control/threat-model.md).
+Scopes ship in `@docstack/client` 0.3.0. `@docstack/abe`, the CP-ABE primitive, is installed as a dependency of the client and is never imported by application code on a device; its authority half runs on your server. The cryptography is experimental pending audit; see the [threat model](../concepts/access-control/threat-model.md).
 :::
 
 ## 1. Mint a scope where you control it
@@ -33,13 +33,14 @@ const hrScope = await ClientStack.buildAccessScope({
 });
 ```
 
-`buildAccessScope` needs the authority *public* key only and returns the document without writing it. Publish it into the database from any stack you control, or ship it in a [patch](./patches.md):
+`buildAccessScope` needs the authority *public* key only and returns the document without writing it. Ship it in an application [patch](./patches.md): every device applies the patch, so every device holds the scope document, the same way it holds the class models.
 
 ```typescript
-await stack.db.bulkDocs([hrScope]);
+{ '~class': 'patch', _id: 'my-app-0.4.0', version: '0.4.0', target: 'my-app', active: true,
+  changelog: 'The hr scope.', docs: [hrScope] }
 ```
 
-The document replicates with the data, so every device receives it. That is safe by design: the policy is public, the content key inside it is sealed, and the canary lets a device verify a key it opens before trusting it.
+That is safe by design: the policy is public, the content key inside it is sealed, and the canary lets a device verify a key it opens before trusting it. A scope written at runtime through `stack.db.bulkDocs` from a stack you control works too and replicates like any other document.
 
 ```json
 {
@@ -131,14 +132,14 @@ const hrV2 = await ClientStack.buildAccessScope({
     pk,
     version: 2,
 });
-await stack.db.bulkDocs([hrV2]);
+// Ship hrV2 in the next application patch, beside the version-1 document it supersedes.
 ```
 
 A device whose key satisfies the new policy admits version 2 as its **read-write** key and keeps version 1 read-only, so documents re-seal under the new key as they are next written and old ones stay readable in the meantime. A device that satisfied only the old policy keeps what it could already read; no cryptosystem un-reads data. Attribute-level revocation, shrinking a key rather than a scope, is the scheme's known weak point and is on the [roadmap](../contributing/roadmap.md).
 
 ## 9. Replication
 
-Scope documents are ordinary documents of the `~AccessScope` class and replicate with the data. A remote holds sealed keys and public policies, nothing it can open. If you replicate with a `classes.include` allow-list, add `~AccessScope` to it: the class is not part of the data-model set that rides along automatically, and a replica without the scope documents has nothing to unlock. See [Filter what replicates](./filtering.md).
+A scope document shipped in a patch is seeded on every device by that patch, like the class models, so it never needs to travel and stays out of replication with the rest of the seeded model. A scope written at runtime replicates as an ordinary `~AccessScope` document. Either way a remote holds a sealed key and a public policy, nothing it can open. See [What stays on the device](../reference/internal-documents.md).
 
 ## 10. What this does not do
 

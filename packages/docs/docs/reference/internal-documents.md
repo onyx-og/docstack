@@ -26,7 +26,7 @@ Every stack writes documents that describe *this device's copy* of the database 
 
 Patches are applied by every client independently, so every document they seed already exists on every client: DocStack's own class models, `Group-Admin`, `AuthMod-Classic`, the bootstrap `class` and `domain` models, the `system` user. Sending them costs quota and invites conflicts, two devices writing the same id independently, for no information gained. Their ids are derived from the system patches at build time (`SYSTEM_SEEDED_DOC_IDS`) and kept local; the ids seeded by the application's own patches are added the same way when `stack.sync()` runs.
 
-The distinction that matters is not "is this DocStack's own?" but "can the peer already reconstruct this?". A user created at runtime, a group an administrator added, an access scope the authority published, an application-created document of any of DocStack's classes: those bind two instances together and always replicate. An `~AccessScope` document carries a sealed key and a public policy, nothing a remote can open.
+The distinction that matters is not "is this DocStack's own?" but "can the peer already reconstruct this?". A user created at runtime, a group an administrator added, an application-created document of any of DocStack's classes: those bind two instances together and always replicate. Access scope documents follow the same rule: shipped in a patch they are seeded everywhere and stay home, written at runtime they travel, and in either case they carry a sealed key and a public policy, nothing a remote can open.
 
 ## Local by default, replicable on request
 
