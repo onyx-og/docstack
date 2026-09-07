@@ -87,20 +87,20 @@ Pushing to `main` runs the `Sync Docs to WordPress` workflow, which needs the re
 The hand-written documentation (the `docs` sidebar, 42 pages) is mirrored to onyx.ac as native Gutenberg pages by [pterodoc](https://github.com/onyx-ac/pterodoc). Docusaurus stays the source of truth; WordPress is a mirror. Where the tree hangs and how pages are laid out is in `pterodoc.config.mjs`; credentials come from the environment only.
 
 ```bash
-cp .env.example .env          # fill in WP_USER and WP_APP_PASSWORD; .env is git-ignored
-npm run wp:doctor             # config, credentials and permissions
-npm run wp:render             # render every page into .pterodoc/, contacts nothing
-npm run wp:sync:dry           # plan against the live site, change nothing
-npm run wp:sync               # create and update pages
+cp .env.example .env                        # fill in WP_USER and WP_APP_PASSWORD; .env is git-ignored
+npm run wp:doctor -- --env-file .env        # config, credentials and permissions
+npm run wp:render                           # render every page into .pterodoc/, contacts nothing
+npm run wp:sync:dry -- --env-file .env      # plan against the live site, change nothing
+npm run wp:sync -- --env-file .env          # create and update pages
 ```
 
-`npm run publish:docs` and `publish:docs:dry` at the repository root run the same two commands. Without credentials every command still renders and reports what it would have done, and `.pterodoc/plan.json` lists each action.
+pterodoc reads an env file only when asked (`--env-file`, or `PTERODOC_ENV_FILE=.env`), so a developer's `.env` can never leak into a scripted run; the workflow passes the variables directly. `npm run publish:docs` and `publish:docs:dry` at the repository root run the same two commands. Without credentials every command still renders and reports what it would have done, and `.pterodoc/plan.json` lists each action.
 
-Pages mirror the documentation URLs: `/docs/guides/sync` becomes `/docstack/docs/guides/sync/` on WordPress, a sidebar category becomes a page of its own, and a page is identified by its parent and slug, so a second run reports everything as unchanged. The generated API reference is not mirrored; links into it point back at this site. A page that disappears from the source is left in place unless the sync runs with `--prune`.
+Pages mirror the documentation URLs: `/docs/guides/sync` becomes `/product/docstack/docs/guides/sync/` on WordPress, a sidebar category becomes a page of its own, and a page is identified by its parent and slug, so a second run reports everything as unchanged. The generated API reference is not mirrored; links into it point back at this site. A page that disappears from the source is left in place unless the sync runs with `--prune`.
 
 The `Publish Docs to onyx.ac` workflow runs the same sync on every push to `main` that touches the docs, and on demand with a dry-run default. It needs the repository variable `WP_URL` and the secrets `WP_USER` and `WP_APP_PASSWORD`; `PTERODOC_WP_ROOT` and `WP_LANG` are optional variables. Until the secrets exist, a push only renders and uploads the plan.
 
-pterodoc is not on npm yet, so the scripts fetch and build it from its `v0.1.0` tag through `npx`; once it is published it becomes an ordinary devDependency.
+pterodoc is not on npm yet, so it is a devDependency pinned to the commit tagged `v0.1.0` in its GitHub repository and built on install; once it is published, the pin becomes a version range.
 
 ## The workbench bundle
 

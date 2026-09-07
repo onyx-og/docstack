@@ -13,10 +13,10 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
-    "wp:doctor": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc doctor",
-    "wp:render": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc render",
-    "wp:sync": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc sync",
-    "wp:sync:dry": "npx --yes --package github:onyx-ac/pterodoc#v0.1.0 pterodoc sync --dry-run"
+    "wp:doctor": "pterodoc doctor",
+    "wp:render": "pterodoc render",
+    "wp:sync": "pterodoc sync",
+    "wp:sync:dry": "pterodoc sync --dry-run"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
@@ -37,6 +37,7 @@
     "@docusaurus/tsconfig": "3.10.2",
     "@docusaurus/types": "3.10.2",
     "docusaurus-plugin-typedoc": "^1.4.2",
+    "pterodoc": "git+https://github.com/onyx-ac/pterodoc.git#10f7e861e6a4d386d92595421a670a2aee196f42",
     "typedoc": "^0.28.16",
     "typedoc-docusaurus-theme": "^1.4.2",
     "typedoc-plugin-markdown": "^4.9.0",

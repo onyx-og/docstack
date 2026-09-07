@@ -50,11 +50,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # Pinned release of the publisher. Not on npm yet, so it is fetched and built
-  # from its tag at run time; move to a devDependency once it is published.
-  PTERODOC_REF: github:onyx-ac/pterodoc#v0.1.0
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -82,7 +77,7 @@ jobs:
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
           PTERODOC_WP_ROOT: ${{ inputs.root || vars.PTERODOC_WP_ROOT }}
           WP_LANG: ${{ vars.WP_LANG }}
-        run: npx --yes --package "$PTERODOC_REF" pterodoc doctor
+        run: npx pterodoc doctor
 
       - name: Publish
         working-directory: packages/docs
@@ -94,7 +89,7 @@ jobs:
           WP_STATUS: ${{ inputs.status }}
           WP_LANG: ${{ vars.WP_LANG }}
         run: >-
-          npx --yes --package "$PTERODOC_REF" pterodoc sync
+          npx pterodoc sync
           ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
           ${{ inputs.prune && '--prune' || '' }}
 

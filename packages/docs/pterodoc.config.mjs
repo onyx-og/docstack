@@ -19,10 +19,11 @@ export default {
 
   target: {
     type: 'wordpress',
-    // The tree hangs from /docstack/docs/. Pages above the documentation root
-    // are created once if missing and never edited again, so the DocStack
-    // product page is safe if the root is later moved under /products/.
-    root: '/docstack',
+    // The tree hangs from /product/docstack/docs/. Pages above the documentation
+    // root (/product and /product/docstack) are created once if missing and never
+    // edited again, so /product/docstack is authored in WordPress as the product
+    // page, with whatever layout its future siblings under /product share.
+    root: '/product/docstack',
     base: 'docs',
     status: 'publish',
     // Jetpack's SEO description field.
