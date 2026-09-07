@@ -32,7 +32,7 @@ Every payload the engine writes carries `kid`, the identifier of the key it was 
 
 A payload without a `kid` predates the field and is assumed to belong to the primary key. With it, a database that holds two keys is legible: `retireDocumentKey(oldKey)` keeps a key available for reading but never for writing, `unlock(newKey)` makes the new one the writer, and the fields still under the old key can be found by comparing their `kid` with `getKeyId()`. Re-keying therefore becomes incremental and restartable rather than a single offline pass. `getReadableKeyIds()` lists what the engine can open, current key first.
 
-This is the seam the scope model builds on: generalise "one document key plus retired keys" into a keyring dispatched by `kid`, and a scope becomes a key in that ring. See below.
+The keyring generalises this. Every access scope's content key enters the ring by `kid` when the session's attribute key opens it, in **read-write** mode for the scope's current version and **read-only** for older versions kept for lazy re-encryption. Reads dispatch on the payload's `kid` whatever the label says; writes select the key from the document's `~scope` label or its class's `defaultScope`, and refuse when the ring holds no read-write key for that scope. `dropScopeKeys` empties the scope half of the ring when a session ends.
 
 ## What decrypts, and what does not
 
@@ -54,6 +54,12 @@ Web Crypto was chosen over a JavaScript implementation for two reasons: native P
 
 ## Scopes beside the engine
 
-Field encryption decides *which fields* are ciphertext. [Access control](./access-control/index.md) decides *under which key*: content belongs to a scope, each scope owns a content key, and that key is sealed under an attribute policy so only a session whose attribute key satisfies the formula can admit it to the keyring. The engine's AES-GCM, `kid` stamping and retired-key mechanics are exactly what a scope key rides on; the scope layer adds the sealing, per-scope canaries and partial locks. [Scopes and keys](./access-control/crypto-access.md) describes that construction and what it costs.
+Field encryption decides *which fields* are ciphertext. [Access control](./access-control/index.md) decides *under which key*: content belongs to a scope, each scope owns a content key, and that key is sealed under an attribute policy so only a session whose attribute key satisfies the formula can admit it to the keyring. The engine's AES-GCM, `kid` stamping and retired-key mechanics are exactly what a scope key rides on; the scope layer adds three things.
+
+- **Sealing and admission.** An `~AccessScope` document carries the content key ABE-sealed under the policy, the key's `kid`, a version and a per-scope canary. `unlockScopes` attempts each with the session's attribute key, through the `@docstack/abe` primitive, and admits a recovered key only if it matches the stated `kid` and opens the canary.
+- **Label binding.** A scope-sealed payload is encrypted with the scope id and key id as AES-GCM additional data, so decryption authenticates against the document's label. Legacy payloads under the document key carry no additional data and stay readable.
+- **The mismatch guard.** A write whose label names one scope while a payload carries another scope's `kid` is refused with `StackScopeMismatchError`, never re-sealed: re-sealing content the writer could not open is exactly the downgrade a tampered label is fishing for.
+
+[Scopes and keys](./access-control/crypto-access.md) describes the construction and what it costs; [Scope your data](../guides/access-scopes.md) is the API.
 
 The decisions are [ADR-0018](https://github.com/onyx-og/docstack/blob/main/specs/adr/0018-docstack-document-key-lifecycle.md) (the key lifecycle and locked stacks), [ADR-0019](https://github.com/onyx-og/docstack/blob/main/specs/adr/0019-stackplugin-pristine-capture.md) (pristine capture), [ADR-0020](https://github.com/onyx-og/docstack/blob/main/specs/adr/0020-change-events-carry-ciphertext.md) (change events decrypt), [ADR-0032](https://github.com/onyx-og/docstack/blob/main/specs/adr/0032-reads-decrypt-policies-arm-on-active.md) (reads decrypt again) and [ADR-0040](https://github.com/onyx-og/docstack/blob/main/specs/adr/0040-sync-while-locked-junction-hazards.md) (revision-addressed reads serve the stored form).

@@ -60,6 +60,8 @@ A stack with encryption enabled and no key is locked. It is usable, with three d
 
 `ready` fires locked; a separate `unlocked` event fires once `unlock` has accepted a key and replayed what was waiting. Locked stacks and sync are covered in [Sync to a remote](./sync.md#the-schema-gate).
 
+Locks are also per scope. A document labeled with an access scope seals under that scope's key rather than the document key, and a scope the session's attribute key cannot open behaves like a locked stack for its content alone: its sealed fields read `null`, writes into it throw `StackLockedError` with `scopeId` set, and patches touching it defer until `unlockScopes` opens it. See [Scope your data](./access-scopes.md).
+
 ## Rotate the key
 
 Re-keying is incremental and resumable. Retire the old key first, then unlock with the new one; fields written under either open while the database is rewritten a piece at a time.
@@ -87,4 +89,8 @@ Two consequences follow. Fields not flagged `encrypted: true` replicate as writt
 
 Encrypt what must not be readable by whoever holds the storage: the remote, a stolen laptop, another tenant's device that replicated your ciphertext. Leave in the clear what the application needs to list, sort, join and filter without a key. Existence, counts, ids and update rhythms are visible either way; if the existence of a record is itself sensitive, that is a modelling problem this layer does not solve.
 
-How the engine fits together, what decrypts and what does not, and how scopes choose *which* key a document is sealed under are in [Crypto engine](../concepts/crypto-engine.md) and [Scopes and keys](../concepts/access-control/crypto-access.md).
+## Which key: scopes
+
+The document key is the default. To seal a document under a key that only holders of certain attributes can open, give it a `~scope` label (or give its class a `defaultScope`) and publish the scope: its content key travels ABE-sealed under an attribute policy, and a session either satisfies the policy or reads `null`. The flag on the attribute still decides *which* fields seal; the scope decides *under which key*. The API is in [Scope your data](./access-scopes.md).
+
+How the engine fits together, what decrypts and what does not, and how scopes are constructed beside it are in [Crypto engine](../concepts/crypto-engine.md) and [Scopes and keys](../concepts/access-control/crypto-access.md).

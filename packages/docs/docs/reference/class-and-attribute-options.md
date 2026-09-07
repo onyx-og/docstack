@@ -34,6 +34,7 @@ sidebar_label: "Class & attribute options"
 | `simple` | boolean, optional | Documents stored as given: no validation, triggers, relation checks or encryption. Cannot encrypt a field. |
 | `ephemeral` | boolean, optional | Documents purged when the stack next opens; never replicated. |
 | `tenants` | string[], optional | The tenant spaces this class belongs to. A tenant is a stack. Static on purpose, so replication scoping can be derived before any data exists. |
+| `defaultScope` | string, optional | The access scope documents of this class seal under when they state no `~scope` of their own. See [Scope your data](../guides/access-scopes.md). |
 
 ## `Class.create`
 
@@ -115,5 +116,6 @@ Every document written through the pipeline carries:
 | `~createTimestamp` | On creation. |
 | `~updateTimestamp` | On update. |
 | `active` | `true` on creation; `false` after `deleteCard` or `deleteDocument`. Reads honour it by default. |
+| `~scope` | Optional, set by you. The access scope the document's encrypted attributes seal under; overrides the class's `defaultScope`. |
 
 The generated [API reference](/docs/api/client/) lists every method of `Class`, `Attribute` and `Domain` with its signature.

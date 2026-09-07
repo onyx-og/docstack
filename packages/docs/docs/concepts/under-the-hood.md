@@ -13,6 +13,7 @@ sidebar_position: 10
 | jsondiffpatch | Schema evolution | A precise delta between the old and new class schema is what propagation applies to existing documents. |
 | semver | Patch ordering | Consumer and system patches sort and compare by semantic version. |
 | Web Crypto (`crypto.subtle`) | Encryption | Native PBKDF2 and AES-GCM: faster than a JavaScript implementation and a smaller surface for error. |
+| rabe (Fraunhofer AISEC), compiled to WASM | Attribute-based encryption | The AC17 CP-ABE scheme, vendored into `@docstack/abe`, seals scope keys under attribute policies. Loaded lazily, only when a stack declares scopes. |
 | Playwright | Tests | The client suite runs the compiled library in a real Chromium against real IndexedDB. |
 | Rollup, tsc, Webpack | Builds | Rollup emits the client as ESM plus a UMD bundle; the React package is plain `tsc`; the workbench is Webpack. |
 
@@ -26,13 +27,14 @@ sidebar_position: 10
 | Trigger | `core/trigger/` | Function hydration and execution. |
 | Job | `core/job-engine/` | `JobEngine`, `JobScheduler`, the schedule grammar. |
 | Query | `core/query-engine/` | Parser, planner, executor, accumulators. |
-| Crypto | `core/crypto-engine/` | Keys, the canary, AES-GCM payloads, `kid`. |
+| Crypto | `core/crypto-engine/` | The keyring: the document key, retired keys and admitted scope keys dispatched by `kid`; canaries; AES-GCM payloads with scope binding. |
+| Access scopes | `core/stack.ts` (scope registry, `unlockScopes`, `buildAccessScope`), `packages/abe` | `~AccessScope` documents, attribute-key admission, and the CP-ABE primitive (rabe's AC17 compiled to WASM) with the policy normaliser and authority helpers. |
 | Transaction | `core/transaction-engine/` | Stage, overlay, sweep, commit. |
 | Sync | `core/sync/` | Lifecycle, filters and their identity, internal documents, the schema gate, tenant scoping. |
 | Content transfer | `core/content-transfer.ts` | `exportContent` and `importContent`. |
 | Data model | `core/datamodel/` | The system patches and the ids they seed. |
 
-`core/policy-engine/` also exists. It is the legacy rule engine that the single-vocabulary decision retires; the cryptographic scope model replaces it, and the retirement is scheduled in the [roadmap](../contributing/roadmap.md).
+The rule-based policy engine that once lived in `core/policy-engine/` is deleted: the scope model is the one access-control language, `~Policy` documents are inert legacy data, and system patch 0.0.18 deactivates the seeded ones.
 
 ## Patterns
 

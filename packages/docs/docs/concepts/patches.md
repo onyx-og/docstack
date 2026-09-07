@@ -31,7 +31,7 @@ A patch says what changed, not what the class is. Its `schema` merges attribute 
 
 ## Deferral behind the key
 
-A locked stack must not write encrypted attributes in the clear. A patch that would write or re-encrypt encrypted data, a seed into an encrypting class, a class-model change whose propagation would rewrite encrypted documents, is therefore held back on a locked stack: recorded as dormant, and replayed in place when `unlock` supplies the key. Deferral is a barrier, not a filter: patches apply in order and a later one may depend on the schema an earlier one installs, so the first deferral stops the run. A class that does not exist yet still applies locked; there is nothing to re-encrypt.
+A locked stack must not write encrypted attributes in the clear. A patch that would write or re-encrypt encrypted data, a seed into an encrypting class, a class-model change whose propagation would rewrite encrypted documents, is therefore held back on a locked stack: recorded as dormant, and replayed in place when `unlock` supplies the key. The same holds per scope: a patch that writes into an access scope the session cannot open waits for `unlockScopes`, which is also why scope material is attempted after the patch chain at open, since a patch may carry the scope documents themselves. Deferral is a barrier, not a filter: patches apply in order and a later one may depend on the schema an earlier one installs, so the first deferral stops the run. A class that does not exist yet still applies locked; there is nothing to re-encrypt.
 
 ## One-shot jobs
 

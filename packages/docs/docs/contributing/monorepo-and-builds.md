@@ -14,6 +14,7 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | `packages/shared` | `@docstack/shared` | Types and abstract bases shared by every package: document, class, domain, trigger and patch models, `StackOptions`, the `Stack` and `Class` abstractions. | 0.1.0 |
 | `packages/client` | `@docstack/client` | The engine. | 0.2.0 |
 | `packages/react` | `@docstack/react` | Provider and hooks. | 0.1.1 |
+| `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | With the next client release |
 | `packages/ui` | `@docstack/ui` | The workbench application. Built with Webpack; its bundle is copied into `packages/docs/static/app` and hosted from this site. | Not a library; hosted |
 | `packages/server` | `@docstack/server` | The server preview. | No |
 | `packages/docs` | `@docstack/docs` | This site (Docusaurus). Builds into the repository's root `docs/` folder, which GitHub Pages serves. | Site |
@@ -21,7 +22,7 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | `packages/examples/react-init` | | A single-file starting point. | |
 | `packages/pouchdb-adapter-channel`, `packages/pouchdb-adapter-tauri-sqlite`, `packages/pouchdb-adapter-native` | | In-repo storage and transport adapters, the latter two as git submodules. Unpublished and not documented on this site. | No |
 | `specs/` | | Numbered specs and `specs/adr/`, the decision records. | |
-| `spikes/` | | Experiments kept outside the workspace glob on purpose, so nothing in the packages can depend on them. | |
+| `spikes/` | | Experiments kept outside the workspace glob on purpose, so nothing in the packages can depend on them. `spikes/abe` holds the two CP-ABE implementations that decided the primitive; the TypeScript one stays as the behavioural cross-check for `@docstack/abe`. | |
 
 The published Google Drive adapter lives in [its own repository](https://github.com/onyx-ac/docstack-pouchdb-adapter-gdrive).
 
@@ -39,7 +40,7 @@ npm run build:docs          # docusaurus build --out-dir ../../docs
 npm run start:docs          # docusaurus start, with polling for WSL and network drives
 ```
 
-`shared` must build before `client`, and `client` before `react`: the type declarations are consumed across the `references` in each `tsconfig.json`. The client's Rollup build owns every `.js` under `lib/`; `tsc` emits declarations only, so the two do not overwrite each other.
+`shared` and `abe` must build before `client`, and `client` before `react`: the type declarations are consumed across the `references` in each `tsconfig.json`. `abe`'s `build:wasm` regenerates the vendored WASM from `rust/` and needs the Rust toolchain with the `wasm32-unknown-unknown` target and `wasm-bindgen-cli`; the ordinary build only copies the vendored artifacts. The client's Rollup build owns every `.js` under `lib/`; `tsc` emits declarations only, so the two do not overwrite each other.
 
 The site's API reference is generated at build time by TypeDoc from `packages/client/src/index.ts`, `packages/react/src/index.ts` and `packages/server/src/index.ts` into `packages/docs/docs/api/`, which is gitignored. Nothing under any package's `lib/` is read or edited by hand.
 

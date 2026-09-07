@@ -97,7 +97,7 @@ await taskClass.deleteCard(task._id);                            // soft delete:
 
 Every write runs the authoring pipeline: `before` triggers, validation (which applies defaults and checks foreign keys and relations), encryption, the write, then `after` triggers. `deleteCard` is a soft delete. It sets `active: false`, which is the document-wide visibility flag that reads honour by default; the document stays in the database and replicates like any other update.
 
-Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
+Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes, and optionally `~scope`, the access scope their encrypted fields seal under. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
 
 ## Reading
 
@@ -123,7 +123,7 @@ Two flags on the class document change what a class costs. Set them in the class
 
 Measured against IndexedDB, 150 writes cost 860 ms as bare documents and 1549 ms through the full authoring path. The 1.8× buys validation, defaults, triggers, relation checks and encryption, and the dominant cost in both rows is the IndexedDB write itself. Where the difference matters, a simple class takes the fast path by design.
 
-A third flag, `tenants: string[]`, declares which tenant spaces a class belongs to. A tenant is a stack (its own database), so the flag is a static declaration that lets replication scoping be derived before any data exists. Single-tenant applications leave it unset.
+`defaultScope: 'hr'` seals the class's encrypted attributes under an access scope unless a document states its own `~scope`; see [Scope your data](./access-scopes.md). A further flag, `tenants: string[]`, declares which tenant spaces a class belongs to. A tenant is a stack (its own database), so the flag is a static declaration that lets replication scoping be derived before any data exists. Single-tenant applications leave it unset.
 
 ## Moving content between stacks
 

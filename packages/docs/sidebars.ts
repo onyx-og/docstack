@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
         'guides/jobs',
         'guides/query-with-sql',
         'guides/encrypt-fields',
+        'guides/access-scopes',
         'guides/transactions',
         'guides/patches',
         'guides/sync',

@@ -614,7 +614,7 @@ Every payload the engine writes carries `kid`, the identifier of the key it was 
 
 A payload without a `kid` predates the field and is assumed to belong to the primary key. With it, a database that holds two keys is legible: `retireDocumentKey(oldKey)` keeps a key available for reading but never for writing, `unlock(newKey)` makes the new one the writer, and the fields still under the old key can be found by comparing their `kid` with `getKeyId()`. Re-keying therefore becomes incremental and restartable rather than a single offline pass. `getReadableKeyIds()` lists what the engine can open, current key first.
 
-This is the seam the scope model builds on: generalise "one document key plus retired keys" into a keyring dispatched by `kid`, and a scope becomes a key in that ring. See below.
+The keyring generalises this. Every access scope's content key enters the ring by `kid` when the session's attribute key opens it, in **read-write** mode for the scope's current version and **read-only** for older versions kept for lazy re-encryption. Reads dispatch on the payload's `kid` whatever the label says; writes select the key from the document's `~scope` label or its class's `defaultScope`, and refuse when the ring holds no read-write key for that scope. `dropScopeKeys` empties the scope half of the ring when a session ends.
 
 ### What decrypts, and what does not
 
@@ -636,7 +636,13 @@ Web Crypto was chosen over a JavaScript implementation for two reasons: native P
 
 ### Scopes beside the engine
 
-Field encryption decides *which fields* are ciphertext. [Access control](./access-control/index.md) decides *under which key*: content belongs to a scope, each scope owns a content key, and that key is sealed under an attribute policy so only a session whose attribute key satisfies the formula can admit it to the keyring. The engine's AES-GCM, `kid` stamping and retired-key mechanics are exactly what a scope key rides on; the scope layer adds the sealing, per-scope canaries and partial locks. [Scopes and keys](./access-control/crypto-access.md) describes that construction and what it costs.
+Field encryption decides *which fields* are ciphertext. [Access control](./access-control/index.md) decides *under which key*: content belongs to a scope, each scope owns a content key, and that key is sealed under an attribute policy so only a session whose attribute key satisfies the formula can admit it to the keyring. The engine's AES-GCM, `kid` stamping and retired-key mechanics are exactly what a scope key rides on; the scope layer adds three things.
+
+- **Sealing and admission.** An `~AccessScope` document carries the content key ABE-sealed under the policy, the key's `kid`, a version and a per-scope canary. `unlockScopes` attempts each with the session's attribute key, through the `@docstack/abe` primitive, and admits a recovered key only if it matches the stated `kid` and opens the canary.
+- **Label binding.** A scope-sealed payload is encrypted with the scope id and key id as AES-GCM additional data, so decryption authenticates against the document's label. Legacy payloads under the document key carry no additional data and stay readable.
+- **The mismatch guard.** A write whose label names one scope while a payload carries another scope's `kid` is refused with `StackScopeMismatchError`, never re-sealed: re-sealing content the writer could not open is exactly the downgrade a tampered label is fishing for.
+
+[Scopes and keys](./access-control/crypto-access.md) describes the construction and what it costs; [Scope your data](../guides/access-scopes.md) is the API.
 
 The decisions are [ADR-0018](https://github.com/onyx-og/docstack/blob/main/specs/adr/0018-docstack-document-key-lifecycle.md) (the key lifecycle and locked stacks), [ADR-0019](https://github.com/onyx-og/docstack/blob/main/specs/adr/0019-stackplugin-pristine-capture.md) (pristine capture), [ADR-0020](https://github.com/onyx-og/docstack/blob/main/specs/adr/0020-change-events-carry-ciphertext.md) (change events decrypt), [ADR-0032](https://github.com/onyx-og/docstack/blob/main/specs/adr/0032-reads-decrypt-policies-arm-on-active.md) (reads decrypt again) and [ADR-0040](https://github.com/onyx-og/docstack/blob/main/specs/adr/0040-sync-while-locked-junction-hazards.md) (revision-addressed reads serve the stored form).
 
@@ -712,7 +718,7 @@ A patch says what changed, not what the class is. Its `schema` merges attribute 
 
 ### Deferral behind the key
 
-A locked stack must not write encrypted attributes in the clear. A patch that would write or re-encrypt encrypted data, a seed into an encrypting class, a class-model change whose propagation would rewrite encrypted documents, is therefore held back on a locked stack: recorded as dormant, and replayed in place when `unlock` supplies the key. Deferral is a barrier, not a filter: patches apply in order and a later one may depend on the schema an earlier one installs, so the first deferral stops the run. A class that does not exist yet still applies locked; there is nothing to re-encrypt.
+A locked stack must not write encrypted attributes in the clear. A patch that would write or re-encrypt encrypted data, a seed into an encrypting class, a class-model change whose propagation would rewrite encrypted documents, is therefore held back on a locked stack: recorded as dormant, and replayed in place when `unlock` supplies the key. The same holds per scope: a patch that writes into an access scope the session cannot open waits for `unlockScopes`, which is also why scope material is attempted after the patch chain at open, since a patch may carry the scope documents themselves. Deferral is a barrier, not a filter: patches apply in order and a later one may depend on the schema an earlier one installs, so the first deferral stops the run. A class that does not exist yet still applies locked; there is nothing to re-encrypt.
 
 ### One-shot jobs
 
@@ -817,13 +823,14 @@ The internals, including the code paths and why the propagation runs where it do
 
 DocStack's security model is one model, enforced in one place: the engine. Access is a property of the ciphertext; what the storage holds and what the wire carries follow from that.
 
-### Five properties
+### Six properties
 
 1. **Encryption happens before storage and before replication.** An attribute flagged `encrypted: true` is AES-GCM ciphertext when it reaches IndexedDB and when it reaches a remote. The document key is the application's to supply and never leaves the device. See [Encrypt fields](../guides/encrypt-fields.md).
-2. **Access is by scope.** Content belongs to a scope sealed under an attribute formula; a session whose attribute key does not satisfy the formula cannot produce the plaintext, on any device, through any code path. Denial is decryption failure, not a check. See [Access control](./access-control/index.md).
-3. **Device-local documents never leave.** The system record, the encryption marker, indexes, propagation locks, sessions, the patch ledger, job runs and log records are filtered out of replication automatically. See [What stays on the device](../reference/internal-documents.md).
-4. **The write path cannot be skipped.** `stack.db` refuses `new_edits: false` writes and the adapter methods beneath the plugin with `StackWriteGuardError`, because those writes skip validation, relation checks, triggers and encryption alike. Replication uses them through an internal handle that DocStack keeps for itself.
-5. **Executable content is opt-in.** Triggers and jobs are JavaScript stored in documents that replicate. `new Function` is not a sandbox; the code runs with the application's authority. Unattended execution is therefore an explicit allow-list (`jobScheduler.start({ jobs })`), with `pinnedHashes` to pin the code a job is expected to have. Treat write access to class and job documents as administrative access.
+2. **Access is by scope.** Content belongs to a scope sealed under an attribute formula; a session whose attribute key does not satisfy the formula cannot produce the plaintext, on any device, through any code path. Denial is decryption failure, not a check. The former rule-based policy engine is gone: nothing evaluates `~Policy` documents, and the seeded ones are deactivated by system patch 0.0.18. See [Access control](./access-control/index.md) and [Scope your data](../guides/access-scopes.md).
+3. **Labels cannot downgrade content.** A scope-sealed payload authenticates its scope and key id into the ciphertext, and a write whose label disagrees with its payload's key is refused rather than re-sealed, so tampering with a label never turns into disclosure.
+4. **Device-local documents never leave.** The system record, the encryption marker, indexes, propagation locks, sessions, the patch ledger, job runs and log records are filtered out of replication automatically. See [What stays on the device](../reference/internal-documents.md).
+5. **The write path cannot be skipped.** `stack.db` refuses `new_edits: false` writes and the adapter methods beneath the plugin with `StackWriteGuardError`, because those writes skip validation, relation checks, triggers and encryption alike. Replication uses them through an internal handle that DocStack keeps for itself.
+6. **Executable content is opt-in.** Triggers and jobs are JavaScript stored in documents that replicate. `new Function` is not a sandbox; the code runs with the application's authority. Unattended execution is therefore an explicit allow-list (`jobScheduler.start({ jobs })`), with `pinnedHashes` to pin the code a job is expected to have. Treat write access to class and job documents as administrative access.
 
 ### Sessions
 
@@ -841,7 +848,7 @@ Replication reads the database as stored. Flagged attributes cross as ciphertext
 - **Unsealed fields are visible.** Ids, `~class`, timestamps, scope labels, counts and update rhythms are plaintext at rest and in sync, necessarily. If the existence of a record is sensitive, that is a modelling problem.
 - **Key handling is the application's half of the contract.** An application that stores keys beside the ciphertext has rebuilt the facade the design exists to escape.
 - **Writers are not yet authenticated.** Anyone with write access can vandalise; the design guarantees vandalism never becomes disclosure. Revision signatures are on the roadmap.
-- **The scope cryptography is experimental pending audit.** An audit gates any production claim; see the [threat model](./access-control/threat-model.md).
+- **The scope cryptography is experimental pending audit.** The primitive is rabe's AC17 on the BN254 curve compiled to WASM, about a 100-bit modern margin and unaudited; an audit gates any production claim. See the [threat model](./access-control/threat-model.md).
 - **Remotes written by `@docstack/client` 0.1.8** should be treated as having held plaintext for encrypted attributes, and be re-created or purged.
 
 ---
@@ -899,6 +906,7 @@ The decision is [ADR-0039](https://github.com/onyx-og/docstack/blob/main/specs/a
 | jsondiffpatch | Schema evolution | A precise delta between the old and new class schema is what propagation applies to existing documents. |
 | semver | Patch ordering | Consumer and system patches sort and compare by semantic version. |
 | Web Crypto (`crypto.subtle`) | Encryption | Native PBKDF2 and AES-GCM: faster than a JavaScript implementation and a smaller surface for error. |
+| rabe (Fraunhofer AISEC), compiled to WASM | Attribute-based encryption | The AC17 CP-ABE scheme, vendored into `@docstack/abe`, seals scope keys under attribute policies. Loaded lazily, only when a stack declares scopes. |
 | Playwright | Tests | The client suite runs the compiled library in a real Chromium against real IndexedDB. |
 | Rollup, tsc, Webpack | Builds | Rollup emits the client as ESM plus a UMD bundle; the React package is plain `tsc`; the workbench is Webpack. |
 
@@ -912,13 +920,14 @@ The decision is [ADR-0039](https://github.com/onyx-og/docstack/blob/main/specs/a
 | Trigger | `core/trigger/` | Function hydration and execution. |
 | Job | `core/job-engine/` | `JobEngine`, `JobScheduler`, the schedule grammar. |
 | Query | `core/query-engine/` | Parser, planner, executor, accumulators. |
-| Crypto | `core/crypto-engine/` | Keys, the canary, AES-GCM payloads, `kid`. |
+| Crypto | `core/crypto-engine/` | The keyring: the document key, retired keys and admitted scope keys dispatched by `kid`; canaries; AES-GCM payloads with scope binding. |
+| Access scopes | `core/stack.ts` (scope registry, `unlockScopes`, `buildAccessScope`), `packages/abe` | `~AccessScope` documents, attribute-key admission, and the CP-ABE primitive (rabe's AC17 compiled to WASM) with the policy normaliser and authority helpers. |
 | Transaction | `core/transaction-engine/` | Stage, overlay, sweep, commit. |
 | Sync | `core/sync/` | Lifecycle, filters and their identity, internal documents, the schema gate, tenant scoping. |
 | Content transfer | `core/content-transfer.ts` | `exportContent` and `importContent`. |
 | Data model | `core/datamodel/` | The system patches and the ids they seed. |
 
-`core/policy-engine/` also exists. It is the legacy rule engine that the single-vocabulary decision retires; the cryptographic scope model replaces it, and the retirement is scheduled in the [roadmap](../contributing/roadmap.md).
+The rule-based policy engine that once lived in `core/policy-engine/` is deleted: the scope model is the one access-control language, `~Policy` documents are inert legacy data, and system patch 0.0.18 deactivates the seeded ones.
 
 ### Patterns
 
@@ -969,7 +978,7 @@ Non-trivial changes to DocStack are recorded as architecture decision records in
 | [0042](https://github.com/onyx-og/docstack/blob/main/specs/adr/0042-a-patch-chain-applies-through-one-internal-transaction.md) | A patch chain applies through one internal transaction | accepted, implemented | 2026-09-03 | Chains compose in memory and land as one batch; all-or-nothing. |
 | [0043](https://github.com/onyx-og/docstack/blob/main/specs/adr/0043-bulkdocs-class-resolution-ignores-the-batch.md) | `bulkDocs` class resolution ignores the batch | finding, fixed | 2026-09-04 | A patch can introduce a class and seed its first document in one batch. |
 | [0044](https://github.com/onyx-og/docstack/blob/main/specs/adr/0044-a-patch-carries-one-shot-jobs.md) | A patch carries one-shot jobs | accepted, implemented | 2026-09-04 | `preApply` and `postApply` migration jobs, staged with the model. |
-| [0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md) | Access control is cryptographic: CP-ABE scopes beside the engine | accepted, spike complete, gate closed | 2026-09-04 | One access-control language, enforced by decryption; the legacy rule engine retires. |
+| [0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md) | Access control is cryptographic: CP-ABE scopes beside the engine | accepted, implemented 2026-09-06 | 2026-09-04 | One access-control language, enforced by decryption; the rule engine is removed, `@docstack/abe` carries the primitive. |
 
 ### Specs
 
@@ -994,6 +1003,7 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | `packages/shared` | `@docstack/shared` | Types and abstract bases shared by every package: document, class, domain, trigger and patch models, `StackOptions`, the `Stack` and `Class` abstractions. | 0.1.0 |
 | `packages/client` | `@docstack/client` | The engine. | 0.2.0 |
 | `packages/react` | `@docstack/react` | Provider and hooks. | 0.1.1 |
+| `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | With the next client release |
 | `packages/ui` | `@docstack/ui` | The workbench application. Built with Webpack; its bundle is copied into `packages/docs/static/app` and hosted from this site. | Not a library; hosted |
 | `packages/server` | `@docstack/server` | The server preview. | No |
 | `packages/docs` | `@docstack/docs` | This site (Docusaurus). Builds into the repository's root `docs/` folder, which GitHub Pages serves. | Site |
@@ -1001,7 +1011,7 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | `packages/examples/react-init` | | A single-file starting point. | |
 | `packages/pouchdb-adapter-channel`, `packages/pouchdb-adapter-tauri-sqlite`, `packages/pouchdb-adapter-native` | | In-repo storage and transport adapters, the latter two as git submodules. Unpublished and not documented on this site. | No |
 | `specs/` | | Numbered specs and `specs/adr/`, the decision records. | |
-| `spikes/` | | Experiments kept outside the workspace glob on purpose, so nothing in the packages can depend on them. | |
+| `spikes/` | | Experiments kept outside the workspace glob on purpose, so nothing in the packages can depend on them. `spikes/abe` holds the two CP-ABE implementations that decided the primitive; the TypeScript one stays as the behavioural cross-check for `@docstack/abe`. | |
 
 The published Google Drive adapter lives in [its own repository](https://github.com/onyx-ac/docstack-pouchdb-adapter-gdrive).
 
@@ -1019,7 +1029,7 @@ npm run build:docs          # docusaurus build --out-dir ../../docs
 npm run start:docs          # docusaurus start, with polling for WSL and network drives
 ```
 
-`shared` must build before `client`, and `client` before `react`: the type declarations are consumed across the `references` in each `tsconfig.json`. The client's Rollup build owns every `.js` under `lib/`; `tsc` emits declarations only, so the two do not overwrite each other.
+`shared` and `abe` must build before `client`, and `client` before `react`: the type declarations are consumed across the `references` in each `tsconfig.json`. `abe`'s `build:wasm` regenerates the vendored WASM from `rust/` and needs the Rust toolchain with the `wasm32-unknown-unknown` target and `wasm-bindgen-cli`; the ordinary build only copies the vendored artifacts. The client's Rollup build owns every `.js` under `lib/`; `tsc` emits declarations only, so the two do not overwrite each other.
 
 The site's API reference is generated at build time by TypeDoc from `packages/client/src/index.ts`, `packages/react/src/index.ts` and `packages/server/src/index.ts` into `packages/docs/docs/api/`, which is gitignored. Nothing under any package's `lib/` is read or edited by hand.
 
@@ -1063,16 +1073,16 @@ Standing work the ADRs have accepted or flagged but that is not yet implemented.
 
 ### Cryptographic access
 
-**Implemented** ([ADR-0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md), [`specs/02-crypto-access.md`](https://github.com/onyx-og/docstack/blob/main/specs/02-crypto-access.md)). The attribute formula is DocStack's one access-control language, enforced by encryption; the legacy `~Policy` rule engine is gone. Shipped in this cycle: the `@docstack/abe` package (rabe's AC17 CP-ABE compiled to WASM, plus the policy normalizer with the AND-chain balancer); the crypto-engine keyring (key-id dispatch, per-scope canary admission, scope-label AAD binding); `~AccessScope` documents and the `~sys-0.0.18` patch; the `accessKeys` consumer contract with `unlockScopes`; per-scope partial locks and patch deferral; and the induced-downgrade guard. See [Access control](../concepts/access-control/index.md) for how to use it.
+The integration landed on 2026-09-06 ([ADR-0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md), [`specs/02-crypto-access.md`](https://github.com/onyx-og/docstack/blob/main/specs/02-crypto-access.md)): `@docstack/abe` with rabe's AC17 compiled to WASM and the policy normaliser, the crypto-engine keyring with per-scope canary admission and label binding, `~AccessScope` documents and system patch 0.0.18, the `accessKeys` contract with `unlockScopes`, per-scope partial locks and patch deferral, the mismatch guard, and the removal of the rule-based policy engine. The TypeScript implementation from the spike stays under `spikes/abe` as the behavioural cross-check. See [Scope your data](../guides/access-scopes.md).
 
 Still open on the track:
 
-1. **Authority tooling as its own package.** `@docstack/abe` carries the authority helpers (`setup`, `keygen`, `wrapCek`) today; splitting the authority-only surface into a separate package the consumer's controlled environment runs (later, the server package) keeps master-key code out of any client dependency graph.
-2. **Deferred within the track:** per-document policy strings; attribute-level revocation; scope-aware channel grants; writer authentication through revision signatures (label tampering is contained, never disclosed, but not prevented without them); and a **security audit before any production claim** — the WASM backend (BN254, ~100-bit margin) is unaudited by construction, and the audit re-opens the curve-margin question the gate deferred.
+1. **Authority tooling as its own package.** `@docstack/abe` carries the authority helpers (`setup`, `keygen`, `wrapCek`) today; splitting the authority-only surface into a package the consumer's controlled environment runs, later the server package, keeps master-key code out of every client dependency graph.
+2. **Deferred within the track:** per-document policy strings; attribute-level revocation (attribute versioning, the scheme's known weak point); scope-aware channel grants; writer authentication through revision signatures (label tampering is contained, never disclosed, but not prevented without them); and a **security audit before any production claim**. The WASM backend, rabe on BN254 at roughly a 100-bit modern margin, is unaudited by construction, and the audit reopens the curve-margin question the gate deferred.
 
 ### Dropped: client-side rule enforcement
 
-A client-side enforcement design for the legacy rule engine (an opt-in flag, a rule-aware handle, an admin bucket, an `operations` field) was written and then dropped, not parked: a client-side gate cannot bind the device owner, and DocStack keeps one access language. The analysis stays in ADR-0045 as documentation of the engine being retired. Three findings from it remain live concerns on their own: the React changes-feed splice bypassing the filtered read path, `~Job` content executing against the real stack, and `setAuthSession` being public.
+A client-side enforcement design for the former rule engine (an opt-in flag, a rule-aware handle, an admin bucket, an `operations` field) was written and then dropped, not parked: a client-side gate cannot bind the device owner, and DocStack keeps one access language. The analysis stays in ADR-0045 as documentation of the engine that was removed. Three findings from it remain live concerns on their own: the React changes-feed splice bypassing the read path's filtering, `~Job` content executing against the real stack, and `setAuthSession` being public.
 
 ### Under evaluation
 
@@ -1454,6 +1464,165 @@ export default function App() {
 
 ---
 
+## Scope your data
+
+An access scope is a named set of content whose encrypted fields seal under one content key, and that key is itself sealed under an **attribute policy** such as `("role:manager" and "dept:sales") or "clearance:secret"`. A device whose attribute key satisfies the policy opens the scope; one whose key does not holds the same ciphertext and reads `null`. There is no check to bypass: denial is decryption failure, on the device owner's own machine included.
+
+Scopes decide *under which key* a document's `encrypted: true` fields seal. The schema still decides *which fields*; see [Encrypt fields](./encrypt-fields.md). The model, its formula language and its limits are in [Access control](../concepts/access-control/index.md); this page is the API.
+
+:::info Version
+Scopes ship in `@docstack/client` from the release after 0.2.0 (they are on `main`). `@docstack/abe`, the CP-ABE primitive, is installed as a dependency of the client and is never imported by application code on a device. The cryptography is experimental pending audit; see the [threat model](../concepts/access-control/threat-model.md).
+:::
+
+### 1. Mint a scope where you control it
+
+The **authority** half runs wherever the application controls: its server, an admin ceremony, a script. Master keys never belong on end-user devices.
+
+```typescript
+import { setup, keygen } from '@docstack/abe';
+import { ClientStack } from '@docstack/client';
+
+// Once per deployment. Keep `msk` secret; `pk` may be public.
+const { pk, msk } = await setup();
+
+// A scope document: a fresh 32-byte content key, sealed under the policy,
+// with the key id and a per-scope canary stamped in.
+const hrScope = await ClientStack.buildAccessScope({
+    scopeId: 'hr',
+    policyString: '"role:hr" or "clearance:exec"',
+    pk,
+});
+```
+
+`buildAccessScope` needs the authority *public* key only and returns the document without writing it. Publish it into the database from any stack you control, or ship it in a [patch](./patches.md):
+
+```typescript
+await stack.db.bulkDocs([hrScope]);
+```
+
+The document replicates with the data, so every device receives it. That is safe by design: the policy is public, the content key inside it is sealed, and the canary lets a device verify a key it opens before trusting it.
+
+```json
+{
+  "_id": "~scope-hr-v1",
+  "~class": "~AccessScope",
+  "scopeId": "hr",
+  "policyString": "(\"role:hr\" or \"clearance:exec\")",
+  "abeWrappedCek": "<opaque>",
+  "kid": "3f9a1c…",
+  "version": 1,
+  "encryptedMarker": { "__enc": true, "iv": "…", "data": "…", "kid": "3f9a1c…" },
+  "active": true
+}
+```
+
+### 2. Issue attribute keys
+
+```typescript
+const aliceKey = await keygen(msk, ['role:hr', 'dept:people']);
+const bobKey = await keygen(msk, ['role:sales']);
+```
+
+An attribute key embeds a person's attributes in the key material. Alice's key satisfies the `hr` policy; Bob's does not, and no amount of client-side effort changes that. Keys and scope blobs are opaque strings: store and transport them verbatim, never parse them.
+
+How a key reaches a device is the application's contract, exactly as it is for the document key: your server hands it over at login, or a cloud grant does, and the device persists it. DocStack stores nothing of it.
+
+### 3. Hand devices their key
+
+```typescript
+const stack = await ClientStack.create('my-app', {
+    documentKey,
+    accessKeys: {
+        attributeKey: await vault.get('attributeKey'),
+        // Called once at open when declared scopes remain sealed after the key above was
+        // tried. Return newer material to try it immediately, or null to stay partially locked.
+        requestAttributeKey: async (lockedScopes) => myServer.fetchAttributeKey(lockedScopes),
+    },
+});
+
+// Later, or instead: an idempotent attempt that opens whatever the key satisfies.
+const { unlocked, locked } = await stack.unlockScopes(attributeKey);
+```
+
+`unlockScopes` tries every declared scope. For each one the key can open, it checks the recovered content key against the scope document's `kid` and canary, admits it to the keyring, and dispatches a `scopeUnlocked` event (`detail: { stackName, scopeId, version, mode }`). Scopes are attempted after patches at open, because a patch may carry the scope documents themselves, and a patch that was deferred behind a sealed scope replays once the scope opens.
+
+```typescript
+stack.isScopeLocked('hr');          // true until a key that satisfies the policy is admitted
+await stack.lockedScopeIds();       // every declared scope this session cannot open
+stack.addEventListener('scopeUnlocked', (e) => console.log(e.detail.scopeId));
+```
+
+### 4. Label documents
+
+A document joins a scope with the reserved `~scope` field, or inherits its class's default:
+
+```typescript
+await salaryClass.add({ who: 'alice', amount: '100000', '~scope': 'hr' });
+```
+
+```json
+{ "_id": "Salary", "~class": "class", "name": "Salary", "defaultScope": "hr", "schema": { "…": "…" } }
+```
+
+The document's own label wins over the class default. A document with neither seals under the legacy document key, unchanged. Only `encrypted: true` attributes seal; ids, timestamps, the label itself and unflagged attributes stay plaintext, which is what keeps lists, joins and replication working without a key.
+
+### 5. What reads look like
+
+A session that has opened the scope reads plaintext. One that has not reads the sealed fields as `null` and everything else as written: the outsider in the example sees `who: 'alice'` and `amount: null`. Queries, `findDocuments`, class reads and live subscriptions all behave the same way, because the seal is on the ciphertext, not in the read path.
+
+Every sealed payload is bound to its label: the scope id and key id are authenticated into the AES-GCM ciphertext as additional data, so a relabeled or stripped label does not merely look inconsistent, its decryption fails.
+
+### 6. What writes refuse
+
+- **Writing into a sealed scope** throws `StackLockedError` with `scopeId` set. A device that cannot open `fin` cannot author into `fin`; writing would seal under the wrong key or none.
+- **Relabeling content the writer could not open** throws `StackScopeMismatchError` (`docId`, `scopeId`). A document labeled `fin` that carries a payload sealed under `hr`'s key is refused and never re-sealed under `fin`. That refusal is the guard against the induced-downgrade attack: a tampered label tricking an authorised writer into re-sealing content under a weaker scope. A legitimate move between scopes opens the source scope first, so the payloads arrive as plaintext and seal cleanly under the target.
+
+### 7. The formula
+
+Policies are monotone formulas over quoted attributes: `and`, `or`, parentheses, `"kind:value"` literals. No negation, no code, no document inspection. The scheme's parser needs balanced parentheses, so `buildAccessScope` and `wrapCek` normalise the formula first: `"a" and "b" and "c" and "d"` becomes `(("a" and "b") and ("c" and "d"))`. `normalizePolicy` from `@docstack/abe` does the same on its own and throws on `not`. Vocabulary and patterns are in [Attribute policies](../concepts/access-control/policy-model.md) and the [recipes](../concepts/access-control/recipes.md).
+
+### 8. Rotate a scope, revoke a member
+
+Revoking membership is rotating the scope. The authority mints a new version with a policy the departed key no longer satisfies:
+
+```typescript
+const hrV2 = await ClientStack.buildAccessScope({
+    scopeId: 'hr',
+    policyString: '"role:hr" and "staff:permanent"',
+    pk,
+    version: 2,
+});
+await stack.db.bulkDocs([hrV2]);
+```
+
+A device whose key satisfies the new policy admits version 2 as its **read-write** key and keeps version 1 read-only, so documents re-seal under the new key as they are next written and old ones stay readable in the meantime. A device that satisfied only the old policy keeps what it could already read; no cryptosystem un-reads data. Attribute-level revocation, shrinking a key rather than a scope, is the scheme's known weak point and is on the [roadmap](../contributing/roadmap.md).
+
+### 9. Replication
+
+Scope documents are ordinary documents of the `~AccessScope` class and replicate with the data. A remote holds sealed keys and public policies, nothing it can open. If you replicate with a `classes.include` allow-list, add `~AccessScope` to it: the class is not part of the data-model set that rides along automatically, and a replica without the scope documents has nothing to unlock. See [Filter what replicates](./filtering.md).
+
+### 10. What this does not do
+
+The mathematics binds the device owner to the policy. It does not bind the *application*: what your code does with an open scope, which screens it shows, is your logic. It does not hide existence, counts or labels, only sealed field values. It does not stop a writer with replication access from vandalising labels; that never becomes disclosure, but preventing it needs writer authentication, which is not built. And the primitive, rabe's AC17 on BN254 compiled to WASM, is unaudited. The [threat model](../concepts/access-control/threat-model.md) states each of these plainly.
+
+### API summary
+
+| Where | Member | Purpose |
+| :--- | :--- | :--- |
+| `@docstack/abe` (authority) | `setup()` | Mints `{ pk, msk }`. |
+| `@docstack/abe` (authority) | `keygen(msk, attributes)` | Issues an attribute key. |
+| `@docstack/abe` (authority) | `wrapCek(pk, policy, cek)` | Seals a 32-byte key; used by `buildAccessScope`. |
+| `@docstack/abe` | `normalizePolicy(policy)`, `parsePolicy`, `policyAttributes` | Formula helpers. |
+| `ClientStack` (static) | `buildAccessScope({ scopeId, policyString, pk, cekHex?, version? })` | Assembles an `~AccessScope` document. |
+| `StackOptions` | `accessKeys: { attributeKey?, requestAttributeKey? }` | The session's key at open. |
+| `stack` | `unlockScopes(attributeKey)` | Attempts every declared scope; returns `{ unlocked, locked }`. |
+| `stack` | `isScopeLocked(scopeId)`, `lockedScopeIds()` | Per-scope lock state. |
+| `stack` | `resolveScopeLabel(doc, classModel?)` | Which scope a write seals under. |
+| Events | `scopeUnlocked` | One per admitted scope key. |
+| Errors | `StackLockedError.scopeId`, `StackScopeMismatchError` | Sealed-scope write, label/key mismatch. |
+
+---
+
 ## Encrypt fields
 
 Mark an attribute `encrypted` and its value is AES-GCM ciphertext before it reaches storage. It stays ciphertext on disk and on every remote it replicates to, and it is decrypted only on the way out, for a session holding the key.
@@ -1512,6 +1681,8 @@ A stack with encryption enabled and no key is locked. It is usable, with three d
 
 `ready` fires locked; a separate `unlocked` event fires once `unlock` has accepted a key and replayed what was waiting. Locked stacks and sync are covered in [Sync to a remote](./sync.md#the-schema-gate).
 
+Locks are also per scope. A document labeled with an access scope seals under that scope's key rather than the document key, and a scope the session's attribute key cannot open behaves like a locked stack for its content alone: its sealed fields read `null`, writes into it throw `StackLockedError` with `scopeId` set, and patches touching it defer until `unlockScopes` opens it. See [Scope your data](./access-scopes.md).
+
 ### Rotate the key
 
 Re-keying is incremental and resumable. Retire the old key first, then unlock with the new one; fields written under either open while the database is rewritten a piece at a time.
@@ -1539,7 +1710,11 @@ Two consequences follow. Fields not flagged `encrypted: true` replicate as writt
 
 Encrypt what must not be readable by whoever holds the storage: the remote, a stolen laptop, another tenant's device that replicated your ciphertext. Leave in the clear what the application needs to list, sort, join and filter without a key. Existence, counts, ids and update rhythms are visible either way; if the existence of a record is itself sensitive, that is a modelling problem this layer does not solve.
 
-How the engine fits together, what decrypts and what does not, and how scopes choose *which* key a document is sealed under are in [Crypto engine](../concepts/crypto-engine.md) and [Scopes and keys](../concepts/access-control/crypto-access.md).
+### Which key: scopes
+
+The document key is the default. To seal a document under a key that only holders of certain attributes can open, give it a `~scope` label (or give its class a `defaultScope`) and publish the scope: its content key travels ABE-sealed under an attribute policy, and a session either satisfies the policy or reads `null`. The flag on the attribute still decides *which* fields seal; the scope decides *under which key*. The API is in [Scope your data](./access-scopes.md).
+
+How the engine fits together, what decrypts and what does not, and how scopes are constructed beside it are in [Crypto engine](../concepts/crypto-engine.md) and [Scopes and keys](../concepts/access-control/crypto-access.md).
 
 ---
 
@@ -2095,7 +2270,7 @@ await taskClass.deleteCard(task._id);                            // soft delete:
 
 Every write runs the authoring pipeline: `before` triggers, validation (which applies defaults and checks foreign keys and relations), encryption, the write, then `after` triggers. `deleteCard` is a soft delete. It sets `active: false`, which is the document-wide visibility flag that reads honour by default; the document stays in the database and replicates like any other update.
 
-Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
+Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes, and optionally `~scope`, the access scope their encrypted fields seal under. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
 
 ### Reading
 
@@ -2121,7 +2296,7 @@ Two flags on the class document change what a class costs. Set them in the class
 
 Measured against IndexedDB, 150 writes cost 860 ms as bare documents and 1549 ms through the full authoring path. The 1.8× buys validation, defaults, triggers, relation checks and encryption, and the dominant cost in both rows is the IndexedDB write itself. Where the difference matters, a simple class takes the fast path by design.
 
-A third flag, `tenants: string[]`, declares which tenant spaces a class belongs to. A tenant is a stack (its own database), so the flag is a static declaration that lets replication scoping be derived before any data exists. Single-tenant applications leave it unset.
+`defaultScope: 'hr'` seals the class's encrypted attributes under an access scope unless a document states its own `~scope`; see [Scope your data](./access-scopes.md). A further flag, `tenants: string[]`, declares which tenant spaces a class belongs to. A tenant is a stack (its own database), so the flag is a static declaration that lets replication scoping be derived before any data exists. Single-tenant applications leave it unset.
 
 ### Moving content between stacks
 
@@ -2971,7 +3146,7 @@ The other half of the idea: **logic is data**. Schemas, triggers, background job
 - **SQL in the browser.** `SELECT`, `JOIN`, `GROUP BY`, subqueries, `ORDER BY … LIMIT`, with index pushdown and streaming scans. No hand-written map/reduce. See [Query with SQL](./guides/query-with-sql.md).
 - **Logic as data.** Triggers and jobs live in the database as documents. Update behaviour at runtime; it replicates with the rest. See [Triggers](./guides/triggers.md) and [Jobs](./guides/jobs.md).
 - **Field-level encryption.** Mark an attribute `encrypted` and it is ciphertext on disk *and on the remote*. Your sync target holds data it cannot read. See [Encrypt fields](./guides/encrypt-fields.md).
-- **Access by scope.** Content belongs to a scope sealed under an attribute formula, and a session that does not satisfy the formula cannot produce the plaintext. Denial is decryption failure, not a check. See [Access control](./concepts/access-control/index.md).
+- **Access by scope.** Content belongs to a scope sealed under an attribute formula, and a session that does not satisfy the formula cannot produce the plaintext. Denial is decryption failure, not a check. See [Scope your data](./guides/access-scopes.md) and [Access control](./concepts/access-control/index.md).
 - **Bring-your-own-remote sync.** `stack.sync({ remote })` against any PouchDB-compatible database. Transport-agnostic on purpose: DocStack never learns about your provider. See [Sync to a remote](./guides/sync.md).
 - **Versioned schema patches.** Migrations as declarative documents with a semver ledger, applied once, all-or-nothing, and gated across devices so a trailing client cannot corrupt a leading one. See [Schema patches](./guides/patches.md).
 - **Named write transactions.** Stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it. See [Write transactions](./guides/transactions.md).
@@ -3109,6 +3284,7 @@ Pre-1.0 and moving. `@docstack/client` and `@docstack/react` are published and i
 | `simple` | boolean, optional | Documents stored as given: no validation, triggers, relation checks or encryption. Cannot encrypt a field. |
 | `ephemeral` | boolean, optional | Documents purged when the stack next opens; never replicated. |
 | `tenants` | string[], optional | The tenant spaces this class belongs to. A tenant is a stack. Static on purpose, so replication scoping can be derived before any data exists. |
+| `defaultScope` | string, optional | The access scope documents of this class seal under when they state no `~scope` of their own. See [Scope your data](../guides/access-scopes.md). |
 
 ### `Class.create`
 
@@ -3190,6 +3366,7 @@ Every document written through the pipeline carries:
 | `~createTimestamp` | On creation. |
 | `~updateTimestamp` | On update. |
 | `active` | `true` on creation; `false` after `deleteCard` or `deleteDocument`. Reads honour it by default. |
+| `~scope` | Optional, set by you. The access scope the document's encrypted attributes seal under; overrides the class's `defaultScope`. |
 
 The generated [API reference](/docs/api/client/) lists every method of `Class`, `Attribute` and `Domain` with its signature.
 
@@ -3219,7 +3396,7 @@ Every stack writes documents that describe *this device's copy* of the database 
 
 Patches are applied by every client independently, so every document they seed already exists on every client: DocStack's own class models, `Group-Admin`, `AuthMod-Classic`, the bootstrap `class` and `domain` models, the `system` user. Sending them costs quota and invites conflicts, two devices writing the same id independently, for no information gained. Their ids are derived from the system patches at build time (`SYSTEM_SEEDED_DOC_IDS`) and kept local; the ids seeded by the application's own patches are added the same way when `stack.sync()` runs.
 
-The distinction that matters is not "is this DocStack's own?" but "can the peer already reconstruct this?". A user created at runtime, a group an administrator added, an application-created document of any of DocStack's classes: those bind two instances together and always replicate.
+The distinction that matters is not "is this DocStack's own?" but "can the peer already reconstruct this?". A user created at runtime, a group an administrator added, an access scope the authority published, an application-created document of any of DocStack's classes: those bind two instances together and always replicate. An `~AccessScope` document carries a sealed key and a public policy, nothing a remote can open.
 
 ### Local by default, replicable on request
 
@@ -3586,7 +3763,7 @@ A subquery must have a `FROM` clause. `IN (SELECT …)` inside a `HAVING` clause
 | :--- | :--- | :--- |
 | `include` | all | Replicate only these classes. Matched against `~class` and against a relation's `sourceClass`/`targetClass`. |
 | `exclude` | none | Never replicate documents of these classes. Applied after `include`. The class models themselves still replicate; add a model's id to `internalDocs.extraDocIds` to keep it local too. |
-| `includeDataModel` | `true` | Keep `DATA_MODEL_CLASSES` (`class`, `~self`, `domain`, `~User`, `~Group`, `~AuthModule`, `~Job` and the rest) when `include` is set. |
+| `includeDataModel` | `true` | Keep `DATA_MODEL_CLASSES` (`class`, `~self`, `domain`, `~User`, `~Group`, `~AuthModule`, `~Job` and the rest) when `include` is set. `~AccessScope` is not in that set: add it to `include` when the replica must be able to open scopes. |
 
 #### `InternalDocFilterOptions`
 
