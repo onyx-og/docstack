@@ -16,7 +16,7 @@ describe("class filtering", () => {
 
         it("keeps the data model", () => {
             expect(filter({ _id: "Task", "~class": "class" })).toBe(true);
-            expect(filter({ _id: "Policy-Task", "~class": "~Policy" })).toBe(true);
+            expect(filter({ _id: "user-alice", "~class": "~User" })).toBe(true);
         });
     });
 
@@ -35,6 +35,13 @@ describe("class filtering", () => {
             expect(filter({ _id: `doc-${className}`, "~class": className })).toBe(true);
         });
 
+        it("does not carry retired classes", () => {
+            // `~Policy` left the data model with ADR-0045: the rule engine is gone and
+            // `~sys-0.0.19` deactivated its class, so legacy policy documents are data
+            // nothing reads rather than something a replica needs to stay readable.
+            expect(filter({ _id: "Policy-Task", "~class": "~Policy" })).toBe(false);
+        });
+
         it("can be told not to keep the data model", () => {
             const bare = createClassFilter({ include: ["Task"], includeDataModel: false });
             expect(bare(task)).toBe(true);
@@ -50,8 +57,8 @@ describe("class filtering", () => {
         });
 
         it("lets exclude override the data model too", () => {
-            const filter = createClassFilter({ include: ["Task"], exclude: ["~Policy"] });
-            expect(filter({ _id: "Policy-Task", "~class": "~Policy" })).toBe(false);
+            const filter = createClassFilter({ include: ["Task"], exclude: ["~User"] });
+            expect(filter({ _id: "user-alice", "~class": "~User" })).toBe(false);
             expect(filter({ _id: "Task", "~class": "class" })).toBe(true);
         });
     });

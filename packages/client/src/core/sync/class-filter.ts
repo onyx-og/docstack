@@ -27,12 +27,16 @@ import { describeFilter, withFilterIdentity } from "./filter-identity.js";
  * Kept by an allow-list unless {@link ClassFilterOptions.includeDataModel} turns that
  * off. `~self` is the bootstrap class model; `patch` is here for completeness even
  * though the internal-document filter already keeps it local.
+ *
+ * `~Policy` is deliberately absent: the JS-rule engine retired with ADR-0045 and its
+ * class was deactivated by `~sys-0.0.19`, so a consumer's legacy policy documents are
+ * data nothing reads, and carrying them into a narrowed replication would be paying
+ * quota to keep two instances agreeing about a language neither speaks.
  */
 export const DATA_MODEL_CLASSES: readonly string[] = [
     "class",
     "~self",
     "domain",
-    "~Policy",
     "~User",
     "~Group",
     "~AuthModule",

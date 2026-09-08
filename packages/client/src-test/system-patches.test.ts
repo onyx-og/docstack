@@ -69,4 +69,50 @@ describe("System Patches Integration", () => {
         expect(result.defaultGroupFound).toBe(true);
         expect(result.schemaVersion).toBeDefined();
     });
+
+    it("~sys-0.0.19: the retired ~Policy class is deactivated but still resolvable", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "policy-class-retired",
+            evaluate: async ({ stack }) => {
+                // Resolvable by id: a consumer's own legacy `~Policy` documents must keep
+                // a class to be read and written through, so this lookup does not filter
+                // on `active`.
+                const model = await stack.getClassModel("~Policy") as any;
+
+                // Absent from the listing a workbench renders (`useClassList`), which
+                // does filter on `active`. This is what deactivation buys.
+                const listed = await stack.getClassModels();
+                const listedNames = listed.list.map((m: any) => m._id);
+
+                // A legacy policy document still writes and reads back.
+                const legacy = {
+                    _id: "Policy-Legacy-Retired",
+                    "~class": "~Policy",
+                    rule: "return true;",
+                    targetClass: ["~User"],
+                };
+                let wrote = false;
+                try {
+                    await (stack as any).db.bulkDocs([legacy]);
+                    wrote = Boolean(await (stack as any).db.get("Policy-Legacy-Retired"));
+                } catch { wrote = false; }
+
+                return {
+                    modelResolves: Boolean(model),
+                    modelActive: model?.active,
+                    listedPolicy: listedNames.includes("~Policy"),
+                    listedAccessScope: listedNames.includes("~AccessScope"),
+                    wrote,
+                };
+            },
+        });
+
+        expect(result.modelResolves).toBe(true);
+        expect(result.modelActive).toBe(false);
+        expect(result.listedPolicy).toBe(false);
+        // The class that replaced it is listed, so the assertion above is about
+        // deactivation rather than about the listing being empty.
+        expect(result.listedAccessScope).toBe(true);
+        expect(result.wrote).toBe(true);
+    });
 });

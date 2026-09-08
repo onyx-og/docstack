@@ -2298,7 +2298,7 @@ class ClientStack extends Stack {
         const invalidateFromChange = (change: { doc?: unknown }) => {
             if (change?.doc) this.invalidateWriteCaches([change.doc]);
         };
-        for (const watched of ["class", "~self", "~Policy"]) {
+        for (const watched of ["class", "~self"]) {
             this.addClassDocSubscriber(ClientStack.subscriberKey("~class", watched), invalidateFromChange);
         }
 

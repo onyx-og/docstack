@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.1 - 2026/09/08
+
+### Removed - the `~Policy` class model, and the last references to it
+
+- **`~sys-0.0.19` deactivates the `~Policy` class model.** 0.3.0 removed the
+  rule engine and `~sys-0.0.18` deactivated the three seeded policy documents,
+  but the class describing them stayed active and kept appearing in every class
+  listing - a schema offered by a database for a language it no longer speaks.
+  Deactivation rather than a tombstone, because that is the difference DocStack
+  already draws: `getClassModels` (the workbench list, `useClassList`) reads
+  through the `active` filter and stops offering the class, while
+  `getClassModel` resolves by id without it, so a consumer's own legacy
+  `~Policy` documents stay readable and writable rather than becoming documents
+  of a class that cannot be resolved. The patches that created the class and
+  seeded its documents are untouched: the system chain is cumulative and a
+  fresh install replays it in order, so retiring is a patch on top, never a
+  rewrite underneath.
+- **`~Policy` leaves `DATA_MODEL_CLASSES`**, so a narrowed replication
+  (`classes.include`) no longer carries legacy policy documents to keep a
+  replica "readable" in a language nothing reads. Applications that deliberately
+  replicate their own `~Policy` documents can name the class in `include`.
+- The cache-invalidation subscriber that still watched `~Policy` class documents
+  is gone - dead work on every change since 0.3.0. The deprecated `PolicyModel`
+  type is kept for one more release.
+
 ## 0.3.0 - 2026/09/07
 
 Breaking: the `~Policy` rule engine is removed and `@docstack/abe` becomes a
