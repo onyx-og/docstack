@@ -20,7 +20,7 @@ The other half of the idea: **logic is data**. Schemas, triggers, background job
 - **Access by scope.** Content belongs to a scope sealed under an attribute formula, and a session that does not satisfy the formula cannot produce the plaintext. Denial is decryption failure, not a check. See [Scope your data](./guides/access-scopes.md) and [Access control](./concepts/access-control/index.md).
 - **Bring-your-own-remote sync.** `stack.sync({ remote })` against any PouchDB-compatible database. Transport-agnostic on purpose: DocStack never learns about your provider. See [Sync to a remote](./guides/sync.md).
 - **Versioned schema patches.** Migrations as declarative documents with a semver ledger, applied once, all-or-nothing, and gated across devices so a trailing client cannot corrupt a leading one. See [Schema patches](./guides/patches.md).
-- **Named write transactions.** Stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it. See [Write transactions](./guides/transactions.md).
+- **Named write transactions.** Stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it. See [Write transactions](./guides/write-transactions.md).
 - **Live React bindings.** Every hook subscribes to the local database. No refetching, no cache invalidation, no staleness story to own. See [React bindings](./guides/react.md).
 
 ## How it works

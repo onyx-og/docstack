@@ -220,8 +220,7 @@ What differs is what sits underneath the hook. A `useQuerySQL` call resolves aga
 
 ## 📖 Documentation
 
-* [Full documentation](https://onyx.ac/products/docstack) — concepts, guides, reference
-* [API reference](https://onyx-og.github.io/docstack/docs/api/react/) — every hook, generated from the source
+* [Full documentation](https://onyx.ac/products/docstack/docs)
 * [@docstack/client](https://github.com/onyx-og/docstack/blob/main/packages/client/README.md) — the engine these hooks wrap
 * [Architecture decisions](https://github.com/onyx-og/docstack/tree/main/specs/adr) — including [ADR-0025](https://github.com/onyx-og/docstack/blob/main/specs/adr/0025-live-usequerysql.md) on live `useQuerySQL` and [ADR-0035](https://github.com/onyx-og/docstack/blob/main/specs/adr/0035-react-usefind-never-applies-an-empty-result.md) on `useFind` result ordering
 * [Contributing](https://github.com/onyx-og/docstack/blob/main/CONTRIBUTING.md)

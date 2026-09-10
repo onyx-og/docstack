@@ -147,3 +147,4 @@ packages/client/test/vendor-bundle.js
 # WordPress docs sync output
 packages/docs/.wp-sync/
 packages/docs/.pterodoc/
+packages/docs/.pterodocs/

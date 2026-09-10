@@ -103,4 +103,4 @@ Staging costs nothing at the storage layer, and committing costs what the same w
 | `TransactionUnsupportedDocError` | A class model, patch, `_design/` or `_local/` document was staged. | Write it directly, or through a patch. |
 | `TransactionStateError` | The handle is not `open` or `partial`. | Begin a new transaction. |
 
-Why the stage sits above the plugin and commits through it, and what the next version adds, is in [Transactions](../concepts/transactions.md).
+Why the stage sits above the plugin and commits through it, and what the next version adds, is in [Transactions](../concepts/transaction-engine.md).

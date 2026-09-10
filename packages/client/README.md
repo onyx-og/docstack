@@ -441,8 +441,7 @@ await docstack.sync({
 
 ## 📖 Documentation
 
-* [Full documentation](https://onyx.ac/products/docstack) — concepts, guides, reference
-* [API reference](https://onyx-og.github.io/docstack/docs/api/client/) — generated from the source
+* [Full documentation](https://onyx.ac/products/docstack/docs) — architecture, guides, API reference
 * [Architecture decisions](https://github.com/onyx-og/docstack/tree/main/specs/adr) — why the engine is shaped this way
 * [Changelog](https://github.com/onyx-og/docstack/blob/main/packages/client/CHANGELOG.md)
 * [Contributing](https://github.com/onyx-og/docstack/blob/main/CONTRIBUTING.md)

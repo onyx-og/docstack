@@ -42,7 +42,7 @@ export default {
 
   render: {
     // Keeps the theme CSS that already targets these class names working.
-    // The pterodoc WordPress plugin must be set to the same prefix, on its
+    // The pterodocs WordPress plugin must be set to the same prefix, on its
     // settings page, or it loads and styles nothing.
     classPrefix: 'docstack',
     unpublishedLinks: 'site',

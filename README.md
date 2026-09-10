@@ -8,11 +8,11 @@ A document data layer for storing, managing and consuming application data — o
 
 [![npm client](https://img.shields.io/npm/v/@docstack/client?label=%40docstack%2Fclient)](https://www.npmjs.com/package/@docstack/client)
 [![npm react](https://img.shields.io/npm/v/@docstack/react?label=%40docstack%2Freact)](https://www.npmjs.com/package/@docstack/react)
-[![Docs](https://img.shields.io/badge/docs-onyx.ac-blue)](https://onyx.ac/products/docstack)
+[![Docs](https://img.shields.io/badge/docs-onyx.ac-blue)](https://onyx.ac/products/docstack/docs)
 [![License](https://img.shields.io/badge/license-CC--BY--SA--4.0-lightgrey)](LICENSE.md)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=4QSQ8L9AK2C74)
 
-[Documentation](https://onyx.ac/products/docstack) · [Live workbench](https://onyx-og.github.io/docstack/app/index.html) · [Client](packages/client/README.md) · [React](packages/react/README.md)
+[Documentation](https://onyx.ac/products/docstack/docs) · [Live workbench](https://onyx-og.github.io/docstack/app/index.html) · [Client](packages/client/README.md) · [React](packages/react/README.md)
 
 </div>
 
@@ -30,9 +30,9 @@ The other half of the idea: **logic is data**. Schemas, triggers, background job
 
 * **⚡ Offline-first by default** — the database is embedded. No round trip for a read, a write, a validation or a join. Works on a plane, in a basement, on a train.
 * **🔍 SQL in the browser** — `SELECT`, `JOIN`, `GROUP BY`, subqueries, `ORDER BY … LIMIT`, with index pushdown and streaming scans. No hand-written map/reduce.
-* **🧠 Logic as data** — triggers, jobs, migrations and access scopes live in the database as documents. Update behaviour at runtime; it replicates with the rest.
+* **🧠 Logic as data** — triggers, jobs and migrations live in the database as documents. Update behaviour at runtime; it replicates with the rest.
 * **🔐 Field-level encryption** — mark an attribute `encrypted` and it is ciphertext on disk *and on the remote*. Your sync target holds data it cannot read.
-* **🛡️ Access by scope** — content is sealed under an attribute formula like `("role:manager" and "dept:sales") or "clearance:secret"`. A session that does not satisfy it cannot produce the plaintext: denial is decryption failure, not a check, so it binds the device owner too.
+* **🎫 Cryptographic access scopes** — access is a property of the ciphertext, not a rule that runs. Content seals under an attribute policy (CP-ABE); a device whose key doesn't satisfy it reads `null`. No client-side check to bypass.
 * **🔄 Bring-your-own-remote sync** — `stack.sync({ remote })` against any PouchDB-compatible database. Transport-agnostic on purpose: DocStack never learns about your provider.
 * **📦 Versioned schema patches** — migrations as declarative documents with a semver ledger, applied once, all-or-nothing, gated across devices so a trailing client can't corrupt a leading one.
 * **🧾 Named write transactions** — stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it.
@@ -87,7 +87,7 @@ const TaskList = () => {
 * **Offline-first field and mobile apps** — data collection, point-of-sale, inspections, note-taking. Validation and business logic run without connectivity, and reconcile later.
 * **Serverless personal apps with user-owned backup** — sync to the user's *own* Drive. Multi-device sync and real backup with no server, no storage bill, and no custody of anyone's data. "We don't hold your data" becomes a feature rather than a compromise.
 * **Privacy-sensitive and regulated data** — health notes, financial records, journals. Encrypted attributes are unreadable to the storage operator and to the sync remote.
-* **Multi-tenant SaaS and internal tools** — each tenant gets a scope sealed under its own attribute, so one deployment serves many tenants and one tenant's devices can hold, but never read, another's data.
+* **Multi-tenant SaaS and internal tools** — access scopes seal each tenant's content under its own key, so one deployment serves many tenants and separation survives a shared replica.
 * **Analytics and reporting surfaces** — the SQL engine lets support staff and analysts query joined, filtered data without a bespoke reporting API.
 
 ## Packages
@@ -103,6 +103,8 @@ const TaskList = () => {
 ### Companion packages
 
 **[@docstack/pouchdb-adapter-googledrive](https://github.com/onyx-ac/docstack-pouchdb-adapter-gdrive)** — [![npm](https://img.shields.io/npm/v/@docstack/pouchdb-adapter-googledrive)](https://www.npmjs.com/package/@docstack/pouchdb-adapter-googledrive) · turns a user's Google Drive folder into a PouchDB remote, which is what makes the serverless pitch real. Append-only log for fast, conflict-free writes; lazy loading (only the index is held in memory, bodies are fetched on demand); multi-writer safe; auto-compaction; and no `googleapis` dependency, so it runs in browsers, Node 18+ and edge runtimes alike.
+
+**[@docstack/abe](packages/abe/README.md)** — [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) · the CP-ABE primitive behind access scopes: the AC17 scheme from [rabe](https://github.com/Fraunhofer-AISEC/rabe) compiled to WASM, the policy normaliser, and the authority helpers that mint attribute keys and seal scope content keys. The client depends on it and loads it lazily, only when a stack declares scopes.
 
 `@docstack/shared` — types and abstract bases shared across the packages. Internal; you rarely import it directly.
 
