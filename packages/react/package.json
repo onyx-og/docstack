@@ -1,6 +1,6 @@
 {
   "name": "@docstack/react",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "One does not simply stack documents.",
   "main": "lib/index.js",
   "module": "lib/index.js",
@@ -39,7 +39,7 @@
     "react-dom": "^19.2.3"
   },
   "dependencies": {
-    "@docstack/client": "^0.3.0",
+    "@docstack/client": "^0.3.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

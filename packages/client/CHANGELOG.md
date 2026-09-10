@@ -25,6 +25,27 @@
   is gone - dead work on every change since 0.3.0. The deprecated `PolicyModel`
   type is kept for one more release.
 
+## 0.3.2 - 2026/09/10
+
+### Changed
+
+- **Dependency ranges only — no runtime change.** `@docstack/abe` and
+  `@docstack/shared` are now required at `^0.1.1`, the releases carrying the
+  corrected `homepage` metadata. 0.3.1 went out still asking for `^0.1.0`, which
+  resolves and works but pins consumers to the older metadata; this supersedes it.
+
+## 0.3.1 - 2026/09/10
+
+### Changed
+
+- **Documentation and package metadata only — no runtime change.** The README is
+  rewritten for npm readers: user and developer stories, worked examples for
+  migrations, sync, transactions and access scopes, the measured figures from
+  ADR-0039 and ADR-0028, and a comparison against raw PouchDB and the
+  offline-first field. `homepage` now points at
+  https://onyx.ac/products/docstack, and documentation links resolve to
+  https://onyx.ac/products/docstack/docs.
+
 ## 0.3.0 - 2026/09/07
 
 Breaking: the `~Policy` rule engine is removed and `@docstack/abe` becomes a

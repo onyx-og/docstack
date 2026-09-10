@@ -1,6 +1,6 @@
 {
     "name": "@docstack/shared",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "main": "lib/index.js",
     "src": "src/index.ts",
     "type": "module",

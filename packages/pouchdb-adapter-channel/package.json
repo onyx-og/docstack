@@ -1,7 +1,7 @@
 {
   "name": "@docstack/pouchdb-adapter-channel",
   "description": "PouchDB replication over a message channel: a driver adapter that presents a remote PouchDB reached through postMessage-style transports, and a host that serves a local PouchDB over the same channel with two-sided scope enforcement.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",

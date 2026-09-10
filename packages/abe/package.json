@@ -1,6 +1,6 @@
 {
     "name": "@docstack/abe",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "CP-ABE (AC17) primitives for DocStack cryptographic access scopes: rabe compiled to WASM, policy normalization, CEK wrap/unwrap (ADR-0045)",
     "type": "module",
     "main": "lib/index.js",
@@ -28,8 +28,7 @@
     "scripts": {
         "build": "npx tsc -build --force ./tsconfig.json && node scripts/copy-wasm.mjs",
         "build:wasm": "bash scripts/build-wasm.sh",
-        "test": "node scripts/smoke.mjs",
-        "prepublishOnly": "npm run build"
+        "test": "node scripts/smoke.mjs"
     },
     "keywords": [
         "cp-abe",
