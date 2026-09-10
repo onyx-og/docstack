@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.1 - 2026/09/08
+## 0.3.2 - 2026/09/10
 
 ### Removed - the `~Policy` class model, and the last references to it
 
@@ -25,14 +25,12 @@
   is gone - dead work on every change since 0.3.0. The deprecated `PolicyModel`
   type is kept for one more release.
 
-## 0.3.2 - 2026/09/10
-
 ### Changed
 
-- **Dependency ranges only — no runtime change.** `@docstack/abe` and
-  `@docstack/shared` are now required at `^0.1.1`, the releases carrying the
-  corrected `homepage` metadata. 0.3.1 went out still asking for `^0.1.0`, which
-  resolves and works but pins consumers to the older metadata; this supersedes it.
+- **Dependency ranges.** `@docstack/abe` and `@docstack/shared` are now required
+  at `^0.1.1`, the releases carrying the corrected `homepage` metadata. 0.3.1
+  went out still asking for `^0.1.0`, which resolves and works but pins consumers
+  to the older metadata; this supersedes it.
 
 ## 0.3.1 - 2026/09/10
 
