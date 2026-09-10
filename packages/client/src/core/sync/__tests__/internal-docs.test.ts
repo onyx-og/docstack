@@ -42,7 +42,7 @@ describe("internal document taxonomy", () => {
             [{ _id: "Task", "~class": "class", schema: {} }, "a class model"],
             [{ _id: "Task-Project", "~class": "domain" }, "a domain model"],
             [{ _id: "rel-1", "~class": "Task-Project", sourceId: "a", targetId: "b" }, "a relation"],
-            [{ _id: "Policy-Task", "~class": "~Policy" }, "a policy"],
+            [{ _id: "~scope-hr-v1", "~class": "~AccessScope" }, "an access scope"],
             [{ _id: "user-alice", "~class": "~User" }, "a user"],
             [{ _id: "Group-Tester", "~class": "~Group" }, "a group"],
         ])("replicates %o (%s)", (doc) => {

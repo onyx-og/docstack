@@ -33,7 +33,7 @@
   "bugs": {
     "url": "https://github.com/onyx-og/docstack/issues"
   },
-  "homepage": "https://onyx.ac/docstack",
+  "homepage": "https://onyx.ac/products/docstack",
   "peerDependencies": {
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

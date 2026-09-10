@@ -25,5 +25,4 @@ yarn-error.log*
 # WordPress sync: credentials and rendered output
 .env
 /.wp-sync/
-/.pterodoc/
 /.pterodocs/

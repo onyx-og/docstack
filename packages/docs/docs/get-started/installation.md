@@ -14,7 +14,9 @@ npm install @docstack/client pouchdb-browser pouchdb-find
 
 `pouchdb-browser` and `pouchdb-find` are **peer dependencies** at `^9`. DocStack does not bundle the storage layer, so you control its version and it is never duplicated in your bundle.
 
-Current version: **0.2.0**, published 2026-09-04. The [release notes](/blog/docstack-client-0-2-0) list what changed; the [changelog](https://github.com/onyx-og/docstack/blob/main/packages/client/CHANGELOG.md) goes back to 0.1.6.
+[![@docstack/client on npm](https://img.shields.io/npm/v/@docstack/client?label=%40docstack%2Fclient)](https://www.npmjs.com/package/@docstack/client)
+
+The badge is the current release, read from npm as you load this page. The [release notes](/blog) say what changed in each one, and the [changelog](https://github.com/onyx-og/docstack/blob/main/packages/client/CHANGELOG.md) goes back to 0.1.6.
 
 ## The React bindings
 
@@ -24,7 +26,7 @@ npm install @docstack/react @docstack/client pouchdb-browser pouchdb-find
 
 React 19 is a peer dependency. `@docstack/react` wraps the client in a provider and a set of hooks that are live by default; see [React bindings](../guides/react.md).
 
-Current version: **0.1.1**, published 2026-09-01.
+[![@docstack/react on npm](https://img.shields.io/npm/v/@docstack/react?label=%40docstack%2Freact)](https://www.npmjs.com/package/@docstack/react)
 
 ## What the runtime needs
 

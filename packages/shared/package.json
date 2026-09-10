@@ -9,7 +9,7 @@
     },
     "description": "Shared utilities and types for docstack packages",
     "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
-    "homepage": "https://onyx.ac/docstack",
+    "homepage": "https://onyx.ac/products/docstack",
     "license": "CC-BY-SA-4.0",
     "bugs": {
         "url": "https://github.com/onyx-og/docstack/issues"

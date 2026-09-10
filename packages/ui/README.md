@@ -66,8 +66,8 @@ To build a *different* interface on the same engine, the packages you want are [
 
 ## 📖 Documentation
 
-* [Full documentation](https://onyx.ac/products/docstack/docs)
-* [Architecture](https://onyx.ac/products/docstack/docs/concepts/core-concepts)
+* [Full documentation](https://onyx.ac/products/docstack) — concepts, guides, reference
+* [Architecture](https://onyx.ac/products/docstack/docs/concepts/core-concepts/)
 * [Contributing](https://github.com/onyx-og/docstack/blob/main/CONTRIBUTING.md)
 
 ## License

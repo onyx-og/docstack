@@ -197,9 +197,9 @@ export const resolveInternalClasses = (options: InternalDocFilterOptions = {}): 
  * group cannot derive from its patches. That includes application data and its class
  * models, and equally an account created at runtime (`user-alice`), a group an
  * administrator added, a policy an application wrote. Those are `~User`, `~Group` and
- * `~Policy` documents - DocStack's classes - and holding them back on the strength of
- * that prefix would break exactly the case replication exists for. Only the *seeded* ones
- * stay home. See ADR-0023.
+ * `~AccessScope` documents - DocStack's classes - and holding them back on the strength
+ * of that prefix would break exactly the case replication exists for. Only the *seeded*
+ * ones stay home. See ADR-0023.
  *
  * @param id - The document id.
  * @param options - Filter options; `replicateSystemDocuments` turns this off, and

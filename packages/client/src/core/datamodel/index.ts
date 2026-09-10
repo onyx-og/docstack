@@ -1501,7 +1501,35 @@ const sys_018: Patch = {
     ]
 };
 
-syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015, sys_016, sys_017, sys_018);
+/**
+ * The `~Policy` class model retires (ADR-0045, spec 02 §5 "class deprecated").
+ *
+ * 0.0.18 deactivated the three seeded policy documents; this deactivates the
+ * class that described them, which is DocStack's own soft-delete idiom rather
+ * than a tombstone: `getClassModels` (the class list a workbench renders, and
+ * `useClassList`) reads through the `active` filter and stops offering it,
+ * while `getClassModel` resolves by id without that filter, so a consumer's
+ * own legacy `~Policy` documents stay readable and writable instead of
+ * becoming documents of a class that cannot be resolved.
+ *
+ * The earlier patches that created the class and seeded its documents are left
+ * exactly as they are: the system chain is cumulative and immutable, a fresh
+ * install replays it in order, and 0.0.6/0.0.9/0.0.14 need the class 0.0.4
+ * creates in order to validate what they seed. Retiring something is a patch on
+ * top, never a rewrite underneath.
+ */
+const sys_019: Patch = {
+    "_id": "~sys-0.0.19",
+    "~class": "patch",
+    "version": "0.0.19",
+    "target": "system",
+    "changelog": "### Schema Patch: v0.0.19\\n#### Deactivated: the ~Policy class model (the rule engine retired in 0.0.18)",
+    "docs": [
+        { "_id": "~Policy", "_rev": "auto", "~class": "class", "active": false }
+    ]
+};
+
+syspatches.push(sys_011, sys_012, sys_013, sys_014, sys_015, sys_016, sys_017, sys_018, sys_019);
 
 /**
  * Every document id the system patches seed.

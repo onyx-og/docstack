@@ -1,13 +1,13 @@
 name: Publish Docs to onyx.ac
 
 # Mirrors the hand-written documentation (the `docs` sidebar) to WordPress as
-# native Gutenberg pages with pterodoc. Docusaurus stays the source of truth.
+# native Gutenberg pages with pterodocs. Docusaurus stays the source of truth.
 #
 # Repository settings this needs:
 #   vars.WP_URL              https://onyx.ac
 #   secrets.WP_USER          a WordPress user
 #   secrets.WP_APP_PASSWORD  one of that user's Application Passwords
-#   vars.PTERODOC_WP_ROOT    optional; overrides target.root in pterodoc.config.mjs
+#   vars.PTERODOCS_WP_ROOT   optional; overrides target.root in pterodocs.config.mjs
 #   vars.WP_LANG             optional; Polylang language code
 #
 # Without the secrets the run still renders every page and uploads the plan,
@@ -21,7 +21,7 @@ on:
       - 'packages/docs/static/**'
       - 'packages/docs/sidebars.ts'
       - 'packages/docs/docusaurus.config.ts'
-      - 'packages/docs/pterodoc.config.mjs'
+      - 'packages/docs/pterodocs.config.mjs'
       - '.github/workflows/sync-docs-wp.yml'
   workflow_dispatch:
     inputs:
@@ -75,9 +75,9 @@ jobs:
           WP_URL: ${{ vars.WP_URL }}
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-          PTERODOC_WP_ROOT: ${{ inputs.root || vars.PTERODOC_WP_ROOT }}
+          PTERODOCS_WP_ROOT: ${{ inputs.root || vars.PTERODOCS_WP_ROOT }}
           WP_LANG: ${{ vars.WP_LANG }}
-        run: npx pterodoc doctor
+        run: npx pterodocs doctor
 
       - name: Publish
         working-directory: packages/docs
@@ -85,11 +85,11 @@ jobs:
           WP_URL: ${{ vars.WP_URL }}
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-          PTERODOC_WP_ROOT: ${{ inputs.root || vars.PTERODOC_WP_ROOT }}
+          PTERODOCS_WP_ROOT: ${{ inputs.root || vars.PTERODOCS_WP_ROOT }}
           WP_STATUS: ${{ inputs.status }}
           WP_LANG: ${{ vars.WP_LANG }}
         run: >-
-          npx pterodoc sync
+          npx pterodocs sync
           ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
           ${{ inputs.prune && '--prune' || '' }}
 
@@ -97,6 +97,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pterodoc-plan
-          path: packages/docs/.pterodoc
+          name: pterodocs-plan
+          path: packages/docs/.pterodocs
           if-no-files-found: ignore

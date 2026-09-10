@@ -34,7 +34,7 @@ sidebar_position: 10
 | Content transfer | `core/content-transfer.ts` | `exportContent` and `importContent`. |
 | Data model | `core/datamodel/` | The system patches and the ids they seed. |
 
-The rule-based policy engine that once lived in `core/policy-engine/` is deleted: the scope model is the one access-control language, `~Policy` documents are inert legacy data, and system patch 0.0.18 deactivates the seeded ones.
+The rule-based policy engine that once lived in `core/policy-engine/` is deleted: the scope model is the one access-control language, `~Policy` documents are inert legacy data, and system patches 0.0.18 and 0.0.19 deactivate the seeded documents and the class that described them. The class is deactivated rather than deleted, so an application's own legacy policy documents stay readable instead of belonging to a class that cannot be resolved.
 
 ## Patterns
 

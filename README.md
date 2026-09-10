@@ -24,7 +24,7 @@ DocStack gives a document store the things applications actually need — **sche
 
 The database runs **inside your application**, not behind a network call. Every read, every write, every validation and every query resolves locally, so your UI never waits on a server and never breaks when the connection does. When a remote is available, the whole database replicates to it — and that remote is *whatever you hand it*: a CouchDB endpoint, another DocStack node, or the user's own Google Drive folder.
 
-The other half of the idea: **logic is data**. Schemas, triggers, background jobs and migrations are documents in the database, not code in your bundle. Change a validation rule or a business process by writing a document — no redeploy, and the change replicates to every device like anything else.
+The other half of the idea: **logic is data**. Schemas, triggers, background jobs, migrations and access scopes are documents in the database, not code in your bundle. Change a validation rule or a business process by writing a document — no redeploy, and the change replicates to every device like anything else.
 
 ## Why DocStack
 
@@ -97,6 +97,7 @@ const TaskList = () => {
 | **[@docstack/client](packages/client/README.md)** | The engine: schema, SQL, triggers, jobs, access scopes, encryption, patches, transactions, sync. Runs in the browser. | [![npm](https://img.shields.io/npm/v/@docstack/client)](https://www.npmjs.com/package/@docstack/client) |
 | **[@docstack/react](packages/react/README.md)** | Provider and live hooks over the client. Every query is a subscription. | [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react) |
 | **[@docstack/ui](packages/ui/README.md)** | The workbench: browse a database, edit schema, run queries, view the ER diagram. | [Live app](https://onyx-og.github.io/docstack/app/index.html) |
+| **[@docstack/abe](packages/abe/README.md)** | The CP-ABE primitive behind access scopes. Installed with the client; its authority half runs where you control it. | [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) |
 | **[@docstack/server](packages/server/README.md)** | The same engine deployed server-side — sync hub, shared workspaces, server-side jobs. | Preview |
 
 ### Companion packages
@@ -115,16 +116,16 @@ const TaskList = () => {
 | **Schema Engine** | Zod-backed validation, class hydration, schema propagation |
 | **Query Engine** | SQL parser, planner and executor — joins, aggregation, pushdown, streaming |
 | **Job Engine** | Background jobs and the unattended scheduler |
-| **Crypto Engine** | Key derivation (PBKDF2) and AES-GCM field-level encryption |
-| **Access Scopes** | CP-ABE sealing: content keys under attribute policies, per scope |
+| **Crypto Engine** | AES-GCM field-level encryption under a keyring: the document key, retired keys and admitted scope keys |
+| **Access control** | CP-ABE-sealed scope keys, attribute-key admission, per-scope locks |
 | **Transaction Engine** | Staged multi-document writes, overlay reads, one-batch commit |
 | **Sync Layer** | Lifecycle, replication filters, convergence state, the schema gate |
 
-Full architecture notes live in the [documentation](https://onyx.ac/products/docstack/docs/concepts/core-concepts); the decisions behind them are recorded as ADRs in [`specs/adr/`](specs/adr/).
+Full architecture notes live in the [documentation](https://onyx.ac/products/docstack/docs/concepts/core-concepts/); the decisions behind them are recorded as ADRs in [`specs/adr/`](specs/adr/).
 
 ## Status
 
-Pre-1.0 and moving. `@docstack/client` and `@docstack/react` are published and in production use; `@docstack/ui` is an application you run or visit rather than install; `@docstack/server` is a preview of the same engine deployed server-side.
+Pre-1.0 and moving. `@docstack/client`, `@docstack/react` and `@docstack/abe` are published and in production use; `@docstack/ui` is an application you run or visit rather than install; `@docstack/server` is a preview of the same engine deployed server-side.
 
 ## Contributing
 

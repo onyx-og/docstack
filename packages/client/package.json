@@ -1,7 +1,7 @@
 {
   "name": "@docstack/client",
   "description": "One does not simply stack documents.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "main": "lib/index.js",
   "module": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -42,7 +42,7 @@
   "bugs": {
     "url": "https://github.com/onyx-og/docstack/issues"
   },
-  "homepage": "https://onyx.ac/docstack",
+  "homepage": "https://onyx.ac/products/docstack",
   "dependencies": {
     "@docstack/abe": "^0.1.0",
     "@docstack/shared": "^0.1.0",
