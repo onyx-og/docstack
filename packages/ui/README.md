@@ -1,5 +1,5 @@
 [![Live app](https://img.shields.io/badge/live-workbench-brightgreen)](https://onyx-og.github.io/docstack/app/index.html)
-[![Docs](https://img.shields.io/badge/docs-onyx--og.github.io-blue)](https://onyx-og.github.io/docstack/)
+[![Docs](https://img.shields.io/badge/docs-onyx.ac-blue)](https://onyx.ac/products/docstack/docs)
 [![License](https://img.shields.io/badge/license-CC--BY--SA--4.0-lightgrey)](https://github.com/onyx-og/docstack/blob/main/LICENSE.md)
 
 # @docstack/ui
@@ -29,7 +29,7 @@ It doubles as the most complete reference consumer of [`@docstack/client`](https
 * **See the relationships** — a generated entity-relation diagram (Mermaid) of classes and the domains connecting them.
 * **Query** — run SQL against the open database and read the results.
 * **Inspect documents** — a JSON viewer for the raw stored form, which is where encrypted attributes are visibly ciphertext.
-* **Authenticate** — sign in against a stack's user documents to see the data as a given session sees it, policies and all.
+* **Authenticate** — sign in against a stack's user documents to see the data as a given session sees it, access scopes and all: content whose scope the session cannot open reads back `null`.
 * **Debug** — a status bar and debug panel reporting what the engine is doing.
 
 ## Running it locally
@@ -66,8 +66,8 @@ To build a *different* interface on the same engine, the packages you want are [
 
 ## 📖 Documentation
 
-* [Full documentation](https://onyx-og.github.io/docstack/)
-* [Architecture](https://onyx-og.github.io/docstack/docs/architecture/core-concepts)
+* [Full documentation](https://onyx.ac/products/docstack/docs)
+* [Architecture](https://onyx.ac/products/docstack/docs/concepts/core-concepts)
 * [Contributing](https://github.com/onyx-og/docstack/blob/main/CONTRIBUTING.md)
 
 ## License

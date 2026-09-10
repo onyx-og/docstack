@@ -1,5 +1,5 @@
 [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react)
-[![Docs](https://img.shields.io/badge/docs-onyx--og.github.io-blue)](https://onyx-og.github.io/docstack/)
+[![Docs](https://img.shields.io/badge/docs-onyx.ac-blue)](https://onyx.ac/products/docstack/docs)
 [![License](https://img.shields.io/badge/license-CC--BY--SA--4.0-lightgrey)](https://github.com/onyx-og/docstack/blob/main/LICENSE.md)
 
 # @docstack/react
@@ -220,7 +220,7 @@ What differs is what sits underneath the hook. A `useQuerySQL` call resolves aga
 
 ## 📖 Documentation
 
-* [Full documentation](https://onyx-og.github.io/docstack/)
+* [Full documentation](https://onyx.ac/products/docstack/docs)
 * [@docstack/client](https://github.com/onyx-og/docstack/blob/main/packages/client/README.md) — the engine these hooks wrap
 * [Architecture decisions](https://github.com/onyx-og/docstack/tree/main/specs/adr) — including [ADR-0025](https://github.com/onyx-og/docstack/blob/main/specs/adr/0025-live-usequerysql.md) on live `useQuerySQL` and [ADR-0035](https://github.com/onyx-og/docstack/blob/main/specs/adr/0035-react-usefind-never-applies-an-empty-result.md) on `useFind` result ordering
 * [Contributing](https://github.com/onyx-og/docstack/blob/main/CONTRIBUTING.md)

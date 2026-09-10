@@ -1,5 +1,5 @@
 [![npm](https://img.shields.io/npm/v/@docstack/client)](https://www.npmjs.com/package/@docstack/client)
-[![Docs](https://img.shields.io/badge/docs-onyx--og.github.io-blue)](https://onyx-og.github.io/docstack/)
+[![Docs](https://img.shields.io/badge/docs-onyx.ac-blue)](https://onyx.ac/products/docstack/docs)
 [![License](https://img.shields.io/badge/license-CC--BY--SA--4.0-lightgrey)](https://github.com/onyx-og/docstack/blob/main/LICENSE.md)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=4QSQ8L9AK2C74)
 
@@ -299,7 +299,7 @@ stack.isScopeLocked('hr');   // false for Alice; true for a device whose key doe
 
 A document joins a scope with the reserved `~scope` field, or inherits its class's `defaultScope`. The scope decides *under which key* the class's `encrypted: true` attributes seal; the schema still decides *which* attributes. Writing into a scope the session cannot open throws `StackLockedError` with `scopeId` set, and a write whose label disagrees with its payload's key is refused with `StackScopeMismatchError` rather than re-sealed. Revoking a member is publishing a new scope version with a policy the departed key no longer satisfies.
 
-Conditional access is write-time labeling ("published means public" is the write choosing the scope), and behavioural rules stay application code. The formula language, the guarantees and the limits, stated plainly, are in the [access control](https://onyx-og.github.io/docstack/docs/concepts/access-control/) section of the documentation.
+Conditional access is write-time labeling ("published means public" is the write choosing the scope), and behavioural rules stay application code. The formula language, the guarantees and the limits, stated plainly, are in the [access control](https://onyx.ac/products/docstack/docs/concepts/access-control/) section of the documentation.
 
 ### 8. Field-level encryption
 
@@ -441,7 +441,7 @@ await docstack.sync({
 
 ## 📖 Documentation
 
-* [Full documentation](https://onyx-og.github.io/docstack/) — architecture, guides, API reference
+* [Full documentation](https://onyx.ac/products/docstack/docs) — architecture, guides, API reference
 * [Architecture decisions](https://github.com/onyx-og/docstack/tree/main/specs/adr) — why the engine is shaped this way
 * [Changelog](https://github.com/onyx-og/docstack/blob/main/packages/client/CHANGELOG.md)
 * [Contributing](https://github.com/onyx-og/docstack/blob/main/CONTRIBUTING.md)
