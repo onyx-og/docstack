@@ -30,7 +30,7 @@ const report = await stack.commit(t);
 
 Atomicity is reported, not assumed. The commit report carries `adapter.atomicBatch`: adapters that land a batch as one storage transaction report `true`; IndexedDB reports `false`, with a revision pre-flight that shrinks the window without eliminating it. A partial commit leaves the handle in `status: "partial"` with only the failed entries retained.
 
-Measured in a real browser against IndexedDB, 100 documents: staging costs 0.43 ms per document with zero backend queries, commit lands at parity with the equivalent non-transactional batch write, empty-stage overlay reads cost the same as plain reads, and a refused commit costs about a millisecond. The reasoning is in [ADR-0039](https://github.com/onyx-og/docstack/blob/main/specs/adr/0039-transactions-stage-above-the-plugin-and-commit-through-it.md); the guide is [Write transactions](/docs/guides/transactions).
+Measured in a real browser against IndexedDB, 100 documents: staging costs 0.43 ms per document with zero backend queries, commit lands at parity with the equivalent non-transactional batch write, empty-stage overlay reads cost the same as plain reads, and a refused commit costs about a millisecond. The reasoning is in [ADR-0039](https://github.com/onyx-og/docstack/blob/main/specs/adr/0039-transactions-stage-above-the-plugin-and-commit-through-it.md); the guide is [Write transactions](/docs/guides/write-transactions).
 
 ## Security: replication no longer pushes encrypted attributes in plaintext
 

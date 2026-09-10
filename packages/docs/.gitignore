@@ -26,3 +26,4 @@ yarn-error.log*
 .env
 /.wp-sync/
 /.pterodoc/
+/.pterodocs/
