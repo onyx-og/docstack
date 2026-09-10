@@ -43,6 +43,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The API reference is generated from the packages' TypeScript sources, and
+      # TypeDoc resolves `@docstack/shared` and `@docstack/abe` through their `main`
+      # and `types` entries - which point into `lib/` and exist only once those
+      # packages are built. `npm ci` builds nothing, so without this step TypeDoc
+      # emits no markdown for client and react, and the sidebar's `api/client/index`
+      # reference then fails the build with "Invalid sidebars file".
+      - name: Build the packages the API reference is generated from
+        run: |
+          npm run build:shared
+          npm run build -w packages/abe
+          npm run build:client
+          npm run build:react
+
       - name: Build documentation site
         run: npm run build:docs
 

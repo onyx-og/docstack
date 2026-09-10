@@ -12,9 +12,9 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | Path | Package | Role | Published |
 | :--- | :--- | :--- | :--- |
 | `packages/shared` | `@docstack/shared` | Types and abstract bases shared by every package: document, class, domain, trigger and patch models, `StackOptions`, the `Stack` and `Class` abstractions. | 0.1.0 |
-| `packages/client` | `@docstack/client` | The engine. | 0.3.0 |
-| `packages/react` | `@docstack/react` | Provider and hooks. | 0.1.2 |
-| `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | 0.1.0, with client 0.3.0 |
+| `packages/client` | `@docstack/client` | The engine. | [![npm](https://img.shields.io/npm/v/@docstack/client)](https://www.npmjs.com/package/@docstack/client) |
+| `packages/react` | `@docstack/react` | Provider and hooks. | [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react) |
+| `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) |
 | `packages/ui` | `@docstack/ui` | The workbench application. Built with Webpack; its bundle is copied into `packages/docs/static/app` and hosted from this site. | Not a library; hosted |
 | `packages/server` | `@docstack/server` | The server preview. | No |
 | `packages/docs` | `@docstack/docs` | This site (Docusaurus). Builds into the repository's root `docs/` folder, which GitHub Pages serves. | Site |

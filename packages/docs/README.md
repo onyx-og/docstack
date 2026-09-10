@@ -14,7 +14,15 @@ npm run build:docs     # writes the static site to the repository's root docs/ f
 
 The root `docs/` folder is committed: GitHub Pages serves it from the `main` branch, and the `Deploy Docs` workflow rebuilds and commits it when docs sources or package sources change. `npm run serve` in this package previews that folder.
 
-The API reference under `docs/api/` is generated at build time by TypeDoc from `packages/client`, `packages/react` and `packages/server`; the directory is gitignored. `npm run clean:api` removes it.
+The API reference under `docs/api/` is generated at build time by TypeDoc from `packages/client`, `packages/react`, `packages/abe` and `packages/server`; the directory is gitignored. `npm run clean:api` removes it.
+
+**Build the packages first on a fresh clone.** TypeDoc reads the packages' sources but resolves `@docstack/shared` and `@docstack/abe` through their `main` and `types` entries, which point into `lib/`. Until those packages are built, TypeDoc emits nothing for client and react and the build fails with `Invalid sidebars file … api/client/index`:
+
+```bash
+npm run build:shared && npm run build -w packages/abe && npm run build:client && npm run build:react
+```
+
+The deploy workflow runs exactly that before `build:docs`.
 
 ## What goes where
 
