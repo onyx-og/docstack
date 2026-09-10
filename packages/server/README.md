@@ -1,4 +1,4 @@
-[![Docs](https://img.shields.io/badge/docs-onyx--og.github.io-blue)](https://onyx-og.github.io/docstack/)
+[![Docs](https://img.shields.io/badge/docs-onyx.ac-blue)](https://onyx.ac/products/docstack)
 [![License](https://img.shields.io/badge/license-CC--BY--SA--4.0-lightgrey)](https://github.com/onyx-og/docstack/blob/main/LICENSE.md)
 
 # @docstack/server

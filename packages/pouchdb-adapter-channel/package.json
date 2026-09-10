@@ -22,7 +22,7 @@
     "pretest": "npm run build",
     "test": "mocha"
   },
-  "homepage": "https://onyx.ac/docstack",
+  "homepage": "https://onyx.ac/products/docstack",
   "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
   "license": "MIT",
   "keywords": [

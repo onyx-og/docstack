@@ -8,11 +8,11 @@ A document data layer for storing, managing and consuming application data — o
 
 [![npm client](https://img.shields.io/npm/v/@docstack/client?label=%40docstack%2Fclient)](https://www.npmjs.com/package/@docstack/client)
 [![npm react](https://img.shields.io/npm/v/@docstack/react?label=%40docstack%2Freact)](https://www.npmjs.com/package/@docstack/react)
-[![Docs](https://img.shields.io/badge/docs-onyx--og.github.io-blue)](https://onyx-og.github.io/docstack/)
+[![Docs](https://img.shields.io/badge/docs-onyx.ac-blue)](https://onyx.ac/products/docstack)
 [![License](https://img.shields.io/badge/license-CC--BY--SA--4.0-lightgrey)](LICENSE.md)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=4QSQ8L9AK2C74)
 
-[Documentation](https://onyx-og.github.io/docstack/) · [Live workbench](https://onyx-og.github.io/docstack/app/index.html) · [Client](packages/client/README.md) · [React](packages/react/README.md)
+[Documentation](https://onyx.ac/products/docstack) · [Live workbench](https://onyx-og.github.io/docstack/app/index.html) · [Client](packages/client/README.md) · [React](packages/react/README.md)
 
 </div>
 
@@ -24,14 +24,15 @@ DocStack gives a document store the things applications actually need — **sche
 
 The database runs **inside your application**, not behind a network call. Every read, every write, every validation and every query resolves locally, so your UI never waits on a server and never breaks when the connection does. When a remote is available, the whole database replicates to it — and that remote is *whatever you hand it*: a CouchDB endpoint, another DocStack node, or the user's own Google Drive folder.
 
-The other half of the idea: **logic is data**. Schemas, triggers, background jobs and access policies are documents in the database, not code in your bundle. Change a validation rule or a business process by writing a document — no redeploy, and the change replicates to every device like anything else.
+The other half of the idea: **logic is data**. Schemas, triggers, background jobs, migrations and access scopes are documents in the database, not code in your bundle. Change a validation rule or a business process by writing a document — no redeploy, and the change replicates to every device like anything else.
 
 ## Why DocStack
 
 * **⚡ Offline-first by default** — the database is embedded. No round trip for a read, a write, a validation or a join. Works on a plane, in a basement, on a train.
 * **🔍 SQL in the browser** — `SELECT`, `JOIN`, `GROUP BY`, subqueries, `ORDER BY … LIMIT`, with index pushdown and streaming scans. No hand-written map/reduce.
-* **🧠 Logic as data** — triggers, jobs and policies live in the database as documents. Update behaviour at runtime; it replicates with the rest.
+* **🧠 Logic as data** — triggers, jobs, migrations and access scopes live in the database as documents. Update behaviour at runtime; it replicates with the rest.
 * **🔐 Field-level encryption** — mark an attribute `encrypted` and it is ciphertext on disk *and on the remote*. Your sync target holds data it cannot read.
+* **🛡️ Access by scope** — content is sealed under an attribute formula like `("role:manager" and "dept:sales") or "clearance:secret"`. A session that does not satisfy it cannot produce the plaintext: denial is decryption failure, not a check, so it binds the device owner too.
 * **🔄 Bring-your-own-remote sync** — `stack.sync({ remote })` against any PouchDB-compatible database. Transport-agnostic on purpose: DocStack never learns about your provider.
 * **📦 Versioned schema patches** — migrations as declarative documents with a semver ledger, applied once, all-or-nothing, gated across devices so a trailing client can't corrupt a leading one.
 * **🧾 Named write transactions** — stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it.
@@ -86,16 +87,17 @@ const TaskList = () => {
 * **Offline-first field and mobile apps** — data collection, point-of-sale, inspections, note-taking. Validation and business logic run without connectivity, and reconcile later.
 * **Serverless personal apps with user-owned backup** — sync to the user's *own* Drive. Multi-device sync and real backup with no server, no storage bill, and no custody of anyone's data. "We don't hold your data" becomes a feature rather than a compromise.
 * **Privacy-sensitive and regulated data** — health notes, financial records, journals. Encrypted attributes are unreadable to the storage operator and to the sync remote.
-* **Multi-tenant SaaS and internal tools** — policies are documents scoped by group and user, so one deployment serves many tenants without per-tenant application code.
+* **Multi-tenant SaaS and internal tools** — each tenant gets a scope sealed under its own attribute, so one deployment serves many tenants and one tenant's devices can hold, but never read, another's data.
 * **Analytics and reporting surfaces** — the SQL engine lets support staff and analysts query joined, filtered data without a bespoke reporting API.
 
 ## Packages
 
 | Package | What it is | Status |
 |---|---|---|
-| **[@docstack/client](packages/client/README.md)** | The engine: schema, SQL, triggers, jobs, policies, encryption, patches, transactions, sync. Runs in the browser. | [![npm](https://img.shields.io/npm/v/@docstack/client)](https://www.npmjs.com/package/@docstack/client) |
+| **[@docstack/client](packages/client/README.md)** | The engine: schema, SQL, triggers, jobs, access scopes, encryption, patches, transactions, sync. Runs in the browser. | [![npm](https://img.shields.io/npm/v/@docstack/client)](https://www.npmjs.com/package/@docstack/client) |
 | **[@docstack/react](packages/react/README.md)** | Provider and live hooks over the client. Every query is a subscription. | [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react) |
 | **[@docstack/ui](packages/ui/README.md)** | The workbench: browse a database, edit schema, run queries, view the ER diagram. | [Live app](https://onyx-og.github.io/docstack/app/index.html) |
+| **[@docstack/abe](packages/abe/README.md)** | The CP-ABE primitive behind access scopes. Installed with the client; its authority half runs where you control it. | [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) |
 | **[@docstack/server](packages/server/README.md)** | The same engine deployed server-side — sync hub, shared workspaces, server-side jobs. | Preview |
 
 ### Companion packages
@@ -112,16 +114,16 @@ const TaskList = () => {
 | **Schema Engine** | Zod-backed validation, class hydration, schema propagation |
 | **Query Engine** | SQL parser, planner and executor — joins, aggregation, pushdown, streaming |
 | **Job Engine** | Background jobs and the unattended scheduler |
-| **Crypto Engine** | Key derivation (PBKDF2) and AES-GCM field-level encryption |
-| **Policy Engine** | Rule-based read/write access, per class and per session |
+| **Crypto Engine** | AES-GCM field-level encryption under a keyring: the document key, retired keys and admitted scope keys |
+| **Access control** | CP-ABE-sealed scope keys, attribute-key admission, per-scope locks |
 | **Transaction Engine** | Staged multi-document writes, overlay reads, one-batch commit |
 | **Sync Layer** | Lifecycle, replication filters, convergence state, the schema gate |
 
-Full architecture notes live in the [documentation](https://onyx-og.github.io/docstack/docs/architecture/core-concepts); the decisions behind them are recorded as ADRs in [`specs/adr/`](specs/adr/).
+Full architecture notes live in the [documentation](https://onyx.ac/products/docstack/docs/concepts/core-concepts/); the decisions behind them are recorded as ADRs in [`specs/adr/`](specs/adr/).
 
 ## Status
 
-Pre-1.0 and moving. `@docstack/client` and `@docstack/react` are published and in production use; `@docstack/ui` is an application you run or visit rather than install; `@docstack/server` is a preview of the same engine deployed server-side.
+Pre-1.0 and moving. `@docstack/client`, `@docstack/react` and `@docstack/abe` are published and in production use; `@docstack/ui` is an application you run or visit rather than install; `@docstack/server` is a preview of the same engine deployed server-side.
 
 ## Contributing
 

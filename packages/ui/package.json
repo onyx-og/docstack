@@ -27,7 +27,7 @@
   "bugs": {
     "url": "https://github.com/onyx-og/docstack/issues"
   },
-  "homepage": "https://github.com/onyx-og/docstack#readme",
+  "homepage": "https://onyx.ac/products/docstack",
   "description": "",
   "dependencies": {
     "@docstack/client": "file:../client",

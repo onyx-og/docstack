@@ -42,7 +42,7 @@
   "bugs": {
     "url": "https://github.com/onyx-og/docstack/issues"
   },
-  "homepage": "https://onyx.ac/docstack",
+  "homepage": "https://onyx.ac/products/docstack",
   "dependencies": {
     "@docstack/abe": "^0.1.0",
     "@docstack/shared": "^0.1.0",

@@ -47,7 +47,7 @@ const ClassModelPanel = (props: ClassModelPanelProps) => {
     } = useModal({ areaId: "root" });
 
     const openExternalDoc = React.useCallback(() => {
-        window.open('https://onyx-og.github.io/docstack/docs', '_blank');
+        window.open('https://onyx.ac/products/docstack/docs/', '_blank');
     }, []);
 
     return <section style={{

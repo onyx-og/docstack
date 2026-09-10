@@ -5,7 +5,7 @@
  * base path, the locales, the markdown format, the admonition keywords — is
  * read from docusaurus.config.ts and is deliberately not repeated here.
  *
- * @type {import('pterodoc').PterodocConfig}
+ * @type {import('pterodocs').PterodocsConfig}
  */
 export default {
   site: {
@@ -19,11 +19,11 @@ export default {
 
   target: {
     type: 'wordpress',
-    // The tree hangs from /product/docstack/docs/. Pages above the documentation
-    // root (/product and /product/docstack) are created once if missing and never
-    // edited again, so /product/docstack is authored in WordPress as the product
-    // page, with whatever layout its future siblings under /product share.
-    root: '/product/docstack',
+    // The tree hangs from /products/docstack/docs/. Pages above the documentation
+    // root (/products and /products/docstack) are created once if missing and never
+    // edited again, so /products/docstack is authored in WordPress as the product
+    // page, with whatever layout its future siblings under /products share.
+    root: '/products/docstack',
     base: 'docs',
     status: 'publish',
     // Jetpack's SEO description field.
@@ -42,9 +42,11 @@ export default {
 
   render: {
     // Keeps the theme CSS that already targets these class names working.
+    // The pterodoc WordPress plugin must be set to the same prefix, on its
+    // settings page, or it loads and styles nothing.
     classPrefix: 'docstack',
     unpublishedLinks: 'site',
   },
 
-  output: { dir: '.pterodoc' },
+  output: { dir: '.pterodocs' },
 };
