@@ -39,11 +39,13 @@ Non-trivial changes to DocStack are recorded as architecture decision records in
 | [0044](https://github.com/onyx-og/docstack/blob/main/specs/adr/0044-a-patch-carries-one-shot-jobs.md) | A patch carries one-shot jobs | accepted, implemented | 2026-09-04 | `preApply` and `postApply` migration jobs, staged with the model. |
 | [0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md) | Access control is cryptographic: CP-ABE scopes beside the engine | accepted, implemented 2026-09-06 | 2026-09-04 | One access-control language, enforced by decryption; the rule engine is removed, `@docstack/abe` carries the primitive. |
 | [0046](https://github.com/onyx-og/docstack/blob/main/specs/adr/0046-engine-sessions.md) | Engine sessions: a request-scoped context the pipeline honours | accepted, implemented | 2026-09-11 | `stack.forSession(session)` narrows reads, refuses foreign-scope writes, attributes them, and reaches triggers and jobs; whole-stack members close through a view. |
+| [0047](https://github.com/onyx-og/docstack/blob/main/specs/adr/0047-the-server-is-a-peer-and-a-service.md) | The server is a peer and a service: one engine, two surfaces, confidentiality per session at the host | accepted | 2026-09-11 | `@docstack/server` runs the engine on Node with an API surface under engine sessions and a Couch-compatible replication surface; the host is the authority; a thin `RemoteStack` makes online mode first-class. |
 
 ## Specs
 
 - [`specs/01-sync.md`](https://github.com/onyx-og/docstack/blob/main/specs/01-sync.md): the replication lifecycle, filters and their identity, the schema gate, the adapter contract.
 - [`specs/02-crypto-access.md`](https://github.com/onyx-og/docstack/blob/main/specs/02-crypto-access.md): the cryptographic access architecture in full and the integration checklist for the cycle that builds it.
+- [`specs/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md): the server design: one engine on a host, the API surface under engine sessions, the Couch-compatible replication surface, grants, the authority, the thin client, deployment shapes, and the integration checklist.
 - [`specs/pouchdb-adapter-tauri-sqlite.md`](https://github.com/onyx-og/docstack/blob/main/specs/pouchdb-adapter-tauri-sqlite.md): the brief for an in-repo storage adapter that is not yet published.
 
 ## Reading them

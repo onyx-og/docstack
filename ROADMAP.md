@@ -30,6 +30,17 @@ Still open on the track:
    construction, and the audit re-opens the curve-margin question the gate
    deferred.
 
+## Server (ADR-0047, specs/03-server.md)
+
+**Accepted 2026-09-11, not started.** `@docstack/server` rebuilt from scratch as one
+engine on a host with two surfaces: an API surface under engine sessions (ADR-0046)
+for online clients and a Couch-compatible replication surface for replicas; the host
+is the authority, runs jobs, hosts the workbench and mirrors upstream. Phases, in
+order: conditional exports in the client and the Node spike; online mode with the
+thin `RemoteStack`; the replication surface; the WebSocket channel and the workbench;
+operations; CLI and docs; durable-store adapters (Firestore, GCS) with a benchmark
+harness and the Docker and Cloud Run recipes. The checklist is spec 03 §12.
+
 ## Dropped: client-side policy enforcement (ADR-0045 deferred section)
 
 The JS-rule enforcement design (opt-in flag, policy-aware handle, wildcard
