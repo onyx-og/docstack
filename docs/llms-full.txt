@@ -915,7 +915,7 @@ The decision is [ADR-0039](https://github.com/onyx-og/docstack/blob/main/specs/a
 | Web Crypto (`crypto.subtle`) | Encryption | Native PBKDF2 and AES-GCM: faster than a JavaScript implementation and a smaller surface for error. |
 | rabe (Fraunhofer AISEC), compiled to WASM | Attribute-based encryption | The AC17 CP-ABE scheme, vendored into `@docstack/abe`, seals scope keys under attribute policies. Loaded lazily, only when a stack declares scopes. |
 | Playwright | Tests | The client suite runs the compiled library in a real Chromium against real IndexedDB. |
-| Rollup, tsc, Webpack | Builds | Rollup emits the client as ESM plus a UMD bundle; the React package is plain `tsc`; the workbench is Webpack. |
+| Rollup, tsc, Webpack | Builds | Rollup emits the client as a browser ESM entry, a Node ESM entry and a UMD bundle; the React package is plain `tsc`; the workbench is Webpack. |
 
 ### The engines
 
@@ -987,11 +987,13 @@ Non-trivial changes to DocStack are recorded as architecture decision records in
 | [0044](https://github.com/onyx-og/docstack/blob/main/specs/adr/0044-a-patch-carries-one-shot-jobs.md) | A patch carries one-shot jobs | accepted, implemented | 2026-09-04 | `preApply` and `postApply` migration jobs, staged with the model. |
 | [0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md) | Access control is cryptographic: CP-ABE scopes beside the engine | accepted, implemented 2026-09-06 | 2026-09-04 | One access-control language, enforced by decryption; the rule engine is removed, `@docstack/abe` carries the primitive. |
 | [0046](https://github.com/onyx-og/docstack/blob/main/specs/adr/0046-engine-sessions.md) | Engine sessions: a request-scoped context the pipeline honours | accepted, implemented | 2026-09-11 | `stack.forSession(session)` narrows reads, refuses foreign-scope writes, attributes them, and reaches triggers and jobs; whole-stack members close through a view. |
+| [0047](https://github.com/onyx-og/docstack/blob/main/specs/adr/0047-the-server-is-a-peer-and-a-service.md) | The server is a peer and a service: one engine, two surfaces, confidentiality per session at the host | accepted | 2026-09-11 | `@docstack/server` runs the engine on Node with an API surface under engine sessions and a Couch-compatible replication surface; the host is the authority; a thin `RemoteStack` makes online mode first-class. |
 
 ### Specs
 
 - [`specs/01-sync.md`](https://github.com/onyx-og/docstack/blob/main/specs/01-sync.md): the replication lifecycle, filters and their identity, the schema gate, the adapter contract.
 - [`specs/02-crypto-access.md`](https://github.com/onyx-og/docstack/blob/main/specs/02-crypto-access.md): the cryptographic access architecture in full and the integration checklist for the cycle that builds it.
+- [`specs/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md): the server design: one engine on a host, the API surface under engine sessions, the Couch-compatible replication surface, grants, the authority, the thin client, deployment shapes, and the integration checklist.
 - [`specs/pouchdb-adapter-tauri-sqlite.md`](https://github.com/onyx-og/docstack/blob/main/specs/pouchdb-adapter-tauri-sqlite.md): the brief for an in-repo storage adapter that is not yet published.
 
 ### Reading them
@@ -1013,7 +1015,7 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | `packages/react` | `@docstack/react` | Provider and hooks. | [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react) |
 | `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) |
 | `packages/ui` | `@docstack/ui` | The workbench application. Built with Webpack; its bundle is copied into `packages/docs/static/app` and hosted from this site. | Not a library; hosted |
-| `packages/server` | `@docstack/server` | The server preview. | No |
+| `packages/server` | `@docstack/server` | The server: a rewrite in progress against [spec 03](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md); the preview sources are not built. | No |
 | `packages/docs` | `@docstack/docs` | This site (Docusaurus). Builds into the repository's root `docs/` folder, which GitHub Pages serves. | Site |
 | `packages/examples/react-todo` | | The runnable example app (Vite). | |
 | `packages/examples/react-init` | | A single-file starting point. | |
@@ -1030,7 +1032,7 @@ Each package builds on its own; the root `package.json` orchestrates:
 ```bash
 npm install                 # once, at the root; links the workspaces
 npm run build:shared
-npm run build:client        # clean, tsc for types, rollup for lib/ (ESM + lib/index.umd.js)
+npm run build:client        # clean, tsc for types, rollup for lib/ (browser ESM + Node ESM + lib/index.umd.js)
 npm run build:react         # tsc
 npm run build:ui            # webpack, production
 npm run build:docs          # docusaurus build --out-dir ../../docs
@@ -1046,7 +1048,7 @@ The site's API reference is generated at build time by TypeDoc from `packages/cl
 | Package | Runner | Command |
 | :--- | :--- | :--- |
 | `@docstack/client` | Playwright, in a real Chromium against IndexedDB | `cd packages/client && npm run test` |
-| `@docstack/server` | Jest | `cd packages/server && npm run test` |
+| `@docstack/server` | `node --test`, against the built client's Node entry | `cd packages/server && npm run test` |
 
 Tests are a required part of a contribution, not an optional follow-up: new functions, branches or conditions ship with tests that exercise them; a bug fix includes a regression test that fails on `main` and passes with the fix; and a test is never weakened to make it pass. If an expectation seems wrong, raise it in the PR rather than loosening the assertion.
 
@@ -1087,6 +1089,10 @@ Still open on the track:
 
 1. **Authority tooling as its own package.** `@docstack/abe` carries the authority helpers (`setup`, `keygen`, `wrapCek`) today; splitting the authority-only surface into a package the consumer's controlled environment runs, later the server package, keeps master-key code out of every client dependency graph.
 2. **Deferred within the track:** per-document policy strings; attribute-level revocation (attribute versioning, the scheme's known weak point); scope-aware channel grants; writer authentication through revision signatures (label tampering is contained, never disclosed, but not prevented without them); and a **security audit before any production claim**. The WASM backend, rabe on BN254 at roughly a 100-bit modern margin, is unaudited by construction, and the audit reopens the curve-margin question the gate deferred.
+
+### Server ([ADR-0047](https://github.com/onyx-og/docstack/blob/main/specs/adr/0047-the-server-is-a-peer-and-a-service.md), [`specs/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md))
+
+**Accepted 2026-09-11, not started.** `@docstack/server` rebuilt from scratch as one engine on a host with two surfaces: an API surface under engine sessions (ADR-0046) for online clients and a Couch-compatible replication surface for replicas; the host is the authority, runs jobs, hosts the workbench and mirrors upstream. Phases, in order: conditional exports in the client and the Node spike; online mode with the thin `RemoteStack`; the replication surface; the WebSocket channel and the workbench; operations; CLI and docs; durable-store adapters (Firestore, GCS) with a benchmark harness and the Docker and Cloud Run recipes. The checklist is spec 03 §12.
 
 ### Dropped: client-side rule enforcement
 
@@ -1238,6 +1244,14 @@ npm install @docstack/client pouchdb-browser pouchdb-find
 
 `pouchdb-browser` and `pouchdb-find` are **peer dependencies** at `^9`. DocStack does not bundle the storage layer, so you control its version and it is never duplicated in your bundle.
 
+The same package runs under Node 20 and later, which is what [the server](../reference/server.md) is built on. Node's `node` export condition resolves `@docstack/client` to a build that uses `pouchdb` (LevelDB, http, replication) instead of `pouchdb-browser`; the engine is the same code, only the constructor differs. A Node consumer installs `pouchdb` and imports the same names:
+
+```bash
+npm install @docstack/client pouchdb pouchdb-find   # Node
+```
+
+`@docstack/client/node` and `@docstack/client/browser` name each build explicitly, for bundlers and test runners that ignore export conditions.
+
 [![@docstack/client on npm](https://img.shields.io/npm/v/@docstack/client?label=%40docstack%2Fclient)](https://www.npmjs.com/package/@docstack/client)
 
 The badge is the current release, read from npm as you load this page. The [release notes](/blog) say what changed in each one, and the [changelog](https://github.com/onyx-og/docstack/blob/main/packages/client/CHANGELOG.md) goes back to 0.1.6.
@@ -1254,10 +1268,10 @@ React 19 is a peer dependency. `@docstack/react` wraps the client in a provider 
 
 ### What the runtime needs
 
-- **IndexedDB.** The default storage adapter is `pouchdb-browser`'s IndexedDB adapter. Any other PouchDB adapter passes through: everything in the options object that is not DocStack's own reaches the PouchDB constructor, so `adapter: 'memory'` with `plugins: [MemoryAdapter]` gives you an in-memory stack for tests.
+- **IndexedDB** in the browser, **LevelDB** under Node. The default storage adapter is the one the resolved PouchDB build ships. Any other PouchDB adapter passes through: everything in the options object that is not DocStack's own reaches the PouchDB constructor, so `adapter: 'memory'` with `plugins: [MemoryAdapter]` gives you an in-memory stack for tests.
 - **Web Crypto.** Field-level encryption uses `crypto.subtle` for AES-GCM and PBKDF2. Every evergreen browser has it; so does Node 20 and later.
 - **WebAssembly**, only if you use [cryptographic access scopes](../concepts/access-control/index.md). The CP-ABE primitive ships as `@docstack/abe`, a client dependency inlined into the bundle. Its ~180 KB (gzipped) WebAssembly module is embedded but instantiated **lazily** — a stack that never touches scopes compiles no WebAssembly and pays only the embedded bytes.
-- **ES modules.** The package is `"type": "module"`. A UMD build is also shipped at `lib/index.umd.js` for script-tag use.
+- **ES modules.** The package is `"type": "module"`, with a browser entry (`lib/index.js`) and a Node entry (`lib/node.js`) selected by export condition. A UMD build is also shipped at `lib/index.umd.js` for script-tag use.
 - **TypeScript types** resolve `@docstack/shared` at `^0.1.0`. The runtime bundle inlines it (and `@docstack/abe`); only the published `.d.ts` files import them.
 
 #### Bundler note
