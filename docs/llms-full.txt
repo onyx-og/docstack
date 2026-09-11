@@ -293,6 +293,11 @@ document. Two consequences follow, and they are features:
   plainly.
 - [Recipes](./recipes.md) — common access patterns.
 
+On a host that holds keys for many principals, the same entitlement is applied
+per request by the engine itself: a [session](../../guides/sessions.md) names the
+scopes a principal satisfies, and the stack opens exactly those for it, attributes
+its writes, and tells triggers and jobs who is asking (ADR-0046).
+
 Specification: `specs/02-crypto-access.md` (ADR-0045, implemented). The CP-ABE
 primitive ships as `@docstack/abe`; the client surface is `accessKeys` at open,
 `stack.unlockScopes(key)` at runtime, and a `~scope` label on documents.
@@ -838,6 +843,8 @@ DocStack's security model is one model, enforced in one place: the engine. Acces
 
 The server preview establishes sessions over HTTP instead: a `POST /login` that verifies credentials, writes the same `~UserSession` document, and returns a JWT as an `httpOnly` cookie, with every private route re-checking that the session is still active. That flow vouches for identity only; it carries no key material. See [Server (preview)](../reference/server.md).
 
+A host that holds keys on behalf of many principals needs a third thing: to act *as* one of them for the length of a request. `stack.forSession(session)` returns a view narrowed to that session's entitlement, with writes attributed to its principal and the session handed to triggers and jobs; whole-stack members (keys, auth, sync, lifecycle) throw through it. Entitlement is the host's claim, decided with the same mathematics a device would run, and the stack's keys are the ceiling. See [Act as a session](../guides/sessions.md).
+
 ### What leaves the device
 
 Replication reads the database as stored. Flagged attributes cross as ciphertext; everything else crosses as written, so a field a remote should not see has to actually be flagged. Replication filters shape what a device bothers to carry, not what someone with access to the remote can read; partitioning belongs to the topology, a database per workspace, a Drive folder per account.
@@ -979,6 +986,7 @@ Non-trivial changes to DocStack are recorded as architecture decision records in
 | [0043](https://github.com/onyx-og/docstack/blob/main/specs/adr/0043-bulkdocs-class-resolution-ignores-the-batch.md) | `bulkDocs` class resolution ignores the batch | finding, fixed | 2026-09-04 | A patch can introduce a class and seed its first document in one batch. |
 | [0044](https://github.com/onyx-og/docstack/blob/main/specs/adr/0044-a-patch-carries-one-shot-jobs.md) | A patch carries one-shot jobs | accepted, implemented | 2026-09-04 | `preApply` and `postApply` migration jobs, staged with the model. |
 | [0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md) | Access control is cryptographic: CP-ABE scopes beside the engine | accepted, implemented 2026-09-06 | 2026-09-04 | One access-control language, enforced by decryption; the rule engine is removed, `@docstack/abe` carries the primitive. |
+| [0046](https://github.com/onyx-og/docstack/blob/main/specs/adr/0046-engine-sessions.md) | Engine sessions: a request-scoped context the pipeline honours | accepted, implemented | 2026-09-11 | `stack.forSession(session)` narrows reads, refuses foreign-scope writes, attributes them, and reaches triggers and jobs; whole-stack members close through a view. |
 
 ### Specs
 
@@ -2060,11 +2068,12 @@ await stack.db.bulkDocs([{
 }]);
 ```
 
-`content` must define `execute(stack, params, job)`:
+`content` must define `execute(stack, params, job)`, and may take a fourth argument:
 
 - `stack` is the `ClientStack` the job runs on.
 - `params` is `defaultParams` merged with whatever the caller passed at run time.
 - `job` is the job document itself, including its current `metadata`.
+- `session`, the optional fourth argument, is the [session](./sessions.md) the run was started under: a trigger's write on a host acting for a principal, or `executeJob(id, params, 'manual', session)`. A scheduled run has none.
 
 Return `{ metadata }` to persist state across runs; it is written back to the job document and recorded on the run as `finalMetadata`. The full document shape is in [Trigger and job document models](../reference/trigger-and-job-models.md).
 
@@ -2273,7 +2282,7 @@ await taskClass.deleteCard(task._id);                            // soft delete:
 
 Every write runs the authoring pipeline: `before` triggers, validation (which applies defaults and checks foreign keys and relations), encryption, the write, then `after` triggers. `deleteCard` is a soft delete. It sets `active: false`, which is the document-wide visibility flag that reads honour by default; the document stays in the database and replicates like any other update.
 
-Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes, and optionally `~scope`, the access scope their encrypted fields seal under. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
+Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes, optionally `~scope`, the access scope their encrypted fields seal under, and, when written through a [session](./sessions.md), `~createdBy` and `~updatedBy`. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
 
 ### Reading
 
@@ -2309,7 +2318,7 @@ const report = await target.importContent(payload, { overwrite: false });
 console.log(report.documents.written, report.issues);
 ```
 
-An export carries application content without the data model that describes it; the target stack must already have the classes, typically by applying the same patches. Encrypted attributes are decrypted on the way out, so the file is as sensitive as the data in it. A locked stack refuses to export unless `allowLossyWhenLocked: true`. Import options decide what happens to a document whose class is missing (`onMissingClass: 'skip' | 'fail'`), an attribute the class does not define (`onUnknownAttribute: 'strip' | 'fail' | 'keep'`), and an id that already exists (`overwrite`). Import is not a transaction; use one if you need the all-or-nothing property. See [Write transactions](./transactions.md).
+An export carries application content without the data model that describes it; the target stack must already have the classes, typically by applying the same patches. Encrypted attributes are decrypted on the way out, so the file is as sensitive as the data in it. A locked stack refuses to export unless `allowLossyWhenLocked: true`. Import options decide what happens to a document whose class is missing (`onMissingClass: 'skip' | 'fail'`), an attribute the class does not define (`onUnknownAttribute: 'strip' | 'fail' | 'keep'`), and an id that already exists (`overwrite`). Import is not a transaction; use one if you need the all-or-nothing property. See [Write transactions](./write-transactions.md).
 
 ---
 
@@ -2542,11 +2551,13 @@ for await (const doc of stack.findDocumentsIterator({ '~class': 'Task' }, { batc
 
 ### Encrypted and sealed data
 
-A row is what the session can read. Encrypted attributes decrypt when the stack holds the key; on a locked stack they come back as `null`, and a row that would consist only of `null` values is dropped rather than returned as an empty object. No `WHERE` clause, join or projection can produce plaintext the session's key cannot; see [Access control](../concepts/access-control/index.md).
+A row is what the session can read. Encrypted attributes decrypt when the stack holds the key; on a locked stack they come back as `null`, and a row that would consist only of `null` values is dropped rather than returned as an empty object. A predicate on an encrypted attribute is never pushed into the index, where it would compare against ciphertext; it is evaluated in memory after decryption, so no `WHERE` clause, join or projection can produce plaintext the session's key cannot; see [Access control](../concepts/access-control/index.md).
+
+On a host that holds keys for many principals, the same rule applies per request: `stack.forSession(session).query(...)` reads with that session's entitlement, and a sealed value evaluates as `null` in every predicate. See [Act as a session](./sessions.md).
 
 ### Inside a transaction
 
-A transaction handle has its own `query`. It sees the documents staged in that transaction overlaid on committed state, including across joins, which is how a multi-document write can check its own invariants before committing. See [Write transactions](./transactions.md).
+A transaction handle has its own `query`. It sees the documents staged in that transaction overlaid on committed state, including across joins, which is how a multi-document write can check its own invariants before committing. See [Write transactions](./write-transactions.md).
 
 ### From React
 
@@ -2765,6 +2776,153 @@ The generated [API reference](/docs/api/react/) lists every export with its sign
 
 ---
 
+## Act as a session
+
+A stack is one user's database: one keyring, one login, one class cache. On a device that is the right shape, because the device *is* the principal. A host is different. A server, a hub, any process that holds keys on behalf of several people and answers their requests from one stack, needs to say "this read is Alice's, this write is Bob's" and have the engine act on it. That is a **session**.
+
+`stack.forSession(session)` returns a view of the stack as that session sees it. Reads through the view open only the access scopes the session is entitled to and read `null` for the rest, whatever keys the stack itself holds. Writes into any other scope refuse. Every write is attributed to the session's principal, and triggers and jobs receive the session as their fourth argument. The view has the stack's own shape, so a `Class` built from it, the query engine and the React hooks work unchanged.
+
+:::info Version
+Engine sessions ship in the next `@docstack/client` release ([ADR-0046](https://github.com/onyx-og/docstack/blob/main/specs/adr/0046-engine-sessions.md)). A stack used without a session behaves exactly as before.
+:::
+
+### 1. Decide what the session may open
+
+A `StackSession` is a claim you construct. The engine does not authenticate it; it enforces it against the keys it actually holds, so a session can never open more than the stack's keyring can. Entitlement is the ceiling you set, the keys are the ceiling the mathematics sets.
+
+```typescript
+import type { StackSession } from '@docstack/client';
+
+const session: StackSession = {
+    id: requestId,                                   // opaque: a request id, a JWT jti, a socket id
+    principal: { sub: 'alice', attributes: ['role:hr', 'dept:people'] },
+    scopes: ['hr'],                                  // access scopes this session may open
+    documentKey: true,                               // whether unlabelled encrypted content is open to it
+};
+```
+
+| Field | Meaning |
+| :--- | :--- |
+| `id` | Recorded, never interpreted. Use whatever names the request on your side. |
+| `principal.sub` | The subject writes are attributed to (`~createdBy`, `~updatedBy`). |
+| `principal.attributes` | Informational, for triggers and jobs. The engine does not evaluate policies from it. |
+| `scopes` | Scope ids the session may open. Content sealed under any other scope reads `null` and refuses writes. |
+| `documentKey` | Whether content sealed under the stack's document key, unlabelled encrypted attributes, is open to this session. |
+
+How a host decides `scopes` is its business, and there is one honest way to do it: the same way a device would. Mint the principal's attribute key from your identity model and attempt each scope with it. `decryptCek` from `@docstack/abe` returns `null` when the policy is not satisfied, and it costs about 24 ms per scope, so compute the set once per session and cache it keyed on the principal's attribute set. Recompute when a scope is rotated or the principal's attributes change.
+
+```typescript
+import { keygen, decryptCek } from '@docstack/abe';
+
+const attributeKey = await keygen(msk, principal.attributes);
+const scopes = [];
+for (const scope of await stack.findDocuments({ '~class': '~AccessScope', active: true })) {
+    if (await decryptCek(attributeKey, scope.abeWrappedCek)) scopes.push(scope.scopeId);
+}
+```
+
+### 2. Open a view
+
+```typescript
+const view = stack.forSession(session);
+
+view.session.scopes;          // ['hr'], frozen: a view cannot widen itself
+view instanceof ClientStack;  // true
+```
+
+A view is cheap and holds no state of its own beyond the session and the classes it builds. One per request is the intended granularity.
+
+### 3. What reads return
+
+A row is what the session can read. A sealed field reads `null`; a document with nothing readable drops out; everything unencrypted reads as written, exactly as on a device whose key does not satisfy a scope.
+
+```typescript
+const { docs } = await view.findDocuments({ '~class': 'Salary' });
+// { who: 'alice', amount: '100000', '~scope': 'hr' }   opened
+// { who: 'bob',   amount: null,     '~scope': 'fin' }  sealed to this session
+
+const { rows } = await view.query('SELECT who, amount FROM Salary');
+await view.query('SELECT who FROM Salary WHERE amount = ?', '200000');   // no rows: the predicate sees null
+for await (const row of view.queryStream('SELECT who FROM Salary')) { … }
+await view.getDocument(bobId);                                            // amount: null
+await view.db.get(bobId);                                                 // the same, through the handle
+```
+
+A predicate on an encrypted attribute is evaluated in memory after decryption, never in the index, so no `WHERE`, join or projection can match plaintext the session may not see. The live subscription is narrowed the same way: `view.subscribeClassDocs('Salary', target)` delivers change events with sealed fields as `null`.
+
+### 4. What writes do
+
+```typescript
+await view.createDoc(null, 'Salary', salaryClass, { who: 'erin', amount: '2', '~scope': 'hr' });   // lands
+await view.createDoc(null, 'Salary', salaryClass, { who: 'dave', amount: '1', '~scope': 'fin' });  // StackLockedError, scopeId: 'fin'
+await view.deleteDocument(bobId);                                                                 // StackLockedError: bob is fin
+```
+
+- **Refusal.** A write labelled with a scope outside the session's entitlement, or unlabelled encrypted content when `documentKey` is `false`, throws `StackLockedError`, the same error a sealed scope raises on a device, because to the writer it is one. `deleteDocument` throws it too rather than answering `false`.
+- **Attribution.** Every write through a view stamps `~updatedBy` with `principal.sub`, and a document's first write stamps `~createdBy`. Both are reserved fields, like `~scope`: a value the caller supplies is overwritten. A write with no session stamps nothing.
+- **The pipeline is unchanged.** Validation, defaults, relation checks, encryption and triggers run exactly as for a direct write. The session only adds who is asking.
+
+A `Class` built from the view routes through it:
+
+```typescript
+const salary = await view.getClass('Salary');
+await salary.addCard({ who: 'frank', amount: '3', '~scope': 'fin' });   // StackLockedError
+const cards = await salary.getCards();                                  // fin amounts read null
+```
+
+Classes built from a view never subscribe to their documents; a view is per request, and a live handle per request is a leak. `useClass`, `useClassDocs` and `useQuerySQL` against a view behave as they do against a stack.
+
+### 5. Triggers and jobs see the session
+
+A trigger body receives the session as its fourth argument; `undefined` on a write with no session. That is where "stamp the author" and "refuse unless a manager" live.
+
+```typescript
+await salaryClass.addTrigger('only-managers-raise', {
+    name: 'only-managers-raise',
+    order: 'before',
+    run: `
+        if (session && !session.principal.attributes.includes('role:manager') && document.amount !== undefined) {
+            throw new Error('Only a manager may set an amount');
+        }
+        return document;
+    `,
+});
+```
+
+The same argument reaches a job's `execute(stack, params, job, session)`: from a trigger's `jobId` path automatically, and from `stack.jobEngine.executeJob(jobId, params, 'manual', view.session)` when you start one on a session's behalf. A scheduled run has no session.
+
+Note what the argument is not: a sandbox. A trigger still receives the whole stack as its third argument and runs with the application's authority, as [Triggers](./triggers.md) states. The session tells trusted code who is asking; it does not constrain the code.
+
+### 6. What a view will not do
+
+Anything that belongs to the whole stack throws `StackSessionError`, naming the member: `authenticate`, `setAuthSession`, `clearAuthSession`, `unlock`, `unlockScopes`, `close`, `reset`, `sync`, `cancelSync`, `applyPatch`, `exportContent`, `importContent`, `beginTransaction`, `commit`, `discardTransaction`, `forSession`, and `db.destroy`, `db.close`, `db.compact`, `db.viewCleanup`. A view is one principal's window; letting it turn a key or close the database would change what every other session sees.
+
+Transactions and content export under a session are closed rather than narrowed for now; both are recorded on the [roadmap](../contributing/roadmap.md).
+
+### 7. What this does not do
+
+- **It does not authenticate.** Who the principal is, and which scopes they satisfy, is decided before `forSession` is called, by your identity model and the authority that holds the master key. A session is the engine's honest execution of that decision.
+- **It does not replace scopes.** On a device, denial is decryption failure and needs no session. Sessions exist for the host that holds keys for many people; the two agree on what each principal sees because the host decides entitlement with the same mathematics.
+- **It does not hide shape.** Ids, classes, labels, counts and timestamps are visible to every session, as they are to every replica.
+- **It does not narrow `stack.db`.** Only the view's handle is narrowed. Host code that reaches the stack directly reads with the whole keyring, which is what a host is for; keep request handling on the view.
+
+### API summary
+
+| Where | Member | Purpose |
+| :--- | :--- | :--- |
+| `@docstack/client` (type) | `StackSession` | `{ id, principal: { sub, attributes? }, scopes, documentKey }`. |
+| `stack` | `forSession(session)` | The view. Returns `SessionView`, a `ClientStack` with a frozen `session`. |
+| `view` | `findDocuments`, `findDocumentsIterator`, `getDocument`, `query`, `queryStream`, `subscribeClassDocs`, `subscribeDomainDocs`, `db.get` | Reads, narrowed to the session. |
+| `view` | `createDoc`, `createDocs`, `deleteDocument`, `db.put`, `db.post`, `db.bulkDocs`, `db.remove` | Writes, attributed to the session and refused outside its scopes. |
+| `view` | `getClass`, `getClassSnapshot` | Classes bound to the view, never subscribed. |
+| Trigger body | fourth argument `session` | The session of the write, or `undefined`. |
+| `execute(stack, params, job, session)` | fourth argument | The session the run was started under, or `undefined`. |
+| `JobEngine` | `executeJob(id, params, triggerType, session?)` | Start a job on a session's behalf. |
+| Fields | `~createdBy`, `~updatedBy` | Reserved; stamped on writes through a view. |
+| Errors | `StackLockedError.scopeId`, `StackSessionError.member` | A refused write; a whole-stack member reached through a view. |
+
+---
+
 ## Sync to a remote
 
 A DocStack stack is a local database first. Everything, validation, triggers, encryption, queries, runs in-process against storage on the device, with no server in the path. That is what makes an application built on it work on a train with no signal.
@@ -2927,6 +3085,109 @@ Every option, status field and error is listed in [Sync options and status](../r
 
 ---
 
+## Validate & react with triggers
+
+A trigger is a function stored on a class document and run by the authoring pipeline. It is data: it replicates with the class, it can be changed at runtime, and it shows up in the workbench's trigger editor.
+
+### Defining one
+
+```typescript
+await postClass.addTrigger('generate-slug', {
+    name: 'generate-slug',
+    order: 'before',
+    run: `document.slug = document.title.toLowerCase().replace(/\\s+/g, '-'); return document;`,
+});
+
+const post = await postClass.add({ title: 'Hello World' });
+console.log(post.slug); // 'hello-world'
+```
+
+A trigger model has four fields:
+
+| Field | Meaning |
+| :--- | :--- |
+| `name` | Unique within the class. |
+| `order` | `'before'` runs on the incoming document, ahead of validation and storage; `'after'` runs on the stored document, revision included. |
+| `run` | The function body as a string. Receives `document`, `classObj`, `stack` and `session`; must return the document. |
+| `jobId` | Instead of `run`: the id of a `~Job` to execute with `{ document }` as its parameters. |
+
+Exactly one of `run` or `jobId` is required. `classObj.addTrigger(name, model)` appends the trigger to the class model and writes the class document; `removeTrigger(name)` drops it from the in-memory class.
+
+### How a trigger runs
+
+The body is hydrated once, when the class is built, with `new Function('document', 'classObj', 'stack', 'session', …)`. It is wrapped in an async immediately-invoked function, so `await` works anywhere in the body. `execute(document, session?)` awaits the result and, if the body returned nothing, logs a warning and passes the original document through. `session` is the [session](./sessions.md) the write runs under, on a host acting for a principal, and `undefined` on a write with none; it is who is asking, not a sandbox. `executeLimited(document)` runs the body with no class and no stack, which is what the workbench uses to preview a trigger against a sample document.
+
+Because the body can reach the stack, a trigger can read other documents, run SQL, or write. Keep `before` triggers to derivations over the document itself where you can; a write in a `before` trigger runs while the pipeline is mid-flight for the document that triggered it.
+
+### Before: derive, validate, refuse
+
+```typescript
+await invoiceClass.addTrigger('total', {
+    name: 'total',
+    order: 'before',
+    run: `
+        document.total = (document.lines ?? []).reduce((sum, line) => sum + line.amount, 0);
+        if (document.total < 0) throw new Error('An invoice cannot be negative');
+        return document;
+    `,
+});
+```
+
+Throwing from a `before` trigger refuses the write. A `before` trigger runs on the raw document, ahead of schema validation: defaults have not been applied yet, and whatever the trigger returns is what gets validated. A trigger that derives a field can therefore satisfy a `mandatory` constraint, and a trigger that sets a bad value is caught by the validator.
+
+### After: react
+
+```typescript
+await orderClass.addTrigger('stamp-review-due', {
+    name: 'stamp-review-due',
+    order: 'after',
+    run: `
+        if (document.deliveredAt && !document.reviewDueAt) {
+            await stack.createDoc(document._id, 'Order', classObj, {
+                ...document, reviewDueAt: document.deliveredAt + 7 * 86400000,
+            });
+        }
+        return document;
+    `,
+});
+```
+
+An `after` trigger sees the stored document with its `_rev`. Writing the same document again from an `after` trigger mints a new revision, so guard it against re-entry, as the example does by checking the field it is about to set.
+
+To run only when a document is created, test the revision prefix: `document._rev.startsWith('1-')` is true for the first revision. It is an idiom, not an API; a document imported with an existing revision history will not match.
+
+### Starting a job from a trigger
+
+Work that should not block the write, or that should be recorded as a run, belongs in a job.
+
+```typescript
+await orderClass.addTrigger('confirm', {
+    name: 'confirm',
+    order: 'after',
+    run: `
+        await stack.jobEngine.executeJob('Job-SendOrderConfirmation', { orderId: document._id }, 'event');
+        return document;
+    `,
+});
+
+// Or, with no body at all:
+await orderClass.addTrigger('confirm', { name: 'confirm', order: 'after', jobId: 'Job-SendOrderConfirmation' });
+```
+
+The `jobId` form passes `{ document }` as the job's runtime parameters and records the run with `triggerType: 'event'`. Jobs, their document shape and the scheduler are covered in [Background jobs and scheduling](./jobs.md).
+
+### Where triggers do not run
+
+- **Replication.** Documents arriving over sync were validated and triggered where they were written; re-running the pipeline on them would reject documents authored by a device one patch ahead and mint revisions mid-replication. Replication writes bypass triggers by design.
+- **Simple classes.** A class flagged `simple` skips the authoring path entirely.
+- **Inside a transaction.** Staging a write does not run its triggers; they run at commit, when the batch goes through the pipeline. Triggers see the committed world, not the transaction's staged view.
+
+### What a trigger is not
+
+`new Function` is not a sandbox. A trigger body runs with the same authority as your application code, against the real stack. Class documents replicate, so a trigger written on one device runs on every device that receives the class. Treat write access to class documents as administrative access, and treat a class model arriving over sync from a peer you do not control as code you are about to run.
+
+---
+
 ## Write transactions
 
 Opt in per stack. A handle stages validated writes in memory; reads through the handle see the staged state overlaid on committed state; commit flushes the journal as **one batch** through the full authoring pipeline.
@@ -3028,110 +3289,7 @@ Staging costs nothing at the storage layer, and committing costs what the same w
 | `TransactionUnsupportedDocError` | A class model, patch, `_design/` or `_local/` document was staged. | Write it directly, or through a patch. |
 | `TransactionStateError` | The handle is not `open` or `partial`. | Begin a new transaction. |
 
-Why the stage sits above the plugin and commits through it, and what the next version adds, is in [Transactions](../concepts/transactions.md).
-
----
-
-## Validate & react with triggers
-
-A trigger is a function stored on a class document and run by the authoring pipeline. It is data: it replicates with the class, it can be changed at runtime, and it shows up in the workbench's trigger editor.
-
-### Defining one
-
-```typescript
-await postClass.addTrigger('generate-slug', {
-    name: 'generate-slug',
-    order: 'before',
-    run: `document.slug = document.title.toLowerCase().replace(/\\s+/g, '-'); return document;`,
-});
-
-const post = await postClass.add({ title: 'Hello World' });
-console.log(post.slug); // 'hello-world'
-```
-
-A trigger model has four fields:
-
-| Field | Meaning |
-| :--- | :--- |
-| `name` | Unique within the class. |
-| `order` | `'before'` runs on the incoming document, ahead of validation and storage; `'after'` runs on the stored document, revision included. |
-| `run` | The function body as a string. Receives `document`, `classObj` and `stack`; must return the document. |
-| `jobId` | Instead of `run`: the id of a `~Job` to execute with `{ document }` as its parameters. |
-
-Exactly one of `run` or `jobId` is required. `classObj.addTrigger(name, model)` appends the trigger to the class model and writes the class document; `removeTrigger(name)` drops it from the in-memory class.
-
-### How a trigger runs
-
-The body is hydrated once, when the class is built, with `new Function('document', 'classObj', 'stack', …)`. It is wrapped in an async immediately-invoked function, so `await` works anywhere in the body. `execute(document)` awaits the result and, if the body returned nothing, logs a warning and passes the original document through. `executeLimited(document)` runs the body with no class and no stack, which is what the workbench uses to preview a trigger against a sample document.
-
-Because the body can reach the stack, a trigger can read other documents, run SQL, or write. Keep `before` triggers to derivations over the document itself where you can; a write in a `before` trigger runs while the pipeline is mid-flight for the document that triggered it.
-
-### Before: derive, validate, refuse
-
-```typescript
-await invoiceClass.addTrigger('total', {
-    name: 'total',
-    order: 'before',
-    run: `
-        document.total = (document.lines ?? []).reduce((sum, line) => sum + line.amount, 0);
-        if (document.total < 0) throw new Error('An invoice cannot be negative');
-        return document;
-    `,
-});
-```
-
-Throwing from a `before` trigger refuses the write. A `before` trigger runs on the raw document, ahead of schema validation: defaults have not been applied yet, and whatever the trigger returns is what gets validated. A trigger that derives a field can therefore satisfy a `mandatory` constraint, and a trigger that sets a bad value is caught by the validator.
-
-### After: react
-
-```typescript
-await orderClass.addTrigger('stamp-review-due', {
-    name: 'stamp-review-due',
-    order: 'after',
-    run: `
-        if (document.deliveredAt && !document.reviewDueAt) {
-            await stack.createDoc(document._id, 'Order', classObj, {
-                ...document, reviewDueAt: document.deliveredAt + 7 * 86400000,
-            });
-        }
-        return document;
-    `,
-});
-```
-
-An `after` trigger sees the stored document with its `_rev`. Writing the same document again from an `after` trigger mints a new revision, so guard it against re-entry, as the example does by checking the field it is about to set.
-
-To run only when a document is created, test the revision prefix: `document._rev.startsWith('1-')` is true for the first revision. It is an idiom, not an API; a document imported with an existing revision history will not match.
-
-### Starting a job from a trigger
-
-Work that should not block the write, or that should be recorded as a run, belongs in a job.
-
-```typescript
-await orderClass.addTrigger('confirm', {
-    name: 'confirm',
-    order: 'after',
-    run: `
-        await stack.jobEngine.executeJob('Job-SendOrderConfirmation', { orderId: document._id }, 'event');
-        return document;
-    `,
-});
-
-// Or, with no body at all:
-await orderClass.addTrigger('confirm', { name: 'confirm', order: 'after', jobId: 'Job-SendOrderConfirmation' });
-```
-
-The `jobId` form passes `{ document }` as the job's runtime parameters and records the run with `triggerType: 'event'`. Jobs, their document shape and the scheduler are covered in [Background jobs and scheduling](./jobs.md).
-
-### Where triggers do not run
-
-- **Replication.** Documents arriving over sync were validated and triggered where they were written; re-running the pipeline on them would reject documents authored by a device one patch ahead and mint revisions mid-replication. Replication writes bypass triggers by design.
-- **Simple classes.** A class flagged `simple` skips the authoring path entirely.
-- **Inside a transaction.** Staging a write does not run its triggers; they run at commit, when the batch goes through the pipeline. Triggers see the committed world, not the transaction's staged view.
-
-### What a trigger is not
-
-`new Function` is not a sandbox. A trigger body runs with the same authority as your application code, against the real stack. Class documents replicate, so a trigger written on one device runs on every device that receives the class. Treat write access to class documents as administrative access, and treat a class model arriving over sync from a peer you do not control as code you are about to run.
+Why the stage sits above the plugin and commits through it, and what the next version adds, is in [Transactions](../concepts/transaction-engine.md).
 
 ---
 
@@ -3152,7 +3310,7 @@ The other half of the idea: **logic is data**. Schemas, triggers, background job
 - **Access by scope.** Content belongs to a scope sealed under an attribute formula, and a session that does not satisfy the formula cannot produce the plaintext. Denial is decryption failure, not a check. See [Scope your data](./guides/access-scopes.md) and [Access control](./concepts/access-control/index.md).
 - **Bring-your-own-remote sync.** `stack.sync({ remote })` against any PouchDB-compatible database. Transport-agnostic on purpose: DocStack never learns about your provider. See [Sync to a remote](./guides/sync.md).
 - **Versioned schema patches.** Migrations as declarative documents with a semver ledger, applied once, all-or-nothing, and gated across devices so a trailing client cannot corrupt a leading one. See [Schema patches](./guides/patches.md).
-- **Named write transactions.** Stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it. See [Write transactions](./guides/transactions.md).
+- **Named write transactions.** Stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it. See [Write transactions](./guides/write-transactions.md).
 - **Live React bindings.** Every hook subscribes to the local database. No refetching, no cache invalidation, no staleness story to own. See [React bindings](./guides/react.md).
 
 ### How it works
@@ -3371,6 +3529,8 @@ Every document written through the pipeline carries:
 | `~updateTimestamp` | On update. |
 | `active` | `true` on creation; `false` after `deleteCard` or `deleteDocument`. Reads honour it by default. |
 | `~scope` | Optional, set by you. The access scope the document's encrypted attributes seal under; overrides the class's `defaultScope`. |
+| `~createdBy` | Reserved. The `principal.sub` of the [session](../guides/sessions.md) that first wrote the document; absent on writes with no session. |
+| `~updatedBy` | Reserved. The `principal.sub` of the session that last wrote it; absent on writes with no session. |
 
 The generated [API reference](/docs/api/client/) lists every method of `Class`, `Attribute` and `Domain` with its signature.
 
@@ -3859,7 +4019,7 @@ Stored in a class document's `triggers` array.
 | :--- | :--- | :--- |
 | `name` | string | Unique within the class. |
 | `order` | `"before"` or `"after"` | Before the document is stored (on the validated document), or after (on the stored document with its `_rev`). |
-| `run` | string, optional | The function body. Hydrated with `new Function('document', 'classObj', 'stack', …)` inside an async IIFE; must return the document. |
+| `run` | string, optional | The function body. Hydrated with `new Function('document', 'classObj', 'stack', 'session', …)` inside an async IIFE; must return the document. `session` is the [session](../guides/sessions.md) of the write, or `undefined`. |
 | `jobId` | string, optional | Instead of `run`: the `~Job` to execute with `{ document }` as runtime parameters and `triggerType: "event"`. |
 
 Exactly one of `run` and `jobId` must be present; the class refuses to build a trigger with neither.
@@ -3874,7 +4034,7 @@ Exactly one of `run` and `jobId` must be present; the class refuses to build a t
 | `description` | string, optional | |
 | `type` | `"system"` or `"user"` | DocStack's own jobs versus the application's. |
 | `workerPlatform` | `"client"`, `"server"` or `"hybrid"` | Where the job is meant to run. |
-| `content` | string | JavaScript defining `execute(stack, params, job)`. |
+| `content` | string | JavaScript defining `execute(stack, params, job)`, with an optional fourth `session` argument. |
 | `hash` | string | SHA-256 hex digest of `content`, computed by the author when the job is written. Mandatory. Verified before every run; a mismatch refuses with `Job content hash mismatch`. |
 | `schedule` | string or `null`, optional | A schedule string for the scheduler; see [Scheduler options](./scheduler-options.md). |
 | `isSingleton` | boolean, optional | When `true`, a run is `SKIPPED` while another run of this job is `RUNNING`. |
@@ -3886,7 +4046,7 @@ Exactly one of `run` and `jobId` must be present; the class refuses to build a t
 #### The `execute` contract
 
 ```typescript
-async function execute(stack: ClientStack, params: Record<string, any>, job: JobModel):
+async function execute(stack: ClientStack, params: Record<string, any>, job: JobModel, session?: StackSession):
     Promise<{ metadata?: Record<string, any> } | void>
 ```
 
@@ -3986,7 +4146,7 @@ const report = await stack.commit(t);
 
 Atomicity is reported, not assumed. The commit report carries `adapter.atomicBatch`: adapters that land a batch as one storage transaction report `true`; IndexedDB reports `false`, with a revision pre-flight that shrinks the window without eliminating it. A partial commit leaves the handle in `status: "partial"` with only the failed entries retained.
 
-Measured in a real browser against IndexedDB, 100 documents: staging costs 0.43 ms per document with zero backend queries, commit lands at parity with the equivalent non-transactional batch write, empty-stage overlay reads cost the same as plain reads, and a refused commit costs about a millisecond. The reasoning is in [ADR-0039](https://github.com/onyx-og/docstack/blob/main/specs/adr/0039-transactions-stage-above-the-plugin-and-commit-through-it.md); the guide is [Write transactions](/docs/guides/transactions).
+Measured in a real browser against IndexedDB, 100 documents: staging costs 0.43 ms per document with zero backend queries, commit lands at parity with the equivalent non-transactional batch write, empty-stage overlay reads cost the same as plain reads, and a refused commit costs about a millisecond. The reasoning is in [ADR-0039](https://github.com/onyx-og/docstack/blob/main/specs/adr/0039-transactions-stage-above-the-plugin-and-commit-through-it.md); the guide is [Write transactions](/docs/guides/write-transactions).
 
 ### Security: replication no longer pushes encrypted attributes in plaintext
 
