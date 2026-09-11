@@ -97,7 +97,7 @@ await taskClass.deleteCard(task._id);                            // soft delete:
 
 Every write runs the authoring pipeline: `before` triggers, validation (which applies defaults and checks foreign keys and relations), encryption, the write, then `after` triggers. `deleteCard` is a soft delete. It sets `active: false`, which is the document-wide visibility flag that reads honour by default; the document stays in the database and replicates like any other update.
 
-Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes, and optionally `~scope`, the access scope their encrypted fields seal under. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
+Documents carry `~class`, `~createTimestamp`, `~updateTimestamp` and `active` alongside your attributes, optionally `~scope`, the access scope their encrypted fields seal under, and, when written through a [session](./sessions.md), `~createdBy` and `~updatedBy`. Ids are random with a class prefix (`Task-x7f3k2m9q1w4`); pass your own to `stack.createDoc(id, 'Task', taskClass, params)` when the id should mean something, which is what scheduled jobs do to stay idempotent.
 
 ## Reading
 
@@ -133,4 +133,4 @@ const report = await target.importContent(payload, { overwrite: false });
 console.log(report.documents.written, report.issues);
 ```
 
-An export carries application content without the data model that describes it; the target stack must already have the classes, typically by applying the same patches. Encrypted attributes are decrypted on the way out, so the file is as sensitive as the data in it. A locked stack refuses to export unless `allowLossyWhenLocked: true`. Import options decide what happens to a document whose class is missing (`onMissingClass: 'skip' | 'fail'`), an attribute the class does not define (`onUnknownAttribute: 'strip' | 'fail' | 'keep'`), and an id that already exists (`overwrite`). Import is not a transaction; use one if you need the all-or-nothing property. See [Write transactions](./transactions.md).
+An export carries application content without the data model that describes it; the target stack must already have the classes, typically by applying the same patches. Encrypted attributes are decrypted on the way out, so the file is as sensitive as the data in it. A locked stack refuses to export unless `allowLossyWhenLocked: true`. Import options decide what happens to a document whose class is missing (`onMissingClass: 'skip' | 'fail'`), an attribute the class does not define (`onUnknownAttribute: 'strip' | 'fail' | 'keep'`), and an id that already exists (`overwrite`). Import is not a transaction; use one if you need the all-or-nothing property. See [Write transactions](./write-transactions.md).

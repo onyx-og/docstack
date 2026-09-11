@@ -43,11 +43,12 @@ await stack.db.bulkDocs([{
 }]);
 ```
 
-`content` must define `execute(stack, params, job)`:
+`content` must define `execute(stack, params, job)`, and may take a fourth argument:
 
 - `stack` is the `ClientStack` the job runs on.
 - `params` is `defaultParams` merged with whatever the caller passed at run time.
 - `job` is the job document itself, including its current `metadata`.
+- `session`, the optional fourth argument, is the [session](./sessions.md) the run was started under: a trigger's write on a host acting for a principal, or `executeJob(id, params, 'manual', session)`. A scheduled run has none.
 
 Return `{ metadata }` to persist state across runs; it is written back to the job document and recorded on the run as `finalMetadata`. The full document shape is in [Trigger and job document models](../reference/trigger-and-job-models.md).
 

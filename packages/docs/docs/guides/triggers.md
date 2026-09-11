@@ -26,14 +26,14 @@ A trigger model has four fields:
 | :--- | :--- |
 | `name` | Unique within the class. |
 | `order` | `'before'` runs on the incoming document, ahead of validation and storage; `'after'` runs on the stored document, revision included. |
-| `run` | The function body as a string. Receives `document`, `classObj` and `stack`; must return the document. |
+| `run` | The function body as a string. Receives `document`, `classObj`, `stack` and `session`; must return the document. |
 | `jobId` | Instead of `run`: the id of a `~Job` to execute with `{ document }` as its parameters. |
 
 Exactly one of `run` or `jobId` is required. `classObj.addTrigger(name, model)` appends the trigger to the class model and writes the class document; `removeTrigger(name)` drops it from the in-memory class.
 
 ## How a trigger runs
 
-The body is hydrated once, when the class is built, with `new Function('document', 'classObj', 'stack', …)`. It is wrapped in an async immediately-invoked function, so `await` works anywhere in the body. `execute(document)` awaits the result and, if the body returned nothing, logs a warning and passes the original document through. `executeLimited(document)` runs the body with no class and no stack, which is what the workbench uses to preview a trigger against a sample document.
+The body is hydrated once, when the class is built, with `new Function('document', 'classObj', 'stack', 'session', …)`. It is wrapped in an async immediately-invoked function, so `await` works anywhere in the body. `execute(document, session?)` awaits the result and, if the body returned nothing, logs a warning and passes the original document through. `session` is the [session](./sessions.md) the write runs under, on a host acting for a principal, and `undefined` on a write with none; it is who is asking, not a sandbox. `executeLimited(document)` runs the body with no class and no stack, which is what the workbench uses to preview a trigger against a sample document.
 
 Because the body can reach the stack, a trigger can read other documents, run SQL, or write. Keep `before` triggers to derivations over the document itself where you can; a write in a `before` trigger runs while the pipeline is mid-flight for the document that triggered it.
 

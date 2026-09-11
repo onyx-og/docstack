@@ -88,11 +88,13 @@ for await (const doc of stack.findDocumentsIterator({ '~class': 'Task' }, { batc
 
 ## Encrypted and sealed data
 
-A row is what the session can read. Encrypted attributes decrypt when the stack holds the key; on a locked stack they come back as `null`, and a row that would consist only of `null` values is dropped rather than returned as an empty object. No `WHERE` clause, join or projection can produce plaintext the session's key cannot; see [Access control](../concepts/access-control/index.md).
+A row is what the session can read. Encrypted attributes decrypt when the stack holds the key; on a locked stack they come back as `null`, and a row that would consist only of `null` values is dropped rather than returned as an empty object. A predicate on an encrypted attribute is never pushed into the index, where it would compare against ciphertext; it is evaluated in memory after decryption, so no `WHERE` clause, join or projection can produce plaintext the session's key cannot; see [Access control](../concepts/access-control/index.md).
+
+On a host that holds keys for many principals, the same rule applies per request: `stack.forSession(session).query(...)` reads with that session's entitlement, and a sealed value evaluates as `null` in every predicate. See [Act as a session](./sessions.md).
 
 ## Inside a transaction
 
-A transaction handle has its own `query`. It sees the documents staged in that transaction overlaid on committed state, including across joins, which is how a multi-document write can check its own invariants before committing. See [Write transactions](./transactions.md).
+A transaction handle has its own `query`. It sees the documents staged in that transaction overlaid on committed state, including across joins, which is how a multi-document write can check its own invariants before committing. See [Write transactions](./write-transactions.md).
 
 ## From React
 

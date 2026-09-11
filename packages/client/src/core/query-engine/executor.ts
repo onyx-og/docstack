@@ -41,18 +41,33 @@ const MANGO_OPS = {
  * predicate this function cannot express (an operator collision on one column, an
  * unpushable shape) is simply left out and still enforced.
  */
-function buildSelector(predicates) {
+function buildSelector(predicates, encryptedColumns = null) {
     if (!predicates || predicates.length === 0) return {};
     const selector = {};
     for (const pred of predicates) {
         if (!isPushablePredicate(pred)) continue;
         const key = pred.left.column;
+        // An encrypted attribute is a ciphertext payload in the index: a comparison
+        // pushed there matches nothing. It stays in memory, where the re-check runs on
+        // decrypted rows - and on `null` for what a session may not open.
+        if (encryptedColumns && encryptedColumns.has(key)) continue;
         const op = MANGO_OPS[pred.operator];
         const existing = selector[key];
         if (existing && op in existing) continue; // same op twice on one column: the in-memory check keeps the stricter
         selector[key] = { ...(existing || {}), [op]: pred.right.value };
     }
     return selector;
+}
+
+/**
+ * The attributes a class stores as ciphertext, by column name, for {@link buildSelector}.
+ * A class without a schema (or with nothing flagged) yields an empty set.
+ */
+function encryptedColumnsOf(classObj) {
+    const attributes = classObj && typeof classObj.getEncryptedAttributes === 'function'
+        ? classObj.getEncryptedAttributes()
+        : [];
+    return new Set(attributes.map(attribute => typeof attribute.getName === 'function' ? attribute.getName() : attribute.name));
 }
 
 /**
@@ -307,7 +322,7 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
     const fromClass = await stack.getClass(plan.fromTable.table);
     if (!fromClass) throw new Error(`Table not found: ${plan.fromTable.table}`);
 
-    const leftSelector = buildSelector(plan.filters.left);
+    const leftSelector = buildSelector(plan.filters.left, encryptedColumnsOf(fromClass));
     const fromAlias0 = plan.fromTable.as || plan.fromTable.table;
     const singleTable = plan.joins.length === 0;
 
@@ -402,8 +417,8 @@ async function executeSingleSelectPlan(stack: ClientStack, plan, params, outerRo
         const rightPredicates = plan.filters.right[join.table] || [];
         const joinFilterLeaves = (join.filters || []).flatMap(f => flattenAnd(f));
         let finalRightSelector = combineSelectors(
-            buildSelector(rightPredicates),
-            buildSelector(joinFilterLeaves.filter(isPushablePredicate))
+            buildSelector(rightPredicates, encryptedColumnsOf(rightClass)),
+            buildSelector(joinFilterLeaves.filter(isPushablePredicate), encryptedColumnsOf(rightClass))
         );
 
         // Identify which side of ON references the joined table, by alias.
@@ -824,7 +839,7 @@ export async function* executePlanStream(stack: ClientStack, plan, params) {
     const projectionFields = safeEarly ? computeProjectionFields(plan) : null;
 
     const selector = {
-        ...buildSelector(plan.filters.left),
+        ...buildSelector(plan.filters.left, encryptedColumnsOf(fromClass)),
         "~class": { $eq: fromClass.getName() },
     };
 

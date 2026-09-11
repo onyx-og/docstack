@@ -25,8 +25,10 @@ import {
     ChangesSubscription,
 } from "@docstack/shared";
 
-import { SystemDoc, Patch, PatchJob, ClassModel, Document, RelationDocument, AccessScopeModel, isRelation } from "@docstack/shared";
-import { StackPlugin, StackLockedError } from "../plugins/pouchdb.js";
+import { SystemDoc, Patch, PatchJob, ClassModel, Document, RelationDocument, AccessScopeModel, isRelation, StackSession } from "@docstack/shared";
+import { createSessionView } from "./session.js";
+import type { SessionView } from "./session.js";
+import { StackPlugin, StackLockedError, StackScopeMismatchError } from "../plugins/pouchdb.js";
 
 import { createGuardedDb, createReplicationDb } from "./guarded-db.js";
 import { StackSyncHandle } from "./sync/index.js";
@@ -574,8 +576,89 @@ class ClientStack extends Stack {
     }
 
     /**
+     * This stack as one session sees it (ADR-0046).
+     *
+     * Reads through the view open only the scopes the session is entitled to and read
+     * `null` for the rest, whatever this stack's keyring holds; writes into any other
+     * scope refuse with `StackLockedError`; every write is attributed to the session's
+     * principal (`~createdBy` on creation, `~updatedBy` on every write) and reaches
+     * triggers and jobs as their fourth argument. The view has the stack's shape, so
+     * `Class` instances built from it, the query engine and the React hooks work
+     * unchanged. State that belongs to the whole stack - keys, auth, sync, lifecycle,
+     * transactions - is not reachable through it and throws `StackSessionError`.
+     *
+     * A session can never open more than this stack's keyring can: entitlement is the
+     * caller's claim, the keys are the ceiling.
+     *
+     * @param session - Who is acting, and what they may open.
+     * @returns A view bound to that session. Cheap to create; one per request is the
+     * intended granularity.
+     *
+     * @example
+     * ```typescript
+     * const view = stack.forSession({
+     *     id: requestId,
+     *     principal: { sub: "alice", attributes: ["role:hr"] },
+     *     scopes: ["hr"],
+     *     documentKey: true,
+     * });
+     * const { rows } = await view.query("SELECT who, amount FROM Salary");   // fin amounts read null
+     * const salary = await view.getClass("Salary");
+     * await salary.addCard({ who: "bob", amount: "1", "~scope": "fin" });      // StackLockedError
+     * ```
+     */
+    public forSession(session: StackSession): SessionView {
+        return createSessionView(this, session);
+    }
+
+    /**
+     * Whether a session may open one sealed payload: a scope-sealed payload needs its
+     * scope in the session's entitlement, an unlabelled one needs the document-key
+     * grant. A `kid` the keyring does not know is treated as document-key content; the
+     * attempt then fails to open it and the value reads `null` either way.
+     */
+    /** A projection with the `~scope` label added, so scope-sealed payloads can decrypt. */
+    private static withScopeLabel(fields: string[]): string[] {
+        return fields.includes("~scope") ? fields : [...fields, "~scope"];
+    }
+
+    private sessionMayOpen(session: StackSession, payload: unknown): boolean {
+        if (!isEncryptedPayload(payload)) return true;
+        const kid = (payload as { kid?: string }).kid;
+        const scopeId = kid ? this.cryptoEngine.scopeOfKid(kid) : undefined;
+        return scopeId ? session.scopes.includes(scopeId) : session.documentKey;
+    }
+
+    /**
+     * One document as a session sees it: the stored form, opened only where the
+     * session is entitled. `stack.db.get` cannot serve this - the plugin's `get`
+     * decrypts with the whole keyring before anything can narrow it - so the read goes
+     * through the replication handle, which serves the stored form.
+     *
+     * @internal
+     */
+    getDocumentForView = async <T extends Document>(session: StackSession, docId: string): Promise<T | null> => {
+        let raw: Document | null = null;
+        try {
+            raw = await this.getReplicationHandle().get(docId) as unknown as Document;
+        } catch (e: any) {
+            if (e?.name === "not_found") return null;
+            throw e;
+        }
+        if (!raw) return null;
+        const className = (raw as any)["~class"] as string | undefined;
+        const classObj = className ? (await this.getClassSnapshot(className)) ?? undefined : undefined;
+        const processed = await this.processReadableDocument(raw, classObj, undefined, undefined, session);
+        return (processed as unknown as T) ?? null;
+    }
+
+    /**
      * Sets the current authentication session.
      * Called automatically by {@link authenticate}, but can be set manually for custom auth flows.
+     *
+     * Whole-stack state: this installs one principal's key material on the shared
+     * stack. A host serving many principals must never call it; per-request views are
+     * {@link forSession}.
      * @param proof - The authentication session proof containing session and encryption keys
      */
     public async setAuthSession(proof: AuthSessionProof) {
@@ -2606,15 +2689,20 @@ class ClientStack extends Stack {
      * doc.ssn; // plaintext, or null when it cannot be opened
      * ```
      */
-    public override prepareChangeDocument = async (doc: Document, classObj?: Class): Promise<Document> => {
+    public override prepareChangeDocument = async (doc: Document, classObj?: Class, session?: StackSession): Promise<Document> => {
         if (!this.cryptoEngine.isEnabled()) return doc;
 
         const encryptedKeys = this.cryptoEngine.identifyEncryptedKeys(doc, classObj);
         if (!encryptedKeys.length) return doc;
 
         const clone = { ...doc } as Document;
-        if (this.cryptoEngine.getDocumentKey()) {
-            await this.cryptoEngine.decryptDocument(clone, classObj, encryptedKeys);
+        // Under a session only the entitled payloads open; the rest stay sealed and
+        // are nulled below, so a live view sees exactly what a read would (ADR-0046).
+        const openable = session
+            ? encryptedKeys.filter((key) => this.sessionMayOpen(session, (clone as any)[key]))
+            : encryptedKeys;
+        if (openable.length && this.cryptoEngine.getDocumentKey()) {
+            await this.cryptoEngine.decryptDocument(clone, classObj, openable);
         }
 
         // Whatever is still sealed - no key at all, or one this engine no longer holds -
@@ -3266,7 +3354,7 @@ class ClientStack extends Stack {
      *
      * @internal
      */
-    findDocumentsForView = async <T extends Document | RelationDocument = Document>(stage: TransactionStage | undefined, selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number, sort?: { [field: string]: "asc" | "desc" }[]) => {
+    findDocumentsForView = async <T extends Document | RelationDocument = Document>(stage: TransactionStage | undefined, selector: { [key: string]: any }, fields?: string[], skip?: number, limit?: number, sort?: { [field: string]: "asc" | "desc" }[], session?: StackSession) => {
         const fnLogger = logger.child({ method: "findDocuments", args: { selector, fields, skip, limit, sort } });
 
         // By default request for only active documents
@@ -3275,14 +3363,14 @@ class ClientStack extends Stack {
         }
 
         if (stage && stageCoversSelector(stage, selector)) {
-            const { queryFields, extras } = widenProjection(fields, sort);
+            const { queryFields, extras } = widenProjection(fields ? ClientStack.withScopeLabel(fields) : fields, sort);
             const found = await this.db.find({
                 selector,
                 ...(queryFields ? { fields: queryFields } : {}),
                 limit: 2 ** 31 - 1,
             } as any);
-            const merged = mergeStageIntoResults(stage, selector, found.docs as unknown as Document[], { sort, skip, limit, fields, extras });
-            const readableDocs = await this.processFoundDocuments<T>(merged, fields);
+            const merged = mergeStageIntoResults(stage, selector, found.docs as unknown as Document[], { sort, skip, limit, fields: fields ? ClientStack.withScopeLabel(fields) : fields, extras });
+            const readableDocs = await this.processFoundDocuments<T>(merged, fields, session);
             return { docs: readableDocs, selector, skip, limit };
         }
 
@@ -3305,7 +3393,11 @@ class ClientStack extends Stack {
             const query = {
                 selector
             }
-            if (fields) query["fields"] = fields;
+            // A scope-sealed payload authenticates against the document's `~scope`
+            // label (spec 02 §2.3), so a projection that drops the label cannot
+            // decrypt what it fetched. The label rides along and is removed again by
+            // `processReadableDocument` when it was not asked for.
+            if (fields) query["fields"] = ClientStack.withScopeLabel(fields);
             if (skip) query["skip"] = skip;
             // A sorted query needs a Mango index carrying the sort fields; callers go
             // through ensureSortIndex first (the query engine does).
@@ -3319,7 +3411,7 @@ class ClientStack extends Stack {
                 result: foundResult,
                 selector: selector,
             });
-            const readableDocs = await this.processFoundDocuments<T>(foundResult.docs as unknown as Document[], fields);
+            const readableDocs = await this.processFoundDocuments<T>(foundResult.docs as unknown as Document[], fields, session);
 
             result = { docs: readableDocs, selector, skip, limit };
             return result;
@@ -3334,7 +3426,7 @@ class ClientStack extends Stack {
      * check, decryption, and field visibility. Shared by {@link findDocuments} and
      * {@link findDocumentsIterator} so the two cannot drift.
      */
-    private async processFoundDocuments<T extends Document | RelationDocument = Document>(docs: Document[], fields?: string[]): Promise<T[]> {
+    private async processFoundDocuments<T extends Document | RelationDocument = Document>(docs: Document[], fields?: string[], session?: StackSession): Promise<T[]> {
         const readableDocs: T[] = [];
 
         // Resolved at most once per class per batch, and detached. This used to be
@@ -3357,7 +3449,7 @@ class ClientStack extends Stack {
             const classObj = encryptedKeys.length || (fields && fields.length)
                 ? await classFor(doc["~class"])
                 : undefined;
-            const processedDoc = await this.processReadableDocument(doc, classObj, fields, encryptedKeys);
+            const processedDoc = await this.processReadableDocument(doc, classObj, fields, encryptedKeys, session);
             if (processedDoc) {
                 readableDocs.push(processedDoc as unknown as T);
             }
@@ -3389,12 +3481,16 @@ class ClientStack extends Stack {
      */
     findDocumentsIterator = <T extends Document | RelationDocument = Document>(
         selector: { [key: string]: any },
-        options: { fields?: string[], batchSize?: number } = {}
+        options: { fields?: string[], batchSize?: number, /** @internal set by a session view */ session?: StackSession } = {}
     ): AsyncGenerator<T, void, void> => {
         const stack = this;
+        const session = options.session;
         const batchSize = Math.max(1, options.batchSize ?? 100);
         let fields = options.fields;
         if (fields && !fields.includes("_id")) fields = [...fields, "_id"];
+        // The label a scope-sealed payload decrypts against; stripped after, see
+        // `findDocumentsForView`.
+        const queryFields = fields ? ClientStack.withScopeLabel(fields) : undefined;
 
         const baseSelector: { [key: string]: any } = { ...selector };
         if (!baseSelector.hasOwnProperty("active")) {
@@ -3421,13 +3517,13 @@ class ClientStack extends Stack {
                     selector: pageSelector,
                     sort: [{ _id: "asc" }],
                     limit: batchSize,
-                    ...(fields ? { fields } : {}),
+                    ...(queryFields ? { fields: queryFields } : {}),
                 });
                 const rawDocs = raw.docs as unknown as Document[];
                 if (!rawDocs.length) return;
 
                 cursor = rawDocs[rawDocs.length - 1]._id;
-                const processed = await stack.processFoundDocuments<T>(rawDocs, fields);
+                const processed = await stack.processFoundDocuments<T>(rawDocs, fields, session);
                 for (const doc of processed) {
                     yield doc;
                 }
@@ -3437,7 +3533,7 @@ class ClientStack extends Stack {
         return iterate();
     }
 
-    private async processReadableDocument(doc: Document, classObj?: Class, fields?: string[], precomputedEncryptedKeys?: string[]) {
+    private async processReadableDocument(doc: Document, classObj?: Class, fields?: string[], precomputedEncryptedKeys?: string[], session?: StackSession) {
         if (!this.cryptoEngine.isEnabled()) {
             return doc;
         }
@@ -3456,7 +3552,14 @@ class ClientStack extends Stack {
         // applied at the granularity the keyring actually has.
         let sealedCount = 0;
         if (encryptedKeys.length) {
-            await this.cryptoEngine.decryptDocument(clone, classObj, encryptedKeys);
+            // Under a session, only payloads the session is entitled to are opened;
+            // the stack's keyring may hold more, and must not show it (ADR-0046).
+            const openable = session
+                ? encryptedKeys.filter((key) => this.sessionMayOpen(session, (clone as any)[key]))
+                : encryptedKeys;
+            if (openable.length) {
+                await this.cryptoEngine.decryptDocument(clone, classObj, openable);
+            }
             for (const key of encryptedKeys) {
                 if (isEncryptedPayload((clone as any)[key])) {
                     (clone as any)[key] = null;
@@ -3465,9 +3568,15 @@ class ClientStack extends Stack {
             }
         }
 
+        // Fetched for decryption only: a projection that did not ask for the label
+        // does not get it back.
+        if (fields && fields.length && !fields.includes("~scope")) {
+            delete (clone as any)["~scope"];
+        }
+
         const encryptedKeySet = new Set(encryptedKeys);
         const visibleKeys = Object.keys(clone).filter((key) => {
-            if (key === "_id" || key === "_rev" || key === "~rev" || key === "~class" || key === "active" || key === "~createTimestamp" || key === "~updateTimestamp" || key === "description") {
+            if (key === "_id" || key === "_rev" || key === "~rev" || key === "~class" || key === "active" || key === "~createTimestamp" || key === "~updateTimestamp" || key === "~createdBy" || key === "~updatedBy" || key === "description") {
                 return false;
             }
             if (fields && fields.length) {
@@ -4016,8 +4125,10 @@ class ClientStack extends Stack {
      * });
      * ```
      */
-    createDoc = async (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}) => {
+    createDoc = async (docId: string | null, type: string, classObj: Class | ClassModel["schema"], params: {}, options?: { session?: StackSession }) => {
         const fnLogger = logger.child({ method: "createDoc", args: { docId, type, params } });
+        // The session rides on the write's options so the plugin sees it (ADR-0046).
+        const writeOptions: { session?: StackSession } = options?.session ? { session: options.session } : {};
         fnLogger.info("Creating document");
         let schema: ClassModel["schema"] = {};
         if (classObj instanceof Class) {
@@ -4079,7 +4190,7 @@ class ClientStack extends Stack {
                 // console.log("Doc after merge", { doc_ })
             }
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
-            let response = await db.put(doc_);
+            let response = await db.put(doc_, writeOptions as PouchDB.Core.PutOptions);
             // Stamped from the response, not left as the pre-put draft. A caller cannot
             // otherwise tell a document that landed from one that did not - which is
             // exactly the ambiguity that made a colliding id look like a success. See
@@ -4135,7 +4246,8 @@ class ClientStack extends Stack {
      * ], 'Task', taskClass);
      * ```
      */
-    createDocs = async (docs: { docId: string | null, params: {} }[], type: string, classObj: Class | ClassModel["schema"]) => {
+    createDocs = async (docs: { docId: string | null, params: {} }[], type: string, classObj: Class | ClassModel["schema"], options?: { session?: StackSession }) => {
+        const writeOptions: { session?: StackSession } = options?.session ? { session: options.session } : {};
         const fnLogger = logger.child({ method: "createDocs", args: { docs } });
 
         let schema: ClassModel["schema"] = {};
@@ -4192,7 +4304,7 @@ class ClientStack extends Stack {
             }
         }
         try {
-            const response = await db.bulkDocs(documents);
+            const response = await db.bulkDocs(documents, writeOptions as PouchDB.Core.BulkDocsOptions);
             fnLogger.info("Response after bulkDocs", { "response": response });
             // Commit the counter once for the whole batch rather than once per document.
             // Ids handed to failed writes are skipped, never reused - uniqueness is what
@@ -4417,14 +4529,20 @@ class ClientStack extends Stack {
      * @param _id 
      * @returns Promise<boolean>
      */
-    deleteDocument = async (_id: string): Promise<boolean> => {
+    deleteDocument = async (_id: string, options?: { session?: StackSession }): Promise<boolean> => {
         const fnLogger = logger.child({ method: "deleteDocument", args: { _id } });
+        const writeOptions: { session?: StackSession } = options?.session ? { session: options.session } : {};
         const doc = await this.db.get<Document>(_id);
         if (doc) {
             try {
-                await this.db.put({ ...doc, active: false });
+                await this.db.put({ ...doc, active: false }, writeOptions as PouchDB.Core.PutOptions);
                 return true;
             } catch (e: any) {
+                // A refusal is the pipeline's answer, not a storage failure: a sealed
+                // scope, a session outside the document's scope, a label that disagrees
+                // with its payload. Those propagate, so a caller can tell "forbidden"
+                // from "gone"; everything else keeps the boolean contract.
+                if (e instanceof StackLockedError || e instanceof StackScopeMismatchError) throw e;
                 fnLogger.error(`Error while deleting document: ${e}`, { document: doc });
                 return false;
             }
@@ -4554,10 +4672,21 @@ class ClientStack extends Stack {
      * ```
      */
     queryStream = (sql: string, ...params: any[]): AsyncGenerator<{ [column: string]: any }, void, void> => {
+        return this.runQueryStream(sql, params, this);
+    }
+
+    /**
+     * {@link queryStream}'s implementation with the executor's data source as a
+     * parameter, the streaming twin of {@link runQuery}: a session view hands itself
+     * in so every page the scan reads is narrowed to the session (ADR-0046).
+     *
+     * @internal
+     */
+    runQueryStream = (sql: string, params: any[], execStack: ClientStack): AsyncGenerator<{ [column: string]: any }, void, void> => {
         const astList = parse(sql);
         ClientStack.bindQueryParams(astList, params);
         const plan = createPlan(astList);
-        return executePlanStream(this, plan, params);
+        return executePlanStream(execStack, plan, params);
     }
 }
 

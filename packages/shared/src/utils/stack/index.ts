@@ -11,6 +11,7 @@ import {
     RelationDocument,
     AuthSessionProof,
     ChangesSubscription,
+    StackSession,
 } from "../../types.js";
 
 import Class from "./class/index.js";
@@ -96,8 +97,10 @@ abstract class Stack extends EventTarget {
      *
      * @param doc - The document from `change.doc`.
      * @param classObj - The class, when the caller has one.
+     * @param session - The session the change is being delivered to, when there is one;
+     * a subclass that encrypts narrows what it opens to that session's entitlement.
      */
-    prepareChangeDocument = async (doc: Document, classObj?: Class): Promise<Document> => doc;
+    prepareChangeDocument = async (doc: Document, classObj?: Class, session?: StackSession): Promise<Document> => doc;
 
     /**
      * Subscribes an event target to a class's document changes.

@@ -117,5 +117,7 @@ Every document written through the pipeline carries:
 | `~updateTimestamp` | On update. |
 | `active` | `true` on creation; `false` after `deleteCard` or `deleteDocument`. Reads honour it by default. |
 | `~scope` | Optional, set by you. The access scope the document's encrypted attributes seal under; overrides the class's `defaultScope`. |
+| `~createdBy` | Reserved. The `principal.sub` of the [session](../guides/sessions.md) that first wrote the document; absent on writes with no session. |
+| `~updatedBy` | Reserved. The `principal.sub` of the session that last wrote it; absent on writes with no session. |
 
 The generated [API reference](/docs/api/client/) lists every method of `Class`, `Attribute` and `Domain` with its signature.

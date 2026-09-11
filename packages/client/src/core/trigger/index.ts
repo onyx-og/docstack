@@ -1,4 +1,4 @@
-import { Class, Document, Trigger as Trigger_, TriggerModel, TriggerRunFunction} from "@docstack/shared";
+import { Class, Document, Trigger as Trigger_, TriggerModel, TriggerRunFunction, StackSession } from "@docstack/shared";
 
 /**
  * The Trigger class dynamically hydrates a function from a string.
@@ -32,11 +32,13 @@ export class Trigger extends Trigger_ {
         }
 
         if (model.jobId) {
-            this.run = async (document, _classObj, stack) => {
+            this.run = async (document, _classObj, stack, session) => {
                 if (!stack || !stack.jobEngine) {
                     throw new Error(`Stack does not expose a job engine for trigger '${model.name}'.`);
                 }
-                await (stack as any).jobEngine.executeJob(model.jobId as string, { document }, "event");
+                // The session rides along to the job, so a job started by a trigger
+                // knows who wrote the document that started it.
+                await (stack as any).jobEngine.executeJob(model.jobId as string, { document }, "event", session);
                 return document;
             }
         } else if (model.run) {
@@ -45,7 +47,9 @@ export class Trigger extends Trigger_ {
                 // Use 'new Function()' for secure, sandboxed execution.
                 // We pass dependencies as explicit arguments to the function's scope.
                 // The `this` context is not used to prevent unwanted access.
-                this.run = new Function('document', 'classObj', 'stack', `
+                // `session` is the fourth argument: the StackSession the write runs
+                // under, or undefined for a write with no session (ADR-0046).
+                this.run = new Function('document', 'classObj', 'stack', 'session', `
                     "use strict";
                     // The developer's code is placed here.
                     return (async () => {
@@ -62,14 +66,16 @@ export class Trigger extends Trigger_ {
      * Executes the hydrated run function with the necessary context.
      * The method is now asynchronous by default.
      * @param document The document to be processed by the trigger.
+     * @param session The session the write runs under, when there is one. Reaches the
+     * body as its fourth argument, so a trigger can attribute or refuse by principal.
      * @returns The updated document returned by the trigger logic as a Promise.
      */
-    public execute = async (document: Document): Promise<Document> => {
+    public execute = async (document: Document, session?: StackSession): Promise<Document> => {
         const stack = this.classObj ? this.classObj.getStack() : undefined;
         
         // Call the dynamically created function with the required arguments.
         // It's crucial to pass the `document` argument and await the result.
-        const result = await this.run(document, this.classObj, stack);
+        const result = await this.run(document, this.classObj, stack, session);
 
         if (result === undefined) {
             console.warn(`Trigger '${this.model.name}' did not return a document. Returning the original document.`);

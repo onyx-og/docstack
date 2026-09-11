@@ -38,6 +38,7 @@ Non-trivial changes to DocStack are recorded as architecture decision records in
 | [0043](https://github.com/onyx-og/docstack/blob/main/specs/adr/0043-bulkdocs-class-resolution-ignores-the-batch.md) | `bulkDocs` class resolution ignores the batch | finding, fixed | 2026-09-04 | A patch can introduce a class and seed its first document in one batch. |
 | [0044](https://github.com/onyx-og/docstack/blob/main/specs/adr/0044-a-patch-carries-one-shot-jobs.md) | A patch carries one-shot jobs | accepted, implemented | 2026-09-04 | `preApply` and `postApply` migration jobs, staged with the model. |
 | [0045](https://github.com/onyx-og/docstack/blob/main/specs/adr/0045-access-control-is-cryptographic-cp-abe-scopes-beside-the-engine.md) | Access control is cryptographic: CP-ABE scopes beside the engine | accepted, implemented 2026-09-06 | 2026-09-04 | One access-control language, enforced by decryption; the rule engine is removed, `@docstack/abe` carries the primitive. |
+| [0046](https://github.com/onyx-og/docstack/blob/main/specs/adr/0046-engine-sessions.md) | Engine sessions: a request-scoped context the pipeline honours | accepted, implemented | 2026-09-11 | `stack.forSession(session)` narrows reads, refuses foreign-scope writes, attributes them, and reaches triggers and jobs; whole-stack members close through a view. |
 
 ## Specs
 

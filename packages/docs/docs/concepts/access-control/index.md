@@ -53,6 +53,11 @@ document. Two consequences follow, and they are features:
   plainly.
 - [Recipes](./recipes.md) — common access patterns.
 
+On a host that holds keys for many principals, the same entitlement is applied
+per request by the engine itself: a [session](../../guides/sessions.md) names the
+scopes a principal satisfies, and the stack opens exactly those for it, attributes
+its writes, and tells triggers and jobs who is asking (ADR-0046).
+
 Specification: `specs/02-crypto-access.md` (ADR-0045, implemented). The CP-ABE
 primitive ships as `@docstack/abe`; the client surface is `accessKeys` at open,
 `stack.unlockScopes(key)` at runtime, and a `~scope` label on documents.

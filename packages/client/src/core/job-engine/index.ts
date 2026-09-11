@@ -1,5 +1,5 @@
 import type ClientStack from "../stack.js";
-import type { JobModel, JobRunModel, JobStatus, JobTriggerType } from "@docstack/shared";
+import type { JobModel, JobRunModel, JobStatus, JobTriggerType, StackSession } from "@docstack/shared";
 
 /**
  * Calculates a SHA-256 hash of the given content.
@@ -68,7 +68,10 @@ export class Job {
      * The job content must define an `execute(stack, params, job)` function.
      */
     private hydrate() {
-        return new Function("stack", "params", "job", `"use strict"; ${this.model.content}; return execute(stack, params, job);`);
+        // `session` is the fourth argument of `execute`: the StackSession the run was
+        // started under (a trigger's write, a host's API request), or undefined for a
+        // scheduled or manual run with none (ADR-0046).
+        return new Function("stack", "params", "job", "session", `"use strict"; ${this.model.content}; return execute(stack, params, job, session);`);
     }
 
     private async hasRunningInstance() {
@@ -140,7 +143,7 @@ export class Job {
      * }
      * ```
      */
-    public async execute(runtimeArgs?: Record<string, any>, triggerType: JobTriggerType = "manual") {
+    public async execute(runtimeArgs?: Record<string, any>, triggerType: JobTriggerType = "manual", session?: StackSession) {
         let run = this.buildRun(triggerType, runtimeArgs);
         run = await this.persistRun(run);
 
@@ -169,7 +172,7 @@ export class Job {
 
             const executor = this.hydrate();
             const params = { ...(this.model.defaultParams || {}), ...(runtimeArgs || {}) };
-            const result = await executor(this.stack, params, this.model);
+            const result = await executor(this.stack, params, this.model, session);
             const finalMetadata = (result && result.metadata) || this.model.metadata;
 
             if (finalMetadata) {
@@ -240,9 +243,9 @@ export class JobEngine {
      * const derivedKey = authRun.finalMetadata?.derivedKey;
      * ```
      */
-    public async executeJob(jobId: string, runtimeArgs?: Record<string, any>, triggerType: JobTriggerType = "manual") {
+    public async executeJob(jobId: string, runtimeArgs?: Record<string, any>, triggerType: JobTriggerType = "manual", session?: StackSession) {
         const jobDoc = await this.stack.db.get<JobModel>(jobId);
         const job = await Job.create(jobDoc, this.stack);
-        return job.execute(runtimeArgs, triggerType);
+        return job.execute(runtimeArgs, triggerType, session);
     }
 }

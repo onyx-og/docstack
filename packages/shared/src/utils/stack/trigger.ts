@@ -1,4 +1,4 @@
-import { Document, TriggerRunFunction, TriggerModel } from "../../types.js";
+import { Document, TriggerRunFunction, TriggerModel, StackSession } from "../../types.js";
 import Class from "./class/index.js";
 
 abstract class Trigger {
@@ -11,7 +11,7 @@ abstract class Trigger {
 
     abstract run: TriggerRunFunction;
 
-    abstract execute: (document: Document) => Promise<Document>;
+    abstract execute: (document: Document, session?: StackSession) => Promise<Document>;
 
     abstract executeLimited: (document: Document) => Promise<Document>; 
 }

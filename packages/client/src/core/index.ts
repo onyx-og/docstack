@@ -882,6 +882,13 @@ export { SYSTEM_SEEDED_DOC_IDS } from "./datamodel/index.js";
 export { collectQueryClasses } from "./query-engine/index.js";
 export { StackWriteGuardError } from "./guarded-db.js";
 export { StackLockedError, StackScopeMismatchError } from "../plugins/pouchdb.js";
+/**
+ * Engine sessions (ADR-0046): `stack.forSession(session)` returns a view narrowed to
+ * one principal's entitlement, with writes attributed to it and reaching triggers and
+ * jobs. `StackSessionError` is what whole-stack members throw through a view.
+ */
+export { createSessionView, StackSessionError } from "./session.js";
+export type { SessionView } from "./session.js";
 export {
     TransactionEngine,
     TransactionHandle,

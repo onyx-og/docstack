@@ -353,7 +353,7 @@ export interface TriggerModel {
  * It takes a document and returns the updated document.
  * It is now asynchronous by default.
  */
-export type TriggerRunFunction = (document: Document, classObj?: Class, stack?: Stack) => Document | Promise<Document>;
+export type TriggerRunFunction = (document: Document, classObj?: Class, stack?: Stack, session?: StackSession) => Document | Promise<Document>;
 
 export interface JobModel extends Document {
     "~class": "~Job";
@@ -461,6 +461,46 @@ export interface AuthSessionProof {
     session: UserSessionModel;
     derivedKey?: string;
     documentKey?: string;
+}
+
+/**
+ * A request-scoped view of who is acting on a stack, and what they may open.
+ *
+ * The engine is single-user by construction: one keyring, one auth session, one
+ * class cache. A host serving many principals from one stack (`@docstack/server`)
+ * cannot express "this read is Alice's" through any of that state, and a facade
+ * wrapped around the stack from outside would leave triggers and jobs blind to the
+ * principal. A `StackSession` is the engine's own notion of that context: handed to
+ * `stack.session(session)`, it narrows every read to the scopes the session may
+ * open, refuses writes into scopes it may not, attributes writes to the principal,
+ * and reaches triggers (fourth argument) and jobs (fourth argument of `execute`).
+ *
+ * Entitlement is decided by whoever constructs the session - a host that holds the
+ * authority decides it with the same CP-ABE math a device would run - and the engine
+ * enforces it against the keys it actually holds: a session may never open more
+ * than the stack's keyring can. See ADR-0046.
+ */
+export interface StackSession {
+    /** Opaque identifier: a request id, a JWT `jti`, a socket id. Recorded, never interpreted. */
+    id: string;
+    /** The acting principal as the host knows it. `sub` is what writes are attributed to. */
+    principal: {
+        /** Stable subject identifier, stamped as `~createdBy` / `~updatedBy`. */
+        sub: string;
+        /** The attribute set the host derived for this principal (`role:hr`, `tenant:acme`). Informational for triggers. */
+        attributes?: string[];
+        [key: string]: unknown;
+    };
+    /**
+     * Access scope ids this session may open. Content sealed under any other scope
+     * reads `null` and refuses writes, whatever keys the stack itself holds.
+     */
+    scopes: string[];
+    /**
+     * Whether content sealed under the stack's document key - unlabelled encrypted
+     * attributes - is open to this session.
+     */
+    documentKey: boolean;
 }
 
 export type ClientCredentials = {

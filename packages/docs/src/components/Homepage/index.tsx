@@ -74,7 +74,7 @@ const FEATURES: { icon: IconName; title: string; body: string; to: string }[] = 
   { icon: 'scope', title: 'Access by scope', body: 'Content is sealed under an attribute formula. A session that does not satisfy it cannot produce the plaintext. Denial is decryption failure, not a check.', to: '/docs/concepts/access-control/' },
   { icon: 'sync', title: 'Bring-your-own-remote sync', body: 'stack.sync({ remote }) against any PouchDB-compatible database, including the user\'s own Google Drive. DocStack never learns about your provider.', to: '/docs/guides/sync' },
   { icon: 'patch', title: 'Versioned schema patches', body: 'Migrations as declarative documents with a semver ledger: applied once, all-or-nothing, gated across devices so a trailing client cannot corrupt a leading one.', to: '/docs/guides/patches' },
-  { icon: 'transaction', title: 'Named write transactions', body: 'Stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it. Atomicity is reported, not assumed.', to: '/docs/guides/transactions' },
+  { icon: 'transaction', title: 'Named write transactions', body: 'Stage a multi-document change, read your own staged state, commit as one batch through the full pipeline, or discard it. Atomicity is reported, not assumed.', to: '/docs/guides/write-transactions' },
   { icon: 'react', title: 'Live React bindings', body: 'Every hook subscribes to the local database. No refetching, no cache invalidation, no staleness story to own.', to: '/docs/guides/react' },
 ];
 

@@ -21,6 +21,8 @@ DocStack's security model is one model, enforced in one place: the engine. Acces
 
 The server preview establishes sessions over HTTP instead: a `POST /login` that verifies credentials, writes the same `~UserSession` document, and returns a JWT as an `httpOnly` cookie, with every private route re-checking that the session is still active. That flow vouches for identity only; it carries no key material. See [Server (preview)](../reference/server.md).
 
+A host that holds keys on behalf of many principals needs a third thing: to act *as* one of them for the length of a request. `stack.forSession(session)` returns a view narrowed to that session's entitlement, with writes attributed to its principal and the session handed to triggers and jobs; whole-stack members (keys, auth, sync, lifecycle) throw through it. Entitlement is the host's claim, decided with the same mathematics a device would run, and the stack's keys are the ceiling. See [Act as a session](../guides/sessions.md).
+
 ## What leaves the device
 
 Replication reads the database as stored. Flagged attributes cross as ciphertext; everything else crosses as written, so a field a remote should not see has to actually be flagged. Replication filters shape what a device bothers to carry, not what someone with access to the remote can read; partitioning belongs to the topology, a database per workspace, a Drive folder per account.

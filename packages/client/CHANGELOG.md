@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased
+
+### Added - engine sessions (ADR-0046)
+
+- **`stack.forSession(session)`** returns a view of the stack as one principal sees
+  it: reads open only the scopes the `StackSession` is entitled to and read `null`
+  for the rest, whatever keys the stack holds; writes into any other scope refuse
+  with `StackLockedError`; every write is attributed to the principal (`~createdBy`
+  on creation, `~updatedBy` on every write, both reserved); `Class` instances built
+  from the view route through it; the query engine and the live subscriptions run
+  narrowed. Whole-stack members - keys, auth, sync, lifecycle, transactions - throw
+  `StackSessionError` through a view. Built for a host serving many principals from
+  one stack; a stack used without a session is unchanged.
+- **Triggers and jobs receive the session.** A trigger body's fourth argument is
+  `session` (`undefined` for a write with no session); `execute(stack, params, job,
+  session)` for jobs, and `JobEngine.executeJob(id, args, triggerType, session)`
+  hands it over. A trigger's `jobId` path forwards it.
+- `StackSession` is exported from `@docstack/shared` and re-exported here with
+  `SessionView`, `StackSessionError` and `createSessionView`.
+
+### Fixed
+
+- **Projected reads of scope-sealed attributes decrypt.** `findDocuments(selector,
+  fields)`, `getCards(selector, fields)`, `findDocumentsIterator` with `fields` and
+  the SQL engine's projection pushdown fetched only the requested fields, dropping
+  the `~scope` label a scope-sealed payload authenticates against, so a projected
+  read of such an attribute silently read `null` with the scope open. The label is
+  now fetched alongside any projection and removed from the result when it was not
+  asked for.
+- **A `WHERE` predicate on an encrypted attribute matches.** The planner pushed
+  every simple predicate into the Mango selector, encrypted attributes included, so
+  the index compared a literal against the stored ciphertext payload and returned
+  nothing; the in-memory re-check never saw the row. Predicates on attributes the
+  class encrypts now stay out of the selector and are evaluated after decryption -
+  which is what the query-engine docs already said happened. Under a session, a
+  sealed value evaluates as `null`, so a predicate can never match plaintext the
+  session may not see.
+- **A bare table name followed by a clause parses.** `SELECT title FROM Task WHERE
+  ...`, `FROM Task ORDER BY title`, `FROM Task LIMIT 5` and a bare alias
+  (`FROM Task t WHERE t.done = FALSE`) all failed with `Unexpected token`: the
+  alias detector tested the word *after* the candidate alias instead of the
+  candidate, so a clause keyword became the alias and a real alias was refused.
+  Every query in the suites wrote `AS t`; the quickstart's form did not work.
+
+### Changed
+
+- `deleteDocument` lets the pipeline's refusals through: `StackLockedError` and
+  `StackScopeMismatchError` now propagate instead of being logged and answered
+  with `false`, so a caller can tell a forbidden delete from a missing document.
+  Storage failures keep the boolean contract.
+- `createDoc`, `createDocs` and `deleteDocument` accept a trailing
+  `{ session }` option; `findDocumentsIterator` accepts `session` in its options;
+  `prepareChangeDocument` accepts a third `session` argument. All optional.
+
 ## 0.3.2 - 2026/09/10
 
 ### Removed - the `~Policy` class model, and the last references to it

@@ -13,7 +13,7 @@ Stored in a class document's `triggers` array.
 | :--- | :--- | :--- |
 | `name` | string | Unique within the class. |
 | `order` | `"before"` or `"after"` | Before the document is stored (on the validated document), or after (on the stored document with its `_rev`). |
-| `run` | string, optional | The function body. Hydrated with `new Function('document', 'classObj', 'stack', …)` inside an async IIFE; must return the document. |
+| `run` | string, optional | The function body. Hydrated with `new Function('document', 'classObj', 'stack', 'session', …)` inside an async IIFE; must return the document. `session` is the [session](../guides/sessions.md) of the write, or `undefined`. |
 | `jobId` | string, optional | Instead of `run`: the `~Job` to execute with `{ document }` as runtime parameters and `triggerType: "event"`. |
 
 Exactly one of `run` and `jobId` must be present; the class refuses to build a trigger with neither.
@@ -28,7 +28,7 @@ Exactly one of `run` and `jobId` must be present; the class refuses to build a t
 | `description` | string, optional | |
 | `type` | `"system"` or `"user"` | DocStack's own jobs versus the application's. |
 | `workerPlatform` | `"client"`, `"server"` or `"hybrid"` | Where the job is meant to run. |
-| `content` | string | JavaScript defining `execute(stack, params, job)`. |
+| `content` | string | JavaScript defining `execute(stack, params, job)`, with an optional fourth `session` argument. |
 | `hash` | string | SHA-256 hex digest of `content`, computed by the author when the job is written. Mandatory. Verified before every run; a mismatch refuses with `Job content hash mismatch`. |
 | `schedule` | string or `null`, optional | A schedule string for the scheduler; see [Scheduler options](./scheduler-options.md). |
 | `isSingleton` | boolean, optional | When `true`, a run is `SKIPPED` while another run of this job is `RUNNING`. |
@@ -40,7 +40,7 @@ Exactly one of `run` and `jobId` must be present; the class refuses to build a t
 ### The `execute` contract
 
 ```typescript
-async function execute(stack: ClientStack, params: Record<string, any>, job: JobModel):
+async function execute(stack: ClientStack, params: Record<string, any>, job: JobModel, session?: StackSession):
     Promise<{ metadata?: Record<string, any> } | void>
 ```
 

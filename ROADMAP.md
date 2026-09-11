@@ -95,6 +95,11 @@ and it is acceptable for a rendezvous with no server.
 
 ## Deferred, owned by existing ADRs
 
+- **Engine sessions v2** (ADR-0046 consequences): decrypt once and redact per
+  session on a feed fanned out to many sessions; transactions and `exportContent`
+  narrowed under a session instead of closed; the entitlement cache and its
+  invalidation on scope rotation (host-side, keyed on the principal's attribute set
+  and the scope registry generation).
 - **Transaction engine v2** (ADR-0039 consequences; ADR-0042 last section): the
   transaction-scoped pipeline facade - triggers reading the tx view at commit,
   public class-model staging with propagation recomputed at commit, streaming

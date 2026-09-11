@@ -51,6 +51,8 @@ export {
     StackWriteGuardError,
     StackLockedError,
     StackScopeMismatchError,
+    StackSessionError,
+    createSessionView,
     deriveKeyId,
     isEncryptedPayload,
     deriveTenantScope,
@@ -58,7 +60,7 @@ export {
 } from "./core/index.js";
 
 export { SYSTEM_SEEDED_DOC_IDS, collectQueryClasses } from "./core/index.js";
-export type { EncryptedPayload, ClassBuildOptions } from "./core/index.js";
+export type { EncryptedPayload, ClassBuildOptions, SessionView } from "./core/index.js";
 
 /**
  * Named write transactions (ADR-0039).
@@ -138,6 +140,7 @@ export type {
     DocstackReady,
     StackConfig,
     StackOptions,
+    StackSession,
 } from "@docstack/shared";
 
 export default DocStack;

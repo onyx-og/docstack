@@ -1,4 +1,4 @@
-import { isClassModel, isDocument, isRelation, isPatch, Domain } from "@docstack/shared";
+import { isClassModel, isDocument, isRelation, isPatch, Domain, type StackSession } from "@docstack/shared";
 import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, PristineDbMethods, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
 import Stack from "../core/stack.js"
@@ -118,7 +118,13 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
             return Promise.resolve("pong");
         },
         bulkDocs: async function (docs, options: PouchDB.Core.BulkDocsOptions & {
-            isPostOp?: boolean
+            isPostOp?: boolean;
+            /**
+             * The session this write runs under (ADR-0046). Set by a session view's
+             * writes; absent for a write with no session. It stamps attribution,
+             * narrows which scopes may be written into, and reaches triggers.
+             */
+            session?: StackSession;
         } | null, callback) {
             const fnLogger = logger.child({ method: "bulkDocs" });
             if (typeof options == 'function') {
@@ -204,7 +210,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                                 const afterTriggers = triggerQueue[docRes.id]
                                 if (afterTriggers && afterTriggers.length) {
                                     for (const afterTrigger of afterTriggers) {
-                                        const updatedDoc = await afterTrigger.execute(doc);
+                                        const updatedDoc = await afterTrigger.execute(doc, options?.session);
                                         Object.assign(doc, updatedDoc);
                                     }
                                     docs.push(doc);
@@ -458,6 +464,16 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         }
 
                         classCache.set(className, classObj);
+                        if (options?.session) {
+                            // Attribution lands inside the pipeline, where the write is
+                            // authenticated by the session that carries it (ADR-0046):
+                            // a document's first write names its creator, every write
+                            // names its last writer. Reserved fields, like `~scope`;
+                            // a caller's own value is overwritten, never trusted.
+                            const sub = options.session.principal.sub;
+                            (doc as any)["~updatedBy"] = sub;
+                            if (!(doc as any)._rev) (doc as any)["~createdBy"] = sub;
+                        }
                         const encryptableAttributes = classObj.getEncryptedAttributes();
                         // A sealed key cannot encrypt. Refuse instead of degrading:
                         // silent plaintext is the failure mode ADR-0018 exists to remove,
@@ -470,6 +486,13 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         if (encryptableAttributes.length && stack.cryptoEngine.isEnabled()) {
                             const scopeLabel = stack.resolveScopeLabel(doc, (classObj as any).model);
                             if (scopeLabel) {
+                                // A session is narrower than the keyring: the stack may
+                                // hold the scope's key and still refuse, because the
+                                // session was not entitled to it. Same error as a sealed
+                                // scope on a device - to the writer it is one.
+                                if (options?.session && !options.session.scopes.includes(scopeLabel)) {
+                                    throw new StackLockedError(className, scopeLabel);
+                                }
                                 if (!stack.cryptoEngine.isScopeWritable(scopeLabel)) {
                                     throw new StackLockedError(className, scopeLabel);
                                 }
@@ -493,6 +516,10 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                                         }
                                     }
                                 }
+                            } else if (options?.session && !options.session.documentKey) {
+                                // Unlabelled encrypted content seals under the document
+                                // key, which this session was not granted.
+                                throw new StackLockedError(className);
                             } else if (stack.isLocked() && !(options as any)?.isPatch) {
                                 throw new StackLockedError(className);
                             }
@@ -531,7 +558,7 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
 
                         if (!options?.isPostOp) {
                             for (const trigger of beforeTriggers) {
-                                const updatedDoc = await trigger.execute(doc);
+                                const updatedDoc = await trigger.execute(doc, options?.session);
                                 Object.assign(doc, updatedDoc); // Merge changes back.
                             }
                         }

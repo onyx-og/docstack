@@ -282,6 +282,9 @@ function parseSelectItem(scan: Scanner) {
     return { expr, as: alias };
 }
 
+/** Words that can follow a table name and are never its alias. */
+const FROM_CLAUSE_KEYWORDS = new Set(['JOIN', 'INNER', 'LEFT', 'RIGHT', 'ON', 'WHERE', 'GROUP', 'ORDER', 'LIMIT', 'OFFSET', 'HAVING', 'AS', 'UNION']);
+
 function parseSingleFrom(scan: Scanner) {
     const table = parseIdentifier(scan);
     scan.skipWSAndComments();
@@ -294,8 +297,12 @@ function parseSingleFrom(scan: Scanner) {
     } else {
         const aliasMatch = scan.matchRe(/^[a-zA-Z_][a-zA-Z0-9_]*/);
         if (aliasMatch) {
-            const tempScanner = new Scanner(scan.text, scan.pos + aliasMatch[0].length);
-            const isReservedWord = ['JOIN', 'WHERE', 'GROUP', 'ORDER', 'LIMIT', 'HAVING', 'ON', 'AS'].some(kw => tempScanner.peekKW(kw));
+            // A bare word after the table is its alias unless the word is itself a
+            // clause keyword. This used to test the token *after* the candidate, which
+            // took `ORDER` in `FROM Task ORDER BY x` (and `WHERE` in `FROM Task WHERE
+            // ...`) as the alias and refused a real bare alias followed by a clause;
+            // every caller had been writing `AS t` around it.
+            const isReservedWord = FROM_CLAUSE_KEYWORDS.has(aliasMatch[0].toUpperCase());
             if (!isReservedWord) {
                 scan.pos += aliasMatch[0].length;
                 alias = aliasMatch[0];
