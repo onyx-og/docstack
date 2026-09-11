@@ -1,4 +1,5 @@
-import PouchDB from "pouchdb-browser";
+import type PouchDB from "pouchdb-browser";
+import { getPouchDB } from "./pouchdb.js";
 import semver from "semver";
 import { diff } from "jsondiffpatch";
 import createLogger from "../utils/logger/index.js";
@@ -390,18 +391,18 @@ class ClientStack extends Stack {
         // PouchDB.plugin((await import('pouchdb-adapter-websql')).default);
 
         // Load default plugins
-        PouchDB.plugin(PouchDBFind);
+        getPouchDB().plugin(PouchDBFind);
 
         // Validation plugin
         if (options?.plugins) {
             for (let plugin of options.plugins) {
-                PouchDB.plugin(plugin);
+                getPouchDB().plugin(plugin);
             }
         }
         // Anything in `options` that isn't DocStack's own is PouchDB configuration -
         // `adapter` most of all, without which a stack could only ever be opened on the
         // default transport and never, say, on a remote-backed one.
-        const rawDb = new PouchDB(
+        const rawDb = new (getPouchDB())(
             conn,
             toPouchConfiguration(options),
         );
@@ -415,7 +416,7 @@ class ClientStack extends Stack {
         // Built from the pristine methods rather than looking them up: the plugin can no
         // longer be constructed at a moment when its capture would be wrong, because the
         // capture is an argument. See ADR-0019.
-        const stackPlugin = StackPlugin(PouchDB, this, this.pristineDbMethods);
+        const stackPlugin = StackPlugin(getPouchDB(), this, this.pristineDbMethods);
         (rawDb as any).ping = stackPlugin.ping;
         (rawDb as any).bulkDocs = stackPlugin.bulkDocs;
         (rawDb as any).bulkGet = stackPlugin.bulkGet;
@@ -3935,7 +3936,7 @@ class ClientStack extends Stack {
     static async clear(conn: string) {
         return new Promise((resolve, reject) => {
             try {
-                let db = new PouchDB(conn)
+                let db = new (getPouchDB())(conn)
                 db.destroy(null, () => {
                     logger.info("clear - Destroyed db");
                     resolve(true);

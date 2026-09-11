@@ -6,7 +6,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "jest",
+    "test": "node --test \"test/**/*.spec.mjs\"",
     "start": "node ./lib/index.js",
     "build:types": "npx tsc -p ./tsconfig.json",
     "build": "rollup --config ./rollup.config.js && npm run build:types && cp -r ./src/utils/stack/datamodel/patch lib/",
@@ -29,5 +29,11 @@
     "url": "https://github.com/onyx-og/docstack/issues"
   },
   "homepage": "https://onyx.ac/products/docstack",
-  "description": ""
+  "description": "DocStack on a host: one engine, two surfaces (spec 03). Rewrite in progress; the old sources are not built.",
+  "dependencies": {
+    "@docstack/client": "^0.3.2",
+    "pouchdb": "^9.0.0",
+    "pouchdb-adapter-memory": "^9.0.0",
+    "pouchdb-find": "^9.0.0"
+  }
 }

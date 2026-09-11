@@ -2,7 +2,7 @@ import { isClassModel, isDocument, isRelation, isPatch, Domain, type StackSessio
 import type { AttributeTypeReference, ClassModel, Document, DomainRelationParams, PristineDbMethods, StackPluginType } from "@docstack/shared";
 // import Stack from "../utils/stack";
 import Stack from "../core/stack.js"
-import PouchDB from "pouchdb-browser";
+import type PouchDB from "pouchdb-browser";
 import { Trigger } from "../core/trigger/index.js";
 import createLogger from "../utils/logger/index.js";
 import {diff} from 'jsondiffpatch';

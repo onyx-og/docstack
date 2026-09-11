@@ -1,4 +1,5 @@
-import PouchDB from "pouchdb-browser";
+import type PouchDB from "pouchdb-browser";
+import { getPouchDB } from "../pouchdb.js";
 import semver from "semver";
 import createLogger from "../../utils/logger/index.js";
 import { createReplicationFilter, type InternalDocFilterOptions } from "./internal-docs.js";
@@ -473,7 +474,7 @@ export class StackSyncHandle extends EventTarget {
         const { remote } = this.options;
         const resolved = typeof remote === "function" ? await remote(this.stack) : remote;
         if (typeof resolved === "string") {
-            return new PouchDB(resolved);
+            return new (getPouchDB())(resolved);
         }
         if (!resolved) {
             throw new Error(`Stack '${this.stack.name}' sync: the remote resolver produced no database`);
@@ -623,21 +624,21 @@ export class StackSyncHandle extends EventTarget {
         const opts = this.buildReplicationOptions();
 
         if (this.direction === "both") {
-            if (typeof (PouchDB as any).sync !== "function") {
+            if (typeof (getPouchDB() as any).sync !== "function") {
                 throw new Error("The bundled PouchDB has no replication support; 'direction: \"both\"' is unavailable");
             }
-            const sync = PouchDB.sync(local, remote, opts);
+            const sync = getPouchDB().sync(local, remote, opts);
             sync.on("change", (info: any) => this.onChange(info.direction === "pull" ? "pull" : "push", info.change));
             this.wireCommonEvents(sync);
             return sync;
         }
 
-        if (typeof (PouchDB as any).replicate !== "function") {
+        if (typeof (getPouchDB() as any).replicate !== "function") {
             throw new Error("The bundled PouchDB has no replication support; 'sync' is unavailable");
         }
 
         const [source, target] = this.direction === "push" ? [local, remote] : [remote, local];
-        const replication = PouchDB.replicate(source, target, opts);
+        const replication = getPouchDB().replicate(source, target, opts);
         replication.on("change", (info: any) => this.onChange(this.direction === "push" ? "push" : "pull", info));
         this.wireCommonEvents(replication);
         return replication;

@@ -14,6 +14,14 @@ npm install @docstack/client pouchdb-browser pouchdb-find
 
 `pouchdb-browser` and `pouchdb-find` are **peer dependencies** at `^9`. DocStack does not bundle the storage layer, so you control its version and it is never duplicated in your bundle.
 
+The same package runs under Node 20 and later, which is what [the server](../reference/server.md) is built on. Node's `node` export condition resolves `@docstack/client` to a build that uses `pouchdb` (LevelDB, http, replication) instead of `pouchdb-browser`; the engine is the same code, only the constructor differs. A Node consumer installs `pouchdb` and imports the same names:
+
+```bash
+npm install @docstack/client pouchdb pouchdb-find   # Node
+```
+
+`@docstack/client/node` and `@docstack/client/browser` name each build explicitly, for bundlers and test runners that ignore export conditions.
+
 [![@docstack/client on npm](https://img.shields.io/npm/v/@docstack/client?label=%40docstack%2Fclient)](https://www.npmjs.com/package/@docstack/client)
 
 The badge is the current release, read from npm as you load this page. The [release notes](/blog) say what changed in each one, and the [changelog](https://github.com/onyx-og/docstack/blob/main/packages/client/CHANGELOG.md) goes back to 0.1.6.
@@ -30,10 +38,10 @@ React 19 is a peer dependency. `@docstack/react` wraps the client in a provider 
 
 ## What the runtime needs
 
-- **IndexedDB.** The default storage adapter is `pouchdb-browser`'s IndexedDB adapter. Any other PouchDB adapter passes through: everything in the options object that is not DocStack's own reaches the PouchDB constructor, so `adapter: 'memory'` with `plugins: [MemoryAdapter]` gives you an in-memory stack for tests.
+- **IndexedDB** in the browser, **LevelDB** under Node. The default storage adapter is the one the resolved PouchDB build ships. Any other PouchDB adapter passes through: everything in the options object that is not DocStack's own reaches the PouchDB constructor, so `adapter: 'memory'` with `plugins: [MemoryAdapter]` gives you an in-memory stack for tests.
 - **Web Crypto.** Field-level encryption uses `crypto.subtle` for AES-GCM and PBKDF2. Every evergreen browser has it; so does Node 20 and later.
 - **WebAssembly**, only if you use [cryptographic access scopes](../concepts/access-control/index.md). The CP-ABE primitive ships as `@docstack/abe`, a client dependency inlined into the bundle. Its ~180 KB (gzipped) WebAssembly module is embedded but instantiated **lazily** — a stack that never touches scopes compiles no WebAssembly and pays only the embedded bytes.
-- **ES modules.** The package is `"type": "module"`. A UMD build is also shipped at `lib/index.umd.js` for script-tag use.
+- **ES modules.** The package is `"type": "module"`, with a browser entry (`lib/index.js`) and a Node entry (`lib/node.js`) selected by export condition. A UMD build is also shipped at `lib/index.umd.js` for script-tag use.
 - **TypeScript types** resolve `@docstack/shared` at `^0.1.0`. The runtime bundle inlines it (and `@docstack/abe`); only the published `.d.ts` files import them.
 
 ### Bundler note

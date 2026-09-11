@@ -15,7 +15,7 @@ sidebar_position: 10
 | Web Crypto (`crypto.subtle`) | Encryption | Native PBKDF2 and AES-GCM: faster than a JavaScript implementation and a smaller surface for error. |
 | rabe (Fraunhofer AISEC), compiled to WASM | Attribute-based encryption | The AC17 CP-ABE scheme, vendored into `@docstack/abe`, seals scope keys under attribute policies. Loaded lazily, only when a stack declares scopes. |
 | Playwright | Tests | The client suite runs the compiled library in a real Chromium against real IndexedDB. |
-| Rollup, tsc, Webpack | Builds | Rollup emits the client as ESM plus a UMD bundle; the React package is plain `tsc`; the workbench is Webpack. |
+| Rollup, tsc, Webpack | Builds | Rollup emits the client as a browser ESM entry, a Node ESM entry and a UMD bundle; the React package is plain `tsc`; the workbench is Webpack. |
 
 ## The engines
 

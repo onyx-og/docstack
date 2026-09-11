@@ -16,7 +16,7 @@ DocStack is an npm-workspaces monorepo (`packages/*`) of independently publishab
 | `packages/react` | `@docstack/react` | Provider and hooks. | [![npm](https://img.shields.io/npm/v/@docstack/react)](https://www.npmjs.com/package/@docstack/react) |
 | `packages/abe` | `@docstack/abe` | The CP-ABE primitive (rabe's AC17, compiled to WASM and vendored under `src/wasm`), the policy normaliser and the authority helpers. A dependency of the client. | [![npm](https://img.shields.io/npm/v/@docstack/abe)](https://www.npmjs.com/package/@docstack/abe) |
 | `packages/ui` | `@docstack/ui` | The workbench application. Built with Webpack; its bundle is copied into `packages/docs/static/app` and hosted from this site. | Not a library; hosted |
-| `packages/server` | `@docstack/server` | The server preview. | No |
+| `packages/server` | `@docstack/server` | The server: a rewrite in progress against [spec 03](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md); the preview sources are not built. | No |
 | `packages/docs` | `@docstack/docs` | This site (Docusaurus). Builds into the repository's root `docs/` folder, which GitHub Pages serves. | Site |
 | `packages/examples/react-todo` | | The runnable example app (Vite). | |
 | `packages/examples/react-init` | | A single-file starting point. | |
@@ -33,7 +33,7 @@ Each package builds on its own; the root `package.json` orchestrates:
 ```bash
 npm install                 # once, at the root; links the workspaces
 npm run build:shared
-npm run build:client        # clean, tsc for types, rollup for lib/ (ESM + lib/index.umd.js)
+npm run build:client        # clean, tsc for types, rollup for lib/ (browser ESM + Node ESM + lib/index.umd.js)
 npm run build:react         # tsc
 npm run build:ui            # webpack, production
 npm run build:docs          # docusaurus build --out-dir ../../docs
@@ -49,7 +49,7 @@ The site's API reference is generated at build time by TypeDoc from `packages/cl
 | Package | Runner | Command |
 | :--- | :--- | :--- |
 | `@docstack/client` | Playwright, in a real Chromium against IndexedDB | `cd packages/client && npm run test` |
-| `@docstack/server` | Jest | `cd packages/server && npm run test` |
+| `@docstack/server` | `node --test`, against the built client's Node entry | `cd packages/server && npm run test` |
 
 Tests are a required part of a contribution, not an optional follow-up: new functions, branches or conditions ship with tests that exercise them; a bug fix includes a regression test that fails on `main` and passes with the fix; and a test is never weakened to make it pass. If an expectation seems wrong, raise it in the PR rather than loosening the assertion.
 

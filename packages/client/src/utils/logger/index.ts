@@ -13,7 +13,8 @@ import { createStackSink, type LogRecord } from "./transport.js";
  * `createLogger`, `.child()` and three level methods, so the dependency bought nothing
  * the twenty lines below do not.
  *
- * Nothing here is exported from the package; log output is the only observable change.
+ * Only {@link setDefaultLogLevel} is exported from the package; log output is otherwise
+ * the only observable behaviour.
  *
  * @module
  */
@@ -104,7 +105,23 @@ const writeToConsole = (record: LogRecord) => {
  * assigned during initialization, which can run after its first loggers exist.
  */
 const stackLevel = (stack?: Stack | null): LogLevel | "silent" | undefined => {
-    return (stack as any)?.options?.logLevel;
+    return (stack as any)?.options?.logLevel ?? defaultLevel;
+};
+
+let defaultLevel: LogLevel | "silent" | undefined;
+
+/**
+ * Sets the level every logger falls back to when its stack has no `logLevel` of its
+ * own - including the module-level loggers (`initdb`, `loadPatches`) that are bound to
+ * no stack and otherwise print `warn` and above whatever the stacks were told.
+ *
+ * A host runs many stacks from one process and owns the process log; `"silent"` hands
+ * it the console back. A stack's explicit `logLevel` still wins over this default.
+ *
+ * @param level - The floor to apply, or `undefined` to restore the library defaults.
+ */
+export const setDefaultLogLevel = (level?: LogLevel | "silent"): void => {
+    defaultLevel = level;
 };
 
 const build = (context: LogFields, sink?: (record: LogRecord) => void, stack?: Stack | null): Logger => {

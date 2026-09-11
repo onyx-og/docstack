@@ -21,7 +21,7 @@ Each package runs its own suite from its own directory (`cd packages/<name>` fir
 | Package | Runner | Command |
 |---|---|---|
 | `@docstack/client` | Playwright (real browser) | `npm run test` |
-| `@docstack/server` | Jest | `npm run test` |
+| `@docstack/server` | `node --test` (Node's built-in runner) | `npm run test` |
 | `@docstack/ui` | Jest | `npm run test` |
 | `@docstack/abe` | Node smoke script | `npm run test` |
 

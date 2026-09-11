@@ -20,6 +20,23 @@
 - `StackSession` is exported from `@docstack/shared` and re-exported here with
   `SessionView`, `StackSessionError` and `createSessionView`.
 
+### Added - the engine under Node (ADR-0047, spec 03)
+
+- **Conditional exports.** `@docstack/client` resolves to a Node build under the
+  `node` export condition, built on `pouchdb` (LevelDB, http, replication) instead
+  of `pouchdb-browser`, which cannot load outside a browser. Same engine, same
+  names; only the constructor differs. `@docstack/client/node` and
+  `@docstack/client/browser` name each build explicitly. `pouchdb ^9` joins the
+  peer dependencies; `pouchdb` and `pouchdb-browser` are both optional peers, one
+  of them is needed.
+- **`setPouchDB` / `getPouchDB`.** The constructor registry the entries use; a host
+  that composes its own PouchDB (extra adapters, plugins) registers it before
+  opening a stack.
+- **`setDefaultLogLevel(level)`.** A process-wide floor for the module-level loggers a
+  stack's own `logLevel` does not reach; `"silent"` hands a host its console back.
+- The fossil Express block left in `DocStack`'s constructor from the server preview is
+  gone.
+
 ### Fixed
 
 - **Projected reads of scope-sealed attributes decrypt.** `findDocuments(selector,
