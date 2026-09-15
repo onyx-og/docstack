@@ -1,22 +1,12 @@
-// import express, {Express} from 'express'
-// import { static as exStatic } from 'express';
-// import * as dotenv from "dotenv";
-// import cors from "cors";
 // dotenv.config({ path: './.env' })
 import createlogger from "../utils/logger/index.js"
-// import test from '../../../server/src//utils/dbManager/test';
-// import { generateJwtKeys, generatePswKeys } from '../../../server/src/utils/crypto';
 import ClientStack from './stack.js';
-// import { login, JWTAuthPayload, setupAdminUser } from '../../../server/src//utils/auth';
-// import memoryAdapter from "pouchdb-adapter-memory"
-// import cookieParser from 'cookie-parser';
-// import jwt from 'jsonwebtoken';
+import RemoteStack from './remote-stack.js';
 import Class from "./class.js";
 import Domain from './domain.js';
 import { Trigger } from "./trigger/index.js";
 import { JobEngine } from "./job-engine/index.js";
 import { JobScheduler } from "./job-engine/scheduler.js";
-// import AbstractClass from '../../shared/src//utils/stack/class';
 import Attribute from './attribute.js';
 import { AttributeType, ClientCredentials, DocstackReady, StackConfig, StackOptions } from "@docstack/shared";
 import { DocStackSyncHandle, deriveTenantScope } from './sync/index.js';
@@ -108,19 +98,36 @@ class DocStack extends EventTarget {
      * @param config - A stack name, or a full configuration object.
      * @returns The connection string and the resolved {@link StackOptions}.
      */
-    private static resolveStackConfig(config: StackConfig): { connection: string; options: StackOptions } {
+    private static resolveStackConfig(config: StackConfig): {
+        connection: string;
+        options: StackOptions;
+        /** Set for `mode: "remote"`: the transport options a `RemoteStack` needs and PouchDB must not see. */
+        remote: { token?: string | (() => string | Promise<string>); headers?: Record<string, string>; fetch?: (input: string, init?: any) => Promise<any> } | null;
+    } {
         if (typeof config === "string") {
-            return { connection: `db-${config}`, options: { name: config } };
+            return { connection: `db-${config}`, options: { name: config }, remote: null };
         }
 
-        const { connection, ...rest } = config as { connection?: string } & StackOptions;
+        const { connection, mode, token, headers, fetch, ...rest } = config as {
+            connection?: string;
+            mode?: "local" | "remote";
+            token?: string | (() => string | Promise<string>);
+            headers?: Record<string, string>;
+            fetch?: (input: string, init?: any) => Promise<any>;
+        } & StackOptions;
         const name = rest.name;
         if (!connection && !name) {
             throw new Error("A stack configuration needs either a 'name' or a 'connection'");
         }
+        if (mode === "remote") {
+            if (!connection) throw new Error("A remote stack needs a 'connection': the stack's URL on the server, e.g. https://host/s/my-app");
+            if (!name) throw new Error("A remote stack needs a 'name'");
+            return { connection, options: { ...rest, name }, remote: { token, headers, fetch } };
+        }
         return {
             connection: connection || `db-${name}`,
             options: { ...rest, name: name || connection! },
+            remote: null,
         };
     }
 
@@ -145,7 +152,7 @@ class DocStack extends EventTarget {
      * ```
      */
     public addStack = async (config: StackConfig): Promise<ClientStack> => {
-        const { connection, options } = DocStack.resolveStackConfig(config);
+        const { connection, options, remote } = DocStack.resolveStackConfig(config);
         const name = options.name || connection;
         const fnLogger = this.logger.child({ method: "addStack" });
 
@@ -169,7 +176,14 @@ class DocStack extends EventTarget {
 
         // Registered before the first `await`, which is what makes the guard atomic:
         // nothing else runs between the miss above and this line.
-        const creation = ClientStack.create(connection, options).then(async stack => {
+        // A remote stack (spec 03 §8) calls a server instead of opening a database; it
+        // joins the same list so `getStack` and the hooks see one kind of thing, and it
+        // never joins a sync - it replicates nothing by definition.
+        const opening: Promise<ClientStack | RemoteStack> = remote
+            ? RemoteStack.connect({ name, url: connection, ...remote })
+            : ClientStack.create(connection, options);
+        const creation = opening.then(async opened => {
+            const stack = opened as unknown as ClientStack;
             this.stacks.push(stack);
             if (!this.store) this.store = stack;
             // Bound to any live un-scoped sync BEFORE the stack is announced, so that
@@ -180,7 +194,7 @@ class DocStack extends EventTarget {
             // missing key reads as "nothing to say" rather than "not covered". A
             // workspace registry that lives in one database and names the others makes
             // that ordering a boot-time coin toss, not an exotic case. See ADR-0033.
-            await this.bindStackToSync(stack);
+            if (opened instanceof ClientStack) await this.bindStackToSync(opened);
             this.dispatchEvent(new CustomEvent("stack-added", { detail: { stack } }));
             return stack;
         });
@@ -218,7 +232,7 @@ class DocStack extends EventTarget {
         // reporting a database this instance no longer holds.
         this.syncHandle?.remove(stack.name);
 
-        if (options?.destroy) {
+        if (options?.destroy && stack instanceof ClientStack) {
             await stack.destroyDb();
         }
 
@@ -253,6 +267,8 @@ class DocStack extends EventTarget {
                 return stack;
             })
             : this.stacks;
+        // Remote stacks call a server and replicate nothing; a standing sync never binds them.
+        targets = targets.filter((stack) => stack instanceof ClientStack);
 
         // A tenant entitlement compiles into per-stack configuration: stacks outside
         // the scope are not synced at all - withheld structurally, which is a stronger
@@ -701,6 +717,13 @@ export { StackLockedError, StackScopeMismatchError } from "../plugins/pouchdb.js
  */
 export { createSessionView, StackSessionError } from "./session.js";
 export type { SessionView } from "./session.js";
+/**
+ * A stack that lives on a DocStack server (spec 03 §8): the same contract the hooks
+ * and `Class` use, over the server's API surface and a live feed. Opened by
+ * `docstack.addStack({ name, connection: url, mode: "remote", token })`.
+ */
+export { RemoteStack, RemoteStackError, RemoteRequestError } from "./remote-stack.js";
+export type { RemoteStackOptions, RemoteFetch } from "./remote-stack.js";
 export {
     TransactionEngine,
     TransactionHandle,

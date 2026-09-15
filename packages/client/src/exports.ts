@@ -62,6 +62,9 @@ export {
     StackScopeMismatchError,
     StackSessionError,
     createSessionView,
+    RemoteStack,
+    RemoteStackError,
+    RemoteRequestError,
     deriveKeyId,
     isEncryptedPayload,
     deriveTenantScope,
@@ -69,7 +72,7 @@ export {
 } from "./core/index.js";
 
 export { SYSTEM_SEEDED_DOC_IDS, collectQueryClasses } from "./core/index.js";
-export type { EncryptedPayload, ClassBuildOptions, SessionView } from "./core/index.js";
+export type { EncryptedPayload, ClassBuildOptions, SessionView, RemoteStackOptions, RemoteFetch } from "./core/index.js";
 
 /**
  * Named write transactions (ADR-0039).

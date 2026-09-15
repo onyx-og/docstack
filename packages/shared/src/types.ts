@@ -320,6 +320,19 @@ export type StackOptions = {
 export type StackConfig = ({
     connection?: string;
     plugins?: any[];
+    /**
+     * `"remote"` opens a thin stack against a DocStack server: `connection` is the
+     * stack's URL (`https://host/s/<name>`), nothing is replicated, every read and
+     * write runs on the host under a session. `"local"` (the default) opens the engine
+     * on this device. See spec 03.
+     */
+    mode?: "local" | "remote";
+    /** Remote mode: the bearer token, or a function returning it, sent with every request. */
+    token?: string | (() => string | Promise<string>);
+    /** Remote mode: extra headers on every request. */
+    headers?: Record<string, string>;
+    /** Remote mode: a `fetch` implementation; the global one by default. */
+    fetch?: (input: string, init?: any) => Promise<any>;
 } & StackOptions) | string | `db-${string}`;
 
 export type CachedClass = Class & {

@@ -20,6 +20,21 @@
 - `StackSession` is exported from `@docstack/shared` and re-exported here with
   `SessionView`, `StackSessionError` and `createSessionView`.
 
+### Added - remote stacks (ADR-0047, spec 03 §8)
+
+- **`RemoteStack`**: a stack that lives on a DocStack server. The same contract the
+  hooks and `Class` use - `getClass`, `getDomain`, `getClassNames`, `addClass`,
+  `findDocuments`, `query`, `createDoc(s)`, `deleteDocument`, `subscribeClassDocs` -
+  over the server's API surface and one server-sent-events feed per stack, so a
+  `Class` built from it, `useQuerySQL` and `useClassDocs` work unchanged. Nothing is
+  replicated; every read and write runs on the host under the caller's session, and
+  the host's refusals come back as `StackLockedError`. Members only a local engine
+  has (`db`, `sync`, keys, transactions) throw `RemoteStackError`.
+- **`StackConfig.mode`**: `"remote"` makes `docstack.addStack` (and `StackProvider`)
+  open a `RemoteStack` at `connection`, with `token`, `headers` and `fetch` as the
+  transport options; `"local"` (default) is today's `ClientStack`. A remote stack
+  joins the same list and never joins a sync.
+
 ### Added - the engine under Node (ADR-0047, spec 03)
 
 - **Conditional exports.** `@docstack/client` resolves to a Node build under the

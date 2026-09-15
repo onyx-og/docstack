@@ -1,27 +1,19 @@
 {
   "compilerOptions": {
-    "sourceMap": true,
-    "target": "es2017",
-    "allowJs": true,
+    "target": "ES2022",
     "module": "NodeNext",
-    "outDir": "../lib",
-    "baseUrl": "./src",
-    "skipLibCheck": true,
-    "alwaysStrict": true,
-    "noImplicitAny": false,
-    "emitDeclarationOnly": true,
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
     "declaration": true,
-    "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "paths" : {
-      "@docstack/shared": ["../../shared/src"]
-    }
+    "sourceMap": true,
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "composite": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["src"],
+  "exclude": ["node_modules", "lib", "test"]
 }

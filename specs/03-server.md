@@ -6,6 +6,15 @@ the host), ADR-0045 (access is cryptographic), ADR-0046 (engine sessions), spec 
 (sync), spec 02 (crypto access). Supersedes the `packages/server` preview in full:
 nothing under its `src/` is kept.
 
+**Implementation status (2026-09-15).** Checklist item 1 landed (conditional exports,
+`@docstack/client/node`, the Node spike `packages/server/test/00-engine.spec.mjs`).
+Item 2, online mode, is written and committed as work in progress but has not been
+built or tested: the new `packages/server/src` (config, stack registry with the omni
+key, authority, credential store, tokens, grants, entitlement, sessions, the
+`node:http` server, the `_ds/*` routes, the SSE feed, `/auth/*`, `/health`, the CLI),
+`RemoteStack` with `StackConfig.mode` in the client, and the `api`/`auth` suites.
+Expect compiler and test rounds before it counts as done. Items 3–7 are not started.
+
 ## 1. The model in one paragraph
 
 `@docstack/server` is the DocStack engine deployed on a host, exposed through **two

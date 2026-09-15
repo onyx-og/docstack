@@ -1,267 +1,98 @@
-import express, {Express} from 'express'
-import { static as exStatic } from 'express';
-import * as dotenv from "dotenv";
-import cors from "cors";
-dotenv.config({ path: './.env' })
-import getLogger, {logRequest} from "./utils/logger"
-import test from './utils/stack/test';
-import { generateJwtKeys, generatePswKeys } from './utils/crypto';
-import Stack from './utils/stack';
-import { login, JWTAuthPayload, setupAdminUser } from './utils/auth';
-// import memoryAdapter from "pouchdb-adapter-memory"
-import cookieParser from 'cookie-parser';
-import jwt from 'jsonwebtoken';
-import Class from './utils/stack/class';
-import Attribute from './utils/stack/attribute';
-import { setPatchCount } from './utils/stack/datamodel';
-import { EventEmitter } from 'node:events';
-import { resolve } from 'node:path';
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
+import { setDefaultLogLevel } from "@docstack/client";
+import { resolveConfig, defineConfig, type ServerConfig, type ServerConfigInput } from "./config/schema.js";
+import { createHostLogger, type HostLogger } from "./engine/logging.js";
+import { StackRegistry } from "./engine/stacks.js";
+import { Authority } from "./auth/authority.js";
+import { CredentialStore } from "./auth/users.js";
+import { TokenService } from "./auth/jwt.js";
+import { Entitlements } from "./session/entitlement.js";
+import { Router } from "./http/router.js";
+import { createHttpServer, type AppContext, type AuthedContext } from "./http/server.js";
+import { registerApiRoutes } from "./http/api.js";
+import { registerSessionRoutes } from "./http/session.js";
+import { HttpError } from "./http/errors.js";
 
-let envPath = process.env.ENVFILE || "./.env";
-envPath = resolve(process.cwd(), envPath);
-dotenv.config({ path: envPath });
+export { defineConfig, resolveConfig };
+export { loadConfig, applyEnvironment } from "./config/load.js";
+export type { ServerConfig, ServerConfigInput } from "./config/schema.js";
+export type { Principal, Grant, StackGrant, GrantClassFilter, AuthorityMaterial, HostStackConfig, UserRecord } from "./types.js";
+export { Authority } from "./auth/authority.js";
+export { CredentialStore } from "./auth/users.js";
+export { StackRegistry, HostStack } from "./engine/stacks.js";
+export { HttpError } from "./http/errors.js";
+export type { FeedEvent } from "./http/feed.js";
 
-class DocStack extends EventEmitter {
-    private app: Express;
-    private dbName: string;
-    private readyState: boolean; 
-    private store: Stack;
+export const VERSION = "0.1.0";
 
-    private async initInstance(dbName: string) {
-        // TODO instead of fixed "db-test" allow the configuration of "test" part
-        const store = await Stack.create(`db-${dbName}`, {
-            // defaults to leveldb
-            // adapter: 'memory', 
-            plugins: [
-            // https://www.npmjs.com/package/pouchdb-adapter-memory
-            // memoryAdapter
-            ]
-        });
-        this.store = store;
-        globalThis.store = this.store;
-        await setupAdminUser();
-        this.readyState = true;
-        this.emit('ready') // TODO: consider wether to provide args
-    }
-
-    async resetDb() {
-        try {
-            await this.store.reset();
-        } catch (e) {
-            throw new Error(e);
-        }
-    }
-
-    public getStore() {
-        return this.store;
-    }
-
-    public getReadyState() {
-        return this.readyState;
-    }
-    async reset() {
-        try {
-            await this.resetDb();
-            await this.initInstance(this.dbName);
-        } catch (e) {
-            throw new Error(e); 
-        }
-    }
-
-    constructor(config?: {
-        dbName: string;
-    }) {
-        super();
-        this.dbName = (config && config.dbName) ? config.dbName : "docstack";
-        const logger = getLogger().child({module: "express"})
-        this.app = express();
-        this.readyState = false;
-
-        this.app.use(logRequest)
-        // Enable CORS for all routes
-        if (process.env.NODE_ENV === 'development') {
-            logger.info("Development environment. Enabling CORS for :8080");
-            this.app.use(cors({
-                origin: 'http://localhost:8080',
-                // Replace with the origin of webpack dev server
-                methods: ['GET', 'POST'], 
-                credentials: true,
-            }));
-        }
-        // Use built-in middleware for parsing JSON and URL-encoded data
-        this.app.use(express.json());
-        this.app.use(express.urlencoded({ extended: true }));
-        this.app.use(cookieParser());
-        this.app.use((req, res, next) => {
-            if (!this.readyState) {
-                return res.status(503); // Service Unavailable.
-            }
-            // Server is ready to receive requests
-            next()
-        })
-        this.app.use('/api/private', (req, res, next) => {
-            const token = req.cookies.jwtToken
-            if (!token) {
-                logger.error("No token provided")
-                return res.status(403).json({
-                    success: false,
-                    message: 'No token provided',
-                });
-            }
-            const secretKey = process.env.JWT_PUBLIC_KEY;
-            if (!secretKey || secretKey === '') {
-                logger.error("No secret key found")
-                return res.status(500).json({
-                    success: false,
-                    message: 'No secret key found',
-                });
-            }
-            jwt.verify(token, secretKey, async (err, payload: JWTAuthPayload) => {
-                if (err) {
-                    logger.error("Invalid token", err)
-                    return res.status(403).json({
-                        success: false,
-                        message: 'Invalid token',
-                    });
-                } else {
-                    // Check whether the session is still valid
-                    const { sessionId } = payload;
-                    const UserSessionClass = await this.store.getClass("UserSession");
-                    const sessionCards = await UserSessionClass.getCards({
-                        sessionId: { $eq: sessionId },
-                        sessionStatus: { $eq: "active" }
-                    }, null, 0, 1);
-                    if (sessionCards.length === 0) {
-                        return res.status(403).json({
-                            success: false,
-                            message: 'Session expired',
-                        });
-                    }
-                    // TODO: Consider passing the session card to the next middleware
-                    next();
-                }
-            });
-        })
-
-        // TODO: Serve the dashboard to a specific route, i.e.: admin 
-        // this.app.use(exStatic('./dist'));
-
-        // TODO: Serve the static files from the build folder
-        // of the UI application
-        // this.app.get('*', (req, res) => {
-        //     const templatePath = resolve(__dirname, './dist', 'index.html');
-        //     res.sendFile(templatePath);
-        // });
-
-        this.app.post('/login', async (req, res) => {
-            try {
-                const { username, password } = req.body;
-                const { responseCode, body, token } = await login(username, password);
-                // Append also the token to the response
-                let cookieOptions = {}
-                if (process.env.NODE_ENV === 'development') {
-                    cookieOptions = { sameSite: 'None', secure: true, maxAge: 1000 * 60 * 15 };
-                    logger.warn("Development mode: setting cookie options to SameSite=None; Secure=true for JWT token");
-                } else cookieOptions = { sameSite: 'Strict', httpOnly: true, maxAge: 1000 * 60 * 15 };
-
-                res.cookie('jwtToken', token, cookieOptions);
-                return res.status(responseCode).json(body);
-            } catch (error) {
-                console.error("Error during login", error);
-                return res.status(500).json({ success: false, error: 'An error occurred' });
-            }
-        });
-
-        this.app.get('/api/private/reset', async (req, res) => {
-            try {
-                await this.reset();
-                return res.status(200).json({ success: true, message: 'Internal database reset' });
-            } catch (e) {
-                return res.status(500).json({ success: false, error: 'An error occurred' });
-            }
-        });
-
-        this.app.get('/api/private/clear:conn', async (req, res) => {
-            try {
-                const conn = req.params.conn;
-                if (!conn) {
-                    throw new Error("Connection name not provided");
-                }
-                await Stack.clear(conn);
-                return res.status(200).json({ success: true, message: 'Internal database cleared' });
-            } catch (e) {
-                logger.error("Error during database clear", e);
-                return res.status(500).json({ success: false, error: 'An error occurred' });
-            }
-        });
-
-        this.app.get('/api/private/test', (req, res) => {
-            return res.status(200).json({ message: 'Hello from the server! This is a private route' });
-        });
-
-        this.app.post('/api/private/create-class/:name', async (req, res) => {
-            const { name } = req.params;
-            const { type, description } = req.query;
-            logger.info("create-class - received request", {
-                params: req.params,
-                query: req.query
-            })
-
-            try {
-                const newClass = await Class.create(
-                    this.store, name, type as string, description as string,
-                    {} // no schema yet
-                );
-                logger.info("create-class", `class '${name}' created successfully.`,
-                    {classModel: newClass.getModel()}
-                )
-            } catch (e) {
-                logger.error(`Error during class '${name} creation`, e);
-                return res.status(500).json({ success: false, error: 'An error occurred' });
-            }
-            
-            return res.status(200).json({ success: true, message: 'Class created successfully' });
-        })
-
-        this.app.put('/api/private/create-attribute/:name', async (req, res) => {
-            const className = req.params.name;
-            const { name, type, config } = req.body;
-            logger.info(`create-attribute - for class '${className}'`, {
-                name, type, config
-            });
-
-            try {
-                // Loads the class object
-                let classObj = await this.store.getClass(className);
-                let newAttribute = await Attribute.create(classObj, name, type, config);
-                logger.info(`create-attribute - Attribute '${name}' added to class '${className}'`, 
-                    {attributeModel: newAttribute.getModel()}
-                );
-            } catch (e) {
-                logger.error(`Error during attribute '${name}' creation`, e)
-            }
-        })
-
-        // const port = process.env.SERVER_PORT || 5000;
-
-        // const server = this.app.listen(port, () => logger.info(`Listening on port ${port}`));
-
-        // Procedure that should run once only
-        // can be considered "setup procedures"
-        generatePswKeys()
-        generateJwtKeys()
-
-        // Server "startup procedures"
-        setPatchCount()
-        // setTimeout(test, 1000)
-        this.initInstance(this.dbName)
-        this.on("ready", () => logger.info("DocStack successfully initialized"))
-    }
-
-    public getApp() {
-        return this.app;
-    }
+/** A running (or startable) node. */
+export interface DocStackServer {
+    config: ServerConfig;
+    registry: StackRegistry;
+    users: CredentialStore | null;
+    authority: Authority | null;
+    logger: HostLogger;
+    httpServer: Server;
+    /** Binds and resolves with where the node listens; port `0` picks a free one. */
+    listen(options?: { port?: number; host?: string }): Promise<{ url: string; port: number; host: string }>;
+    /** Stops listening, closes every stack. */
+    close(): Promise<void>;
 }
 
-export { Stack, Class, Attribute, getLogger }
-export {DocStack};
+/**
+ * Builds a node from configuration: opens every stack, wires the surfaces, does not
+ * listen yet. `createServer(config).listen()` is what `ds serve` does.
+ */
+export const createServer = async (input: ServerConfigInput | ServerConfig): Promise<DocStackServer> => {
+    const config = resolveConfig(input as ServerConfigInput);
+    const logger = createHostLogger(config.logLevel);
+    setDefaultLogLevel(config.engineLogLevel);
+
+    const authority = await Authority.load(config.authority);
+    const users = config.auth.users ? new CredentialStore(config.auth.store === "memory" ? undefined : join(config.state.dir, "users.json")) : null;
+    const tokens = new TokenService(config.auth);
+    const registry = new StackRegistry(config, authority, logger);
+    const entitlements = new Entitlements(authority);
+
+    const app: AppContext = { config, registry, logger, tokens, users, authority, entitlements, uuid: randomUUID(), version: VERSION };
+    const router = new Router();
+
+    router.add("GET", "/health", async (ctx: AuthedContext) => {
+        const ready = registry.isReady;
+        ctx.json(ready ? 200 : 503, { status: ready ? "ok" : "starting", version: VERSION, stacks: registry.status() });
+    });
+    router.add("GET", "/s", async (ctx: AuthedContext) => {
+        ctx.json(200, { docstack: "Welcome", uuid: app.uuid, version: VERSION, vendor: { name: "DocStack", version: VERSION } });
+    });
+    registerSessionRoutes(router);
+    registerApiRoutes(router);
+
+    const httpServer = createHttpServer(app, router);
+    await registry.openAll();
+    logger.info("stacks open", { stacks: registry.names(), blind: registry.names().map((name) => registry.get(name)?.blind) });
+
+    return {
+        config, registry, users, authority, logger, httpServer,
+        listen: (options) => new Promise((resolve, reject) => {
+            const host = options?.host ?? config.host;
+            const port = options?.port ?? config.port;
+            httpServer.once("error", reject);
+            httpServer.listen(port, host, () => {
+                httpServer.off("error", reject);
+                const address = httpServer.address() as AddressInfo;
+                const url = `http://${host.includes(":") ? `[${host}]` : host}:${address.port}`;
+                logger.info("listening", { url });
+                resolve({ url, port: address.port, host });
+            });
+        }),
+        close: async () => {
+            await new Promise<void>((resolve) => { httpServer.closeAllConnections?.(); httpServer.close(() => resolve()); });
+            await registry.close();
+        },
+    };
+};
+
+export { HttpError as ServerHttpError };
