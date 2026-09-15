@@ -19,6 +19,7 @@ import ClassList from 'views/ClassList';
 import DomainList from 'views/DomainList';
 
 const AppHeader = () => {
+    const docStack = useContext(DocStackContext);
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
     const isAnonymous = useAppSelector((state) => state.auth.isAnonymous);
     const navigate = useNavigate();
@@ -53,7 +54,7 @@ const AppHeader = () => {
         }
         items.push(
             // { item: , key: "dashboard-title", position: "left" },
-            { item: <Button type="text" iconName="bug" onClick={openDebugPanel} />, key: "btn-bug", position: "right" },
+            { item: <Button type="text" iconName="bug" aria-label="Debug panel" title="Debug panel" onClick={openDebugPanel} />, key: "btn-bug", position: "right" },
             { item: <Button type="primary" iconName='sign-out' onClick={doLogout}/>, key: "btn-logout", position: "right" }
         )
         return items;
@@ -64,7 +65,7 @@ const AppHeader = () => {
         }}>
             
         <Modal title={"Debug Panel"}>
-            <DebugPanel />
+            <DebugPanel docStack={docStack} />
         </Modal>
         <ActionBar items={actionBarItems} />
         
