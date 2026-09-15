@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { Icon, Text } from "@prismal/react";
 import "./index.scss";
 import { useLocation, useNavigate, useNavigation } from "react-router-dom";

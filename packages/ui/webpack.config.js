@@ -116,6 +116,10 @@ const config = {
       '.css', ".tsx", ".ts"
     ],
     alias: {
+      // One React instance in the bundle whatever the workspace layout nests: the
+      // linked @docstack/react and react-redux resolve to the same copy this app uses.
+      'react': path.dirname(require.resolve('react/package.json')),
+      'react-dom': path.dirname(require.resolve('react-dom/package.json')),
       'pouchdb-promise$': "pouchdb-promise/lib/index.js",
       'styles': path.resolve(__dirname, "src/styles"),
       'components': path.resolve(__dirname, "src/components"),

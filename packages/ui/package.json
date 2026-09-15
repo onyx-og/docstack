@@ -33,12 +33,19 @@
     "@docstack/client": "file:../client",
     "@docstack/react": "file:../react",
     "@docstack/shared": "file:../shared",
-    "@prismal/react": "^1.0.1",
+    "@prismal/react": "^1.0.11",
+    "@reduxjs/toolkit": "^2.11.0",
     "@uiw/react-json-view": "^2.0.0-alpha.39",
-    "monaco-editor": "^0.52.2"
+    "monaco-editor": "^0.52.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-redux": "^9.2.0",
+    "react-router-dom": "^7.18.0"
   },
   "devDependencies": {
     "@sass-collective/strip-unit": "^3.1.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "eslint": "^9.38.0",
     "eslint-webpack-plugin": "^5.0.2",
     "json-viewer": "^2.2.0",

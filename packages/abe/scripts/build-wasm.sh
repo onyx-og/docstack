@@ -8,6 +8,18 @@ cargo build --release --target wasm32-unknown-unknown
 wasm-bindgen --target web --out-dir pkg-web target/wasm32-unknown-unknown/release/abe_rabe_wasm.wasm
 cp pkg-web/abe_rabe_wasm.js ../src/wasm/glue.js
 cp pkg-web/abe_rabe_wasm.d.ts ../src/wasm/glue.d.ts
+# The generated default path is a static asset reference (`new URL('...wasm',
+# import.meta.url)`) that bundlers try to resolve; DocStack always supplies the
+# embedded bytes, so the default becomes a clear error instead.
+node -e "
+const fs = require('fs');
+const path = '../src/wasm/glue.js';
+const glue = fs.readFileSync(path, 'utf8');
+const target = \"module_or_path = new URL('abe_rabe_wasm_bg.wasm', import.meta.url);\";
+if (!glue.includes(target)) throw new Error('build-wasm: the glue default path changed; update the patch');
+fs.writeFileSync(path, glue.replace(target,
+  '// DocStack always passes the embedded bytes (src/runtime.ts); the generated default was a static asset reference bundlers try to resolve. Patched by build-wasm.sh.\n        throw new Error(\"@docstack/abe: the WASM module bytes must be supplied; the glue never loads from a URL.\");'));
+"
 node -e "
 const fs = require('fs');
 const b64 = fs.readFileSync('pkg-web/abe_rabe_wasm_bg.wasm').toString('base64');

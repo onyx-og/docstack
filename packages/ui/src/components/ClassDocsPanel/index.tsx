@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { useClassDocs } from "@docstack/react";
 import { ClassModel, Document } from "@docstack/shared";
 import { ActionBar, Button, Select, Table, useModal } from "@prismal/react";

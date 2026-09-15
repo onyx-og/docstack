@@ -117,7 +117,7 @@ const AppStatusBar = () => {
 
     return <StatusBar>
         <ChangelogModal title="Changelog">
-            <p>{docStack?.getStack(dbName)?.patches.map(patch => patch.changelog)}</p>
+            <p>{docStack?.getStack(dbName)?.options?.patches?.map((patch) => patch.changelog)}</p>
         </ChangelogModal>
         <Marquee>{`Stack: ${dbName}`}</Marquee>
         <Marquee>{`Version: ${docStack?.getStack(dbName)?.appVersion}`}</Marquee>

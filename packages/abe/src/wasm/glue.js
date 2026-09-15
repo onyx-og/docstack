@@ -410,7 +410,10 @@ async function __wbg_init(module_or_path) {
     }
 
     if (module_or_path === undefined) {
-        module_or_path = new URL('abe_rabe_wasm_bg.wasm', import.meta.url);
+        // DocStack always passes the embedded bytes (src/runtime.ts); the generated
+        // default, `new URL('abe_rabe_wasm_bg.wasm', import.meta.url)`, is a static
+        // asset reference bundlers try to resolve and cannot. Patched by build-wasm.sh.
+        throw new Error("@docstack/abe: the WASM module bytes must be supplied; the glue never loads from a URL.");
     }
     const imports = __wbg_get_imports();
 

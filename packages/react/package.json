@@ -39,9 +39,7 @@
     "react-dom": "^19.2.3"
   },
   "dependencies": {
-    "@docstack/client": "^0.3.2",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "@docstack/client": "^0.3.2"
   },
   "devDependencies": {
     "eslint": "^9.38.0",

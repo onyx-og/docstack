@@ -2,7 +2,6 @@ import { Button, Form, TextInput, Card, Select, ActionBar } from "@prismal/react
 import { useAppDispatch, useAppSelector } from "hooks"
 import React, { useCallback, useMemo } from "react"
 import { login, skipLogin } from "features/auth";
-import { saveState } from "features/store"
 
 import "./index.scss";
 import { setStackName } from "features/stack";
@@ -28,10 +27,6 @@ const AuthView = () => {
             throw new Error("should have run credentials form submit");
         }
     }, [dispatch, target])
-
-    const doSaveState = useCallback(() => {
-        dispatch(saveState(true));
-    }, [dispatch]);
 
 
     const changeTarget = React.useCallback((value: string) => {

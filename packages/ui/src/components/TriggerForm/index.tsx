@@ -16,9 +16,9 @@ interface TriggerFormProps {
 const TriggerForm: React.FC<TriggerFormProps> = (props) => {
     const { closeModal } = props;
     const [editorMountPointSet, markEditorMountPointSet] = React.useState(false);
-    const editorMountPoint = React.useRef<HTMLDivElement>();
+    const editorMountPoint = React.useRef<HTMLDivElement | null>(null);
 
-    const editor = React.useRef<monaco.editor.IStandaloneCodeEditor>();
+    const editor = React.useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
     const setEditorMountPoint = React.useCallback((node: HTMLDivElement) => {
         if (editorMountPoint.current) {

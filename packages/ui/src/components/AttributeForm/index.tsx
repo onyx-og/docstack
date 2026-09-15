@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import React, { ReactElement, ReactNode } from "react";
 import { AttributeModel, AttributeType, Class } from "@docstack/shared";
 import { Form, NumberInput, Select, TextInput, Toggle } from "@prismal/react";
