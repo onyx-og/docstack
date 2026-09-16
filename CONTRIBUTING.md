@@ -22,7 +22,7 @@ Each package runs its own suite from its own directory (`cd packages/<name>` fir
 |---|---|---|
 | `@docstack/client` | Playwright (real browser) | `npm run test` |
 | `@docstack/server` | `node --test` (Node's built-in runner) | `npm run test` |
-| `@docstack/ui` | Jest | `npm run test` |
+| `@docstack/ui` | Playwright smoke test against the production build | `npm run test` |
 | `@docstack/abe` | Node smoke script | `npm run test` |
 
 Cross-package/integration tests exist for scenarios spanning multiple packages (e.g. client + server). These are heavier and are **not** run automatically as part of a normal package change — see [AGENTS.md](AGENTS.md) for the full policy on when to run them.

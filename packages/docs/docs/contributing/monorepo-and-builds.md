@@ -50,6 +50,7 @@ The site's API reference is generated at build time by TypeDoc from `packages/cl
 | :--- | :--- | :--- |
 | `@docstack/client` | Playwright, in a real Chromium against IndexedDB | `cd packages/client && npm run test` |
 | `@docstack/server` | `node --test`, against the built client's Node entry | `cd packages/server && npm run test` |
+| `@docstack/ui` | Playwright, one smoke test that builds the workbench and drives the production build as the site hosts it | `cd packages/ui && npm run test` |
 
 Tests are a required part of a contribution, not an optional follow-up: new functions, branches or conditions ship with tests that exercise them; a bug fix includes a regression test that fails on `main` and passes with the fix; and a test is never weakened to make it pass. If an expectation seems wrong, raise it in the PR rather than loosening the assertion.
 

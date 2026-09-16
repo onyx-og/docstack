@@ -6,9 +6,10 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "jest",
     "build": "webpack --node-env=production",
-    "develop": "webpack serve --node-env=development --progress"
+    "develop": "webpack serve --node-env=development --progress",
+    "pretest": "npm run build",
+    "test": "playwright test -c smoke/playwright.config.mjs"
   },
   "repository": {
     "type": "git",
@@ -43,6 +44,7 @@
     "react-router-dom": "^7.18.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@sass-collective/strip-unit": "^3.1.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

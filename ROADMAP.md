@@ -32,7 +32,7 @@ Still open on the track:
 
 ## Server (ADR-0047, specs/03-server.md)
 
-**Accepted 2026-09-11, not started.** `@docstack/server` rebuilt from scratch as one
+**Accepted 2026-09-11, in progress** (phases 0 and 1 landed 2026-09-11; phase 2, online mode, written and committed unverified 2026-09-15; the running state and the full plan are in `specs/plans/03-server.md`). `@docstack/server` rebuilt from scratch as one
 engine on a host with two surfaces: an API surface under engine sessions (ADR-0046)
 for online clients and a Couch-compatible replication surface for replicas; the host
 is the authority, runs jobs, hosts the workbench and mirrors upstream. Phases, in

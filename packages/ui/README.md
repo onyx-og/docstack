@@ -58,6 +58,13 @@ To produce a static build:
 npm run build
 ```
 
+To check that build the way the site hosts it, run the smoke test. It builds first, then drives the built app in a real Chromium: one React in the bundle (a duplicate breaks every hook at runtime), a fresh stack opened through the provider, and the debug panel exporting and restoring through the engine's content transfer.
+
+```bash
+npx playwright install chromium   # once per machine
+npm run test
+```
+
 ## Not an npm package
 
 `@docstack/ui` is an application, not a library — there is nothing to `npm install` and nothing to import. Use the [hosted build](https://onyx-og.github.io/docstack/app/index.html), or run it from source as above.

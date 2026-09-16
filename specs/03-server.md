@@ -14,6 +14,9 @@ key, authority, credential store, tokens, grants, entitlement, sessions, the
 `node:http` server, the `_ds/*` routes, the SSE feed, `/auth/*`, `/health`, the CLI),
 `RemoteStack` with `StackConfig.mode` in the client, and the `api`/`auth` suites.
 Expect compiler and test rounds before it counts as done. Items 3–7 are not started.
+The working plan behind this checklist (the questions that shaped the design, the
+sequencing, deployment and adapter detail, the running state) is
+[`specs/plans/03-server.md`](plans/03-server.md).
 
 ## 1. The model in one paragraph
 

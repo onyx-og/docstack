@@ -143,6 +143,7 @@ lib/
 packages/client/test-results/
 packages/client/playwright-report/
 packages/client/test/vendor-bundle.js
+packages/ui/test-results/
 
 # WordPress docs sync output
 packages/docs/.wp-sync/

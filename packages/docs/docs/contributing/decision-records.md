@@ -46,6 +46,7 @@ Non-trivial changes to DocStack are recorded as architecture decision records in
 - [`specs/01-sync.md`](https://github.com/onyx-og/docstack/blob/main/specs/01-sync.md): the replication lifecycle, filters and their identity, the schema gate, the adapter contract.
 - [`specs/02-crypto-access.md`](https://github.com/onyx-og/docstack/blob/main/specs/02-crypto-access.md): the cryptographic access architecture in full and the integration checklist for the cycle that builds it.
 - [`specs/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md): the server design: one engine on a host, the API surface under engine sessions, the Couch-compatible replication surface, grants, the authority, the thin client, deployment shapes, and the integration checklist.
+- [`specs/plans/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/plans/03-server.md): the working plan for spec 03: the questions that shaped it, the decisions taken with the maintainer, the phases, deployment shapes and durable-store adapters in detail, the benchmark harness, and the running state.
 - [`specs/pouchdb-adapter-tauri-sqlite.md`](https://github.com/onyx-og/docstack/blob/main/specs/pouchdb-adapter-tauri-sqlite.md): the brief for an in-repo storage adapter that is not yet published.
 
 ## Reading them
