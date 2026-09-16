@@ -994,6 +994,7 @@ Non-trivial changes to DocStack are recorded as architecture decision records in
 - [`specs/01-sync.md`](https://github.com/onyx-og/docstack/blob/main/specs/01-sync.md): the replication lifecycle, filters and their identity, the schema gate, the adapter contract.
 - [`specs/02-crypto-access.md`](https://github.com/onyx-og/docstack/blob/main/specs/02-crypto-access.md): the cryptographic access architecture in full and the integration checklist for the cycle that builds it.
 - [`specs/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md): the server design: one engine on a host, the API surface under engine sessions, the Couch-compatible replication surface, grants, the authority, the thin client, deployment shapes, and the integration checklist.
+- [`specs/plans/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/plans/03-server.md): the working plan for spec 03: the questions that shaped it, the decisions taken with the maintainer, the phases, deployment shapes and durable-store adapters in detail, the benchmark harness, and the running state.
 - [`specs/pouchdb-adapter-tauri-sqlite.md`](https://github.com/onyx-og/docstack/blob/main/specs/pouchdb-adapter-tauri-sqlite.md): the brief for an in-repo storage adapter that is not yet published.
 
 ### Reading them
@@ -1049,6 +1050,7 @@ The site's API reference is generated at build time by TypeDoc from `packages/cl
 | :--- | :--- | :--- |
 | `@docstack/client` | Playwright, in a real Chromium against IndexedDB | `cd packages/client && npm run test` |
 | `@docstack/server` | `node --test`, against the built client's Node entry | `cd packages/server && npm run test` |
+| `@docstack/ui` | Playwright, one smoke test that builds the workbench and drives the production build as the site hosts it | `cd packages/ui && npm run test` |
 
 Tests are a required part of a contribution, not an optional follow-up: new functions, branches or conditions ship with tests that exercise them; a bug fix includes a regression test that fails on `main` and passes with the fix; and a test is never weakened to make it pass. If an expectation seems wrong, raise it in the PR rather than loosening the assertion.
 
@@ -1092,7 +1094,7 @@ Still open on the track:
 
 ### Server ([ADR-0047](https://github.com/onyx-og/docstack/blob/main/specs/adr/0047-the-server-is-a-peer-and-a-service.md), [`specs/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/03-server.md))
 
-**Accepted 2026-09-11, not started.** `@docstack/server` rebuilt from scratch as one engine on a host with two surfaces: an API surface under engine sessions (ADR-0046) for online clients and a Couch-compatible replication surface for replicas; the host is the authority, runs jobs, hosts the workbench and mirrors upstream. Phases, in order: conditional exports in the client and the Node spike; online mode with the thin `RemoteStack`; the replication surface; the WebSocket channel and the workbench; operations; CLI and docs; durable-store adapters (Firestore, GCS) with a benchmark harness and the Docker and Cloud Run recipes. The checklist is spec 03 §12.
+**Accepted 2026-09-11, in progress** (phases 0 and 1 landed 2026-09-11; phase 2, online mode, written and committed unverified 2026-09-15; the running state and the full plan are in [`specs/plans/03-server.md`](https://github.com/onyx-og/docstack/blob/main/specs/plans/03-server.md)). `@docstack/server` rebuilt from scratch as one engine on a host with two surfaces: an API surface under engine sessions (ADR-0046) for online clients and a Couch-compatible replication surface for replicas; the host is the authority, runs jobs, hosts the workbench and mirrors upstream. Phases, in order: conditional exports in the client and the Node spike; online mode with the thin `RemoteStack`; the replication surface; the WebSocket channel and the workbench; operations; CLI and docs; durable-store adapters (Firestore, GCS) with a benchmark harness and the Docker and Cloud Run recipes. The checklist is spec 03 §12.
 
 ### Dropped: client-side rule enforcement
 
