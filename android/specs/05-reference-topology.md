@@ -26,7 +26,7 @@ record of which ones actually did.
 | Web app | The Todo app. Unchanged code, runs in a browser or under Permetic. |
 | `permetic` + `-push`, `-billing` | WebView host; auth, push, billing, background. |
 | `docstack-store` + `-permetic` | Native document store, mode C. |
-| `docstack-headless` | Replication with no WebView attached. |
+| ~~`docstack-headless`~~ | **Dropped** (`../../2.0.md` §4). In this topology the WebView carrier replicates; a host with no WebView uses the Kotlin binding of the Rust core. |
 | `@docstack/server` | CouchDB-protocol facade, a component inside Strapi. |
 | Strapi (Cloud Run) | Accounts, rosters, entitlements. Postgres-backed. |
 | Firestore | Durable document storage behind `@docstack/server`. |
@@ -48,9 +48,11 @@ The server never touches anyone's Drive. Every Drive file is created by the app'
 own OAuth client on behalf of its own user, so `drive.file` suffices — no
 restricted scope, no annual security assessment, no per-member consent to a server.
 
-Team data reaches a member as: member writes locally → `docstack-headless`
+Team data reaches a member as: member writes locally → the device's DocStack engine
 replicates to the server → server persists to Firestore → other members replicate
-down. Drive is a personal replica, not a sync node.
+down. Drive is a personal replica, not a sync node. (That engine was
+`docstack-headless` when this was written; it is the JS client under the WebView
+carrier, or the Kotlin binding on a host without one — `../../2.0.md` §4.)
 
 ## Where each capability lands
 

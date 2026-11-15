@@ -134,10 +134,11 @@ so numeric and lexical order agree.
 
 ## Open decisions
 
-- **D-1** Does the WebView carrier need a lease when `docstack-headless` is also
+- **D-1** ~~Does the WebView carrier need a lease when `docstack-headless` is also
   running, or does the headless engine always own the store and the WebView route
-  through it? Spec 04 decides; the store must support whichever answer. Moot for
-  topologies with no WebView carrier at all (spec 04's primary-carrier mode) — the
-  headless engine is then the only writer.
+  through it?~~ **Closed 2026-11-15, moot**: headless is dropped (`../../2.0.md` §4),
+  so the WebView carrier is the only carrier and the only writer. No lease, and spec 04
+  task 6 is dropped with it. A host with no WebView does not contend either — it owns
+  the store through the Rust core's foreign-store hook, with no second writer.
 - **D-2** Filesystem spill threshold for attachments — 1 MB is a starting guess,
   not a measurement.

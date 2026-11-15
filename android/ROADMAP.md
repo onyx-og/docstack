@@ -1,10 +1,24 @@
 # Roadmap — native Kotlin app, no web parts, multi-device Drive sync
 
+Status: **held, waiting on the DocStack Kotlin/JVM binding** (decided 2026-11-15). The
+app does not ship on a WebView carrier and does not ship on an embedded JS engine; it
+waits. Permetic is not deprecated by that — it is simply not what this app is built on.
+
 Target shape: a plain Kotlin Android app (no WebView, no Permetic) using
-`docstack-store` + `docstack-headless` in **primary-carrier mode** (see spec 04) as
-its local store and Google Drive sync engine. Multi-device conflict resolution and
-future team workspaces (spec 05) both need real revision-tree merging, so this stays
-on the full `pouchdb-merge`-in-JS path — no shortcuts around ADR-0001.
+`docstack-store` as its local store and the **Rust DocStack core's Kotlin/JVM binding**
+(`../ports.md` §4.2, §10 phase 5, one UniFFI binding for Android and plain JVM) as its
+engine and Google Drive sync engine. Multi-device conflict resolution and future team workspaces (spec 05) both need
+real revision-tree merging, which the core owns in Rust — no shortcuts around ADR-0001,
+and no `pouchdb-merge`-in-JS on this device any more.
+
+**What changed.** The original target was `docstack-store` + `docstack-headless` in
+primary-carrier mode: the real JS adapter and `pouchdb-merge` running inside
+QuickJS/Zipline. DocStack 2.0 drops the embedded-JS port track outright (`../2.0.md`
+§4), so phases 3 and 4 below are **cancelled**, not paused. Phases 0–2 keep all of their
+value: `docstack-store` becomes a foreign `DocumentStore` for the core (`../ports.md`
+§3.2) with its spec-02 semantics intact, and the adapter's vendored PouchDB conformance
+suite becomes the reference suite every store implementation must pass (`../ports.md`
+§8).
 
 Out of scope for this app: `permetic`, `permetic-web`, `permetic-push`,
 `permetic-billing`, `docstack-permetic`. Auth is a direct Google Sign-In /
@@ -375,7 +389,18 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       372/372, 30 pending — the new spec file un-skipped itself under
       `TEST_ENV=production`).
 
-## Phase 3 — Headless engine as primary carrier (spec 04, re-scoped tasks 2–4, 7)
+## Phase 3 — CANCELLED — Headless engine as primary carrier (spec 04, re-scoped tasks 2–4, 7)
+
+**Cancelled 2026-11-15** by the DocStack 2.0 decision to drop the embedded-JS port track
+(`../2.0.md` §4). Not blocked, not deferred: the engine for this app is the Kotlin
+binding of the Rust core instead, and spec 04 is superseded. The Zipline/QuickJS
+investigation and its two upstream fixes (cashapp/zipline#1833) stay recorded in
+`docstack-headless/SPIKE-NOTES.md`, which is now a record of why embedding was rejected
+rather than a plan; the `mavenLocal()` / `1.28.0-SNAPSHOT` pins are abandoned with it and
+that PR is no longer tracked for this app.
+
+The entries below are kept verbatim as the record of what was built and found. **Do not
+resume them.**
 
 - [ ] Carrier binding (Kotlin `suspend` ↔ JS promise) + binary side-channel — now
       on the critical path for every UI read/write, not just background sync.
@@ -426,9 +451,16 @@ Credential Manager flow in Kotlin, not the `auth` capability.
       outbound `dispatchFn` round trip hits it.
 
 Note: spec 02 D-1 (WebView-vs-engine store ownership) does not apply in this
-topology — there is only ever one carrier, so spec 04 task 6 (lease) is skipped.
+topology — there is only ever one carrier, so spec 04 task 6 (lease) is skipped. With
+headless dropped the question is closed for every topology: the WebView carrier is the
+only carrier that ever existed.
 
-## Phase 4 — Background continuity (spec 04 tasks 5–6, cuttable under deadline)
+## Phase 4 — CANCELLED as specified — Background continuity (spec 04 tasks 5–6)
+
+**Cancelled 2026-11-15** in the form below, which assumed the headless engine. Background
+sync is still wanted and comes back as a plain-Kotlin concern once the binding lands:
+WorkManager driving the native core directly, with no JS engine and no carrier in the
+path. Re-specify it against the binding, not against spec 04.
 
 - [ ] WorkManager periodic sync (sufficient for v1).
 - [ ] FCM data-message wake path — improves sync latency while backgrounded, does

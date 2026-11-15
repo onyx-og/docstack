@@ -8,6 +8,16 @@ Permetic works standalone. `docstack-*` is optional, and when registered it adds
 Permetic owns the WebView, so Permetic owns provisioning — DocStack never touches the
 WebView directly.
 
+**DocStack 2.0 dropped the embedded-JS carrier** (`../2.0.md` §4). `docstack-headless`
+is frozen and spec 04 is superseded: a host with no WebView gets the Rust core's
+Kotlin/JVM binding (`../ports.md`), never a JS engine.
+
+Permetic and `docstack-permetic` are **unaffected and stay in the plan** — specs 01, 03
+and 05 are current, and the WebView carrier is now the only carrier. The one thing that
+changed for them: DocStack's native-host story is not built on Permetic, so do not
+extend the carrier to serve a plain Kotlin or JVM app. `ROADMAP.md`'s plain-Kotlin app is
+held until the binding ships.
+
 | Module              | Coordinates / package                    | Role                                                          |
 | ------------------- | ---------------------------------------- | ------------------------------------------------------------- |
 | `permetic`          | `ac.onyx.permetic:permetic-core`         | WebView host. Runs the web app, grants scoped native access.   |
@@ -16,7 +26,7 @@ WebView directly.
 | `permetic-web`      | npm `permetic`                           | Contract types + JS runtime that builds the global.            |
 | `docstack-store`    | `ac.onyx.docstack:docstack-store`        | Document store + envelope dispatcher. Carrier-agnostic.        |
 | `docstack-permetic` | `ac.onyx.docstack:docstack-permetic`     | WebView carrier. Registers `StorageCapability` with Permetic.  |
-| `docstack-headless` | `ac.onyx.docstack:docstack-headless`     | QuickJS/Zipline carrier. Replication with no WebView attached. |
+| `docstack-headless` | `ac.onyx.docstack:docstack-headless`     | **Dropped 2026-11-15** (`../2.0.md` §4). Frozen, not maintained. Do not build on it. |
 | —                   | npm `@docstack/pouchdb-adapter-native`   | The PouchDB adapter. One implementation, carrier injected.     |
 
 The JS global is `permetic`.
@@ -26,7 +36,8 @@ The JS global is `permetic`.
 - `@specs/01-permetic-webview.md` — the WebView host and its JS runtime. Start here.
 - `@specs/02-docstack-store.md` — the native document store and dispatcher.
 - `@specs/03-docstack-adapter.md` — the PouchDB adapter.
-- `@specs/04-docstack-headless.md` — the QuickJS engine.
+- `@specs/04-docstack-headless.md` — the QuickJS engine. **Superseded**; read only for
+  history.
 - `@specs/05-reference-topology.md` — a worked product example. Not a deliverable;
   read it when a product decision looks like it needs a contract change.
 - `@permetic-web/src/index.d.ts` — the capability contract. Source of truth.

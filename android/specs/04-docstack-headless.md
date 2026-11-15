@@ -1,7 +1,15 @@
 # 04 — docstack-headless: replication with no WebView
 
-Status: **draft, awaiting review** · Owner: Onyx
-Module: `docstack-headless`
+Status: **superseded 2026-11-15** · Owner: Onyx
+Module: `docstack-headless` (frozen)
+
+**Superseded by DocStack 2.0** (`../../2.0.md` §4), which drops the embedded-JS port
+track. A host with no WebView gets the Kotlin binding of the Rust core
+(`../../ports.md` §4.2) instead of a JS engine. Nothing in this spec is a work order
+any more; it is kept because the requirements it pins down — engine lifecycle, cold
+start, the Kotlin `suspend`/`Flow` CRUD surface, background wake — are the same
+requirements the binding inherits, and because `docstack-headless/SPIKE-NOTES.md`
+refers to it. The text below is unchanged.
 
 ## Goal
 
