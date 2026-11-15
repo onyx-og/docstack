@@ -47,15 +47,21 @@ it read like. Those are recorded here too, because fixing them changed stored be
    the version, so the chain is readable in a diff and orderable without loading
    anything, and a revision is a new file rather than an edit to a shared array that a
    generator would have to parse and rewrite.
-7. **Typed surfaces are additive.** `typed(stack, model)` and the `useClassDocs(stack,
+7. **A model module is imported from `@docstack/client/model`.** The declarations, the
+   mapping, the fold and the diff, with no engine behind them. A model file is read in
+   Node by `docstack revision` as well as in the browser by the application, so importing
+   the main entry would make generating a patch depend on the storage layer resolving. The
+   main entry re-exports the same names, so code that already has the engine needs no
+   second import path, and generated patch files import their `Patch` type from here.
+8. **Typed surfaces are additive.** `typed(stack, model)` and the `useClassDocs(stack,
    Todo)` overload are new paths; the untyped `Class` API and the name-based hook are
    unchanged, because runtime-created and `simple` classes need them.
-8. **A read and a write are typed by different rules.** A write must carry an attribute
+9. **A read and a write are typed by different rules.** A write must carry an attribute
    when it is `mandatory` and the engine will not fill it; a read is guaranteed it when
    the attribute is `mandatory` or carries a default the engine writes. An array's
    `defaultValue` is a *member* default, because modifiers apply it before `isArray`, so
    nothing is filled and the key may be absent.
-9. **The canonical model hash** is SHA-256 over semantic fields with sorted keys and
+10. **The canonical model hash** is SHA-256 over semantic fields with sorted keys and
    descriptions excluded. Exposed per class and per model; nothing gates on it yet. This
    answers difficulties (2) and (3) of the datamodel-hash gate in `ROADMAP.md`.
 
@@ -81,6 +87,18 @@ breaking for data already stored, which is why they land in a major release (`2.
   lexicographic order matches chronological order.
 - **`object` keeps unknown keys**, through `z.looseObject({})`. `z.object({})` strips
   every key on parse, which is harmless only while the parse output is discarded.
+- **The document types no longer go through the ambient `PouchDB` namespace.** `Document`,
+  `RelationDocument` and `Patch.docs` are declared in `@docstack/shared` itself -
+  structurally identical, since `PouchDB.Core.Document<T>` is `T & { _id: string }`. The
+  namespace comes from `@types/pouchdb` and is only in a program that includes it; a
+  project that sets `compilerOptions.types` does not, and the Vite React template sets it
+  to `["vite/client"]`. In such a program every type declared through the namespace
+  resolved to `any`, `skipLibCheck` hid the cause, and `InferDoc` - an intersection with
+  `Document` - was `any` as well: the typed model typechecked everything and checked
+  nothing. Found by porting the example application, which is the only place the library is
+  consumed the way an application consumes it. `@types/pouchdb` is now a dependency rather
+  than a devDependency of `@docstack/shared`, so the engine-facing signatures that still
+  use the namespace resolve where a consumer does not restrict `types`.
 
 ## Consequences
 
@@ -103,9 +121,13 @@ breaking for data already stored, which is why they land in a major release (`2.
 - Mixing runtime class edits with a declared model is unsound by construction, and the
   model hash is the only thing that could detect it. Runtime edits stay supported and stay
   untyped.
+- A typed **read** still permits an undeclared field, because `InferDoc` intersects
+  `Document` and `Document` carries `[key: string]: any` - documents legitimately hold
+  fields no class declares. Writes are exact in both directions.
 - Still open, and recorded in `proposal.md` §9: branded ids for `foreign_key`, typing
-  Mango selector keys, whether `StackOptions.model` eventually replaces `patches`, and
-  whether the write path should return what it wrote.
+  Mango selector keys, whether `StackOptions.model` eventually replaces `patches`, whether
+  the write path should return what it wrote, and whether a typed read should reject an
+  undeclared field.
 
 ## Alternatives rejected
 

@@ -16,6 +16,8 @@ Options:
       --target <name>    Consumer patch target. Default: this project's package name.
       --bump <level>     major | minor | patch. Default: minor.
       --version <semver> An explicit next version, instead of bumping.
+      --types-import <s> Where generated files import the Patch type from.
+                         Default: @docstack/client/model.
   -h, --help             This text.
 
 \`--check\` exits non-zero when the model and the patch chain disagree, which is what
@@ -26,9 +28,9 @@ patch directory's index.
 /**
  * Parses the argument vector.
  *
- * Hand-rolled rather than pulled from a dependency: the surface is two flags and four
- * options, and a CLI an application installs should not drag an argument parser behind
- * it.
+ * Hand-rolled rather than pulled from a dependency: the surface is two flags and a
+ * handful of options, and a CLI an application installs should not drag an argument
+ * parser behind it.
  *
  * @param argv - Arguments after the node executable and script.
  * @returns The command name and the options it carries.
@@ -67,6 +69,7 @@ export const parseArgs = (argv: readonly string[]): {
                 break;
             }
             case "--version": options.version = next(); break;
+            case "--types-import": options.typesImport = next(); break;
             case "-h": case "--help": options.help = true; break;
             default:
                 if (argument.startsWith("-")) throw new Error(`Unknown option '${argument}'.`);

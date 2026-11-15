@@ -394,6 +394,12 @@ why each went the way it did.
 8. ~~Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip?~~ — **decided**:
    `date` landed in phase 1 as an ISO-8601 UTC string (`format: "date"` for date-only).
    `integer` is fixed too, on the shipping line, so none of the three is open.
+9. Should a typed **read** reject an undeclared field? `InferDoc` intersects `Document`,
+   which carries `[key: string]: any`, so `doc.titel` is `any` rather than an error. The
+   index signature is there because documents really do hold fields no class declares -
+   `~createTimestamp`, trigger output, another client's attributes. Omitting it from
+   `InferDoc` alone would catch typos and would also make `InferDoc` describe less than
+   the engine stores; both halves of that trade are real.
 
 ## 10. Implementation plan (phased; each phase mergeable alone)
 
@@ -423,12 +429,40 @@ why each went the way it did.
    driving the real command against throwaway projects, including the generated files'
    contents. `init`, `doctor` and `docs` are not built, so `create-docstack` and the
    "Start here" line still wait on `init` (§12.2, §12.3).
-5. **Typed client/react surface** — **wrappers and overloads landed 2026-11-15**;
-   porting `examples/react-todo` is the remaining piece. `typed(stack, model)` gives one
-   `TypedClass` per declared class keyed by name, `typedClass(stack, Todo)` wraps one, and
-   `useClassDocs(stack, Todo)` types its documents while `(stack, "Todo")` is unchanged.
-   Type-level tests include six calls the compiler must reject, so they fail the build if
-   they ever stop erroring.
+5. ~~**Typed client/react surface**~~ — **landed 2026-11-15**. `typed(stack, model)` gives
+   one `TypedClass` per declared class keyed by name, `typedClass(stack, Todo)` wraps one,
+   and `useClassDocs(stack, Todo)` types its documents while `(stack, "Todo")` is
+   unchanged. Type-level tests include six calls the compiler must reject, so they fail the
+   build if they ever stop erroring.
+
+   `examples/react-todo` is ported, and doing it found three things the wrappers alone
+   could not (§7.1). Two were defects in what the packages ship rather than in the design:
+
+   1. **A model module could not be loaded in Node.** The guide said to import the
+      builders from `@docstack/client`, whose main entry carries the engine and PouchDB
+      with it - so `docstack revision`, which loads the model in Node, failed on the
+      storage layer resolving rather than on anything about the model. Fixed with
+      `@docstack/client/model`: the same names, declarations only, 28 KB, importing
+      nothing but `zod` and `semver`. The main entry still re-exports them for code that
+      already has the engine.
+   2. **A generated patch imported an internal package.** `@docstack/shared` is not a
+      dependency an application has, so the emitted `import type { Patch }` would not
+      compile in a project that installed only the client and the CLI. The emitter now
+      targets `@docstack/client/model`, with `--types-import` for a project that depends
+      on a different DocStack package.
+   3. **The typed surface was `any` in a consumer that restricts `compilerOptions.types`.**
+      `Document` was declared through the ambient `PouchDB` namespace, which comes from
+      `@types/pouchdb` and is only in a program that includes it - and the Vite React
+      template sets `"types": ["vite/client"]`, as does any project listing its own. In
+      such a program `Document` resolved to `any`, `skipLibCheck` hid the cause, and
+      `InferDoc` - an intersection with `Document` - was `any` too: every call typechecked
+      and nothing was checked. Verified at the value level, not by `Equal<>`, which cannot
+      see `any`. `Document`, `RelationDocument` and `Patch.docs` are now self-contained
+      (structurally identical: `PouchDB.Core.Document<T>` is `T & { _id: string }`), and
+      `@types/pouchdb` became a real dependency of `@docstack/shared` so the
+      engine-facing signatures still resolve where they are used. This is the one worth
+      remembering: a typed layer that silently degrades to `any` is worse than no typed
+      layer, because it reads as a guarantee.
 6. ~~**Docs**~~ — **landed 2026-11-15**. [Declare your model in code]
    (`packages/docs/docs/guides/code-defined-model.md`) as the guide, and
    `specs/adr/0048-the-data-model-is-declared-in-code.md` recording the decisions here and
@@ -444,8 +478,17 @@ builds automatically.
 
 ## 11. Acceptance criteria
 
-- `examples/react-todo` defines its model with `defineClass`, its patches are generated,
-  and `useClassDocs(DB, Todo)` returns typed docs with no `any` in app code.
+- ~~`examples/react-todo` defines its model with `defineClass`, its patches are generated,
+  and `useClassDocs(DB, Todo)` returns typed docs with no `any` in app code.~~ — **met
+  2026-11-15.** `src/model.ts` declares `Todo` with four attributes covering the three
+  behaviours this release fixed (a filled default, an enum, a date); `src/patches/1.0.0.ts`
+  is generated and `1.0.1.ts` is a hand-written data patch in the same chain; `App.tsx`
+  reads through `useClassDocs(DB_NAME, Todo)` and writes through `typedClass`, with no
+  `any` in its source and the priority picker built from
+  `Todo.attributes.priority.config.values`. `tsc -b` is clean. Note that reading an
+  *undeclared* field still gives `any`, because `Document` carries
+  `[key: string]: any` - documents legitimately hold fields no class declares. Narrowing
+  that on the typed read path is open (§9.9).
 - Changing an attribute in the model without regenerating fails `revision --check`.
 - A generated patch adding an attribute behaves identically to a hand-written ADR-0038
   delta patch, including on a locked stack with deferral and replay.
@@ -454,7 +497,11 @@ builds automatically.
 - The 1.x → 2.0 migration guide (`2.0.md` §5) covers every §8 defect actually fixed, with
   the `docstack doctor` check an app runs before upgrading.
 - `docstack revision --check` runs in CI for `examples/react-todo`, so the guard is
-  demonstrated and not just documented.
+  demonstrated and not just documented. **Half done:** the example carries it as
+  `npm run revision:check` and it passes, but the repository has no test workflow to add
+  it to - the two under `.github/workflows` only build and publish the docs - and the
+  example is not an npm workspace, so `npm ci` does not install it. Adding a test
+  workflow is a repository-wide decision rather than part of this track.
 
 ## 12. Tooling packages, naming and agent discoverability
 

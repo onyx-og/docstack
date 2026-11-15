@@ -19,6 +19,10 @@
     "./browser": {
       "types": "./lib/index.d.ts",
       "default": "./lib/index.js"
+    },
+    "./model": {
+      "types": "./lib/model.d.ts",
+      "default": "./lib/model.js"
     }
   },
   "src": "src/index.ts",

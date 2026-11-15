@@ -28,6 +28,15 @@ client uses too, so the tool and the engine cannot disagree (`proposal.md` §6).
 - **Generated files are reviewable**: bare keys where possible, one entry per line,
   trailing commas, deterministic order, and the one-shot job hooks offered as commented
   stubs rather than omitted (ADR-0044).
+- **Generated files import `Patch` from `@docstack/client/model`**, not from
+  `@docstack/shared`: shared is an internal package that an application does not depend
+  on, so the emitted import would not have compiled in a project that installed the
+  client and this tool. `--types-import <specifier>` overrides it for a project that
+  depends on a different DocStack package.
+- **A hand-written patch in the same directory is left alone.** The generator owns the
+  files it wrote and the index; a patch that seeds content rather than schema sits beside
+  them, is picked up by the index, and `--check` stays quiet about it because it carries
+  no class documents. `examples/react-todo` has one of each.
 
 Not yet, and listed in `proposal.md` §12.2: `init`, `doctor` and `docs`. `doctor` is
 where the report for documents predating the integer and default-value changes belongs.

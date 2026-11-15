@@ -1,6 +1,13 @@
 {
   "//": "Typechecks the type-level tests in src-test/types. Nothing is emitted; failure to compile IS the failure. Strict on purpose: the inference under test is about optionality and nullability, which a loose config would hide.",
   "compilerOptions": {
+    // Empty, deliberately, and load-bearing. An application that sets `types` gets no
+    // ambient @types at all, and the Vite React template sets it to ["vite/client"]. A
+    // public type declared through the ambient PouchDB namespace then resolves to `any`,
+    // `skipLibCheck` hides the cause, and `InferDoc` - an intersection with `Document` -
+    // became `any` with every assertion in these files still passing vacuously. Checking
+    // them under the harshest version of a consumer's config is what catches that.
+    "types": [],
     "target": "es2022",
     "module": "esnext",
     "moduleResolution": "bundler",

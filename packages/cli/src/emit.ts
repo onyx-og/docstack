@@ -38,6 +38,16 @@ export const toSource = (value: unknown, indent = ""): string => {
     return `{\n${lines.join("\n")}\n${indent}}`;
 };
 
+/**
+ * Where a generated file imports the `Patch` type from.
+ *
+ * `@docstack/client/model` rather than `@docstack/shared`: shared is an internal package
+ * that an application does not depend on, so a file importing it would not compile in a
+ * project that installed the client and this CLI. The model entry is the pure one - no
+ * engine, no storage layer - which is also what the model module itself imports.
+ */
+export const DEFAULT_TYPES_IMPORT = "@docstack/client/model";
+
 /** Everything the generated patch module needs to state. */
 export type PatchFileInput = {
     /** The patch's semver version, which is also its file name. */
@@ -48,6 +58,8 @@ export type PatchFileInput = {
     changelog: string;
     /** The delta documents, from `diffModel`. */
     docs: unknown[];
+    /** Import specifier for the `Patch` type. Default {@link DEFAULT_TYPES_IMPORT}. */
+    typesImport?: string;
 };
 
 /**
@@ -62,7 +74,7 @@ export type PatchFileInput = {
  */
 export const renderPatchFile = (input: PatchFileInput): string => {
     const identifier = `patch_${input.version.replace(/[.\-+]/g, "_")}`;
-    return `import type { Patch } from "@docstack/shared";
+    return `import type { Patch } from "${input.typesImport ?? DEFAULT_TYPES_IMPORT}";
 
 /**
  * ${input.changelog}
@@ -94,9 +106,11 @@ export default ${identifier};
  * every revision rewrites it, and the order is the one the engine applies in.
  *
  * @param versions - The versions present, already in semver order.
+ * @param typesImport - Where to import the `Patch` type from; see
+ * {@link DEFAULT_TYPES_IMPORT}.
  * @returns The module source, newline-terminated.
  */
-export const renderIndexFile = (versions: readonly string[]): string => {
+export const renderIndexFile = (versions: readonly string[], typesImport?: string): string => {
     const names = versions.map(version => ({
         version,
         identifier: `patch_${version.replace(/[.\-+]/g, "_")}`,
@@ -105,7 +119,7 @@ export const renderIndexFile = (versions: readonly string[]): string => {
         .map(({ version, identifier }) => `import ${identifier} from "./${version}.js";`)
         .join("\n");
     const list = names.map(({ identifier }) => `    ${identifier},`).join("\n");
-    return `import type { Patch } from "@docstack/shared";
+    return `import type { Patch } from "${typesImport ?? DEFAULT_TYPES_IMPORT}";
 ${imports}
 
 /**

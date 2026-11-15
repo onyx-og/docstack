@@ -57,8 +57,17 @@
   resolve `@docstack/shared` through its built declarations, so what they assert is what
   a consumer sees.
 
+- **`@docstack/client/model`** is a new entry point carrying the declarations, the
+  attribute mapping, the fold and the diff with **no engine behind them**: 28 KB,
+  importing nothing but `zod` and `semver`. A model module is read outside the browser as
+  well - `docstack revision` loads it in Node - and the main entry carries PouchDB, so
+  importing it there made generating a patch depend on the storage layer resolving. The
+  main entry still re-exports every one of these names, so code that already has the
+  engine needs no second import path. Generated patch files import their `Patch` type
+  from here.
+
 Not yet: `defineHandler` and the `handler?: string` references on `TriggerModel` and
-`PatchJob` (`proposal.md` §13), `defineDomain`, the fold/diff library and the CLI.
+`PatchJob` (`proposal.md` §13), `defineDomain`.
 
 ### Changed - the attribute mapping is one function, in shared (DocStack 2.0, `2.0.md`)
 
@@ -95,6 +104,17 @@ carry the design and the defects these close.
   one copy of it rather than risking two schema identities in one dependency graph.
 - `integer` applies `.int()` here too, so the one mapping and the engine agree; the
   change itself landed on the shipping line and is described under **Changed** below.
+- **`Document`, `RelationDocument` and `Patch.docs` no longer go through the ambient
+  `PouchDB` namespace.** Structurally identical - `PouchDB.Core.Document<T>` is
+  `T & { _id: string }` - but no longer dependent on `@types/pouchdb` being in the
+  consumer's program. It is not, in any project that sets `compilerOptions.types`; the
+  Vite React template sets it to `["vite/client"]`. In such a project every type declared
+  through the namespace resolved to `any`, `skipLibCheck` hid the cause, and `InferDoc` -
+  an intersection with `Document` - was `any` too, so the typed model typechecked
+  everything and guaranteed nothing. `@types/pouchdb` also became a dependency rather
+  than a devDependency of `@docstack/shared`, so the engine-facing signatures that still
+  use the namespace resolve where a consumer does not restrict `types`. Found by porting
+  `examples/react-todo`.
 
 ### Added - engine sessions (ADR-0046)
 

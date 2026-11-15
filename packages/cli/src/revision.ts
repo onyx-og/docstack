@@ -25,6 +25,12 @@ export type RevisionOptions = {
     bump?: "major" | "minor" | "patch";
     /** `--version`, an explicit next version, which wins over `--bump`. */
     version?: string;
+    /**
+     * `--types-import`, where generated files import the `Patch` type from. Defaults to
+     * `@docstack/client/model`; a project that depends on a different DocStack package
+     * points it at that one.
+     */
+    typesImport?: string;
 };
 
 /** What the command decided, so a caller can report it without re-deriving anything. */
@@ -165,13 +171,14 @@ export const revision = (options: RevisionOptions): RevisionResult => {
         target,
         changelog: options.message,
         docs: diff.docs,
+        typesImport: options.typesImport,
     }), "utf8");
 
     const versions = listPatchFiles(patchDir)
         .map(entry => entry.version)
         .filter(entry => semver.valid(entry))
         .sort(semver.compare);
-    writeFileSync(join(patchDir, "index.ts"), renderIndexFile(versions), "utf8");
+    writeFileSync(join(patchDir, "index.ts"), renderIndexFile(versions, options.typesImport), "utf8");
 
     output.push(
         `Wrote ${file}`,

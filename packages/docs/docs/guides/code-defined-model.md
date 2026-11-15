@@ -10,8 +10,10 @@ This is additive. Everything in [Model your data](./model-your-data.md) still wo
 
 ## Declare
 
+Put the declaration in `src/model.ts`, which is where the CLI looks for it:
+
 ```typescript
-import { defineClass, defineModel, a, type InferDoc, type InferInput } from '@docstack/client';
+import { defineClass, defineModel, a, type InferDoc, type InferInput } from '@docstack/client/model';
 
 export const Todo = defineClass('Todo', {
     description: 'A task to be completed',
@@ -32,6 +34,8 @@ export const model = defineModel({ classes: [Todo] });
 ```
 
 `TodoDoc` and `TodoInput` are inferred from the declaration above. There is no generated file to keep in sync and no build step between editing the model and seeing the types.
+
+The import is `@docstack/client/model`, not `@docstack/client`. The two export the same names, but the model entry carries only the declarations and no engine, and your model file is read **outside the browser** as well: `docstack revision` loads it in Node. The main entry would drag the storage layer into that, which is a way to fail for reasons that have nothing to do with your model.
 
 An enum narrows to its own members, so `priority` is `'low' | 'normal' | 'high'` rather than `string`. You do not need `as const`.
 
@@ -82,6 +86,8 @@ npx docstack revision --autogenerate -m "add a due date"
 
 Generated patches are meant to be read and committed. Regenerate rather than hand-edit the documents in them; a data migration goes in the `preApply` or `postApply` hook, which the generated file leaves as a commented stub.
 
+A patch you write by hand lives in the same directory and is picked up by the same index: the generator only owns the files it wrote. That is how a patch that seeds *content* works, and `--check` stays quiet about it because it carries no class documents. See `packages/examples/react-todo` for both kinds side by side.
+
 ### Keep CI honest
 
 ```bash
@@ -102,7 +108,7 @@ const open = await db.Todo.getCards({ completed: { $eq: false } });
 await db.Todo.updateCard(created._id, { completed: true });
 ```
 
-`db.Todo` is typed by the declaration: an undeclared attribute, a value outside an enum or a missing mandatory attribute is a compile error. Selectors are unchanged, so everything in [Filtering](./filtering.md) and [Query with SQL](./query-with-sql.md) still applies.
+`db.Todo` is typed by the declaration: on a write, an undeclared attribute, a value outside an enum or a missing mandatory attribute is a compile error. Selectors are unchanged, so everything in [Filtering](./filtering.md) and [Query with SQL](./query-with-sql.md) still applies.
 
 A projected read returns partial documents, because that is what it is:
 
@@ -111,16 +117,23 @@ const titles = await db.Todo.getCards(undefined, ['title']);
 titles[0].title;        // string | undefined
 ```
 
+Reads are typed by what the engine stores, and a document also carries fields no class declares - `~createTimestamp`, `~createdBy` and whatever a trigger wrote - so reading an *undeclared* name gives you `any` rather than an error. Writes are exact in both directions.
+
 The untyped class is always one call away, for anything the wrapper does not cover:
 
 ```typescript
 const classObj = await db.Todo.untyped();
 ```
 
+### A whole app
+
+`packages/examples/react-todo` is this guide, built: a declared model, a generated schema patch, a hand-written data patch, typed reads through the hook and typed writes through the wrapper, and no `any` anywhere in its source.
+
 ### In React
 
 ```tsx
-import { useClassDocs } from '@docstack/react';
+import { typedClass } from '@docstack/client';
+import { useClassDocs, useDocStack } from '@docstack/react';
 import { Todo } from './model.js';
 
 const TodoList = () => {
@@ -131,6 +144,18 @@ const TodoList = () => {
 ```
 
 Passing the declared class types `docs`. Passing a name still works and still returns `Document[]`, which is what a runtime-created class needs.
+
+There is no typed write *hook*; build the wrapper from the stack instead, which is cheap and needs no `await`:
+
+```tsx
+const docStack = useDocStack();
+const todos = useMemo(() => {
+    const stack = docStack?.getStack('my-app');
+    return stack ? typedClass(stack, Todo) : null;
+}, [docStack]);
+
+await todos?.addCard({ title: 'Ship' });
+```
 
 ## What stays untyped, deliberately
 

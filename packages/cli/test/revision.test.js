@@ -89,7 +89,13 @@ test("autogenerate writes the first patch and its index", () => {
     // The job hooks are offered as commented stubs, not silently omitted.
     assert.match(patch, /\/\/ patch_0_1_0\.preApply/);
 
+    // The Patch type comes from the entry an application actually depends on.
+    // `@docstack/shared` is internal, so importing it would not compile in a project
+    // that installed the client and this tool.
+    assert.match(patch, /import type \{ Patch \} from "@docstack\/client\/model";/);
+
     const index = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(index, /import type \{ Patch \} from "@docstack\/client\/model";/);
     assert.match(index, /import patch_0_1_0 from "\.\/0\.1\.0\.js";/);
     assert.match(index, /export const patches: Patch\[\] = \[\n    patch_0_1_0,\n\];/);
 });
@@ -186,6 +192,51 @@ test("argument parsing refuses what it does not understand", () => {
     assert.throws(() => parseArgs(["revision", "--patchez", "x"]), /Unknown option/);
     assert.throws(() => parseArgs(["revision", "--bump", "sideways"]), /must be major, minor or patch/);
     assert.throws(() => parseArgs(["revision", "-m"]), /needs a value/);
+});
+
+test("--types-import redirects the generated imports", () => {
+    const root = project(TODO_MODEL);
+    revision({
+        cwd: root, mode: "autogenerate", message: "add the Todo class",
+        typesImport: "@acme/db",
+    });
+    const dir = join(root, "src", "patches");
+    assert.match(readFileSync(join(dir, "0.1.0.ts"), "utf8"), /from "@acme\/db";/);
+    assert.match(readFileSync(join(dir, "index.ts"), "utf8"), /from "@acme\/db";/);
+});
+
+test("a hand-written patch joins the chain and does not provoke a revision", () => {
+    const root = project(TODO_MODEL);
+    revision({ cwd: root, mode: "autogenerate", message: "add the Todo class" });
+    const dir = join(root, "src", "patches");
+
+    // A patch that seeds content rather than schema: the common reason to write one by
+    // hand. It must fold into the chain without the diff noticing it, or every app that
+    // seeds data would be told its model and chain disagree.
+    writeFileSync(join(dir, "0.2.0.ts"), [
+        'const patch = {',
+        '    _id: "todo-app-0.2.0",',
+        '    "~class": "patch",',
+        '    target: "todo-app",',
+        '    version: "0.2.0",',
+        '    changelog: "seed",',
+        '    docs: [{ _id: "task-1", "~class": "Todo", active: true, title: "Ship" }],',
+        '};',
+        'export default patch;',
+    ].join("\n"), "utf8");
+
+    const result = revision({ cwd: root, mode: "check" });
+    assert.equal(result.code, 0);
+    assert.match(result.output.join("\n"), /agree on 1 class\(es\): Todo/);
+
+    // And the next generated index picks it up, in version order.
+    writeFileSync(join(root, "src", "model.ts"), TODO_MODEL.replace(
+        "title: a.string({ mandatory: true, maxLength: 200 }),",
+        "title: a.string({ mandatory: true, maxLength: 200 }),\n        done: a.boolean({}),"
+    ), "utf8");
+    revision({ cwd: root, mode: "autogenerate", message: "add done" });
+    const index = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(index, /patch_0_1_0,\n    patch_0_2_0,\n    patch_0_3_0,/);
 });
 
 test("the source printer is deterministic and readable", () => {

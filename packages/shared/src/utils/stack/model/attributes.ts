@@ -20,9 +20,10 @@ export type CommonAttributeConfig = {
     /**
      * Value used when a write omits the attribute.
      *
-     * Narrowed per type by each builder. Note that nothing fills defaults on create -
-     * the validator merely accepts the omission - so a stored document may simply have
-     * no such key. See `./infer.js`.
+     * Narrowed per type by each builder. Written on a document's **first** write, so an
+     * update cannot resurrect a cleared value. An array attribute is the exception: its
+     * default belongs to the members, because modifiers apply `defaultValue` before
+     * `isArray`, so nothing is filled and the key may be absent. See `./infer.js`.
      */
     defaultValue?: unknown;
 };

@@ -99,6 +99,25 @@ export type _optionalArrayWithDefaultIsNotFilled =
 
 // A read carries the stored document's own fields as well as the declared attributes.
 export type _docHasId = Expect<Equal<ModsDoc["_id"], string>>;
+
+/**
+ * The same claim at the value level, because `Equal` cannot see `any`.
+ *
+ * `Equal<any, string>` does not reliably evaluate to `false` - `any extends string` is
+ * both branches at once - so every assertion in this file passes vacuously if the
+ * inferred document collapses to `any`. It did: `Document` was declared through the
+ * ambient `PouchDB` namespace, which is absent from a program that sets
+ * `compilerOptions.types`, and `skipLibCheck` hid the cause. An assignment is immune to
+ * that, because `any` is assignable to `number` and a `string` is not: this line errors
+ * while the type is real, and `@ts-expect-error` turns the error *going away* into the
+ * failure. Keep it paired with `"types": []` in `tsconfig.types-test.json`, which is what
+ * reproduces the consumer that found this.
+ */
+declare const storedDoc: ModsDoc;
+// @ts-expect-error - `_id` is a string, so this assignment must not be allowed.
+export const _docIdIsNotAny: number = storedDoc._id;
+// @ts-expect-error - and a declared attribute is its declared type, not `any`.
+export const _attributeIsNotAny: number = storedDoc.required;
 export type _docHasClass = Expect<Equal<ModsDoc["~class"], string>>;
 export type _docKeepsAttributes = Expect<Equal<ModsDoc["required"], string>>;
 // An input is attributes only: the engine stamps everything else.

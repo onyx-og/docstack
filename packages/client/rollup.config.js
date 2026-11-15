@@ -60,4 +60,16 @@ export default [
         output: { file: 'lib/node.js', format: 'es', inlineDynamicImports: true },
         plugins: plugins({ browser: false }),
     },
+    {
+        // `@docstack/client/model`: the declarations, the attribute-to-validator mapping,
+        // the fold and the diff, with no engine behind them. A model module is loaded in
+        // Node by `docstack revision` as well as in the browser by the app, so it must not
+        // drag the storage layer in. Environment-neutral by construction - nothing here
+        // touches a database - so one build serves both, resolved with `browser: false`
+        // because the Node side is the one with a resolver to disappoint.
+        input: './src/model.ts',
+        external,
+        output: { file: 'lib/model.js', format: 'es', inlineDynamicImports: true },
+        plugins: plugins({ browser: false }),
+    },
 ];

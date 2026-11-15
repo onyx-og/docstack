@@ -158,7 +158,7 @@ export interface ClassModel extends Document {
      * document key. See ADR-0045.
      */
     defaultScope?: string,
-    _rev?: PouchDB.Core.RevisionId | undefined;
+    _rev?: string | undefined;
     schema: {[name: string]: AttributeModel};
     triggers: TriggerModel[];
 }
@@ -170,7 +170,7 @@ export interface DomainModel extends Document {
     sourceClass: string;
     targetClass: string;
     description?: string,
-    _rev?: PouchDB.Core.RevisionId | undefined;
+    _rev?: string | undefined;
 }
 
 export type DomainRelationParams = {
@@ -216,15 +216,39 @@ export interface Logger {
     debug(message: string, fields?: unknown): void;
 }
 
-export type Document = PouchDB.Core.Document<{
+/**
+ * A document's identity, declared here rather than taken from `PouchDB.Core`.
+ *
+ * Structurally identical to what it replaces - `PouchDB.Core.Document<T>` is
+ * `T & { _id: string }` and `RevisionId` is `string` - but **independent of the ambient
+ * `PouchDB` namespace**, which is the whole point. That namespace comes from
+ * `@types/pouchdb` and is only in a consumer's program if the consumer includes it. A
+ * project that sets `compilerOptions.types` does not, and the Vite React template sets it
+ * to `["vite/client"]`; so does any project listing its own types. In such a program every
+ * type declared through the namespace resolves to `any`, `skipLibCheck` hides the cause,
+ * and `InferDoc` - an intersection with `Document` - becomes `any` as well. The typed
+ * model would then typecheck everything and promise nothing, which is worse than being
+ * untyped, because it reads as a guarantee.
+ *
+ * So the types a model touches stand alone. Engine-facing signatures still use the
+ * namespace (a `PouchDB.Plugin` has no local equivalent worth writing), and
+ * `@types/pouchdb` is a dependency of this package so those at least resolve in a
+ * consumer that does not restrict `types`.
+ */
+type IdMeta = { _id: string };
+
+/** A stored document's revision. See {@link IdMeta} for why this is not `PouchDB.Core`. */
+type RevisionMeta = { _rev?: string | undefined };
+
+export type Document = {
     "~class": string;
     "~domain"?: never;
-} & BaseDocumentFields>
+} & BaseDocumentFields & IdMeta
 
-export type RelationDocument = PouchDB.Core.Document<{
+export type RelationDocument = {
     "~domain": string;
     "~class"?: never;
-} & BaseDocumentFields>
+} & BaseDocumentFields & IdMeta
 
 export interface SystemDoc {
     _id: string;
@@ -261,9 +285,11 @@ export interface Patch extends Document {
     target: string;
     version: string;
     changelog?: string;
-    docs: (PouchDB.Core.ExistingDocument<{
-        [key: string]: any
-    }> | PouchDB.Core.Document<{[key: string]: any}>)[]
+    /**
+     * The documents this patch carries, as authored. `_rev: "auto"` on one of them is the
+     * engine's merge marker (ADR-0038); any other document is a fresh insert.
+     */
+    docs: ({ [key: string]: any } & IdMeta & RevisionMeta)[]
     /** Runs before this patch's docs stage, writes staged into the chain transaction (ADR-0044). */
     preApply?: PatchJob;
     /** Runs after the chain commit, in a second staged transaction, before the ledger arms (ADR-0044). */
