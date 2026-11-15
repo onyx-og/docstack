@@ -181,6 +181,15 @@ export { defineClass, defineModel, a, attributeSpecToZod } from "@docstack/share
  */
 export { foldPatchChain, diffModel, mergePatchSchema, canonicalJson } from "@docstack/shared";
 export type { FoldedChain, ModelDiff } from "@docstack/shared";
+
+/**
+ * The typed read and write surface over a declared model (`proposal.md` §7).
+ *
+ * Additive: the untyped `Class` API is unchanged and stays reachable, which is what
+ * runtime-created and `simple` classes still need.
+ */
+export { typed, typedClass } from "./core/typed.js";
+export type { TypedClass, TypedStack } from "./core/typed.js";
 export type {
     AttributeSpec,
     AttributeShape,

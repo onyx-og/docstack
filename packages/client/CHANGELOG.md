@@ -26,6 +26,18 @@
   `classHashes()`. The hash is SHA-256 over semantic fields only, with sorted keys and
   descriptions excluded, so cosmetic edits cannot look like schema drift. Per-class
   hashes are the comparable unit the datamodel-hash gate needs (`ROADMAP.md`).
+- **`typed(stack, model)` and `typedClass(stack, declared)`** are the typed read and
+  write surface (`proposal.md` §7). `typed` returns one wrapper per declared class, keyed
+  by name; each exposes `addCard`, `updateCard`, `get`, `getCards` and `validate` typed by
+  the declaration, and `untyped()` for anything the wrapper does not cover. Additive: the
+  `Class` API is unchanged, which is what runtime-created and `simple` classes still need.
+  A projected read widens to partial documents rather than claiming whole ones. Writes
+  re-read the document by id, because the write path returns a pre-pipeline draft that
+  omits filled defaults and attribution; `proposal.md` §7 records the better fix.
+- **`useClassDocs(stack, Todo)`** in `@docstack/react` types the documents it returns when
+  given a class declared in code. `useClassDocs(stack, "Todo")` is untouched and still
+  returns `Document[]`, which is what a runtime-created class needs. One implementation
+  serves both: a declaration carries its own name.
 - **`foldPatchChain(patches)` and `diffModel(folded, model)`** are the two pure
   functions `docstack revision --autogenerate` and `--check` will be built from. The
   fold replays a chain into the model it produces with no database involved, applying

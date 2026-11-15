@@ -724,6 +724,8 @@ export type { SessionView } from "./session.js";
  */
 export { RemoteStack, RemoteStackError, RemoteRequestError } from "./remote-stack.js";
 export type { RemoteStackOptions, RemoteFetch } from "./remote-stack.js";
+export { typed, typedClass } from "./typed.js";
+export type { TypedClass, TypedStack } from "./typed.js";
 export {
     TransactionEngine,
     TransactionHandle,

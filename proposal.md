@@ -262,6 +262,18 @@ Escape hatches, deliberately untyped:
 A typed wrapper over a class whose stored model has drifted from the code model (by
 runtime edits) is unsound. Mitigation: §8 hash check in dev mode.
 
+**The wrapper reads back after a write, and should not have to.** `createDoc` returns the
+pre-pipeline draft with the real `_id` and `_rev` stamped on it, not the document the
+pipeline wrote: PouchDB hands the pipeline its own copy, so a declared `defaultValue`, the
+`~createdBy` / `~updatedBy` attribution and encryption are all absent from the value the
+caller receives. The untyped API has always returned that draft; typing it made the gap a
+lie, since `InferDoc` promises the stored shape. `typedClass` therefore re-reads by id
+after `addCard` and `updateCard`, at the cost of one extra read per typed write.
+
+**Open:** have the write path return what it wrote, after which the re-read goes away. It
+is a change in the core write path with a cost on every create, so it is recorded rather
+than taken.
+
 **Verified 2026-11-15, open behaviour question: the runtime path has no encryption
 precondition, and its failure handling hides that.** `addAttribute` mutates the live
 object first — `this.attributes[name]`, `this.model.schema`, `this.schemaZOD` — and only
@@ -411,8 +423,12 @@ why each went the way it did.
    driving the real command against throwaway projects, including the generated files'
    contents. `init`, `doctor` and `docs` are not built, so `create-docstack` and the
    "Start here" line still wait on `init` (§12.2, §12.3).
-5. **Typed client/react surface** — wrappers and overloads; port
-   `examples/react-todo` to the new API as the reference.
+5. **Typed client/react surface** — **wrappers and overloads landed 2026-11-15**;
+   porting `examples/react-todo` is the remaining piece. `typed(stack, model)` gives one
+   `TypedClass` per declared class keyed by name, `typedClass(stack, Todo)` wraps one, and
+   `useClassDocs(stack, Todo)` types its documents while `(stack, "Todo")` is unchanged.
+   Type-level tests include six calls the compiler must reject, so they fail the build if
+   they ever stop erroring.
 6. **Docs** — guide page + an ADR recording the decisions taken in §9.
 
 All six phases are 2.0.0 (`2.0.md` §6); each is still mergeable on its own, and nothing here

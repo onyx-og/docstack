@@ -2,6 +2,7 @@ import { useContext, useCallback, useEffect, useRef, useState } from "react";
 import { DocStackContext } from "../components/StackProvider/index.js";
 import { Class } from "@docstack/client";
 import {ClassModel, Document} from "@docstack/client";
+import type { ClassDefinition, InferDoc } from "@docstack/client";
 
 /**
  * Hook to create a new Class in a specific stack.
@@ -315,8 +316,36 @@ export const useClass = (stack: string, className: string) => {
  * };
  * ```
  */
-export const useClassDocs = (stack: string, className: string, query = {}) => {
+/**
+ * `useClassDocs`, in both of its shapes.
+ *
+ * Passing a class **declared in code** types the documents it returns; passing a name
+ * keeps today's behaviour exactly, which is what runtime-created and `simple` classes
+ * need (`proposal.md` §7). One implementation serves both: a declaration carries its own
+ * name, so the hook only has to read it.
+ */
+type UseClassDocs = {
+    <C extends ClassDefinition>(stack: string, declared: C, query?: object): {
+        docs: InferDoc<C>[];
+        loading: boolean;
+        error: any;
+    };
+    (stack: string, className: string, query?: object): {
+        docs: Document[];
+        loading: boolean;
+        error: any;
+    };
+};
+
+export const useClassDocs: UseClassDocs = (
+    stack: string,
+    classNameOrDeclared: string | ClassDefinition,
+    query: object = {}
+): any => {
     const docStack = useContext(DocStackContext);
+    const className = typeof classNameOrDeclared === "string"
+        ? classNameOrDeclared
+        : classNameOrDeclared.name;
 
     const [classObj, setClass] = useState<Class>();
     const [docs, setDocs] = useState<Document[]>([]);
