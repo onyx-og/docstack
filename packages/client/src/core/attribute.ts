@@ -1,6 +1,6 @@
 import z, { ZodType, ZodSafeParseResult } from "zod";
 import Class from "./class.js";
-import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, AttributeTypeReference } from "@docstack/shared";
+import { Attribute as Attribute_, AttributeModel, AttributeType, ATTRIBUTE_TYPES, AttributeTypeConfig, AttributeTypeReference, attributeSpecToZod } from "@docstack/shared";
 
 /**
  * Represents a single attribute (field) within a Class schema.
@@ -133,7 +133,7 @@ class Attribute extends Attribute_ {
      * Called automatically during construction.
      */
     public setField = () => {
-        const { name, type, config } = this.model;
+        const { type, config } = this.model;
 
         let cacheKey: string | null = null;
         if (type !== 'foreign_key') {
@@ -151,147 +151,31 @@ class Attribute extends Attribute_ {
             }
         }
 
-        let field: z.ZodType;
-
-        switch (type) {
-            // ... existing cases for 'string', 'number', 'boolean', 'date' ...
-            case 'string':
-                field = z.string();
-                if (config.maxLength !== undefined) {
-                    field = (field as z.ZodString).max(config.maxLength);
-                }
-                break;
-
-            case 'integer':
-                // `.int()`, so an `integer` attribute actually rejects `1.5`. It did not
-                // before, which made the declared type a suggestion: nothing enforced it
-                // and nothing reported it. Documents already holding a decimal in an
-                // integer attribute now fail validation on their next write, which is the
-                // point - the alternative is a field whose type means nothing.
-                field = z.number().int();
-                if (typeof config.min === 'number') {
-                    field = (field as z.ZodNumber).min(config.min);
-                }
-
-                if (typeof config.max === 'number') {
-                    field = (field as z.ZodNumber).max(config.max);
-                }
-                break;
-
-            // case 'date':
-            //     field = z.date();
-
-
-            //     break;
-
-            case 'decimal':
-                field = z.number();
-
-                // min and max validation
-                if (typeof config.min === 'number') {
-                    field = (field as z.ZodNumber).min(config.min);
-                }
-                if (typeof config.max === 'number') {
-                    field = (field as z.ZodNumber).max(config.max);
-                }
-
-                // decimal precision validation (with refinement)
-                if (typeof config.precision === 'number' && config.precision >= 0) {
-                    const isPrecise = (value: any) => {
-                        if (typeof value !== 'number')
-                            return true;
-                        const valueAsString = value.toString();
-                        const decimalPart = valueAsString.split('.')[1];
-                        const decimalPlaces = decimalPart ? decimalPart.length : 0;
-                        return decimalPlaces <= config.precision;
-                    };
-
-                    field = field.refine(
-                        isPrecise,
-                        `Number cannot have more than ${config.precision} decimals.`
-                    );
-                }
-                break;
-
-            case 'boolean':
-                field = z.boolean();
-                break;
-
-            case "object":
-                field = z.object({});
-                break;
-
-            case 'enum':
-                if (!config.values || !Array.isArray(config.values) || config.values.length === 0) {
-                    throw new Error(
-                        `Attribute '${name}' of type 'enum' must have a non-empty 'values' array in its config.`
-                    );
-                }
-                const enumValues = config.values.map(v => v.value);
-                field = z.enum(enumValues as [string, ...string[]]);
-                break;
-
-            case 'foreign_key':
-                if (!config.targetClass) {
-                    throw new Error(
-                        `Attribute '${name}' of type 'foreign_key' is missing a 'targetClass' in its config.`
-                    );
-                }
-
-                const foreignClass = config.targetClass;
-                const baseSchema = z.string();
-
-                field = baseSchema.refine(
-                    async (documentIdOrIds: string | string[]) => {
-                        const idsToValidate = Array.isArray(documentIdOrIds) ? documentIdOrIds : [documentIdOrIds];
-                        if (idsToValidate.length === 0) {
-                            return true;
-                        }
-
-                        try {
-                            if (this.class) {
-                                const stack = this.class.getStack();
-                                if (stack) {
-                                    const promises = idsToValidate.map(id => stack.db.get!(id));
-                                    const fetchResult = await Promise.all(promises);
-                                    return true;
-                                } else throw new Error("Missing stack connection");
-                            } else throw new Error("Missing class parentship");
-                        } catch (error: any) {
-                            if (error.status === 404) {
-                                console.error(`Foreign key validation failed: document not found in class '${foreignClass}'. ${this.class?.getName()}`, { error });
-                                return false;
-                            }
-                            throw error;
-                        }
-                    },
-                    {
-                        message: `One or more documents not found in class '${foreignClass}'.`,
+        // The mapping itself lives in `@docstack/shared` so that one definition answers
+        // both the runtime validator and anything deriving static types from the same
+        // model (`proposal.md` §5). Only the parts that need a live stack stay here: the
+        // foreign-key existence check, which closes over this attribute's class, and the
+        // cache above, which is keyed on this process's attribute models.
+        const field = attributeSpecToZod(this.model, {
+            foreignKeyExists: async (ids, targetClass) => {
+                try {
+                    if (!this.class) throw new Error("Missing class parentship");
+                    const stack = this.class.getStack();
+                    if (!stack) throw new Error("Missing stack connection");
+                    await Promise.all(ids.map(id => stack.db.get!(id)));
+                    return true;
+                } catch (error: any) {
+                    if (error.status === 404) {
+                        console.error(
+                            `Foreign key validation failed: document not found in class '${targetClass}'. ${this.class?.getName()}`,
+                            { error }
+                        );
+                        return false;
                     }
-                );
-                break;
-
-            case 'reference':
-                field = z.string().min(1);
-                break;
-
-            default:
-                throw new Error(`Unsupported schema type: '${type}' for field '${name}'`);
-        }
-
-        // These rules are applied regardless of the type, and in the correct order
-        if (config.defaultValue !== undefined) {
-            field = field.default(config.defaultValue);
-        }
-        if (config.isArray === true) {
-            field = z.array(field);
-        }
-        if (config.mandatory !== true) {
-            // Optional attributes accept `null` as well as absence: `undefined` does not
-            // survive JSON serialization, so `null` is the only way a client can express
-            // "clear this field" on a stored document.
-            field = field.nullable().optional();
-        }
+                    throw error;
+                }
+            },
+        });
 
         if (cacheKey) {
             Attribute.fieldCache.set(cacheKey, field);

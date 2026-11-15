@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Changed - the attribute mapping is one function, in shared (DocStack 2.0, `2.0.md`)
+
+Breaking where noted. `2.0.md` §3 carries the full inventory; `proposal.md` §5 and §8
+carry the design and the defects these close.
+
+- **One definition of what an attribute accepts.** `attributeSpecToZod(spec, options?)`
+  in `@docstack/shared` is now the single source of truth, and `Attribute.setField`
+  delegates to it. Only what needs a live stack stays in the client: the foreign-key
+  existence check, handed in as `options.foreignKeyExists`, and the field cache.
+  Modifier order (`defaultValue`, then `isArray`, then nullable-and-optional for
+  anything not `mandatory`) is unchanged and documented as load-bearing.
+- **`enum` values are strings. Breaking.** The config type narrows from
+  `string | number | object` to `string`, and a non-string value now raises a named
+  error naming the attribute and the offending index. `z.enum` only ever accepted
+  strings: handed numbers it built without complaint and then rejected *every* input,
+  so a numeric enum has never accepted a value and nothing can depend on one.
+- **`date` attributes work. Breaking, previously a throw.** A `date` attribute used to
+  throw `Unsupported schema type` when its class was built. It is now an **ISO-8601
+  string in UTC**, with `config.format: "date"` for a date-only value, and `min`/`max`
+  compared as instants rather than as text. A `Date` object is deliberately not the
+  stored shape: a document body round-trips through JSON, so a `Date` reads back as a
+  string that `z.date()` rejects, which would fail a read-modify-write on the
+  document's own data. Offsets are refused so lexicographic order matches
+  chronological order for range queries.
+- **`object` keeps unknown keys.** `z.looseObject({})` replaces `z.object({})`, which
+  stripped every key on parse. Harmless while parse output is discarded; a trap the
+  moment it is used.
+- **`AttributeTypeDate`** replaces the misspelled `AttribruteTypeDate`, which remains as
+  a deprecated alias so existing imports resolve.
+- `@docstack/shared` declared `zod ^3.24.1` as a dependency while compiling against
+  Zod 4, with `^4.2.1` duplicated in `devDependencies`. It now declares Zod 4 once.
+- `integer` still does **not** apply `.int()`, so decimals keep passing. Adding it
+  rejects data already stored, so it stays an open 2.0 decision (`2.0.md` §3).
+
 ### Added - engine sessions (ADR-0046)
 
 - **`stack.forSession(session)`** returns a view of the stack as one principal sees

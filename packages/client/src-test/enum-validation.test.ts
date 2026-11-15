@@ -30,6 +30,34 @@ describe("enum attribute validation", () => {
         expect(result.invalidStatus).toBe(false);
     });
 
+    it("refuses a non-string enum value instead of accepting nothing", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "enum-non-string",
+            evaluate: async ({ stack }) => {
+                const { Class } = (window as any).docstack;
+                // `z.enum` takes strings only: handed numbers it used to build without
+                // complaint and then reject every input, so the attribute silently
+                // accepted nothing. The mapping now says so at build time.
+                let error: string | null = null;
+                try {
+                    await Class.create(stack, "NumericEnumDoc", "class", "Numeric enum", {
+                        rank: {
+                            name: "rank",
+                            type: "enum",
+                            config: { mandatory: true, values: [{ value: 1 }, { value: 2 }] },
+                        },
+                    });
+                } catch (e: any) {
+                    error = String(e?.message ?? e);
+                }
+                return { error };
+            },
+        });
+
+        expect(result.error).toContain("accepts string values only");
+        expect(result.error).toContain("rank");
+    });
+
     it("exposes enum-backed system schemas for jobs", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "enum-job",

@@ -35,11 +35,29 @@ export type AttributeTypeString = {
     config: {maxLength?: number, defaultValue?: string} & AttributeTypeConfig
 }
 
-export type AttribruteTypeDate = {
+export type AttributeTypeDate = {
     type: "date",
     name: string,
-    config: {format?: string, defaultValue?: string | number, max?: string|number, min?: string | number} & AttributeTypeConfig
+    config: {
+        /**
+         * `"date"` for a date-only value (`YYYY-MM-DD`); a full ISO-8601 UTC timestamp
+         * otherwise.
+         */
+        format?: "date" | "datetime",
+        /** ISO-8601 string, matching {@link format}. */
+        defaultValue?: string,
+        /** ISO-8601 string. Compared as an instant, not as text. */
+        max?: string,
+        /** ISO-8601 string. Compared as an instant, not as text. */
+        min?: string
+    } & AttributeTypeConfig
 }
+
+/**
+ * @deprecated Misspelling kept so existing imports keep resolving. Use
+ * {@link AttributeTypeDate}.
+ */
+export type AttribruteTypeDate = AttributeTypeDate;
 
 export type AttributeTypeBoolean = {
     type: "boolean",
@@ -61,9 +79,15 @@ export type AttributeTypeEnum = {
     name: string,
     config: {
         values: {
-            value: string | number | object
+            /**
+             * Strings only. `z.enum`, which validates this attribute, accepts nothing
+             * else: given a number it builds without complaint and then rejects every
+             * input, so a numeric enum never accepted a value. Narrowed to what the
+             * validator always enforced.
+             */
+            value: string
         }[],
-        type: AttributeType["type"]
+        type?: AttributeType["type"]
     } & AttributeTypeConfig
 }
 export type AttributeTypeReference = {
@@ -74,7 +98,7 @@ export type AttributeTypeReference = {
     } & AttributeTypeConfig
 }
 export type AttributeType =
-    AttributeTypeString | AttributeTypeInteger | AttribruteTypeDate |
+    AttributeTypeString | AttributeTypeInteger | AttributeTypeDate |
     AttributeTypeDecimal | AttributeTypeBoolean | AttributeTypeForeignKey |
     AttributeTypeObject | AttributeTypeEnum | AttributeTypeReference;
 export type AttributeModel = {
