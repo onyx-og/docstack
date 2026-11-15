@@ -1,0 +1,14 @@
+{
+  "//": "Typechecks the type-level tests in src-test/types. Nothing is emitted; failure to compile IS the failure. Strict on purpose: the inference under test is about optionality and nullability, which a loose config would hide.",
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src-test/types/**/*.ts"]
+}

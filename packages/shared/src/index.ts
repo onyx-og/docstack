@@ -6,5 +6,6 @@ import Stack from "./utils/stack/index.js";
 import Trigger from "./utils/stack/trigger.js";
 
 export * from "./types.js";
+export * from "./utils/stack/model/index.js";
 export type { AttributeSpecToZodOptions } from "./utils/stack/attribute/to-zod.js";
 export {Stack, Class, Domain, Attribute, Trigger, attributeSpecToZod};

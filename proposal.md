@@ -144,11 +144,30 @@ Two derived types:
   attributes may be absent or `null`. Note `Class.validate` only checks
   `safeParseAsync(...).success` and **discards the parse output**, so Zod defaults are not
   what fills stored values — type reads by the stored shape, not `z.output`.
-- **`InferInput`** (what `addCard` accepts): mandatory attributes required unless they
-  have a `defaultValue`. **VERIFY** where defaults are actually filled on create
-  (`Attribute.getEmpty` at `attribute.ts` ~L426, used by propagation; check whether
-  `addCard`/`addOrUpdateCard` fill defaults before validation). If they don't, a
-  mandatory attribute with a default is still required on input.
+- **`InferInput`** (what `addCard` accepts): an attribute is required only when it is
+  `mandatory` **and** carries no `defaultValue`.
+
+**Answered 2026-11-15, measured against the engine: nothing fills defaults on create,
+and the write succeeds anyway.** `Attribute.getEmpty` has exactly one caller,
+`applySchemaDelta` (`client/src/utils/index.ts` ~L23), which is propagation. On create,
+a `mandatory` attribute carrying a `defaultValue` behaves like this:
+
+| | Result |
+|---|---|
+| `validate({})` on such a class | **passes** - Zod applies the default while parsing, and `Class.validate` only reads `.success` |
+| the created document | **has no such key**: the parse output is discarded, so the default reaches nothing |
+
+So it is neither required on input (the write goes through) nor guaranteed on a read,
+which is why both `InferInput` and `InferDoc` treat it as optional: typing it as present
+would describe a document the engine does not produce.
+
+**This is a footgun, and the types now make it visible rather than fixing it.** A
+developer who declares `completed: a.boolean({ mandatory: true, defaultValue: false })`
+reasonably expects `false` to be stored. **Recommended for 2.0:** fill declared defaults
+on create, from the same `getEmpty` propagation already uses, after which a mandatory
+attribute with a default becomes genuinely present and `InferDoc` can promise it. That
+is an engine behaviour change, so it is recorded as a decision (§9) rather than taken
+here.
 
 **Single source of truth.** Implement the mapping once as a pure function
 `attributeSpecToZod(spec)` in `shared` and make `Attribute.setField` delegate to it
@@ -327,7 +346,12 @@ why each went the way it did.
 5. Typed selectors: type Mango selector keys against `InferDoc` now, or later.
 6. Should `StackOptions.model` replace `patches` eventually (patches generated at build
    time), or always remain alongside them?
-7. ~~Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip?~~ — **decided**:
+7. Should the engine **fill declared defaults on create**? Today it does not, so
+   `mandatory` + `defaultValue` validates while storing nothing, and the inferred types
+   have to call such an attribute optional on both sides (§5). Filling them makes the
+   declaration mean what it reads like and lets `InferDoc` promise the value; it also
+   changes what every existing app writes, so it belongs in 2.0 or nowhere.
+8. ~~Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip?~~ — **decided**:
    `date` landed in phase 1 as an ISO-8601 UTC string (`format: "date"` for date-only).
    `integer` is the one left open, since `.int()` rejects data already stored.
 
@@ -338,9 +362,14 @@ why each went the way it did.
    and the field cache in the client. Defects 1, 2, 4 and 5 resolved; defect 3 left open
    on purpose. The client suite passes unchanged, plus three new tests for the date round
    trip, instant-compared bounds, and the enum refusal.
-2. **Builders + inference** — `defineClass`, `a.*`, `InferDoc`, `InferInput`,
-   `toClassModel`, `hash`. Type-level tests per mapping row; round-trip test:
-   `defineClass → toClassModel → Class.buildFromModel → validate` on fixtures.
+2. ~~**Builders + inference**~~ — **landed 2026-11-15**. `defineClass`, `a.*`,
+   `InferDoc`, `InferInput`, `toClassModel`, `canonical`, `hash`, plus `defineModel`
+   with per-class hashes. Type-level tests cover every mapping row and modifier
+   (`packages/client/tsconfig.types-test.json`, `npm run test:types`); the round-trip
+   test drives `defineClass → toClassModel → Class.buildFromModel → validate` over
+   accept and reject fixtures and checks the hash ignores descriptions. Deferred within
+   this phase: `defineHandler` and the `handler?: string` schema change (§13), and
+   `defineDomain`.
 3. **Fold + diff library** — pure functions, unit-tested against hand-written chains,
    including ADR-0037's "lost attributes" scenario and `null` drops.
 4. **CLI** — create `@docstack/cli` (bin `docstack`) with `revision --autogenerate` and

@@ -155,4 +155,34 @@ export type {
     StackSession,
 } from "@docstack/shared";
 
+/**
+ * The code-defined model (`proposal.md`).
+ *
+ * Re-exported from `@docstack/shared` so an application declares its classes through
+ * the package it already depends on, and so the builders reach the browser bundle.
+ * One definition yields both the TypeScript types and the class document the engine
+ * stores, which is what keeps the two from drifting.
+ *
+ * @example
+ * ```typescript
+ * import { defineClass, a, type InferDoc } from "@docstack/client";
+ *
+ * export const Todo = defineClass("Todo", {
+ *     attributes: { title: a.string({ mandatory: true }) },
+ * });
+ * export type TodoDoc = InferDoc<typeof Todo>;
+ * ```
+ */
+export { defineClass, defineModel, a, attributeSpecToZod } from "@docstack/shared";
+export type {
+    AttributeSpec,
+    AttributeShape,
+    AttributeValue,
+    ClassDefinition,
+    ClassDefinitionInput,
+    ModelDefinition,
+    InferDoc,
+    InferInput,
+} from "@docstack/shared";
+
 export default DocStack;

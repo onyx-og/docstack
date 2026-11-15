@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Added - a code-defined, statically typed data model (DocStack 2.0, `2.0.md`)
+
+- **`defineClass(name, { attributes, ... })`** declares a class in code. The same
+  definition yields the TypeScript types *and* `toClassModel()`, the class document the
+  engine already consumes, so the types and the runtime cannot drift. Re-exported from
+  `@docstack/client` alongside the builders, so an application declares its model
+  through the package it already depends on.
+- **`a.*` attribute builders** for every attribute type: `string`, `integer`, `decimal`,
+  `boolean`, `object`, `date`, `enum`, `foreignKey`, `reference`. Each keeps its config's
+  literal type, so an enum narrows to its own members with no `as const` and no codegen
+  step.
+- **`InferDoc<typeof Class>` and `InferInput<typeof Class>`** give the stored shape and
+  the accepted-write shape. An attribute is required only when it is `mandatory` **and**
+  carries no `defaultValue`, because the engine does not fill defaults on create: such a
+  write validates (Zod applies the default while parsing, and the parse output is
+  discarded) and stores no value. Measured, not assumed; `proposal.md` §5 carries the
+  table and recommends the engine fill them in 2.0, which would let `InferDoc` promise
+  the value.
+- **`defineModel({ classes })`** collects classes, rejects a duplicate name, and exposes
+  `toClassModels()`, a `canonical()` serialization, a whole-model `hash()` and per-class
+  `classHashes()`. The hash is SHA-256 over semantic fields only, with sorted keys and
+  descriptions excluded, so cosmetic edits cannot look like schema drift. Per-class
+  hashes are the comparable unit the datamodel-hash gate needs (`ROADMAP.md`).
+- **`npm run test:types -w @docstack/client`** typechecks the type-level tests in
+  `src-test/types`, one assertion per row of the mapping table plus the modifiers. They
+  resolve `@docstack/shared` through its built declarations, so what they assert is what
+  a consumer sees.
+
+Not yet: `defineHandler` and the `handler?: string` references on `TriggerModel` and
+`PatchJob` (`proposal.md` §13), `defineDomain`, the fold/diff library and the CLI.
+
 ### Changed - the attribute mapping is one function, in shared (DocStack 2.0, `2.0.md`)
 
 Breaking where noted. `2.0.md` §3 carries the full inventory; `proposal.md` §5 and §8

@@ -37,6 +37,7 @@
     "build:prod": "webpack --node-env=production",
     "build:vendor": "rollup --config ./rollup.vendor.js",
     "lint": "eslint ./src --ext .ts,.tsx",
+    "test:types": "npx tsc --noEmit -p ./tsconfig.types-test.json",
     "pretest": "npm run build && npm run build:vendor",
     "test": "playwright test"
   },
