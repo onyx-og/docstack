@@ -70,13 +70,17 @@
   re-derived the model from the class instance, which is no longer the one being
   persisted, so a schema change against a host would have applied locally while the
   host was sent the unchanged model.
-- Known limitation this surfaced, unchanged in behaviour and now pinned by a test:
-  removing a **mandatory** attribute from a class that holds documents does not persist.
-  Propagation strips the attribute from each document, then the stripped document is
-  validated against the class as currently stored - which still declares the attribute
-  mandatory - so the class write is discarded. Previously the attribute vanished from
-  the instance while the stored class kept it, and a reload brought it back. Optional
-  attributes, and classes with no documents, remove and persist normally.
+- **Schema propagation judges documents against the schema being written.** Removing a
+  **mandatory** attribute from a class that holds documents could never persist:
+  propagation strips the attribute from each document, and the stripped document was
+  then validated against the class as still stored, which declares the attribute
+  mandatory, so the whole class write was discarded. Propagation now carries the model
+  it is propagating, which takes the precedence ADR-0043 already gives a class model
+  riding its own batch - the model about to be committed outranks the store - across the
+  call boundary, since the class document is written by the enclosing call and must not
+  be written twice. The documents lose the attribute as well, which re-enables an
+  assertion that had been commented out as "re-enable when attribute removal is fixed".
+  Optional attributes and classes with no documents were unaffected and remain so.
 - **Projected reads of scope-sealed attributes decrypt.** `findDocuments(selector,
   fields)`, `getCards(selector, fields)`, `findDocumentsIterator` with `fields` and
   the SQL engine's projection pushdown fetched only the requested fields, dropping

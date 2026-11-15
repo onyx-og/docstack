@@ -125,6 +125,18 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
              * narrows which scopes may be written into, and reaches triggers.
              */
             session?: StackSession;
+            /**
+             * The class model whose schema change this write is propagating.
+             *
+             * Internal, set only by the propagation sweep below. Propagation rewrites a
+             * class's documents to the schema *being written*, which is not yet the
+             * stored one, so the documents must be judged against it rather than against
+             * the class they are about to stop matching. Same precedence ADR-0043 gives a
+             * class model riding its own batch - the model about to be committed outranks
+             * the store - carried across the call boundary, since the class document is
+             * written by the enclosing call and must not be written twice.
+             */
+            propagatingClass?: ClassModel;
         } | null, callback) {
             const fnLogger = logger.child({ method: "bulkDocs" });
             if (typeof options == 'function') {
@@ -370,7 +382,11 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                     // PouchDB reports per-document failures in the *resolved* array,
                     // not by rejecting - awaiting alone would let a conflicted update
                     // silently drop one document's propagation.
-                    const propagated = await stack.db.bulkDocs(updates) as any[];
+                    // Judged against the schema being written, not the stored one: a
+                    // removal strips the attribute from each document, and the stored
+                    // class still demands it, so without this a mandatory attribute could
+                    // never be removed from a class that holds documents.
+                    const propagated = await stack.db.bulkDocs(updates, { propagatingClass: doc } as any) as any[];
                     const failures = propagated.filter(entry => entry && (entry as any).error);
                     if (failures.length) {
                         throw new Error(
@@ -434,9 +450,16 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                         // committed - and the search sees the whole array, so ordering
                         // within the batch does not matter. The relation branch above
                         // has made the same decision for its endpoints since ADR-0039.
-                        const batchModel = documentsToProcess.find((mate: any) =>
+                        const propagating = options?.propagatingClass;
+                        const batchModel = (documentsToProcess.find((mate: any) =>
                             isClassModel(mate) && !mate._deleted
-                            && ((mate as any).name === className || mate._id === className)) as unknown as ClassModel | undefined;
+                            && ((mate as any).name === className || mate._id === className)) as unknown as ClassModel | undefined)
+                            // The schema being propagated counts as "riding this batch":
+                            // it is the model these documents are being rewritten for.
+                            ?? (propagating
+                                && ((propagating as any).name === className || propagating._id === className)
+                                ? propagating
+                                : undefined);
                         try {
                             // Built DETACHED - `Class.get` + `setModel`, the same path
                             // `buildFromModel` takes for a stored doc. `buildFromModel`

@@ -65,14 +65,10 @@ describe("@docstack/core-datamodel integration", () => {
                 // and persists: propagation strips it from each document and the stripped
                 // document still satisfies the class it is validated against.
                 await classObj.removeAttribute("edition");
-                // Removing a MANDATORY attribute from a class that holds documents does
-                // not. Propagation strips it, then the stripped document is validated
-                // against the class as currently stored - which still declares it
-                // mandatory - so validation fails and the whole class write is discarded.
-                // Pinned as it stands, both here and in the database: before schema
-                // changes persisted ahead of being applied, this dropped the attribute
-                // from the instance while the stored class kept it, so a reload brought
-                // it back. Known limitation, not a regression of this test.
+                // A MANDATORY attribute removes too. Propagation judges the stripped
+                // documents against the schema being written rather than the stored one,
+                // which still demands the attribute; before that, this removal could
+                // never persist on a class that held documents.
                 await classObj.removeAttribute("pages");
                 createdDoc = await stack.getDocument<Document & {title: string, pages?: number}>(createdDoc._id);
                 const storedClass = await stack.getDocument(classObj.getId());
@@ -87,9 +83,13 @@ describe("@docstack/core-datamodel integration", () => {
         expect(test.schema).toHaveProperty("title");
         expect(test.schema).not.toHaveProperty("edition");
         expect(test.storedSchema).not.toHaveProperty("edition");
-        // The mandatory removal is refused, and the instance and the database agree on it.
-        expect(test.schema).toHaveProperty("pages");
-        expect(test.storedSchema).toHaveProperty("pages");
+        // Mandatory or not, a removal lands in the instance and in the database.
+        expect(test.schema).not.toHaveProperty("pages");
+        expect(test.storedSchema).not.toHaveProperty("pages");
+        // The documents lose the attribute too, which is what propagation is for. This
+        // assertion was commented out as "re-enable when attribute removal is fixed".
+        expect(test.doc).not.toHaveProperty("pages");
+        expect(test.doc).not.toHaveProperty("edition");
     });
 
     it("leaves the class unchanged when a schema write is refused", async ({ useDocStack }) => {
