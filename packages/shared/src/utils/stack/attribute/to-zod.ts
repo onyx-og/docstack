@@ -162,10 +162,12 @@ export const attributeSpecToZod = (
         }
 
         case "integer": {
-            // Deliberately not `.int()`: decimals have always passed this validator, so
-            // adding it rejects data already stored. Recorded as a 2.0 decision still to
-            // be taken (`2.0.md` §3, `proposal.md` §8 defect 3), not taken here.
-            let base = z.number();
+            // `.int()`, so an attribute declared `integer` rejects `1.5`. It did not
+            // before, which left the declared type meaning nothing: unenforced and
+            // unreported. A document already holding a decimal here fails validation on
+            // its next write, which is the intended consequence (`2.0.md` §3,
+            // `proposal.md` §8 defect 3).
+            let base = z.number().int();
             if (typeof config.min === "number") base = base.min(config.min);
             if (typeof config.max === "number") base = base.max(config.max);
             field = base;

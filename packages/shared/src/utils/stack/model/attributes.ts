@@ -128,10 +128,8 @@ export const a = {
         spec("string", config),
 
     /**
-     * A whole-number attribute.
-     *
-     * Note that the engine does not currently reject decimals here; see
-     * `proposal.md` §8 defect 3, which is an open 2.0 decision.
+     * A whole-number attribute. A decimal is rejected, so the declared type is the
+     * enforced one.
      */
     integer: <const TConfig extends NumberConfig>(config: TConfig = {} as TConfig) =>
         spec("integer", config),

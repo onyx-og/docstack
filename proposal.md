@@ -125,7 +125,7 @@ produce the same accepted shapes. Current runtime behaviour:
 | `type` | Runtime Zod (today) | Static TS type |
 |---|---|---|
 | `string` | `z.string()` (+`.max(maxLength)`) | `string` |
-| `integer` | `z.number()` (+min/max) — **note: not `.int()`** | `number` |
+| `integer` | `z.number().int()` (+min/max) | `number` (TypeScript has no integer type) |
 | `decimal` | `z.number()` (+min/max, precision refine) | `number` |
 | `boolean` | `z.boolean()` | `boolean` |
 | `object` | `z.object({})` | `Record<string, unknown>` |
@@ -319,18 +319,20 @@ why each went the way it did.
    (`AttributeTypeEnum` in `shared/src/types.ts`), which is evidence the original intent was
    typed members; whichever option is chosen, that field should either drive the mapping or
    be dropped.
-3. `integer` does not use `.int()`; decimals pass validation. Decide whether to fix
-   (breaking for existing data) or keep and type as `number`. *Recommended:* add `.int()` in
-   2.0.0 and have `docstack doctor` report documents that would newly fail, so an app sees
-   the damage before it upgrades. The static type stays `number` either way (TypeScript has
-   no integer type), which is exactly why leaving the runtime loose is the worse option: the
-   type would promise nothing and the validator would enforce nothing.
+3. ~~`integer` does not use `.int()`; decimals pass validation.~~ — **fixed 2026-11-15**,
+   on the shipping line as well as in the extracted mapping. A document already holding a
+   decimal in an integer attribute fails validation on its next write. The static type
+   stays `number`, TypeScript having no integer type, which is exactly why leaving the
+   runtime loose was the worse option: the type promised nothing and the validator
+   enforced nothing. `docstack doctor` reporting the rows that would newly fail (§12.2) is
+   still worth building for apps upgrading.
 4. `object` uses `z.object({})`, which in Zod 4 strips unknown keys on parse. Harmless
    today because parse output is discarded (§5), but `attributeSpecToZod` must use
    `z.record(z.string(), z.unknown())` or `z.looseObject({})` if output is ever used.
-5. Zod version skew: `client` depends on `zod ^4.1.5`; `shared/package.json` lists
-   `zod ^3.24.1` and `^4.2.1` in different dependency blocks. Moving the mapping into
-   `shared` requires aligning on Zod 4 (and likely a peer dependency).
+5. ~~Zod version skew~~ — **fixed 2026-11-15**: `shared` declares Zod as a **peer
+   dependency** (`^4.1.5`, the client's own floor) and keeps it as a dev dependency so
+   the workspace still builds. One copy of Zod in an application's graph, so there is one
+   schema identity.
 
 ## 9. Open questions (maintainer decides)
 
@@ -353,7 +355,7 @@ why each went the way it did.
    changes what every existing app writes, so it belongs in 2.0 or nowhere.
 8. ~~Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip?~~ — **decided**:
    `date` landed in phase 1 as an ISO-8601 UTC string (`format: "date"` for date-only).
-   `integer` is the one left open, since `.int()` rejects data already stored.
+   `integer` is fixed too, on the shipping line, so none of the three is open.
 
 ## 10. Implementation plan (phased; each phase mergeable alone)
 

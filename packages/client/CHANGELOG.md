@@ -63,9 +63,11 @@ carry the design and the defects these close.
 - **`AttributeTypeDate`** replaces the misspelled `AttribruteTypeDate`, which remains as
   a deprecated alias so existing imports resolve.
 - `@docstack/shared` declared `zod ^3.24.1` as a dependency while compiling against
-  Zod 4, with `^4.2.1` duplicated in `devDependencies`. It now declares Zod 4 once.
-- `integer` still does **not** apply `.int()`, so decimals keep passing. Adding it
-  rejects data already stored, so it stays an open 2.0 decision (`2.0.md` §3).
+  Zod 4, with `^4.2.1` duplicated in `devDependencies`. Zod is now a **peer
+  dependency** (`^4.1.5`, matching the client's own floor), so an application resolves
+  one copy of it rather than risking two schema identities in one dependency graph.
+- `integer` applies `.int()` here too, so the one mapping and the engine agree; the
+  change itself landed on the shipping line and is described under **Changed** below.
 
 ### Added - engine sessions (ADR-0046)
 
