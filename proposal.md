@@ -429,7 +429,12 @@ why each went the way it did.
    `useClassDocs(stack, Todo)` types its documents while `(stack, "Todo")` is unchanged.
    Type-level tests include six calls the compiler must reject, so they fail the build if
    they ever stop erroring.
-6. **Docs** — guide page + an ADR recording the decisions taken in §9.
+6. ~~**Docs**~~ — **landed 2026-11-15**. [Declare your model in code]
+   (`packages/docs/docs/guides/code-defined-model.md`) as the guide, and
+   `specs/adr/0048-the-data-model-is-declared-in-code.md` recording the decisions here and
+   the engine behaviour they changed. Pages the behaviour changes made wrong were
+   corrected in the same pass: the attribute reference's type table, the schema engine's
+   mapping and its claim about defaults, and the modelling guide's type list.
 
 All six phases are 2.0.0 (`2.0.md` §6); each is still mergeable on its own, and nothing here
 waits on the Rust core.

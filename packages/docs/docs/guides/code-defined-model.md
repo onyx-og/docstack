@@ -1,0 +1,150 @@
+---
+title: "Declare your model in code"
+description: "Declare classes in your own source, infer their TypeScript types with no codegen step, generate the patches that install them, and read and write documents that are typed."
+sidebar_position: 2
+---
+
+A class declared in code is the same class document the engine stores. One declaration gives you the TypeScript types, the stored model and the patch that installs it, so the types and the runtime cannot drift apart.
+
+This is additive. Everything in [Model your data](./model-your-data.md) still works, and you need it for classes created at runtime.
+
+## Declare
+
+```typescript
+import { defineClass, defineModel, a, type InferDoc, type InferInput } from '@docstack/client';
+
+export const Todo = defineClass('Todo', {
+    description: 'A task to be completed',
+    attributes: {
+        title: a.string({ mandatory: true, maxLength: 200 }),
+        completed: a.boolean({ defaultValue: false }),
+        priority: a.enum(['low', 'normal', 'high']),
+        tags: a.string({ isArray: true }),
+        dueOn: a.date(),
+        owner: a.foreignKey({ targetClass: 'User' }),
+    },
+});
+
+export type TodoDoc = InferDoc<typeof Todo>;
+export type TodoInput = InferInput<typeof Todo>;
+
+export const model = defineModel({ classes: [Todo] });
+```
+
+`TodoDoc` and `TodoInput` are inferred from the declaration above. There is no generated file to keep in sync and no build step between editing the model and seeing the types.
+
+An enum narrows to its own members, so `priority` is `'low' | 'normal' | 'high'` rather than `string`. You do not need `as const`.
+
+## What a read gives you, and what a write takes
+
+They are not the same shape, because the engine fills some attributes and not others.
+
+| Declared | A write must carry it | A read is guaranteed to have it |
+| :--- | :--- | :--- |
+| `mandatory`, no default | yes | yes |
+| `mandatory` with a `defaultValue` | no, the engine fills it | yes |
+| a `defaultValue`, not mandatory | no | yes |
+| neither | no | no |
+| `isArray` with a `defaultValue` | same as without one | no |
+
+The last row is the one that surprises people. Modifiers apply `defaultValue` before `isArray`, so the default belongs to the array's *members*, not to the array. There is no sensible whole-array value to write, so nothing is filled.
+
+```typescript
+await todos.addCard({ title: 'Ship' });          // completed is stored as false
+const todo = await todos.get(id);
+todo.completed;                                   // boolean, always present
+todo.priority;                                    // 'low' | 'normal' | 'high' | null | undefined
+```
+
+## Generate the patches
+
+A class declared in code is not installed until a patch carries it. The CLI writes that patch for you by comparing your model against the patches you already have.
+
+```bash
+npm install --save-dev @docstack/cli
+
+npx docstack revision --autogenerate -m "add the Todo class"
+```
+
+That writes `src/patches/0.1.0.ts` and regenerates `src/patches/index.ts`. Pass the chain to the stack the way you always have:
+
+```typescript
+import { patches } from './patches/index.js';
+
+const stack = await ClientStack.create('my-app', { patches });
+```
+
+Change an attribute and run it again. The second patch carries only the delta, which is what the engine merges:
+
+```bash
+npx docstack revision --autogenerate -m "add a due date"
+```
+
+Generated patches are meant to be read and committed. Regenerate rather than hand-edit the documents in them; a data migration goes in the `preApply` or `postApply` hook, which the generated file leaves as a commented stub.
+
+### Keep CI honest
+
+```bash
+npx docstack revision --check
+```
+
+This exits non-zero when your model and your patch chain disagree, and names the classes. It is the guard for the failure that otherwise reaches a device: editing the model, forgetting the patch, and shipping an app whose code expects a schema the database never installed.
+
+## Typed reads and writes
+
+```typescript
+import { typed } from '@docstack/client';
+
+const db = typed(stack, model);
+
+const created = await db.Todo.addCard({ title: 'Ship', priority: 'high' });
+const open = await db.Todo.getCards({ completed: { $eq: false } });
+await db.Todo.updateCard(created._id, { completed: true });
+```
+
+`db.Todo` is typed by the declaration: an undeclared attribute, a value outside an enum or a missing mandatory attribute is a compile error. Selectors are unchanged, so everything in [Filtering](./filtering.md) and [Query with SQL](./query-with-sql.md) still applies.
+
+A projected read returns partial documents, because that is what it is:
+
+```typescript
+const titles = await db.Todo.getCards(undefined, ['title']);
+titles[0].title;        // string | undefined
+```
+
+The untyped class is always one call away, for anything the wrapper does not cover:
+
+```typescript
+const classObj = await db.Todo.untyped();
+```
+
+### In React
+
+```tsx
+import { useClassDocs } from '@docstack/react';
+import { Todo } from './model.js';
+
+const TodoList = () => {
+    const { docs, loading } = useClassDocs('my-app', Todo);
+    if (loading) return <p>Loading…</p>;
+    return <ul>{docs.map(doc => <li key={doc._id}>{doc.title}</li>)}</ul>;
+};
+```
+
+Passing the declared class types `docs`. Passing a name still works and still returns `Document[]`, which is what a runtime-created class needs.
+
+## What stays untyped, deliberately
+
+- Classes created at runtime with `Class.create`, `addAttribute`, `modifyAttribute` or `removeAttribute`.
+- `simple` classes, which have no schema by definition.
+- Any class your model does not declare.
+
+A typed wrapper describes the class *as declared*. If a runtime edit has changed the stored class since, the types describe something the database no longer holds. That is the trade for an escape hatch, and it is why runtime edits and declared models are better not mixed on the same class.
+
+## The model hash
+
+```typescript
+await model.hash();         // one digest for the whole model
+await model.classHashes();  // one per class
+```
+
+Both are SHA-256 over the semantic parts of the declaration, with keys sorted and descriptions excluded, so renaming a comment never looks like a schema change. They are exposed for comparing two builds; nothing in the engine gates on them yet.

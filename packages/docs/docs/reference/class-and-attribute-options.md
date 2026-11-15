@@ -65,12 +65,12 @@ Writes the attribute into the class document and rebuilds the class's validator.
 | Type | Zod validator | Type-specific configuration |
 | :--- | :--- | :--- |
 | `string` | `z.string()` | `maxLength` |
-| `integer` | `z.number()` | `min`, `max` |
+| `integer` | `z.number().int()` | `min`, `max` |
 | `decimal` | `z.number()` with a precision refinement | `min`, `max`, `precision` (maximum decimal places) |
 | `boolean` | `z.boolean()` | |
-| `date` | stored as given | `format`, `min`, `max` |
-| `enum` | `z.enum(values)` | `values`: a non-empty array of `{ value }` |
-| `object` | `z.object({})` | |
+| `date` | `z.iso.datetime()`, or `z.iso.date()` with `format: 'date'`. Stored as an ISO-8601 string in UTC; offsets are refused so lexicographic order matches chronological order. | `format` (`'date'` or `'datetime'`), `min`, `max` as ISO-8601 strings compared as instants |
+| `enum` | `z.enum(values)` | `values`: a non-empty array of `{ value }`, the values being **strings**. A non-string value is refused when the class is built. |
+| `object` | `z.looseObject({})`, which keeps unknown keys | |
 | `foreign_key` | `z.string()` with an async existence check | `targetClass`: the class the referenced document must belong to |
 | `reference` | bound to a domain | `domain`: the domain name. Cannot be an array. |
 
@@ -81,7 +81,7 @@ Where a `reference` attribute may live follows from the domain's cardinality: on
 | Key | Type | Effect |
 | :--- | :--- | :--- |
 | `mandatory` | boolean | A write without the attribute is refused. Otherwise the attribute is optional and may be `null`. |
-| `defaultValue` | the attribute's type | Stamped when the attribute is absent from a write. Also stamped onto existing documents when the attribute is added to a class they belong to. |
+| `defaultValue` | the attribute's type | Written onto the document when the attribute is absent from its **first** write, and onto existing documents when the attribute is added to a class they belong to. An update does not re-apply it, so clearing a value keeps it cleared. An `isArray` attribute's default is a *member* default, so nothing is written for it. |
 | `isArray` | boolean | The attribute holds an array of the type. `foreign_key` arrays check every id. |
 | `primaryKey` | boolean | Part of the class's natural key. `addOrUpdateCard(params)` and `getByPrimaryKeys(params)` look documents up by every primary-key attribute together, and `uniqueCheck` refuses a duplicate. |
 | `encrypted` | boolean | Stored as an AES-GCM payload under the stack's document key; see [Encrypt fields](../guides/encrypt-fields.md). |

@@ -104,6 +104,15 @@ and it is acceptable for a rendezvous with no server.
 **Verdict for now:** real gap, medium effort, and the design hinges on decisions
 (1) and (3). Not scheduled; recorded so the flow is not lost.
 
+**Update 2026-11-15 (ADR-0048):** difficulties (2) and (3) now have an answer in code. A
+code-defined model exposes `model.hash()` and `model.classHashes()` - SHA-256 over
+semantic fields with sorted keys and descriptions excluded, per class as well as per
+model - so canonicalization is settled and the comparable unit is already per class.
+Nothing gates on either yet: publishing a hash on the sync marker and deciding the
+pairing rule of difficulty (1) remain the unbuilt half. Note also that a *declared*
+model narrows the gap by itself, since `docstack revision --check` fails CI when the code
+model and the patch chain disagree, which is where by-hand drift starts.
+
 ## Deferred, owned by existing ADRs
 
 - **Engine sessions v2** (ADR-0046 consequences): decrypt once and redact per

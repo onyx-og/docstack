@@ -6,6 +6,8 @@ sidebar_position: 1
 
 A class is a schema stored as a document. Documents of that class are validated against it on every write, and the schema itself replicates with the data, so a second device can read what the first one wrote.
 
+This page builds classes at runtime, which is what you want for a class whose shape is decided while the app runs. To declare your model in your own source and get TypeScript types from it, see [Declare your model in code](./code-defined-model.md).
+
 ## Classes
 
 ```typescript
@@ -46,6 +48,8 @@ await Attribute.create(taskClass, 'notes', 'string', 'Private notes', { encrypte
 ```
 
 `Attribute.create(classObj, name, type, description?, config?)` adds the attribute to the class document and rebuilds its validator. Nine types exist: `string`, `integer`, `decimal`, `boolean`, `date`, `enum`, `object`, `foreign_key` and `reference`.
+
+An `integer` attribute rejects a decimal, a `date` is an ISO-8601 string in UTC (`format: 'date'` for a date-only value), and an `enum`'s values are strings. See the [attribute reference](../reference/class-and-attribute-options.md#attribute-types) for every type and its configuration.
 
 The configuration keys every type accepts:
 

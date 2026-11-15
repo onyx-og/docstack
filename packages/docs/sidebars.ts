@@ -17,6 +17,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'guides/model-your-data',
+        'guides/code-defined-model',
         'guides/triggers',
         'guides/jobs',
         'guides/query-with-sql',
