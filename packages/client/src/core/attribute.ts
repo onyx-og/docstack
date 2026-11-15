@@ -163,7 +163,12 @@ class Attribute extends Attribute_ {
                 break;
 
             case 'integer':
-                field = z.number();
+                // `.int()`, so an `integer` attribute actually rejects `1.5`. It did not
+                // before, which made the declared type a suggestion: nothing enforced it
+                // and nothing reported it. Documents already holding a decimal in an
+                // integer attribute now fail validation on their next write, which is the
+                // point - the alternative is a field whose type means nothing.
+                field = z.number().int();
                 if (typeof config.min === 'number') {
                     field = (field as z.ZodNumber).min(config.min);
                 }

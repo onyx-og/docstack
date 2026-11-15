@@ -52,6 +52,16 @@
 - The fossil Express block left in `DocStack`'s constructor from the server preview is
   gone.
 
+### Changed
+
+- **An `integer` attribute rejects a decimal. Breaking.** The validator built a plain
+  number schema with no integer check, so `1.5` passed on an attribute declared
+  `integer`: the declared type was a suggestion that nothing enforced and nothing
+  reported. It now applies `.int()`. A document already holding a decimal in an integer
+  attribute fails validation on its next write, which is the intended consequence -
+  there is no reading under which both the old behaviour and the declared type are
+  correct. `decimal` is untouched.
+
 ### Fixed
 
 - **A schema change persists before it is applied to the `Class`.**
