@@ -26,6 +26,20 @@
   `classHashes()`. The hash is SHA-256 over semantic fields only, with sorted keys and
   descriptions excluded, so cosmetic edits cannot look like schema drift. Per-class
   hashes are the comparable unit the datamodel-hash gate needs (`ROADMAP.md`).
+- **`foldPatchChain(patches)` and `diffModel(folded, model)`** are the two pure
+  functions `docstack revision --autogenerate` and `--check` will be built from. The
+  fold replays a chain into the model it produces with no database involved, applying
+  the engine's own rules: semver order through the same comparator the engine sorts
+  with, a per-attribute merge for a document carrying `_rev: "auto"`, a replace for any
+  other document, and removal on `_deleted`. The diff emits a new class whole, a new or
+  changed attribute as a full attribute model inside a delta, a dropped attribute as
+  `null`, and reports a class the model stopped declaring instead of guessing at
+  removal semantics.
+- **`mergePatchSchema` moved to `@docstack/shared`** and the client delegates to it. It
+  was a private static shared by `applyPatch` and the ADR-0042 chain staging; the fold
+  needs exactly those semantics, and a second copy would have been a second set of
+  rules. `semver` joins shared's dependencies for the same reason, so the fold cannot
+  order a chain differently from the engine.
 - **`npm run test:types -w @docstack/client`** typechecks the type-level tests in
   `src-test/types`, one assertion per row of the mapping table plus the modifiers. They
   resolve `@docstack/shared` through its built declarations, so what they assert is what

@@ -174,6 +174,13 @@ export type {
  * ```
  */
 export { defineClass, defineModel, a, attributeSpecToZod } from "@docstack/shared";
+/**
+ * Folding a patch chain and diffing a model against it: the two pure functions
+ * `docstack revision --autogenerate` and `--check` are built from (`proposal.md` §6).
+ * No database is involved, and the fold applies the engine's own merge rules.
+ */
+export { foldPatchChain, diffModel, mergePatchSchema, canonicalJson } from "@docstack/shared";
+export type { FoldedChain, ModelDiff } from "@docstack/shared";
 export type {
     AttributeSpec,
     AttributeShape,

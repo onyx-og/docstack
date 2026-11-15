@@ -1,5 +1,6 @@
 import { ClassModel, TriggerModel } from "../../../types.js";
 import { AttributeSpec } from "./attributes.js";
+import { canonicalJson, sha256Hex } from "./canonical.js";
 
 /**
  * What `defineClass` accepts beside its name.
@@ -49,43 +50,6 @@ export type ClassDefinition<
     readonly canonical: () => string;
     /** SHA-256 of {@link canonical}, hex-encoded. */
     readonly hash: () => Promise<string>;
-};
-
-/**
- * Serializes a value with object keys in sorted order, so the same model always
- * produces the same string whatever order it was written in.
- *
- * @param value - Any JSON-serializable value.
- * @returns A deterministic JSON string.
- */
-const canonicalJson = (value: unknown): string => {
-    if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
-    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-    const entries = Object.entries(value as Record<string, unknown>)
-        .filter(([, entry]) => entry !== undefined)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(",")}}`;
-};
-
-/**
- * Hex-encoded SHA-256, through Web Crypto so the same code runs in a browser and in
- * Node.
- *
- * @param input - The string to digest.
- * @returns The digest, lowercase hex.
- * @throws If the runtime exposes no Web Crypto digest.
- */
-const sha256Hex = async (input: string): Promise<string> => {
-    const subtle = globalThis.crypto?.subtle;
-    if (!subtle) {
-        throw new Error(
-            "Model hashing needs Web Crypto (globalThis.crypto.subtle), which this runtime does not expose."
-        );
-    }
-    const digest = await subtle.digest("SHA-256", new TextEncoder().encode(input));
-    return Array.from(new Uint8Array(digest))
-        .map(byte => byte.toString(16).padStart(2, "0"))
-        .join("");
 };
 
 /**

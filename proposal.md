@@ -192,6 +192,22 @@ last patch produces". This is a pure function over patch JSON — no database. R
 client's own merge logic if it can be extracted from `applyPatch`; do **not** write a
 second, divergent merge.
 
+**Implemented 2026-11-15** as `foldPatchChain`. The merge *was* extractable: it was
+`ClientStack.mergePatchSchema`, already pure and already shared by `applyPatch` and the
+ADR-0042 chain staging, so it moved to shared and the client now delegates to it.
+
+Two rules the sketch above does not state, both taken from the engine rather than
+invented:
+
+- **`_rev: "auto"` is what makes a patch document merge.** Both `applyPatch` and
+  `stagePatch` merge only for that marker; any other document is written as authored,
+  the fresh-insert case, which *replaces*. The fold reproduces both, and a generated
+  delta therefore has to carry the marker or it would conflict instead of merging.
+- **Order is semver, through the same comparator the engine sorts with** (`semver`,
+  now a dependency of shared). String ordering would put `0.10.0` before `0.9.0` and
+  fold a different baseline. A version `semver` cannot parse is refused rather than
+  guessed at.
+
 ### 6.2 Diff and emit
 `docstack revision --autogenerate -m "add priority"`:
 1. Load the code model (`defineModel` export) and the patch chain (a module exporting
@@ -378,8 +394,14 @@ why each went the way it did.
    accept and reject fixtures and checks the hash ignores descriptions. Deferred within
    this phase: `defineHandler` and the `handler?: string` schema change (§13), and
    `defineDomain`.
-3. **Fold + diff library** — pure functions, unit-tested against hand-written chains,
-   including ADR-0037's "lost attributes" scenario and `null` drops.
+3. ~~**Fold + diff library**~~ — **landed 2026-11-15**. `foldPatchChain(patches)` and
+   `diffModel(folded, model)` in shared, with the ADR-0038 merge extracted from the
+   client as `mergePatchSchema` so the engine and the fold cannot diverge. Tested
+   against hand-written chains, including ADR-0037's "lost attributes" scenario, `null`
+   drops, `_deleted`, semver ordering (`0.10.0` after `0.9.0`), the refusal on an
+   unparseable version, a new class emitted whole, an added/changed attribute, a dropped
+   one emitted as `null`, a removed class warned about, and the no-op case `--check`
+   relies on.
 4. **CLI** — create `@docstack/cli` (bin `docstack`) with `revision --autogenerate` and
    `revision --check`; snapshot tests on generated files. Publish `create-docstack`
    delegating to `@docstack/cli init` as soon as `init` exists (§12). Add the "Start

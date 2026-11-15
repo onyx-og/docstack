@@ -29,6 +29,7 @@ import {
 import { SystemDoc, Patch, PatchJob, ClassModel, Document, RelationDocument, AccessScopeModel, isRelation, StackSession } from "@docstack/shared";
 import { createSessionView } from "./session.js";
 import type { SessionView } from "./session.js";
+import { mergePatchSchema } from "@docstack/shared";
 import { StackPlugin, StackLockedError, StackScopeMismatchError } from "../plugins/pouchdb.js";
 
 import { createGuardedDb, createReplicationDb } from "./guarded-db.js";
@@ -2227,19 +2228,12 @@ class ClientStack extends Stack {
      * stored, and an explicit `null` entry drops the attribute - from the model
      * here, and from the documents when the write propagates. Shared by
      * {@link applyPatch} and the chain staging of ADR-0042 so the two cannot drift.
+     *
+     * The rule itself now lives in `@docstack/shared` as `mergePatchSchema`, because the
+     * patch-chain fold the CLI diffs against has to reproduce it exactly, and a second
+     * implementation would be a second set of semantics (`proposal.md` §6.1).
      */
-    private static mergePatchSchema(sourceDoc: any, existingDoc: any, doc: any): void {
-        const incoming = sourceDoc?.schema;
-        const stored = existingDoc?.schema;
-        if (incoming && typeof incoming === "object" && !Array.isArray(incoming)
-            && stored && typeof stored === "object" && !Array.isArray(stored)) {
-            const merged: Record<string, unknown> = { ...stored, ...incoming };
-            for (const name of Object.keys(incoming)) {
-                if (incoming[name] === null) delete merged[name];
-            }
-            doc.schema = merged;
-        }
-    }
+    private static mergePatchSchema = mergePatchSchema;
 
     applyPatch = async (patch: Patch): Promise<string> => {
         const fnLogger = logger.child({ method: "applyPatch", args: { patch } });
