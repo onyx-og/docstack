@@ -497,6 +497,39 @@ export const StackPlugin: StackPluginType = (pouch: PouchDB.Static, stack: Stack
                             (doc as any)["~updatedBy"] = sub;
                             if (!(doc as any)._rev) (doc as any)["~createdBy"] = sub;
                         }
+
+                        // A declared `defaultValue` is what the attribute means when a
+                        // write omits it, so the write stores it. Nothing used to: the
+                        // validator accepted the omission (Zod applies the default while
+                        // parsing, and `Class.validate` discards the parse output), and
+                        // the document was stored with no such key, which left the
+                        // declaration decorative - `mandatory` with a default validated
+                        // and persisted nothing.
+                        //
+                        // Only on a document's FIRST write, the same test the attribution
+                        // above uses: an update must not resurrect a value the caller
+                        // cleared. Only attributes whose model declares a default, so
+                        // nothing stamps `null` over an attribute that merely allows
+                        // absence. Replication never arrives here - a `new_edits: false`
+                        // write returns verbatim far above - so replicas are never
+                        // reshaped by this.
+                        if (!(doc as any)._rev) {
+                            for (const attribute of Object.values(classObj.getAttributes())) {
+                                const config = attribute.model.config as { defaultValue?: unknown; isArray?: boolean };
+                                if (config.defaultValue === undefined) continue;
+                                // An array attribute's default is an ELEMENT default -
+                                // modifiers apply `defaultValue` before `isArray`, so
+                                // `z.array(field.default(v))` defaults the members, not
+                                // the array. There is no sound document-level value to
+                                // write, so it is left alone.
+                                if (config.isArray === true) continue;
+                                const name = attribute.getName();
+                                if ((doc as any)[name] === undefined) {
+                                    (doc as any)[name] = config.defaultValue;
+                                }
+                            }
+                        }
+
                         const encryptableAttributes = classObj.getEncryptedAttributes();
                         // A sealed key cannot encrypt. Refuse instead of degrading:
                         // silent plaintext is the failure mode ADR-0018 exists to remove,

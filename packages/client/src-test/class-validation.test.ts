@@ -27,6 +27,48 @@ describe("PouchDB plugin class validation", () => {
         expect(result.errorMessage).toContain(`Class '${result.missingClass}' not found`);
     });
 
+    it("fills declared defaults on a first write, and only then", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "declared-defaults",
+            evaluate: async ({ stack }) => {
+                const { Class } = (window as any).docstack;
+                const defaulted = await Class.create(stack, "Defaulted", "class", "Defaulted", {
+                    title: { name: "title", type: "string", config: { mandatory: true } },
+                    // Mandatory WITH a default: the case that used to validate and store
+                    // nothing, so the declaration meant nothing.
+                    flag: { name: "flag", type: "boolean", config: { mandatory: true, defaultValue: true } },
+                    note: { name: "note", type: "string", config: { defaultValue: "none" } },
+                    // No default: absence stays absence, nothing stamps null over it.
+                    bare: { name: "bare", type: "string", config: {} },
+                    // An array's default is an element default, so there is no sound
+                    // document-level value and the attribute is left alone.
+                    tags: { name: "tags", type: "string", config: { isArray: true, defaultValue: "x" } },
+                });
+
+                const created = await defaulted.addCard({ title: "first" });
+                const read = await stack.getDocument(created._id);
+
+                // An update must not resurrect a value the caller cleared.
+                await defaulted.updateCard(created._id, { note: null });
+                const afterClear = await stack.getDocument(created._id);
+
+                return {
+                    flag: (read as any)?.flag,
+                    note: (read as any)?.note,
+                    hasBare: read ? "bare" in (read as any) : null,
+                    hasTags: read ? "tags" in (read as any) : null,
+                    noteAfterClear: (afterClear as any)?.note,
+                };
+            },
+        });
+
+        expect(result.flag).toBe(true);
+        expect(result.note).toBe("none");
+        expect(result.hasBare).toBe(false);
+        expect(result.hasTags).toBe(false);
+        expect(result.noteAfterClear).toBe(null);
+    });
+
     it("an integer attribute rejects a decimal", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "integer-validation",

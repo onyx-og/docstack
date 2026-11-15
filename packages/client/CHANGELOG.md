@@ -54,6 +54,20 @@
 
 ### Changed
 
+- **A declared `defaultValue` is written on create.** It was not: the validator accepted
+  a write that omitted the attribute, because Zod applies the default while parsing and
+  `Class.validate` discards the parse output, so the document was stored with no such
+  key. `mandatory` with a `defaultValue` therefore validated and persisted nothing,
+  which left the declaration decorative. The default now lands on a document's **first
+  write only**, so an update cannot resurrect a value the caller cleared, and only for
+  attributes that actually declare one, so nothing stamps `null` over an attribute that
+  merely allows absence. Replication is untouched, a `new_edits: false` write being
+  stored verbatim before any of this. One deliberate exception: an array attribute's
+  default is an *element* default (modifiers apply `defaultValue` before `isArray`), so
+  there is no sound document-level value and the attribute is left alone. Documents
+  written before this change are unchanged; adding an attribute to a class still
+  backfills through propagation as before.
+
 - **An `integer` attribute rejects a decimal. Breaking.** The validator built a plain
   number schema with no integer check, so `1.5` passed on an attribute declared
   `integer`: the declared type was a suggestion that nothing enforced and nothing
