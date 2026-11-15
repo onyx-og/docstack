@@ -14,12 +14,13 @@
   literal type, so an enum narrows to its own members with no `as const` and no codegen
   step.
 - **`InferDoc<typeof Class>` and `InferInput<typeof Class>`** give the stored shape and
-  the accepted-write shape. An attribute is required only when it is `mandatory` **and**
-  carries no `defaultValue`, because the engine does not fill defaults on create: such a
-  write validates (Zod applies the default while parsing, and the parse output is
-  discarded) and stores no value. Measured, not assumed; `proposal.md` §5 carries the
-  table and recommends the engine fill them in 2.0, which would let `InferDoc` promise
-  the value.
+  the accepted-write shape, under two different rules. A write must carry an attribute
+  when it is `mandatory` and the engine will not fill it, so `mandatory` with a
+  `defaultValue` is optional there - the omission validates. A read carries it when it
+  is `mandatory` or when its default is written on create. Arrays are the exception in
+  both directions: modifiers apply `defaultValue` before `isArray`, so the default
+  belongs to the members, the engine fills nothing, and a mandatory array with a default
+  stays required. `proposal.md` §5 carries the table.
 - **`defineModel({ classes })`** collects classes, rejects a duplicate name, and exposes
   `toClassModels()`, a `canonical()` serialization, a whole-model `hash()` and per-class
   `classHashes()`. The hash is SHA-256 over semantic fields only, with sorted keys and

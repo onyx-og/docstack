@@ -147,27 +147,34 @@ Two derived types:
 - **`InferInput`** (what `addCard` accepts): an attribute is required only when it is
   `mandatory` **and** carries no `defaultValue`.
 
-**Answered 2026-11-15, measured against the engine: nothing fills defaults on create,
-and the write succeeds anyway.** `Attribute.getEmpty` has exactly one caller,
-`applySchemaDelta` (`client/src/utils/index.ts` ~L23), which is propagation. On create,
-a `mandatory` attribute carrying a `defaultValue` behaves like this:
+**Answered 2026-11-15, and then fixed.** The question was where defaults are filled.
+Measured: nowhere. `Attribute.getEmpty` had exactly one caller, `applySchemaDelta`
+(`client/src/utils/index.ts` ~L23), which is propagation, so a `mandatory` attribute
+carrying a `defaultValue` validated (Zod applies the default while parsing, and
+`Class.validate` reads only `.success`) and stored no key at all - the declaration was
+decorative.
 
-| | Result |
-|---|---|
-| `validate({})` on such a class | **passes** - Zod applies the default while parsing, and `Class.validate` only reads `.success` |
-| the created document | **has no such key**: the parse output is discarded, so the default reaches nothing |
+**The engine now writes a declared default on a document's first write**, so the
+inference splits into two rules rather than one:
 
-So it is neither required on input (the write goes through) nor guaranteed on a read,
-which is why both `InferInput` and `InferDoc` treat it as optional: typing it as present
-would describe a document the engine does not produce.
+| Declared | Required on a write | Present on a read |
+|---|---|---|
+| `mandatory`, no default | yes | yes |
+| `mandatory` + default | **no** - the omission validates | **yes** - the engine fills it |
+| default, not mandatory | no | **yes** - the engine fills it |
+| `mandatory` + default + `isArray` | **yes** | yes |
+| default + `isArray`, not mandatory | no | **no** |
+| neither | no | no |
 
-**This is a footgun, and the types now make it visible rather than fixing it.** A
-developer who declares `completed: a.boolean({ mandatory: true, defaultValue: false })`
-reasonably expects `false` to be stored. **Recommended for 2.0:** fill declared defaults
-on create, from the same `getEmpty` propagation already uses, after which a mandatory
-attribute with a default becomes genuinely present and `InferDoc` can promise it. That
-is an engine behaviour change, so it is recorded as a decision (§9) rather than taken
-here.
+The `isArray` rows are not an inconsistency. Modifiers apply `defaultValue` **before**
+`isArray`, so `z.array(field.default(v))` defaults the *members* and never the array;
+verified directly against Zod. There is no sound document-level value to write, so the
+engine fills nothing, and a mandatory array with a default still rejects `undefined` and
+stays required.
+
+What a read promises is what the current engine creates. A document written before
+defaults were applied on create may lack the key; that is a migration concern, and
+`docstack doctor` (§12.2) is where it should be reported.
 
 **Single source of truth.** Implement the mapping once as a pure function
 `attributeSpecToZod(spec)` in `shared` and make `Attribute.setField` delegate to it
@@ -348,11 +355,10 @@ why each went the way it did.
 5. Typed selectors: type Mango selector keys against `InferDoc` now, or later.
 6. Should `StackOptions.model` replace `patches` eventually (patches generated at build
    time), or always remain alongside them?
-7. Should the engine **fill declared defaults on create**? Today it does not, so
-   `mandatory` + `defaultValue` validates while storing nothing, and the inferred types
-   have to call such an attribute optional on both sides (§5). Filling them makes the
-   declaration mean what it reads like and lets `InferDoc` promise the value; it also
-   changes what every existing app writes, so it belongs in 2.0 or nowhere.
+7. ~~Should the engine fill declared defaults on create?~~ — **decided and done**
+   2026-11-15, on the shipping line. A declared default lands on a document's first
+   write, which is what let `InferDoc` promise the value (§5). Still worth building:
+   the `doctor` report for documents written before it.
 8. ~~Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip?~~ — **decided**:
    `date` landed in phase 1 as an ISO-8601 UTC string (`format: "date"` for date-only).
    `integer` is fixed too, on the shipping line, so none of the three is open.

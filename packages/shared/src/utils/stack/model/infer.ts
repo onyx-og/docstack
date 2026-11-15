@@ -43,30 +43,63 @@ export type AttributeShape<TSpec> =
         ? AttributeValue<TSpec>[]
         : AttributeValue<TSpec>;
 
-/**
- * Whether an attribute is guaranteed to be present.
- *
- * `mandatory` alone is not enough. A `defaultValue` makes the validator accept a write
- * that omits the attribute (Zod applies the default during parse), and **nothing fills
- * defaults on create** - `Attribute.getEmpty` is only used by schema propagation - so
- * the stored document simply has no such key. Measured against the engine on
- * 2026-11-15; `proposal.md` §5 raised it as the question this answers.
- */
-type IsRequired<TSpec> =
-    ConfigOf<TSpec> extends { mandatory: true }
-        ? Declares<TSpec, "defaultValue"> extends true ? false : true
+/** Whether the attribute declares a default the engine will write on create. */
+type Fills<TSpec> =
+    Declares<TSpec, "defaultValue"> extends true
+        // An array attribute's default is an ELEMENT default, because modifiers apply
+        // `defaultValue` before `isArray`: `z.array(field.default(v))` defaults the
+        // members, never the array. The engine therefore writes nothing for it.
+        ? ConfigOf<TSpec> extends { isArray: true } ? false : true
         : false;
 
-type RequiredNames<TAttributes> = {
-    [K in keyof TAttributes]: IsRequired<TAttributes[K]> extends true ? K : never;
+/**
+ * Whether a **write** must carry the attribute.
+ *
+ * `mandatory` alone is not enough: a `defaultValue` makes the validator accept a write
+ * that omits the attribute, because Zod applies the default while parsing. The array
+ * exception holds here too - a mandatory array with a default still rejects `undefined`,
+ * verified against Zod directly - so such an attribute stays required.
+ */
+type IsRequiredOnWrite<TSpec> =
+    ConfigOf<TSpec> extends { mandatory: true }
+        ? Fills<TSpec> extends true ? false : true
+        : false;
+
+/**
+ * Whether a **stored document** is guaranteed to carry the attribute.
+ *
+ * Either it is `mandatory`, so no write without it validates, or it declares a default
+ * the engine writes on create. Note what this promises: documents the current engine
+ * creates. One written before declared defaults were applied on create may lack the
+ * key, which is a migration concern rather than a typing one.
+ */
+type IsPresentOnRead<TSpec> =
+    ConfigOf<TSpec> extends { mandatory: true }
+        ? true
+        : Fills<TSpec>;
+
+type NamesWhere<TAttributes, TPredicate extends { [K in keyof TAttributes]: boolean }> = {
+    [K in keyof TAttributes]: TPredicate[K] extends true ? K : never;
 }[keyof TAttributes];
 
-type OptionalNames<TAttributes> = Exclude<keyof TAttributes, RequiredNames<TAttributes>>;
+type RequiredOnWrite<TAttributes> = NamesWhere<TAttributes, {
+    [K in keyof TAttributes]: IsRequiredOnWrite<TAttributes[K]>;
+}>;
 
-/** The attribute half of a class's shape, with requiredness and nullability applied. */
-type AttributeFields<TAttributes> = Prettify<
-    { [K in RequiredNames<TAttributes>]: AttributeShape<TAttributes[K]> } &
-    { [K in OptionalNames<TAttributes>]?: AttributeShape<TAttributes[K]> | null }
+type PresentOnRead<TAttributes> = NamesWhere<TAttributes, {
+    [K in keyof TAttributes]: IsPresentOnRead<TAttributes[K]>;
+}>;
+
+/**
+ * The attribute half of a class's shape.
+ *
+ * `TPresent` names the keys that cannot be absent; every other key is optional and
+ * accepts `null`, because `undefined` does not survive JSON serialization and `null` is
+ * how a client clears a stored field.
+ */
+type AttributeFields<TAttributes, TPresent extends keyof TAttributes> = Prettify<
+    { [K in TPresent]: AttributeShape<TAttributes[K]> } &
+    { [K in Exclude<keyof TAttributes, TPresent>]?: AttributeShape<TAttributes[K]> | null }
 >;
 
 /** A class definition, as far as inference needs to see it. */
@@ -75,9 +108,9 @@ type WithAttributes = { attributes: Record<string, AttributeSpec> };
 /**
  * What a read of this class returns: the stored shape.
  *
- * Typed by what the database holds, not by what the validator would produce. Zod's
- * parse output is discarded by `Class.validate`, so defaults never reach storage and an
- * attribute carrying one may be absent however it is declared.
+ * Typed by what the database holds. An attribute is present when it is `mandatory` or
+ * when it declares a default the engine writes on create; an array attribute's default
+ * is an element default, so it fills nothing and the key may be absent.
  *
  * @example
  * ```typescript
@@ -86,14 +119,15 @@ type WithAttributes = { attributes: Record<string, AttributeSpec> };
  * ```
  */
 export type InferDoc<TClass extends WithAttributes> =
-    Prettify<Document & AttributeFields<TClass["attributes"]>>;
+    Prettify<Document & AttributeFields<TClass["attributes"], PresentOnRead<TClass["attributes"]>>>;
 
 /**
  * What a write of this class accepts.
  *
- * An attribute is required only when it is `mandatory` **and** carries no
- * `defaultValue`, for the same reason {@link InferDoc} may omit it: a write without it
- * validates. System fields are not part of the input; the engine stamps them.
+ * An attribute is required when it is `mandatory` and the engine will not fill it: a
+ * write omitting a `mandatory` attribute that carries a default still validates, so it
+ * is optional here, while a `mandatory` *array* with a default is not filled and stays
+ * required. System fields are not part of the input; the engine stamps them.
  *
  * @example
  * ```typescript
@@ -102,4 +136,4 @@ export type InferDoc<TClass extends WithAttributes> =
  * ```
  */
 export type InferInput<TClass extends WithAttributes> =
-    AttributeFields<TClass["attributes"]>;
+    AttributeFields<TClass["attributes"], RequiredOnWrite<TClass["attributes"]>>;
