@@ -1,0 +1,48 @@
+{
+    "name": "@docstack/cli",
+    "version": "0.1.0",
+    "description": "The DocStack command line tool: generate and check the patch chain from a code-defined model",
+    "type": "module",
+    "main": "lib/index.js",
+    "bin": {
+        "docstack": "lib/index.js"
+    },
+    "files": [
+        "lib"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "author": "Onyx <hello@onyx.ac> (https://onyx.ac)",
+    "homepage": "https://onyx.ac/products/docstack",
+    "license": "CC-BY-SA-4.0",
+    "bugs": {
+        "url": "https://github.com/onyx-og/docstack/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/onyx-og/docstack.git"
+    },
+    "keywords": [
+        "docstack",
+        "cli",
+        "migrations",
+        "schema"
+    ],
+    "scripts": {
+        "build": "npx tsc -build --force ./tsconfig.json",
+        "test": "npm run build && node --test \"test/*.test.js\"",
+        "lint": "eslint ./src --ext .ts"
+    },
+    "dependencies": {
+        "@docstack/shared": "^0.1.1",
+        "jiti": "^1.21.7",
+        "semver": "^7.7.3"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/pouchdb": "^6.4.2",
+        "@types/semver": "^7.7.1",
+        "typescript": "^5.9.3"
+    }
+}

@@ -362,8 +362,12 @@ why each went the way it did.
 1. ~~Package placement~~ — **decided**: builders and pure model logic in
    `@docstack/shared`; CLI in a separate `@docstack/cli`, fronted by `create-docstack`
    (§12).
-2. Patch file layout: one module exporting `Patch[]` (as today) vs `patches/<semver>.ts`
-   plus a generated index.
+2. ~~Patch file layout~~ — **decided 2026-11-15**: `patches/<semver>.ts`, one module per
+   revision exporting a `Patch` as its default, plus a generated `index.ts` exporting the
+   ordered array. The file name carries the version, so the chain is readable in a diff
+   and orderable without loading anything, and a new revision is a new file rather than
+   an edit to a shared array - which the generator would otherwise have to parse and
+   rewrite.
 3. ~~Job authoring~~ — **decided**: compiled handlers by name, runtime strings via the
    optional plugin (§6.4, §13).
 4. Branded ids for `foreign_key` (`Id<"User">`) — nicer, but every id from untyped paths
@@ -402,10 +406,11 @@ why each went the way it did.
    unparseable version, a new class emitted whole, an added/changed attribute, a dropped
    one emitted as `null`, a removed class warned about, and the no-op case `--check`
    relies on.
-4. **CLI** — create `@docstack/cli` (bin `docstack`) with `revision --autogenerate` and
-   `revision --check`; snapshot tests on generated files. Publish `create-docstack`
-   delegating to `@docstack/cli init` as soon as `init` exists (§12). Add the "Start
-   here" line (§12.3) in the same PR that first publishes either package.
+4. ~~**CLI**~~ — **landed 2026-11-15** for `revision`. `@docstack/cli` (bin `docstack`)
+   with `revision --autogenerate` and `revision --check`, 11 tests through `node:test`
+   driving the real command against throwaway projects, including the generated files'
+   contents. `init`, `doctor` and `docs` are not built, so `create-docstack` and the
+   "Start here" line still wait on `init` (§12.2, §12.3).
 5. **Typed client/react surface** — wrappers and overloads; port
    `examples/react-todo` to the new API as the reference.
 6. **Docs** — guide page + an ADR recording the decisions taken in §9.
@@ -451,7 +456,10 @@ library is hard for humans and agents to discover.
   Permetic; or server: Node, Strapi), install the right `@docstack/*` packages, scaffold
   `model.ts`, `patches/`, and the `StackProvider` / server wiring. Writes the agent section
   (§12.4).
-- `docstack revision --autogenerate | --check` — §6.
+- `docstack revision --autogenerate | --check` — §6. **Implemented.** Conventions for
+  the model and patch paths with flags to override, the patch target defaulting to the
+  project's package name, `--bump` and `--version` for the next version, and no silent
+  fallback: an unresolvable path names every location tried.
 - `docstack doctor` — model vs folded chain, Zod version alignment, adapters present, and
   the pre-upgrade scan for documents the §8 data-shape fixes would newly reject.
 - `docstack docs [topic]` — print the relevant section of `llms.txt` / point to docs.

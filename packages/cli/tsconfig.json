@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "outDir": "lib",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationDir": "lib",
+    "sourceMap": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "composite": true,
+    // `pouchdb` carries the global PouchDB namespace that `Document` and `ClassModel`
+    // in @docstack/shared are built from. Without it their document fields resolve to
+    // nothing and `_id` looks like it does not exist.
+    "types": ["node", "pouchdb"],
+    "paths": {
+      "@docstack/shared": ["../../shared"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["lib", "node_modules", "test"],
+  "references": [
+    { "path": "../shared" }
+  ]
+}

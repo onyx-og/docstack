@@ -41,6 +41,7 @@
     "build:shared": "npm run -w packages/shared build",
     "build:client": "npm run -w packages/client build",
     "test:client": "npm run -w packages/client test",
+    "test:cli": "npm run -w @docstack/cli test",
     "build:react": "npm run -w packages/react build",
     "start:docs": "npm run -w packages/docs start",
     "build:docs": "npm run -w packages/docs build",
