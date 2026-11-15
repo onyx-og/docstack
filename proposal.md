@@ -496,12 +496,28 @@ builds automatically.
   shared fixture set for every attribute type and modifier combination.
 - The 1.x → 2.0 migration guide (`2.0.md` §5) covers every §8 defect actually fixed, with
   the `docstack doctor` check an app runs before upgrading.
-- `docstack revision --check` runs in CI for `examples/react-todo`, so the guard is
-  demonstrated and not just documented. **Half done:** the example carries it as
-  `npm run revision:check` and it passes, but the repository has no test workflow to add
-  it to - the two under `.github/workflows` only build and publish the docs - and the
-  example is not an npm workspace, so `npm ci` does not install it. Adding a test
-  workflow is a repository-wide decision rather than part of this track.
+### Nice to have, not a gate
+
+- `docstack revision --check` **running in this repository's CI** for
+  `examples/react-todo`. The example carries it as `npm run revision:check` and it passes;
+  what is missing is a workflow to run it in, since the two under `.github/workflows` only
+  build and publish the docs, and the example is not an npm workspace, so `npm ci` does not
+  install it.
+
+  Demoted because it is evidence about this repository rather than about the feature. What
+  the criterion was reaching for - that the guard catches an un-regenerated model - is the
+  second criterion above, and that is covered by the CLI's own tests: a check that fails
+  and names the command, a check that passes once the patch exists, a second revision
+  emitting only the delta, and a hand-written data patch that must *not* provoke one. A
+  green workflow badge would add no information about whether `--check` works; it would
+  only confirm that this repository runs it, which matters to contributors here and not to
+  the design.
+
+  It is still worth having, and it is cheap once there is somewhere to put it: a test
+  workflow is a repository-wide decision - what runs, on what triggers, against which Node
+  versions, and whether the Playwright suite belongs in it - and that decision does not
+  belong to a schema-authoring track. Whoever adds the first test workflow should add this
+  line to it.
 
 ## 12. Tooling packages, naming and agent discoverability
 
