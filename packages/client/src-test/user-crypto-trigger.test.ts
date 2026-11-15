@@ -29,7 +29,12 @@ describe("user triggers", () => {
                     authMethod: "AuthMod-Classic",
                 });
 
-                const user = await User.get("test-user");
+                // Fetched by the id the write returned, not the one passed in `params`:
+                // `add` generates the id (`addOrUpdateCard` takes one as its second
+                // argument instead), so "test-user" was never this document's id. The
+                // mismatch was invisible while `get` returned a one-element array for a
+                // single id, which made `user._id` read `undefined` rather than fail.
+                const user = await User.get(userDoc._id);
 
                 // const unwrappedKey = await stack.cryptoEngine.unwrapAndStoreDocumentKey(user.wrappedDocumentKey, user.keyDerivationSalt);
 
@@ -45,6 +50,10 @@ describe("user triggers", () => {
         });
 
         expect(result.user.hasWrappedKey).toBe(true);
+        // One id, one document: pinned here too, since this is the call that found the
+        // old shape.
+        expect(result.user._id).toBeTruthy();
+        expect(result.user.username).toBe("test-user");
         // expect(result.keysMatch).toBe(true);
     });
 });

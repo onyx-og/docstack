@@ -892,9 +892,14 @@ class Class extends Class_ {
     async get(...cardId: string[]): Promise<Document[]>;
     async get(...cardId: string[]): Promise<Document | Document[] | null> {
         const fnLogger = this.logger.child({ method: "get", args: { cardId } });
-        if (typeof cardId === "string") {
+        // Counted, not type-tested. Rest parameters make `cardId` an array even for one
+        // id, so `typeof cardId === "string"` was never true: a single-id call took the
+        // many-ids branch and returned a one-element ARRAY, contradicting both overloads
+        // above and the examples in this doc comment. A caller doing `(await
+        // cls.get(id))._id` got `undefined` and no error.
+        if (cardId.length === 1) {
             let docs = await this.getCards(
-                { _id: { $eq: cardId } },
+                { _id: { $eq: cardId[0] } },
             );
             return docs[0] || null;
         } else {

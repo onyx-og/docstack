@@ -78,6 +78,12 @@
 
 ### Fixed
 
+- **`Class.get(id)` returns one document, not a one-element array.** The implementation
+  takes rest parameters, so its `typeof cardId === "string"` test could never be true and
+  every call took the many-ids branch - contradicting both overloads and the examples in
+  its own doc comment. A caller reading a field off the result got `undefined` with no
+  error, which is why nothing noticed. Several ids still return an array, and a single id
+  that matches nothing returns `null`.
 - **A schema change persists before it is applied to the `Class`.**
   `addAttribute`, `modifyAttribute` and `removeAttribute` mutated the instance - its
   attribute map, its model and its Zod shape - and only then wrote the class document.

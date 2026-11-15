@@ -92,6 +92,41 @@ describe("@docstack/core-datamodel integration", () => {
         expect(test.doc).not.toHaveProperty("edition");
     });
 
+    it("get returns one document for one id, and an array for several", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "class-get-shape",
+            evaluate: async ({ stack }) => {
+                const { Class, Attribute } = (window as any).docstack;
+                const classObj = await Class.create(stack, `Row-${Math.random().toString(16).slice(2)}`, "class", "Rows");
+                await Attribute.create(classObj, "label", "string", "Label", { mandatory: true });
+                const first = await classObj.addCard({ label: "one" });
+                const second = await classObj.addCard({ label: "two" });
+
+                const single = await classObj.get(first._id);
+                const many = await classObj.get(first._id, second._id);
+                const missing = await classObj.get("Row-nope");
+
+                return {
+                    // One id used to return a one-element array, so this read was
+                    // `undefined` while the overload promised a document.
+                    singleIsArray: Array.isArray(single),
+                    singleLabel: single?.label,
+                    singleId: single?._id,
+                    manyIsArray: Array.isArray(many),
+                    manyCount: Array.isArray(many) ? many.length : -1,
+                    missingIsNull: missing === null,
+                };
+            },
+        });
+
+        expect(result.singleIsArray).toBe(false);
+        expect(result.singleLabel).toBe("one");
+        expect(result.singleId).toBeTruthy();
+        expect(result.manyIsArray).toBe(true);
+        expect(result.manyCount).toBe(2);
+        expect(result.missingIsNull).toBe(true);
+    });
+
     it("leaves the class unchanged when a schema write is refused", async ({ useDocStack }) => {
         const result = await useDocStack({
             name: "integration-refused-schema",
