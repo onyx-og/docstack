@@ -224,13 +224,16 @@ runtime edits) is unsound. Mitigation: §8 hash check in dev mode.
 precondition, and its failure handling hides that.** `addAttribute` mutates the live
 object first — `this.attributes[name]`, `this.model.schema`, `this.schemaZOD` — and only
 then persists through `stack.updateClass` (`client/src/core/class.ts` ~L537). On a locked
-stack, a class that already holds documents refuses during propagation: the propagated
-writes re-enter the pipeline as ordinary document writes (`stack.db.bulkDocs` in
-`plugins/pouchdb.ts` ~L373) and each hits the lock refusal (~L522, which exempts patch
-writes only), so the class-model write aborts. `addAttribute` then logs and returns
-`this`, so the caller holds a `Class` whose schema claims an attribute the database does
-not have, with no error raised. A class with no documents skips propagation entirely and
-the attribute lands, which is harmless — later data writes refuse as they should.
+stack, a refusal is reachable: propagation's writes re-enter the pipeline as ordinary
+document writes (`stack.db.bulkDocs` in `plugins/pouchdb.ts` ~L373) and the lock refusal
+sits on that path (~L522, which exempts patch writes only). Whether it fires depends on
+which class the pipeline resolves for those propagated documents — it reads the *stored*
+class, which does not carry the new attribute yet, so the refusal may come from the
+mutated live instance being served out of the class cache rather than from the schema
+being written. **Read from the source, not yet observed end to end.** Either way the
+caller cannot tell: `addAttribute` logs and returns `this`, so on any refusal the caller
+holds a `Class` whose schema claims an attribute the database does not have, with no
+error raised.
 
 Two consequences for the escape hatch, whichever way the behaviour question is decided:
 
