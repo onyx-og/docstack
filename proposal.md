@@ -267,7 +267,9 @@ minor with a migration story (`2.0.md` §3). A recommendation is given per defec
 is the maintainer's, and `docstack doctor` (§12.2) is the natural place to report existing
 violations before an app upgrades.
 
-**Defects / inconsistencies to resolve before or alongside this work:**
+**Defects / inconsistencies to resolve before or alongside this work.** 1, 2, 4 and 5 are
+resolved in phase 1 (`c8373d3`); 3 is open. The recommendations are kept as the record of
+why each went the way it did.
 1. `date` attribute type is declared in `shared/src/types.ts` (`AttribruteTypeDate`, note
    the typo) but `setField` has no `date` case → building a class with a `date` attribute
    throws. Decide the stored representation (ISO string vs epoch number; config allows
@@ -325,14 +327,17 @@ violations before an app upgrades.
 5. Typed selectors: type Mango selector keys against `InferDoc` now, or later.
 6. Should `StackOptions.model` replace `patches` eventually (patches generated at build
    time), or always remain alongside them?
-7. Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip to a later minor with
-   its declaration removed in the meantime?
+7. ~~Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip?~~ — **decided**:
+   `date` landed in phase 1 as an ISO-8601 UTC string (`format: "date"` for date-only).
+   `integer` is the one left open, since `.int()` rejects data already stored.
 
 ## 10. Implementation plan (phased; each phase mergeable alone)
 
-1. **Mapping extraction** — `attributeSpecToZod` in shared, `setField` delegates; resolve
-   defects 2 and 5 (and 1 if `date` is in scope). No public API change. Existing client
-   test suite must pass unchanged.
+1. ~~**Mapping extraction**~~ — **landed 2026-11-15** (`c8373d3` on `feat/2.0`).
+   `attributeSpecToZod` in shared, `setField` delegates, keeping the foreign-key refine
+   and the field cache in the client. Defects 1, 2, 4 and 5 resolved; defect 3 left open
+   on purpose. The client suite passes unchanged, plus three new tests for the date round
+   trip, instant-compared bounds, and the enum refusal.
 2. **Builders + inference** — `defineClass`, `a.*`, `InferDoc`, `InferInput`,
    `toClassModel`, `hash`. Type-level tests per mapping row; round-trip test:
    `defineClass → toClassModel → Class.buildFromModel → validate` on fixtures.
