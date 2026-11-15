@@ -220,6 +220,35 @@ Escape hatches, deliberately untyped:
 A typed wrapper over a class whose stored model has drifted from the code model (by
 runtime edits) is unsound. Mitigation: §8 hash check in dev mode.
 
+**Verified 2026-11-15, open behaviour question: the runtime path has no encryption
+precondition, and its failure handling hides that.** `addAttribute` mutates the live
+object first — `this.attributes[name]`, `this.model.schema`, `this.schemaZOD` — and only
+then persists through `stack.updateClass` (`client/src/core/class.ts` ~L537). On a locked
+stack, a class that already holds documents refuses during propagation: the propagated
+writes re-enter the pipeline as ordinary document writes (`stack.db.bulkDocs` in
+`plugins/pouchdb.ts` ~L373) and each hits the lock refusal (~L522, which exempts patch
+writes only), so the class-model write aborts. `addAttribute` then logs and returns
+`this`, so the caller holds a `Class` whose schema claims an attribute the database does
+not have, with no error raised. A class with no documents skips propagation entirely and
+the attribute lands, which is harmless — later data writes refuse as they should.
+
+Two consequences for the escape hatch, whichever way the behaviour question is decided:
+
+- **The ordering and the swallowed error are the defect, not just the missing check.** Any
+  refusal (a conflict, parent-class validation, the lock) leaves the in-memory class lying.
+  A precondition added inside a method that returns `this` on refusal would be invisible.
+- **Deferral is not available here.** ADR-0041 deferral is safe only because the app
+  re-supplies the same patch list at every open, so a held-back patch is re-offered
+  (`applyConsumerPatches`' own doc comment: "no persisted state to drift"). An imperative
+  call is never re-offered, so the only coherent remedy is refusing before anything
+  mutates. The predicate already exists — `patchBlockedByLock` / `patchNeedsDocumentKey`
+  in `core/stack.ts` ~L1915 answer "would this schema need a key this device lacks".
+- **Do not move the check down to the shared seam.** The chain converts a
+  `StackLockedError` into a deferral around *staging* only (`core/stack.ts` ~L1743);
+  faults at commit are rejected as-is by design. A precondition relocated to the
+  class-model branch of the write interception would therefore turn patch deferral into a
+  hard failure.
+
 ## 8. Canonical model hash and known defects found while reading
 
 **Hash.** `model.hash()` and per-class `Todo.hash()`: SHA-256 over a canonical
