@@ -244,12 +244,28 @@ violations before an app upgrades.
    ADR-0001) and round-trips through JSON without a parse step; rename the type in the same
    pass, since 2.0 is the only cheap window for it. If `date` slips past 2.0.0, remove the
    declaration rather than ship a type that throws.
+   *Measured on zod 4.4.3, 2026-11-15:* the commented-out case was `z.date()`, and that is
+   not a viable way to finish it. A `Date` passes `z.date()`, but a document body
+   JSON-round-trips, so the stored and re-read value is the ISO string
+   `"2026-11-15T14:10:03.567Z"`, which `z.date()` **rejects**. Uncommenting it would make
+   read-modify-write fail on every date attribute: `get` then `updateCard` with the
+   unmodified document throws. `z.iso.datetime()` accepts that same string, so the ISO
+   representation is the one that closes the loop.
 2. `enum` config allows `value: string | number | object`, but runtime uses `z.enum`,
    which only accepts strings. Either restrict the type to strings or switch to
    `z.union(literals)`; the static mapping must follow whichever is chosen. *Recommended:*
    restrict the config to `string` and keep `z.enum` — the narrower contract is the one the
    runtime has actually enforced all along, so no stored value changes meaning. Switch to
    `z.union` only if numeric enums have a real consumer.
+   *Measured on zod 4.4.3, 2026-11-15:* a numeric enum is not merely unspecified, it is
+   dead. `z.enum([1, 2, 3])` constructs without complaint and then rejects **every** input,
+   `1` and `"1"` alike, so an attribute declared that way today accepts nothing and no app
+   can be relying on it. Narrowing the config to `string` therefore changes no stored data,
+   and `z.union([z.literal(1), ...])` is the only shape that would make numeric enums work
+   at all. Note the config also carries a nested `type` field naming the member type
+   (`AttributeTypeEnum` in `shared/src/types.ts`), which is evidence the original intent was
+   typed members; whichever option is chosen, that field should either drive the mapping or
+   be dropped.
 3. `integer` does not use `.int()`; decimals pass validation. Decide whether to fix
    (breaking for existing data) or keep and type as `number`. *Recommended:* add `.int()` in
    2.0.0 and have `docstack doctor` report documents that would newly fail, so an app sees
