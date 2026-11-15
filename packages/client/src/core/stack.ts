@@ -4004,9 +4004,17 @@ class ClientStack extends Stack {
         }
     }
 
-    updateClass = async (classObj: Class) => {
+    /**
+     * Persists a class model.
+     *
+     * @param classObj - The class being written.
+     * @param model - The model to write. A schema change persists *before* it is applied
+     * to `classObj` (see `Class.addAttribute`), so the write needs the prospective model
+     * rather than the instance's current one. Omitted, the instance's own model is used.
+     */
+    updateClass = async (classObj: Class, model?: ClassModel) => {
         const fnLogger = logger.child({ method: "updateClass", args: { class: classObj.name } });
-        let result = await this.createDoc(classObj.getId()!, 'class', classObj, classObj.getModel());
+        let result = await this.createDoc(classObj.getId()!, 'class', classObj, model ?? classObj.getModel());
         fnLogger.info("Result", result)
         return result
     }

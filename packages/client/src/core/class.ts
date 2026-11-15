@@ -31,6 +31,45 @@ export type ClassBuildOptions = {
 };
 
 /**
+ * Writes a prospective schema for a class and reports whether it landed.
+ *
+ * A schema change persists **before** it is applied to the instance. A refusal - the
+ * lock on a class with encrypted attributes, a write conflict, parent-class validation
+ * (`plugins/pouchdb.ts`) - must not leave the object claiming a shape the database does
+ * not hold, which is what mutating first did: propagation runs inside the class write,
+ * and a refusal there aborts the write after the instance had already been changed.
+ *
+ * A detached class (no stack or no id) has nothing to persist to and nothing that can
+ * diverge, so it reports success after logging, exactly as it did before.
+ *
+ * Module-level rather than a private method on purpose: a private member would make
+ * this `Class` structurally incompatible with the abstract `Class` in
+ * `@docstack/shared`, which the attribute assignments below rely on.
+ *
+ * @param classObj - The class whose schema is changing.
+ * @param nextSchema - The schema the class should end up with.
+ * @param fnLogger - The calling method's logger, so failures are attributed to it.
+ * @returns `true` when the caller may apply the change, `false` when it must not.
+ */
+const persistSchema = async (
+    classObj: Class,
+    nextSchema: ClassModel["schema"],
+    fnLogger: Logger
+): Promise<boolean> => {
+    if (!classObj.stack || !classObj.id) {
+        fnLogger.error("Class not updated on db because of missing stack or id");
+        return true;
+    }
+    try {
+        await classObj.stack.updateClass(classObj, { ...classObj.getModel(), schema: nextSchema });
+        return true;
+    } catch (error) {
+        fnLogger.error("Class not updated on db, leaving this instance unchanged", error);
+        return false;
+    }
+};
+
+/**
  * Represents a data class (schema definition) in the DocStack database.
  * 
  * A Class defines the structure of documents, including their attributes,
@@ -54,6 +93,7 @@ export type ClassBuildOptions = {
  * 
  * @extends Class_
  */
+
 class Class extends Class_ {
     /** Reference to the parent stack instance. */
     stack: Stack | undefined;
@@ -536,47 +576,34 @@ class Class extends Class_ {
      */
     addAttribute = async (attribute: Attribute_ | AttributeModel): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "addAttribute", args: { attribute: attribute.name } });
-        const attribute_ = isAttributeModel(attribute) 
-            ? new Attribute(
-                this, attribute.name, attribute.type,
-                attribute.description, attribute.config
-            ) : attribute;
         try {
-            let name = attribute_.getName();
-            // console.log("Adding attribute", {className: this.name, attribute: name})
-            if (!this.hasAttribute(name)) {
-                fnLogger.info("Adding attribute", { name: name, type: attribute_.getModel() });
-                this.attributes[name] = attribute_;
-                let attributeModel = attribute_.getModel();
-                fnLogger.info("Adding attribute to schema", { attributeModel: attributeModel });
-                const currentSchema = this.model.schema ?? {};
-                this.model.schema = {
-                    ...currentSchema,
-                    [name]: attributeModel
-                };
-                this.schemaZOD = this.schemaZOD.extend({
-                    [name]: attribute_.field
-                });
-                // TODO:
-                // this.schema[name] = attributeModel; // sometimes getting schema undefined
-                // update class on db
-                fnLogger.info("Checking for requirements before updating class on db", { stack: (this.stack != null), id: this.id })
-                if (this.stack && this.id) {
-                    // debugger;
-                    fnLogger.info("Updating class on db")
-                    let res = await this.stack.updateClass(this);
-                    return this;
-                    // TODO: Check if this class has subclasses
-                } else {
-                    fnLogger.error("Class not updated on db because of missing stack or id")
-                    return this;
-                }
-            } else {
+            const attribute_ = isAttributeModel(attribute)
+                ? new Attribute(
+                    this, attribute.name, attribute.type,
+                    attribute.description, attribute.config
+                ) : attribute;
+            const name = attribute_.getName();
+            if (this.hasAttribute(name)) {
                 fnLogger.error("Attribute with name " + name + " already exists within this Class");
                 return this;
             }
+            const attributeModel = attribute_.getModel();
+            fnLogger.info("Adding attribute", { name: name, type: attributeModel });
+            // Persist before applying: see `persistSchema`. The three statements below
+            // run only once the write has landed, so the attribute map, the model and
+            // the Zod shape never describe an attribute the database rejected.
+            const nextSchema = { ...this.buildSchema(), [name]: attributeModel };
+            if (!await persistSchema(this, nextSchema, fnLogger)) {
+                return this;
+            }
+            this.attributes[name] = attribute_;
+            // The schema that landed, so the model cannot drift from the written doc.
+            this.model.schema = nextSchema;
+            this.schemaZOD = this.schemaZOD.extend({ [name]: attribute_.field });
+            // TODO: Check if this class has subclasses
+            return this;
         } catch (e) {
-            fnLogger.error("Falied adding attribute because: ", e)
+            fnLogger.error("Failed adding attribute because: ", e)
             return this;
         }
     }
@@ -590,24 +617,32 @@ class Class extends Class_ {
      */
     modifyAttribute = async (name: string, attribute: Attribute_ | AttributeModel): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "modifyAttribute", args: { name } });
-        const originSchema = { ...this.model.schema[name] },
-            originAttr = this.attributes[name];
-        const attribute_ = isAttributeModel(attribute)
-            ? new Attribute(
-                this, attribute.name, attribute.type,
-                attribute.description, attribute.config
-            ) : attribute;
         try {
+            const attribute_ = isAttributeModel(attribute)
+                ? new Attribute(
+                    this, attribute.name, attribute.type,
+                    attribute.description, attribute.config
+                ) : attribute;
+            const nextName = attribute_.getName();
+            const attributeModel = attribute_.getModel();
             fnLogger.info(`Attempting to change attribute definition.`);
-            delete this.model.schema[name];
+            // One write, not a remove followed by an add: the definition changes
+            // atomically, and a refusal leaves the old one in place rather than
+            // dropping it. The new definition may carry a different name, so a rename
+            // removes the old key and adds the new one in the same schema.
+            const nextSchema = { ...this.buildSchema() };
+            delete nextSchema[name];
+            nextSchema[nextName] = attributeModel;
+            if (!await persistSchema(this, nextSchema, fnLogger)) return this;
+            // `nextSchema` is what landed, so the model takes it whole rather than
+            // being edited key by key - which also covers a model carrying no schema.
+            this.model.schema = nextSchema;
             delete this.attributes[name];
-            this.schemaZOD = this.schemaZOD.omit({ [name]: true });
-            return this.addAttribute(attribute_);
+            this.attributes[nextName] = attribute_;
+            this.schemaZOD = this.schemaZOD.omit({ [name]: true }).extend({ [nextName]: attribute_.field });
+            return this;
         } catch (e: any) {
-            // Revert
-            this.model.schema[name] = originSchema;
-            this.attributes[name] = originAttr;
-            fnLogger.error(`Failed at removing attribute from class.'`);
+            fnLogger.error(`Failed at changing the attribute definition.`, e);
         }
         return this;
     }
@@ -620,21 +655,25 @@ class Class extends Class_ {
      */
     removeAttribute = async (name: string): Promise<Class> => {
         const fnLogger = this.logger.child({ method: "removeAttribute", args: { name } });
-        const originSchema = { ...this.model.schema[name] },
-            originAttr = this.attributes[name];
+        // Unchanged contract: a class with no stack has nothing to remove the attribute
+        // from, so it removes it nowhere, not just here.
+        if (!this.stack) {
+            fnLogger.error("Missing stack, cannot perform updates.");
+            return this;
+        }
         try {
             fnLogger.info(`Attempting to remove attribute from class.`);
-            delete this.model.schema[name];
+            const nextSchema = { ...this.buildSchema() };
+            delete nextSchema[name];
+            // Awaited, unlike before: an unawaited write can be neither caught nor
+            // reverted, so a refused removal used to drop the attribute from this
+            // instance and from nowhere else, and reject unhandled.
+            if (!await persistSchema(this, nextSchema, fnLogger)) return this;
+            this.model.schema = nextSchema;
             delete this.attributes[name];
             this.schemaZOD = this.schemaZOD.omit({ [name]: true });
-            if (this.stack) {
-                this.stack.updateClass(this);
-            } else throw new Error("Missing stack, cannot perform updates.");
         } catch (e: any) {
-            // Revert
-            this.model.schema[name] = originSchema;
-            this.attributes[name] = originAttr;
-            fnLogger.error(`Failed at removing attribute from class.'`);
+            fnLogger.error(`Failed at removing attribute from class.`, e);
         }
         return this;
     };

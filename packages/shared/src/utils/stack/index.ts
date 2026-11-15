@@ -63,7 +63,15 @@ abstract class Stack extends EventTarget {
 
     abstract addDomain: (domainObj: Domain) => Promise<DomainModel>;
 
-    abstract updateClass: (classObj: Class) => Promise<Document | null>;
+    /**
+     * Persists a class model.
+     *
+     * `model` writes a schema the live `classObj` does not describe yet. Schema changes
+     * persist before they are applied to the instance, so a refused write cannot leave
+     * a `Class` claiming a shape the database does not hold; omitted, the class's own
+     * current model is written.
+     */
+    abstract updateClass: (classObj: Class, model?: ClassModel) => Promise<Document | null>;
 
     abstract addClassLock: (className: string) => Promise<boolean>;
 

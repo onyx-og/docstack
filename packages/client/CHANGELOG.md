@@ -54,6 +54,29 @@
 
 ### Fixed
 
+- **A schema change persists before it is applied to the `Class`.**
+  `addAttribute`, `modifyAttribute` and `removeAttribute` mutated the instance - its
+  attribute map, its model and its Zod shape - and only then wrote the class document.
+  Propagation runs inside that write, so any refusal (a locked stack on a class with
+  encrypted attributes, a conflict, parent-class validation) aborted the write and left
+  the instance describing a schema the database never accepted, while the method logged
+  and returned the class as though nothing had happened. All three now write first and
+  apply only what landed. `removeAttribute` is also awaited, so its failure can be
+  observed at all rather than rejecting unhandled, and `modifyAttribute` is one write
+  instead of a remove followed by an add, so a refusal no longer drops the old
+  definition. A caller still gets the class back either way; the difference is that the
+  class now tells the truth.
+- **A remote stack is sent the schema being written.** `RemoteStack.updateClass`
+  re-derived the model from the class instance, which is no longer the one being
+  persisted, so a schema change against a host would have applied locally while the
+  host was sent the unchanged model.
+- Known limitation this surfaced, unchanged in behaviour and now pinned by a test:
+  removing a **mandatory** attribute from a class that holds documents does not persist.
+  Propagation strips the attribute from each document, then the stripped document is
+  validated against the class as currently stored - which still declares the attribute
+  mandatory - so the class write is discarded. Previously the attribute vanished from
+  the instance while the stored class kept it, and a reload brought it back. Optional
+  attributes, and classes with no documents, remove and persist normally.
 - **Projected reads of scope-sealed attributes decrypt.** `findDocuments(selector,
   fields)`, `getCards(selector, fields)`, `findDocumentsIterator` with `fields` and
   the SQL engine's projection pushdown fetched only the requested fields, dropping

@@ -322,11 +322,16 @@ export class RemoteStack extends Stack {
         return { ...model, _rev: result.rev };
     };
 
-    updateClass = async (classObj: Class): Promise<Document | null> => {
-        const model = classObj.getModel();
-        const result = await this.request<{ id: string; rev: string }>("POST", "/_ds/classes", { model });
+    /**
+     * @param model - The model to send. A schema change persists before it is applied to
+     * `classObj` (see `Class.addAttribute`), so without this the host would be sent the
+     * class as it still is and would never learn about the change.
+     */
+    updateClass = async (classObj: Class, model?: ClassModel): Promise<Document | null> => {
+        const next = model ?? classObj.getModel();
+        const result = await this.request<{ id: string; rev: string }>("POST", "/_ds/classes", { model: next });
         this.classCache.delete(classObj.getName());
-        return { ...model, _rev: result.rev } as unknown as Document;
+        return { ...next, _rev: result.rev } as unknown as Document;
     };
 
     getDomainModel = async (domainName: string): Promise<DomainModel | null> => {
