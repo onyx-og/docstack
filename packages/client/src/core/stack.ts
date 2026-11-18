@@ -4199,12 +4199,13 @@ class ClientStack extends Stack {
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
             // `bulkDocs` rather than `put`, which is what makes the returned document
             // the one that was written. `pouchdb-core`'s `put` clones the document
-            // before handing it on, so the pipeline - filled defaults, the `~createdBy`
-            // and `~updatedBy` attribution, before-triggers - enriched a copy the caller
-            // never saw, and this method returned a draft that was missing all of it.
-            // `bulkDocs` passes the objects through, and the pipeline enriches them in
-            // place, so `doc_` below IS the stored document. `createDocs` has always
-            // taken this route, which is why the batch path did not share the defect.
+            // before handing it on, so the write pipeline - filled defaults, the
+            // `~createdBy` and `~updatedBy` attribution, before-triggers - enriched a
+            // copy the caller never saw, and this method returned a draft that was
+            // missing all of it while reporting success. `bulkDocs` passes the objects
+            // through and the pipeline enriches them in place, so `doc_` below IS the
+            // stored document. `createDocs` has always taken this route, which is why
+            // the batch path never had the defect.
             //
             // Encryption stays absent on purpose: it seals a clone, so an `encrypted`
             // attribute comes back as the plaintext the caller supplied - which is
@@ -4414,6 +4415,17 @@ class ClientStack extends Stack {
             const doc_ = withoutEmptyRev({ ...doc, ...params, _id: docId, _rev: doc._rev, "~updateTimestamp": new Date().getTime() });
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
             let response = await db.put(doc_);
+            // Stamped from the response, not left as the draft. `doc` was the relation
+            // document as fetched or prepared, so what came back carried no `_rev` and
+            // none of the elaboration the write applied - a caller could not tell a
+            // relation that landed from one that did not, the same ambiguity ADR-0023
+            // closed for `createDoc`.
+            //
+            // `put` stays here, where `createDoc` moved to `bulkDocs`: the pipeline
+            // validates a relation document and returns without touching it - no schema,
+            // so no filled defaults, no attribution and no triggers - so there is nothing
+            // for `put`'s clone to hide.
+            doc = { ...doc_, _id: response.id, _rev: response.rev } as RelationDocument;
             fnLogger.info("Response after put", { "response": response });
             if (response.ok && isNewDoc) {
                 await this.incrementLastDocId();
@@ -4444,7 +4456,12 @@ class ClientStack extends Stack {
             });
 
             // A conflict means the relation is already stored, which is the one outcome
-            // the caller asked for anyway. `createDoc` treats it the same way.
+            // the caller asked for anyway - so this is the one path that reports success
+            // for a write that did not land. `createDoc` does NOT do the same: it
+            // rethrows, because a colliding document id is data loss rather than a
+            // duplicate of something equivalent (ADR-0023). The document returned here is
+            // the draft, without the stored revision; reading the stored relation back
+            // would cost a round trip on a path that random ids make near-unreachable.
             if (e?.name === "conflict") {
                 fnLogger.info("Conflict - relation already present");
                 return doc;

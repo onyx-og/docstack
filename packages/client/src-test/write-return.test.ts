@@ -26,6 +26,11 @@ const describe = it.describe;
  * makes the guard call itself forever - and racing two real `updateCard` calls on one
  * document crashes the renderer, which is a pre-existing defect recorded in `ROADMAP.md`
  * and not this path's fault.
+ *
+ * The third test covers `createRelationDoc`, which had the same defect in a smaller form:
+ * it returned the draft it had prepared, so the result carried no `_rev` at all. That one
+ * keeps `put` and only stamps the response, because the pipeline validates a relation
+ * document and returns without touching it - no schema, so nothing for a clone to hide.
  */
 describe("what a write returns", () => {
     it("returns the stored document, not the draft that was sent", async ({ useDocStack }) => {
@@ -124,5 +129,48 @@ describe("what a write returns", () => {
         expect(result.status).toBe(409);
         expect(result.namesTheDocument).toBe(true);
         expect(result.storedTitle).toBe("first");
+    });
+
+    it("a relation document comes back with the revision it was written at", async ({ useDocStack }) => {
+        const result = await useDocStack({
+            name: "write-return-relation",
+            evaluate: async ({ stack }) => {
+                const { Class, Domain } = (window as any).docstack;
+
+                const personClass = await Class.create(stack, "WRPerson", "class", "People", {
+                    name: { name: "name", type: "string", config: { mandatory: true, primaryKey: true } },
+                });
+                const projectClass = await Class.create(stack, "WRProject", "class", "Projects", {
+                    title: { name: "title", type: "string", config: { mandatory: true, primaryKey: true } },
+                });
+                const person = await personClass.addCard({ name: "ada" });
+                const project = await projectClass.addCard({ title: "engine" });
+                const domain = await Domain.create(
+                    stack, null, "WRWorksOn", "domain", "1:N",
+                    personClass, projectClass, "Who works on what"
+                );
+
+                const relation = await domain.addRelation(project, person._id);
+                const stored = await stack.getDocument(relation._id);
+
+                return {
+                    // `createRelationDoc` returned the draft it had prepared, so this
+                    // was `undefined`: a relation that landed looked exactly like one
+                    // that did not.
+                    hasRev: typeof relation._rev === "string",
+                    revMatchesStored: relation._rev === stored._rev,
+                    // And the elaboration the write applied is on it.
+                    hasTimestamp: typeof relation["~updateTimestamp"] === "number",
+                    sourceId: relation.sourceId,
+                    targetId: relation.targetId,
+                };
+            },
+        });
+
+        expect(result.hasRev).toBe(true);
+        expect(result.revMatchesStored).toBe(true);
+        expect(result.hasTimestamp).toBe(true);
+        expect(result.sourceId).toBeTruthy();
+        expect(result.targetId).toBeTruthy();
     });
 });

@@ -69,29 +69,6 @@
 Not yet: `defineHandler` and the `handler?: string` references on `TriggerModel` and
 `PatchJob` (`proposal.md` §13), `defineDomain`.
 
-### Fixed - a write returns the document it wrote (DocStack 2.0, `2.0.md`)
-
-- **`createDoc` returned a draft the write pipeline had never touched.** Filled defaults,
-  the `~createdBy` / `~updatedBy` attribution and before-trigger output were all missing
-  from the value a caller got back, while the write itself was fine - so `addCard` reported
-  a document that did not match the one in the database, and anything using the return value
-  instead of re-reading was working from stale data.
-
-  The cause: `pouchdb-core`'s **`put` clones** the document before passing it on, so the
-  pipeline enriched a copy the caller never saw. `bulkDocs` passes the caller's objects
-  through and the pipeline enriches them in place, which is why `createDocs` - the batch
-  sibling - never had the defect. `createDoc` takes the same route now, so there is no
-  extra read anywhere and the two methods agree.
-
-  Switching off `put` meant reimplementing what it did with a failed result (`yankError`):
-  for a single-document write, a per-document error in the results array is a rejection,
-  not a value. A conflict still rejects rather than handing back something
-  document-shaped (ADR-0023).
-
-  An `encrypted` attribute still comes back as the plaintext that was supplied, because
-  encryption seals a clone - and that is what reading the document back decrypts it to, so
-  the returned value is the one a subsequent read gives.
-
 ### Changed - the attribute mapping is one function, in shared (DocStack 2.0, `2.0.md`)
 
 Breaking where noted. `2.0.md` §3 carries the full inventory; `proposal.md` §5 and §8
@@ -215,6 +192,35 @@ carry the design and the defects these close.
 
 ### Fixed
 
+- **A write returns the document it wrote.** `createDoc` returned a draft the write
+  pipeline had never touched: the `defaultValue`s it fills, the `~createdBy` /
+  `~updatedBy` attribution and before-trigger output were all missing from the value a
+  caller got back, while the write itself was fine. So `addCard` reported a document that
+  did not match the one in the database, and code using the return value instead of
+  re-reading was working from stale data. The declared-defaults fix below makes this more
+  visible, not less: the default is stored, and was absent from what came back.
+
+  The cause: `pouchdb-core`'s **`put` clones** the document before passing it on, so the
+  pipeline enriched a copy the caller never saw. `bulkDocs` passes the caller's objects
+  through and the pipeline enriches them in place, which is why `createDocs` - the batch
+  sibling - never had the defect. `createDoc` takes the same route now; no extra read
+  replaced it, and the two methods agree.
+
+  Switching off `put` meant reimplementing what it did with a failed result (`yankError`):
+  for a single-document write, a per-document error in the results array is a rejection,
+  not a value. A conflict still rejects rather than handing back something
+  document-shaped (ADR-0023).
+
+  An `encrypted` attribute still comes back as the plaintext that was supplied, because
+  encryption seals a clone - and that is what reading the document back decrypts it to, so
+  the returned value is the one a subsequent read gives.
+- **`createRelationDoc` returns the relation at the revision it was written at.** It
+  returned the draft it had prepared, so the result carried no `_rev` and none of the
+  elaboration the write applied: a relation that landed looked exactly like one that did
+  not, which is the ambiguity ADR-0023 closed for documents. `Domain.addRelation` passed
+  that value straight to the caller. The response is stamped onto it now. `put` is kept
+  here, unlike in `createDoc`, because the pipeline validates a relation document and
+  returns without touching it - no schema, so nothing for a clone to hide.
 - **`Class.get(id)` returns one document, not a one-element array.** The implementation
   takes rest parameters, so its `typeof cardId === "string"` test could never be true and
   every call took the many-ids branch - contradicting both overloads and the examples in
