@@ -21,11 +21,21 @@ Each package runs its own suite from its own directory (`cd packages/<name>` fir
 | Package | Runner | Command |
 |---|---|---|
 | `@docstack/client` | Playwright (real browser) | `npm run test` |
+| `@docstack/client` | type-level tests, which fail by failing to compile | `npm run test:types` |
+| `@docstack/cli` | `node --test`, driving the real command against throwaway projects | `npm run test` |
 | `@docstack/server` | `node --test` (Node's built-in runner) | `npm run test` |
 | `@docstack/ui` | Playwright smoke test against the production build | `npm run test` |
 | `@docstack/abe` | Node smoke script | `npm run test` |
 
+`examples/react-todo` is not a package but is checked like one: `npx tsc -b` typechecks the application against its own strict config, and `npm run revision:check` fails when its declared model and its generated patch chain disagree. It is the only place the library is consumed the way an application consumes it, so it catches things no package suite can — a public type that resolves to `any` in a consumer, for instance.
+
 Cross-package/integration tests exist for scenarios spanning multiple packages (e.g. client + server). These are heavier and are **not** run automatically as part of a normal package change — see [AGENTS.md](AGENTS.md) for the full policy on when to run them.
+
+## What CI runs
+
+[`.github/workflows/tests.yml`](.github/workflows/tests.yml) runs, on every pull request and every push to `main` and `develop`: the `shared`, `client`, `react` and `cli` builds, the client's type-level tests, the CLI suite, the client's Playwright suite, and the example's typecheck and `revision --check`.
+
+It does **not** run `@docstack/server` (it does not currently compile), `@docstack/ui`'s smoke test (it needs a production build and a served app — it is a pre-publish gate), `@docstack/abe` or the adapter submodules. The workflow's own header says why for each, and what it would take to add one. A red run there means the change is broken, so anything added to that file should be green locally first.
 
 ## `@docstack/client`'s Playwright suite — what to know
 

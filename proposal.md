@@ -496,28 +496,28 @@ builds automatically.
   shared fixture set for every attribute type and modifier combination.
 - The 1.x → 2.0 migration guide (`2.0.md` §5) covers every §8 defect actually fixed, with
   the `docstack doctor` check an app runs before upgrading.
-### Nice to have, not a gate
+- ~~`docstack revision --check` runs in CI for `examples/react-todo`, so the guard is
+  demonstrated and not just documented.~~ — **met 2026-11-18.**
+  `.github/workflows/tests.yml` is the repository's first test workflow: the `shared`,
+  `client`, `react` and `cli` builds, the client's type-level tests under
+  `compilerOptions.types: []`, the CLI suite, the client's Playwright suite, and the
+  example's `tsc -b` and `revision:check`, on every pull request and every push to `main`
+  and `develop`. The workflow header says what is *not* in it - the server, which does not
+  compile; the workbench smoke test; abe; the adapter submodules; and linting, which
+  ESLint 9 refuses because the packages' `lint` scripts predate it - and what each would
+  need. Rehearsed end to end on ext4 before being written: `npm ci`, the builds, 166
+  client tests in 3.4 minutes under CI settings, 14 CLI tests, the example installed from
+  scratch and both of its checks.
 
-- `docstack revision --check` **running in this repository's CI** for
-  `examples/react-todo`. The example carries it as `npm run revision:check` and it passes;
-  what is missing is a workflow to run it in, since the two under `.github/workflows` only
-  build and publish the docs, and the example is not an npm workspace, so `npm ci` does not
-  install it.
-
-  Demoted because it is evidence about this repository rather than about the feature. What
-  the criterion was reaching for - that the guard catches an un-regenerated model - is the
-  second criterion above, and that is covered by the CLI's own tests: a check that fails
-  and names the command, a check that passes once the patch exists, a second revision
-  emitting only the delta, and a hand-written data patch that must *not* provoke one. A
-  green workflow badge would add no information about whether `--check` works; it would
-  only confirm that this repository runs it, which matters to contributors here and not to
-  the design.
-
-  It is still worth having, and it is cheap once there is somewhere to put it: a test
-  workflow is a repository-wide decision - what runs, on what triggers, against which Node
-  versions, and whether the Playwright suite belongs in it - and that decision does not
-  belong to a schema-authoring track. Whoever adds the first test workflow should add this
-  line to it.
+  Writing it was worth more than the badge, twice over. The root lockfile turned out not
+  to know about `@docstack/cli` at all, and still carried shared's pre-2.0 `zod`
+  dependency, so `npm ci` failed on this branch before running anything - regenerated and
+  committed with it. And running `revision:check` through the *installed bin* rather than
+  by path found that the bin did nothing and exited 0: `npm` installs a bin as a symlink,
+  so `process.argv[1]` is the link while `import.meta.url` is the resolved target, and the
+  entry-point guard comparing them as URLs never matched. The check would have passed in
+  CI without checking anything. Both sides are real paths now, and a test invokes the
+  built entry through a symlink the way `npm` does.
 
 ## 12. Tooling packages, naming and agent discoverability
 

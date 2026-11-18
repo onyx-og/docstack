@@ -1,0 +1,140 @@
+name: Tests
+
+# The repository's first test workflow. It runs what is known green and fast:
+# the packages the schema-authoring track touches, plus the example application,
+# which is the only place the library is consumed the way an application consumes
+# it - and is therefore where the typed model's real failures have shown up.
+#
+# Deliberately not here, and why:
+#   @docstack/server   does not compile (spec 03 phase 2 was committed unverified;
+#                      31 errors, none of them about the data model). Add it to this
+#                      file in the change that makes it compile, not before.
+#   @docstack/ui       the smoke test needs a webpack production build and a served
+#                      app; it is a pre-publish gate for the hosted workbench rather
+#                      than a per-commit one.
+#   @docstack/abe      its suite wants the WASM artifacts the build copies; worth
+#                      adding, but it has never run here and an unproven step would
+#                      make this workflow's first failure uninformative.
+#   the adapters       submodules with their own mocha suites and native dependencies.
+#   lint               every package's `lint` script is `eslint ./src --ext .ts`, which
+#                      ESLint 9 refuses twice over: `--ext` is gone and there is no
+#                      `eslint.config.js` anywhere. Linting in CI needs that fixed
+#                      first; it is not an oversight here.
+#
+# A red run here means the change is broken, not that CI is flaky. Keep it that way:
+# anything added should be green locally first.
+
+# The two filters below are the same list twice: `paths-ignore` is per event, and
+# GitHub's own documentation discourages YAML anchors in workflow files.
+#
+# Documentation-only and spec-only changes cannot break these suites, and running
+# them on a README typo wastes minutes for everyone. Note the trade: if this
+# workflow is ever made a *required* check, a PR touching only these paths reports
+# that check as pending forever, and the rule has to move into the job - a first
+# step that exits 0 - instead of into the trigger.
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'packages/docs/**'
+      - 'specs/**'
+      - 'android/**'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/sync-docs-wp.yml'
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - '**/*.md'
+      - 'packages/docs/**'
+      - 'specs/**'
+      - 'android/**'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/sync-docs-wp.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The adapter workspaces are submodules; `npm ci` needs their package.json
+          # to match the root lockfile. All submodule repositories are public over
+          # HTTPS. Same reason as deploy-docs.yml.
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build order is a dependency order, not a preference. `@docstack/shared`
+      # emits the declarations the others compile against; the client's rollup build
+      # emits `lib/model.js`, which is what the example's model imports and what the
+      # CLI loads in Node; the react build is a typecheck of the hooks against both.
+      - name: Build the packages under test
+        run: |
+          npm run build:shared
+          npm run build:client
+          npm run build:react
+          npm run -w @docstack/cli build
+
+      # Type-level tests: they fail by failing to compile. Run under
+      # `compilerOptions.types: []`, which is the harshest version of a consumer's
+      # config and the thing that catches a public type silently resolving to `any`.
+      - name: Type-level tests (@docstack/client)
+        run: npm run -w packages/client test:types
+
+      - name: CLI tests (@docstack/cli)
+        run: npm run test:cli
+
+      - name: Install Playwright's browser
+        run: npx playwright install --with-deps chromium
+        working-directory: packages/client
+
+      # The client's own `pretest` rebuilds the bundle and the vendor bundle, so this
+      # tests what it just built rather than whatever was in `lib` beforehand. Under
+      # CI the config already serialises the workers and retries twice.
+      - name: Client suite (@docstack/client)
+        run: npm run test:client
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: packages/client/playwright-report/
+          retention-days: 7
+
+      # The example is not an npm workspace - `packages/*` does not match
+      # `packages/examples/*` - so it installs on its own. It has no lockfile on
+      # purpose: it is a template people copy, and `npm ci` would have nothing to
+      # read. Determinism for the library itself comes from the root lockfile above.
+      - name: Install the example application
+        run: npm install --no-audit --no-fund
+        working-directory: packages/examples/react-todo
+
+      # What the typed model promises an application, checked as an application:
+      # `tsc -b` over the app's own strict config, which is where a type that
+      # degrades to `any` stops being invisible.
+      - name: Typecheck the example application
+        run: npx tsc -b
+        working-directory: packages/examples/react-todo
+
+      # The guard this workflow exists for (`proposal.md` §11). It fails when the
+      # declared model and the generated patch chain disagree, which is the mistake
+      # that otherwise ships an app whose code expects a schema no device installed.
+      - name: The model and its patch chain agree (docstack revision --check)
+        run: npm run revision:check
+        working-directory: packages/examples/react-todo
