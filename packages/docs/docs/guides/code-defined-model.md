@@ -10,6 +10,8 @@ This is additive. Everything in [Model your data](./model-your-data.md) still wo
 
 ## Declare
 
+`npx docstack init` writes everything on this page's first half for you — a starter model, its first patch, the npm scripts, and a DocStack section in your `AGENTS.md` so an agent working on the project stays on the model-first workflow. It installs nothing and touches none of your own source; it prints the one install command and the one wiring snippet and leaves those to you.
+
 Put the declaration in `src/model.ts`, which is where the CLI looks for it:
 
 ```typescript
@@ -95,6 +97,19 @@ npx docstack revision --check
 ```
 
 This exits non-zero when your model and your patch chain disagree, and names the classes. It is the guard for the failure that otherwise reaches a device: editing the model, forgetting the patch, and shipping an app whose code expects a schema the database never installed.
+
+### Check the whole setup
+
+```bash
+npx docstack doctor
+```
+
+`revision --check` answers one question: do the model and the chain agree? `doctor` answers the rest, and exits non-zero only on an error.
+
+- **The chain.** A class restated without `_rev: "auto"` — which replaces the stored class instead of merging, losing every attribute an earlier patch added. A patch whose file name and declared version disagree, so the generator and the engine order it differently. A chain that changes `target` mid-way, which the sync gate reads as two chains.
+- **The model.** Shapes that are legal to write down and do not mean what they read like: an array with a `defaultValue` (it fills nothing — see the table above), an `integer` whose default is not one, a `foreign_key` pointing at a class you never declared.
+- **The project.** Zod resolvable and on 4.x, and a `tsconfig` that sets `compilerOptions.types` without `"pouchdb"` — which makes DocStack's engine-facing types resolve to `any` without telling you, because `skipLibCheck` hides the cause. If you started from a Vite template, you have this.
+- **Your stored data, by naming what it cannot reach.** The 2.0 attribute fixes are stricter than what older documents were written under, so `doctor` lists every `integer`, `enum` and `date` attribute at risk and tells you to check them where your data actually lives. It cannot open your users' IndexedDB from a terminal, and does not pretend to. A document that fails is still readable; it is the next *write* that is refused.
 
 ## Typed reads and writes
 

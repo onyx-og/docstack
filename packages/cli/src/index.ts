@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { doctor } from "./doctor.js";
+import { init } from "./init.js";
 import { revision, RevisionOptions } from "./revision.js";
 
 /** What the tool prints when asked, and when misused. */
 const USAGE = `docstack - the DocStack command line tool
 
 Usage:
+  docstack init [options]
   docstack revision --autogenerate -m "<what changed>" [options]
   docstack revision --check [options]
+  docstack doctor [options]
 
 Options:
   -m, --message <text>   What the patch changes. Required when generating.
@@ -21,9 +25,17 @@ Options:
                          Default: @docstack/client/model.
   -h, --help             This text.
 
-\`--check\` exits non-zero when the model and the patch chain disagree, which is what
-CI runs. \`--autogenerate\` writes the patch that closes the gap and regenerates the
-patch directory's index.
+\`init\` scaffolds the model-first workflow into an existing project: a starter model,
+its first patch, the npm scripts and the DocStack section in AGENTS.md. It installs
+nothing and edits no source of yours - it prints the one command and the one snippet.
+
+\`revision --check\` exits non-zero when the model and the patch chain disagree, which
+is what CI runs. \`--autogenerate\` writes the patch that closes the gap and regenerates
+the patch directory's index.
+
+\`doctor\` reports on the whole setup: the chain's health, model shapes that do not mean
+what they read like, and dependency or TypeScript settings that silently weaken the
+types. It exits non-zero only on an error.
 `;
 
 /**
@@ -103,21 +115,30 @@ export const run = (argv: readonly string[], cwd: string): number => {
         console.log(USAGE);
         return command ? 0 : 2;
     }
-    if (command !== "revision") {
+    if (command !== "revision" && command !== "doctor" && command !== "init") {
         console.error(`docstack: unknown command '${command}'.\n`);
         console.error(USAGE);
         return 2;
     }
-    if (!options.mode) {
+    if (command === "revision" && !options.mode) {
         console.error("docstack: revision needs --autogenerate or --check.\n");
         console.error(USAGE);
         return 2;
     }
 
     try {
-        const result = revision({ ...options, cwd, mode: options.mode });
+        const result = command === "revision"
+            ? revision({ ...options, cwd, mode: options.mode! })
+            : command === "doctor"
+                ? doctor({ cwd, model: options.model, patches: options.patches })
+                : init({
+                    cwd, model: options.model, patches: options.patches, target: options.target,
+                    typesImport: options.typesImport,
+                });
         for (const line of result.output) {
-            if (line.startsWith("warning:")) console.warn(line);
+            // `warning:` and `error:` go to stderr so a caller piping the report keeps the
+            // findings separate from the lines that merely describe what was inspected.
+            if (line.startsWith("warning:") || line.startsWith("error:")) console.warn(line);
             else console.log(line);
         }
         return result.code;

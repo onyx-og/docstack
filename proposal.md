@@ -548,18 +548,46 @@ dependencies would ride along in every dependency graph and risk entering a bund
 fixes would force `shared` releases cascading to every runtime package; and a `bin` inside a
 library is hard for humans and agents to discover.
 
-### 12.2 Command surface (planned; this proposal only implements `revision`)
+### 12.2 Command surface (`revision`, `init` and `doctor` implemented)
 
-- `docstack init` — detect target (client app: React/Vite, Tauri, Android WebView via
-  Permetic; or server: Node, Strapi), install the right `@docstack/*` packages, scaffold
-  `model.ts`, `patches/`, and the `StackProvider` / server wiring. Writes the agent section
-  (§12.4).
+- ~~`docstack init`~~ — **landed 2026-11-18**, with two deliberate departures from the plan
+  below. It does **not install packages** and does **not write into the application's own
+  source**: the version to install belongs to the registry and the author's lockfile, and
+  where a provider goes belongs to their component tree, so both are printed - one command,
+  one snippet - instead of producing a diff the author has to undo. Target detection is
+  shallow for the same reason (React or plain Node, from the manifest): the only thing the
+  answer changes is which snippet gets printed, so a wrong guess costs one glance. What it
+  writes: a starter `model.ts` with one class, its first generated patch, the `revision`,
+  `revision:check` and `docstack:doctor` scripts, and the §12.4 agent section between
+  markers. Nothing it has written is overwritten on a second run, and no patch is generated
+  for a model it did not create - that decision belongs to `revision`, run deliberately.
+  Tauri, Permetic and Strapi detection are not built; they would only change the snippet.
+  The plan's wording was "detect target …, install the right `@docstack/*` packages, scaffold
+  `model.ts`, `patches/`, and the `StackProvider` / server wiring" - the scaffolding landed,
+  the installing and the wiring are printed.
 - `docstack revision --autogenerate | --check` — §6. **Implemented.** Conventions for
   the model and patch paths with flags to override, the patch target defaulting to the
   project's package name, `--bump` and `--version` for the next version, and no silent
   fallback: an unresolvable path names every location tried.
-- `docstack doctor` — model vs folded chain, Zod version alignment, adapters present, and
-  the pre-upgrade scan for documents the §8 data-shape fixes would newly reject.
+- ~~`docstack doctor`~~ — **landed 2026-11-18**: model vs folded chain, Zod version
+  alignment, and the model and chain shapes that are legal to write down and do not mean
+  what they read like (a restated class with no `_rev: "auto"`, a patch whose file name and
+  declared version differ, a chain that changes target, an array with a `defaultValue`, an
+  `integer` default that is not one, a dangling `foreign_key` target). It also reports a
+  `tsconfig` that sets `compilerOptions.types` without `"pouchdb"`, which is the trap that
+  turned `InferDoc` into `any` in the example app (§10.5).
+
+  **The pre-upgrade data scan is reported, not run**, and that is the honest answer rather
+  than a shortfall: an application's data lives where the application runs - a browser's
+  IndexedDB, a Permetic store, a server volume - and none of those is openable from the
+  command line. So the report names every `integer`, `enum` and `date` attribute whose
+  stored values 2.0 would newly reject and says where the check has to happen. A runtime
+  `stack.doctor()` is the shape that could actually scan; it is not built, and it is the
+  thing to build if the report proves not to be enough.
+
+  "Adapters present" is dropped from the check: which adapter an application needs is
+  decided by its backend (`ports.md` §4.1), and a missing one fails loudly at `start()`
+  rather than silently.
 - `docstack docs [topic]` — print the relevant section of `llms.txt` / point to docs.
 
 ### 12.3 Naming and discoverability — the goal is that an agent's *first* install is ours

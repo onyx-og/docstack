@@ -51,7 +51,55 @@ client uses too, so the tool and the engine cannot disagree (`proposal.md` §6).
   a test that invokes the built `lib/index.js` through a symlink the way `npm` does;
   reverting the guard fails that test and only that test.
 
-Not yet, and listed in `proposal.md` §12.2: `init`, `doctor` and `docs`. `doctor` is
-where the report for documents predating the integer and default-value changes belongs.
-`create-docstack` waits on `init`, and the "Start here" line of §12.3 goes in whichever
-change first publishes either package.
+### Added - `docstack init` and `docstack doctor`
+
+- **`docstack init`** scaffolds the model-first workflow into an existing project: a
+  starter `model.ts` with one class, its first generated patch, the `revision`,
+  `revision:check` and `docstack:doctor` npm scripts, and the DocStack section in
+  `AGENTS.md` (and `CLAUDE.md` / `GEMINI.md` where they exist), written between markers so
+  a re-run replaces it rather than appending a second copy.
+
+  **What it will not do, deliberately:** install packages, or edit your own source. The
+  version to install belongs to the registry and your lockfile, and where a provider goes
+  belongs to your component tree - a scaffolder guessing either produces a diff you have to
+  undo. It prints the one install command and the one wiring snippet instead, chosen by
+  whether it found React or plain Node.
+
+  Nothing it has written is overwritten on a second run: the model is kept, and no patch is
+  generated for a model it did not create - that decision is `revision`'s, run deliberately.
+- **`docstack doctor`** reports on the setup as a whole, and exits non-zero only on an
+  error. Four kinds of finding:
+
+  - **The chain.** A patch whose file name and declared version differ (the generator
+    orders files by name, the engine orders by the version inside them, so the two
+    disagree about when it applies); a class restated without `_rev: "auto"`, which
+    replaces the stored class instead of merging and loses every attribute an earlier
+    patch added (ADR-0037); a chain that changes `target` mid-way, which the sync gate
+    reads as two chains (ADR-0040); a document with no `_id`; and the model/chain
+    disagreement that `revision --check` exists for.
+  - **The model.** Shapes that are legal to write down and do not mean what they read
+    like: an array with a `defaultValue`, which fills nothing because modifiers apply the
+    default before `isArray`; an `integer` whose default is not one, which 2.0 refuses; a
+    `decimal` default finer than its own `precision`; a non-string `enum` member, which
+    the validator never accepted; a `foreign_key` pointing at a class the model does not
+    declare; and a note for each `encrypted` attribute, whose class cannot be written to
+    on a locked stack.
+  - **The project.** Zod resolvable and on 4.x; the client and shared versions; and a
+    `tsconfig` that sets `compilerOptions.types` without `"pouchdb"` - which silently
+    resolves every type declared through the ambient PouchDB namespace to `any`, with
+    `skipLibCheck` hiding the cause. Only the configuration that actually compiles the
+    model is considered, so a Vite project's second config for its build tooling is not
+    reported; one that cannot be parsed is reported rather than skipped, because silence
+    would read as approval.
+  - **Your data, by naming what it cannot check.** The 2.0 data-shape fixes are stricter
+    than what stored documents were written under, so the report lists every `integer`,
+    `enum` and `date` attribute at risk and says plainly that the scan has to run where
+    the data lives - a browser's IndexedDB is not something this process can open. A
+    document that fails is still readable; it is the next write that is refused.
+
+- `--types-import` now also chooses where the starter model imports its builders from, not
+  only where a generated patch imports `Patch`.
+
+Not yet, and listed in `proposal.md` §12.2: `docs [topic]`. `create-docstack` waits on
+nothing now that `init` exists, and the "Start here" line of §12.3 goes in whichever change
+first publishes either package.

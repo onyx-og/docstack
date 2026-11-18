@@ -152,4 +152,4 @@ packages/docs/.pterodocs/
 
 # CLI test fixtures: throwaway projects created inside the package so module
 # resolution can find @docstack/shared the way a real application would.
-packages/cli/test/.tmp/
+packages/cli/test/.tmp*/

@@ -138,3 +138,12 @@ jobs:
       - name: The model and its patch chain agree (docstack revision --check)
         run: npm run revision:check
         working-directory: packages/examples/react-todo
+
+      # Everything `--check` does not answer: chain health, model shapes that do not
+      # mean what they read like, and dependency or tsconfig settings that silently
+      # weaken the types. It exits non-zero only on an error, and the example is clean,
+      # so this gates the example's own setup and smoke-tests `doctor` against a real
+      # project at the same time.
+      - name: The example's setup is healthy (docstack doctor)
+        run: npm run doctor
+        working-directory: packages/examples/react-todo

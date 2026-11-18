@@ -124,6 +124,35 @@ export const listPatchFiles = (directory: string): PatchFile[] => {
         }));
 };
 
+/** A loaded patch, with the file it came from. */
+export type LoadedPatch = PatchFile & {
+    /** The patch the module exported. */
+    patch: Patch;
+};
+
+/**
+ * Loads every patch in a directory, keeping the file each one came from.
+ *
+ * The pairing is what lets a caller compare a patch's **declared** version against the
+ * one its file name states. They can differ, and the consequence is not obvious: the
+ * generator orders files by name while the engine orders patches by the version inside
+ * them, so the two disagree about when the patch applies. `doctor` reports that.
+ *
+ * @param directory - Absolute path to the patch directory.
+ * @returns One entry per patch file, unordered; `foldPatchChain` owns the ordering.
+ * @throws If a file exports no patch, naming the file.
+ */
+export const loadPatchFiles = (directory: string): LoadedPatch[] => {
+    return listPatchFiles(directory).map(file => {
+        const exported = loadModule(file.path);
+        const patch = (exported.default ?? exported.patch) as Patch | undefined;
+        if (!patch || typeof patch !== "object" || !("version" in patch)) {
+            throw new Error(`'${file.path}' exports no patch as its default.`);
+        }
+        return { ...file, patch };
+    });
+};
+
 /**
  * Loads every patch in a directory.
  *
@@ -131,13 +160,5 @@ export const listPatchFiles = (directory: string): PatchFile[] => {
  * @returns The chain, unordered; `foldPatchChain` owns the ordering.
  * @throws If a file exports no patch, naming the file.
  */
-export const loadChain = (directory: string): Patch[] => {
-    return listPatchFiles(directory).map(file => {
-        const exported = loadModule(file.path);
-        const patch = (exported.default ?? exported.patch) as Patch | undefined;
-        if (!patch || typeof patch !== "object" || !("version" in patch)) {
-            throw new Error(`'${file.path}' exports no patch as its default.`);
-        }
-        return patch;
-    });
-};
+export const loadChain = (directory: string): Patch[] =>
+    loadPatchFiles(directory).map(entry => entry.patch);

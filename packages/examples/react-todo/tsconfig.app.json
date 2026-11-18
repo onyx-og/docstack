@@ -5,7 +5,11 @@
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "types": ["vite/client"],
+    // "pouchdb" alongside Vite's own: setting `types` at all turns off automatic @types
+    // inclusion, and DocStack's engine-facing public types are declared through the
+    // ambient PouchDB namespace. Without it they resolve to `any` and `skipLibCheck`
+    // hides the cause. `npx docstack doctor` reports this.
+    "types": ["vite/client", "pouchdb"],
     "skipLibCheck": true,
 
     /* Bundler mode */
