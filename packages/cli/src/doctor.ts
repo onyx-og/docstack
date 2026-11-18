@@ -73,12 +73,13 @@ const NEWLY_STRICT: Record<string, string> = {
  * @param name - Package name.
  * @returns The version, or `null` when the package cannot be resolved from there.
  */
-const installedVersion = (cwd: string, name: string): string | null => {
-    const require = createRequire(join(cwd, "package.json"));
-    const read = (path: string): string | null => {
+const installed = (from: string, name: string): { dir: string; version: string } | null => {
+    const require = createRequire(join(from, "package.json"));
+    const read = (path: string): { dir: string; version: string } | null => {
         try {
             const parsed = JSON.parse(readFileSync(path, "utf8")) as { name?: string; version?: string };
-            return parsed.name === name ? parsed.version ?? null : null;
+            if (parsed.name !== name || !parsed.version) return null;
+            return { dir: dirname(path), version: parsed.version };
         } catch {
             return null;
         }
@@ -90,8 +91,8 @@ const installedVersion = (cwd: string, name: string): string | null => {
         try {
             let directory = dirname(require.resolve(name));
             for (let depth = 0; depth < 8; depth += 1) {
-                const version = read(join(directory, "package.json"));
-                if (version) return version;
+                const found = read(join(directory, "package.json"));
+                if (found) return found;
                 const parent = dirname(directory);
                 if (parent === directory) break;
                 directory = parent;
@@ -102,6 +103,17 @@ const installedVersion = (cwd: string, name: string): string | null => {
         return null;
     }
 };
+
+/**
+ * A dependency's version as resolved from a directory.
+ *
+ * @param from - Where to resolve from: a project root, or an installed package's own
+ * directory, which is how a second nested copy becomes visible.
+ * @param name - Package name.
+ * @returns The version, or `null` when it does not resolve from there.
+ */
+const installedVersion = (from: string, name: string): string | null =>
+    installed(from, name)?.version ?? null;
 
 /**
  * Checks the declared model for shapes that are legal to write down and do not mean what
@@ -354,18 +366,62 @@ const checkEnvironment = (cwd: string, modelRelative?: string): Finding[] => {
         });
     }
 
-    if (installedVersion(cwd, "@types/pouchdb")) {
+    // Either package will do, and testing only the umbrella one was a false positive on a
+    // real project: `@types/pouchdb-core` is what carries `declare namespace PouchDB`, and
+    // an application that depends on `pouchdb-browser` has that without the umbrella.
+    const namespaceFrom = ["@types/pouchdb", "@types/pouchdb-core"]
+        .find(name => installedVersion(cwd, name));
+    if (namespaceFrom) {
         findings.push({
             severity: "ok", check: "types",
-            message: "@types/pouchdb resolves, so the engine-facing public types are real types.",
+            message: `${namespaceFrom} resolves, so the engine-facing public types are real types.`,
         });
     } else {
         findings.push({
             severity: "warning", check: "types",
-            message: "@types/pouchdb does not resolve from this project.",
-            detail: "`@docstack/shared` depends on it, so a normal install has it. Without it, "
-                + "the engine-facing public types resolve to `any` and `skipLibCheck` hides why.",
+            message: "Neither @types/pouchdb nor @types/pouchdb-core resolves from this project.",
+            detail: "One of them declares the ambient `PouchDB` namespace, which DocStack's "
+                + "engine-facing public types are written in terms of. Without it they resolve "
+                + "to `any` and `skipLibCheck` hides why. `@docstack/shared` depends on the "
+                + "umbrella package, so a current install has it.",
         });
+    }
+
+    // Two copies of zod in one graph is two schema identities: a schema built by one and
+    // parsed by the other fails in ways that read as a validation bug. This is why zod is
+    // a peer dependency of `@docstack/shared` - and an older shared that declared it as a
+    // direct dependency gets a nested copy, which is live in at least one real project.
+    for (const name of ["@docstack/shared", "@docstack/client"]) {
+        const pkg = installed(cwd, name);
+        if (!pkg || !zod || !semver.valid(zod)) continue;
+        const theirs = installedVersion(pkg.dir, "zod");
+        if (!theirs || theirs === zod || !semver.valid(theirs)) continue;
+
+        // Two majors is a different problem from two minors, so it gets a different
+        // severity. Across majors the copies are not interchangeable at all - a schema
+        // built by zod 3 cannot be parsed by zod 4's machinery - and that is a package
+        // declaring zod as a dependency rather than a peer, which is fixed by upgrading.
+        // Within one major the copies behave alike and the cost is a second one in the
+        // bundle, which a lockfile or an `overrides` entry dedupes; reporting that as a
+        // warning in every workspace monorepo would be noise.
+        if (semver.major(theirs) !== semver.major(zod)) {
+            findings.push({
+                severity: "warning", check: "deps",
+                message: `${name} resolves zod ${theirs} while this project resolves ${zod}.`,
+                detail: "Across majors the two are not interchangeable, so a schema built by one "
+                    + `and parsed by the other fails in ways that read as a validation bug. `
+                    + `Upgrade ${name} to a version that takes zod as a PEER dependency, which `
+                    + "is what makes an application resolve exactly one copy.",
+            });
+        } else {
+            findings.push({
+                severity: "note", check: "deps",
+                message: `${name} resolves zod ${theirs} while this project resolves ${zod}.`,
+                detail: "Same major, so they behave alike; the cost is two copies in the bundle "
+                    + "and two schema identities. Aligning the ranges, or an `overrides` entry, "
+                    + "dedupes them.",
+            });
+        }
     }
 
     for (const entry of readdirSync(cwd).filter(name => /^tsconfig.*\.json$/.test(name))) {
@@ -470,33 +526,70 @@ export const doctor = (options: DoctorOptions): DoctorResult => {
     const findings: Finding[] = [];
     let model: ModelDefinition | null = null;
     let modelPath: string | null = null;
+    let patchDir: string | null = null;
+    let modelError: string | null = null;
 
+    // Resolved before anything is reported, because what the absence of one MEANS depends
+    // on the other. A project with neither has not adopted the code-defined model, which
+    // is not a fault; a declared model with nothing to install it is.
     try {
         modelPath = resolvePath(options.cwd, options.model, MODEL_CANDIDATES, "model");
-        model = loadModel(modelPath);
-        findings.push({
-            severity: "ok", check: "model",
-            message: `${model.classes.length} class(es) declared in ${modelPath}: `
-                + `${model.classes.map(c => c.name).join(", ") || "none"}.`,
-        });
     } catch (error) {
-        findings.push({
-            severity: "error", check: "model",
-            message: (error as Error).message,
-        });
+        modelError = (error as Error).message;
     }
-
-    let patchDir: string | null = null;
     try {
         patchDir = resolvePath(options.cwd, options.patches, PATCH_CANDIDATES, "patch directory");
-    } catch (error) {
+    } catch {
+        patchDir = null;
+    }
+
+    if (modelPath) {
+        try {
+            model = loadModel(modelPath);
+            findings.push({
+                severity: "ok", check: "model",
+                message: `${model.classes.length} class(es) declared in ${modelPath}: `
+                    + `${model.classes.map(c => c.name).join(", ") || "none"}.`,
+            });
+        } catch (error) {
+            // The file is there and does not export a model: that IS broken.
+            findings.push({
+                severity: "error", check: "model",
+                message: (error as Error).message,
+            });
+        }
+        // Only worth saying when the model actually loaded: piling a missing patch
+        // directory on top of a model that does not export one buries the real error.
+        if (!patchDir && model) {
+            findings.push({
+                severity: "error", check: "chain",
+                message: "A model is declared but there is no patch directory, so nothing installs it.",
+                detail: "Run `docstack revision --autogenerate -m \"the initial model\"`. Looked for "
+                    + `${PATCH_CANDIDATES.join(", ")} under '${options.cwd}'.`,
+            });
+        }
+    } else if (patchDir) {
+        // Hand-written patches and no declared model: the pre-2.0 way, and still supported.
+        // The chain checks below do not need a model, so they run; only the comparison
+        // between the two is skipped.
         findings.push({
-            severity: "error", check: "chain",
-            message: (error as Error).message,
+            severity: "note", check: "model",
+            message: "No model is declared in code, so the model-versus-chain check was skipped.",
+            detail: `${modelError ?? "No model found."}\n`
+                + "The chain itself is still checked. `docstack init` sets up a declared model, "
+                + "after which `revision --check` can tell you whether the two agree.",
+        });
+    } else {
+        findings.push({
+            severity: "note", check: "model",
+            message: "This project does not declare its DocStack model in code.",
+            detail: "Nothing is wrong: hand-written patches are still supported. `docstack init` "
+                + "scaffolds a declared model, from which the types and the patches are both "
+                + "derived. The dependency and TypeScript checks below apply either way.",
         });
     }
 
-    if (patchDir && model) {
+    if (patchDir) {
         try {
             const loaded = loadPatchFiles(patchDir);
             const chain = loaded.map(entry => entry.patch);
@@ -507,24 +600,34 @@ export const doctor = (options: DoctorOptions): DoctorResult => {
             findings.push(...checkChain(loaded));
 
             const folded = foldPatchChain(chain);
-            const diff = diffModel(folded, model);
-            for (const warning of diff.warnings) {
-                findings.push({ severity: "warning", check: "chain", message: warning });
-            }
-            if (diff.docs.length) {
-                findings.push({
-                    severity: "error", check: "chain",
-                    message: "The model and the patch chain disagree on "
-                        + `${diff.docs.map(doc => (doc as ClassModel).name ?? doc._id).join(", ")}.`,
-                    detail: "Run `docstack revision --autogenerate -m \"<what changed>\"` and commit "
-                        + "the generated patch. Until then, a device installs a schema the code "
-                        + "does not expect.",
-                });
-            } else if (diff.unchanged.length) {
+            if (!model) {
+                // No declared model to compare against, so the fold is reported for what
+                // it is worth on its own: the classes a device ends up with.
                 findings.push({
                     severity: "ok", check: "chain",
-                    message: `Model and chain agree on ${diff.unchanged.length} class(es).`,
+                    message: `The chain folds to ${Object.keys(folded.classes).length} class(es): `
+                        + `${Object.keys(folded.classes).join(", ") || "none"}.`,
                 });
+            } else {
+                const diff = diffModel(folded, model);
+                for (const warning of diff.warnings) {
+                    findings.push({ severity: "warning", check: "chain", message: warning });
+                }
+                if (diff.docs.length) {
+                    findings.push({
+                        severity: "error", check: "chain",
+                        message: "The model and the patch chain disagree on "
+                            + `${diff.docs.map(doc => (doc as ClassModel).name ?? doc._id).join(", ")}.`,
+                        detail: "Run `docstack revision --autogenerate -m \"<what changed>\"` and commit "
+                            + "the generated patch. Until then, a device installs a schema the code "
+                            + "does not expect.",
+                    });
+                } else if (diff.unchanged.length) {
+                    findings.push({
+                        severity: "ok", check: "chain",
+                        message: `Model and chain agree on ${diff.unchanged.length} class(es).`,
+                    });
+                }
             }
         } catch (error) {
             findings.push({

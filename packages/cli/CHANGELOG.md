@@ -100,6 +100,28 @@ client uses too, so the tool and the engine cannot disagree (`proposal.md` §6).
 - `--types-import` now also chooses where the starter model imports its builders from, not
   only where a generated patch imports `Patch`.
 
+Four of `doctor`'s checks were corrected by running it against a real application that had
+never seen it (`tokido`, 2026-11-18) - which is the only way this kind of defect shows up:
+
+- **A missing model is no longer an error.** A project with neither a model nor a patch
+  directory has not adopted the code-defined model, which is not a fault; it gets a note
+  pointing at `init`, and the dependency and TypeScript checks still run. A project with
+  **patches and no model** keeps its chain checked and only loses the comparison - that is
+  the pre-2.0 way and still supported. A **model with no patch directory** is the case that
+  really is broken, and stays an error. A diagnostic that exits non-zero because a feature
+  is not adopted is useless as a gate in any repository that mixes the two.
+- **The ambient-namespace check counted the wrong package.** It tested for
+  `@types/pouchdb`, but `@types/pouchdb-core` is what carries
+  `declare namespace PouchDB` - so an application depending on `pouchdb-browser` was told
+  its types were weakened when they were fine. Either package satisfies it now.
+- **A second copy of zod is reported**, which is what found a live two-identity hazard in
+  that application: zod 3.25.76 nested under an older `@docstack/shared` while the app
+  itself resolved 4.4.3. Graded by whether the majors differ - across majors the copies are
+  not interchangeable at all and it is a warning; within one major they behave alike and it
+  is a note, because otherwise every workspace monorepo would see a warning.
+- **A failed model load no longer drags a second error behind it.** "No patch directory"
+  was reported on top of "this file exports no model", burying the real one.
+
 Not yet, and listed in `proposal.md` §12.2: `docs [topic]`. `create-docstack` waits on
 nothing now that `init` exists, and the "Start here" line of §12.3 goes in whichever change
 first publishes either package.

@@ -408,7 +408,18 @@ why each went the way it did.
 8. ~~Do all the §8 data-shape fixes land in 2.0.0, or does `date` slip?~~ — **decided**:
    `date` landed in phase 1 as an ISO-8601 UTC string (`format: "date"` for date-only).
    `integer` is fixed too, on the shipping line, so none of the three is open.
-9. Should a typed **read** reject an undeclared field? `InferDoc` intersects `Document`,
+9. **One model per project, or one per stack?** Every convention here assumes a project
+   has *a* model and *a* chain: `MODEL_CANDIDATES`, `PATCH_CANDIDATES`, the index the
+   generator rewrites, `revision --check`. A real consumer (tokido, checked 2026-11-18)
+   does not fit: it runs a **root** stack for identity and the workspace registry, plus
+   one stack per workspace, and declares `ROOT_PATCHES` and `WORKSPACE_PATCHES` as two
+   chains for two kinds of database. Nothing about the declaration layer prevents that -
+   two `defineModel` calls and two directories - but the CLI would need to know about both
+   (`--model`/`--patches` already accept paths, so two invocations work today; one
+   `--check` run that covers the project does not). Worth deciding before `init` grows a
+   multi-stack mode, since the shape of the answer decides whether a project configures
+   the CLI or just passes flags.
+10. Should a typed **read** reject an undeclared field? `InferDoc` intersects `Document`,
    which carries `[key: string]: any`, so `doc.titel` is `any` rather than an error. The
    index signature is there because documents really do hold fields no class declares -
    `~createTimestamp`, trigger output, another client's attributes. Omitting it from
