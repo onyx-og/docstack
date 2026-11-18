@@ -192,6 +192,28 @@ carry the design and the defects these close.
 
 ### Fixed
 
+- **A failed write rejects, instead of hanging forever.** Four methods were written as
+  `new Promise(async (resolve, reject) => ...)`: `Class.updateCard`,
+  `Class.addOrUpdateCard`, `Class.build` and `Domain.build`. A rejection from an awaited
+  call inside an async executor is not forwarded to `reject`, so the returned promise
+  **never settled** - the caller's `await` hung - and the error escaped as an unhandled
+  rejection. In a browser that took the page down; in Node it would be an unhandled
+  rejection warning and a stuck request.
+
+  Every failure on those paths was affected, not only conflicts: a locked stack, a
+  validation refusal, a class whose originator is missing. A hang is worse than a throw,
+  because there is nothing to catch and nothing in a log to read.
+
+  The visible case was two concurrent updates to one document. `createDoc` refuses the
+  second write (ADR-0023) and the refusal could not reach the caller; the behaviour now is
+  the one the engine always intended - one write lands, the other rejects with `conflict`,
+  and the application decides what to do about it. That is PouchDB's own model, and it is
+  the only honest one for an engine that replicates: conflicts cannot be hidden locally
+  when two devices can write offline.
+
+  These four also rejected with bare strings where they rejected at all; they throw `Error`
+  instances now, like the rest of the engine, so a caller can read a message and a stack.
+  Nothing in the repository matched on those strings.
 - **A write returns the document it wrote.** `createDoc` returned a draft the write
   pipeline had never touched: the `defaultValue`s it fills, the `~createdBy` /
   `~updatedBy` attribution and before-trigger output were all missing from the value a
