@@ -98,6 +98,15 @@ npx docstack revision --check
 
 This exits non-zero when your model and your patch chain disagree, and names the classes. It is the guard for the failure that otherwise reaches a device: editing the model, forgetting the patch, and shipping an app whose code expects a schema the database never installed.
 
+**If your app has more than one stack** — a root database plus one per workspace, say — it has one model and one chain per stack, and you run the command once per pair:
+
+```bash
+npx docstack revision --check --model src/model.root.ts      --patches src/patches/root
+npx docstack revision --check --model src/model.workspace.ts --patches src/patches/workspace
+```
+
+Without those flags the command refuses rather than picking one, because a run that silently covered only the first would pass while the second had drifted.
+
 ### Check the whole setup
 
 ```bash

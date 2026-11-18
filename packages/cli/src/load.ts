@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { ModelDefinition, Patch } from "@docstack/shared";
 
 /**
@@ -93,6 +93,91 @@ export const loadModel = (path: string): ModelDefinition => {
         `'${path}' exports no model. Export one as \`model\` or as the default: ` +
         `\`export const model = defineModel({ classes: [...] })\`. ` +
         `Found: ${Object.keys(exported).join(", ") || "nothing"}.`
+    );
+};
+
+/**
+ * Other files beside the chosen model that look like one too.
+ *
+ * The conventions pick the FIRST candidate that exists, which is right for a project with
+ * one model and silently wrong for a project with two: a `--check` that passes while a
+ * second model's chain has drifted is a green CI run over a broken schema. The tool cannot
+ * know a project has two stacks unless the project says so, so where it might be guessing
+ * it refuses instead and asks for an explicit path.
+ *
+ * Deliberately a heuristic, and deliberately overridable: a file named `model-utils.ts`
+ * next to the model trips it, and the cost of that false positive is one `--model` flag,
+ * which is also the fix. A missed second model costs a false pass, which is worse.
+ *
+ * @param chosen - Absolute path to the model the conventions picked.
+ * @returns Absolute paths of the others, sorted; empty when the choice is unambiguous.
+ */
+export const otherModelCandidates = (cwd: string, chosen: string): string[] => {
+    const found = new Set<string>();
+    for (const candidate of MODEL_CANDIDATES) {
+        const absolute = join(cwd, candidate);
+        if (existsSync(absolute)) found.add(absolute);
+    }
+    const directory = dirname(chosen);
+    if (existsSync(directory)) {
+        for (const entry of readdirSync(directory)) {
+            if (/\.d\.(ts|mts)$/.test(entry)) continue;
+            if (/^model.*\.(ts|js|mjs)$/.test(entry) || /\.model\.(ts|js|mjs)$/.test(entry)) {
+                found.add(join(directory, entry));
+            }
+        }
+    }
+    found.delete(chosen);
+    return [...found].sort();
+};
+
+/**
+ * Other directories beside the chosen one that look like a patch chain.
+ *
+ * Same reasoning as {@link otherModelCandidates}, for the same reason: a patch generated
+ * into the wrong chain is as wrong as a check that read the wrong one.
+ *
+ * @param cwd - Project root.
+ * @param chosen - Absolute path to the patch directory the conventions picked.
+ * @returns Absolute paths of the others, sorted; empty when the choice is unambiguous.
+ */
+export const otherPatchCandidates = (cwd: string, chosen: string): string[] => {
+    const found = new Set<string>();
+    for (const candidate of PATCH_CANDIDATES) {
+        const absolute = join(cwd, candidate);
+        if (existsSync(absolute)) found.add(absolute);
+    }
+    const parent = dirname(chosen);
+    if (existsSync(parent)) {
+        for (const entry of readdirSync(parent, { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
+            if (/patches/i.test(entry.name)) found.add(join(parent, entry.name));
+        }
+    }
+    found.delete(chosen);
+    return [...found].sort();
+};
+
+/**
+ * Refuses when the conventions had more than one plausible answer.
+ *
+ * @param cwd - Project root.
+ * @param chosen - What the conventions picked.
+ * @param others - The other candidates.
+ * @param flag - The flag that makes the choice explicit.
+ * @throws Always, when `others` is non-empty.
+ */
+export const refuseAmbiguous = (
+    cwd: string, chosen: string, others: string[], flag: string
+): void => {
+    if (!others.length) return;
+    const show = (path: string) => relative(cwd, path) || path;
+    throw new Error(
+        `Ambiguous: ${flag} was not given, and '${show(chosen)}' is not the only candidate. `
+        + `Also found ${others.map(show).map(entry => `'${entry}'`).join(", ")}. `
+        + `Pass ${flag} explicitly. A project with more than one model or chain - one stack `
+        + "per workspace, say - runs this command once per pair, because a run that silently "
+        + "covered only one of them would pass while the other had drifted."
     );
 };
 

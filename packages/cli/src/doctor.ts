@@ -5,7 +5,8 @@ import { diffModel, foldPatchChain } from "@docstack/shared";
 import type { AttributeModel, ClassModel, ModelDefinition, Patch } from "@docstack/shared";
 import semver from "semver";
 import {
-    LoadedPatch, MODEL_CANDIDATES, PATCH_CANDIDATES, loadModel, loadPatchFiles, resolvePath,
+    LoadedPatch, MODEL_CANDIDATES, PATCH_CANDIDATES, loadModel, loadPatchFiles,
+    otherModelCandidates, otherPatchCandidates, resolvePath,
 } from "./load.js";
 
 /**
@@ -544,6 +545,25 @@ export const doctor = (options: DoctorOptions): DoctorResult => {
     }
 
     if (modelPath) {
+        // `revision` refuses outright here; a report has no reason to stop, so it says
+        // what it covered and what it did not.
+        const extraModels = options.model ? [] : otherModelCandidates(options.cwd, modelPath);
+        const extraChains = options.patches || !patchDir
+            ? [] : otherPatchCandidates(options.cwd, patchDir);
+        if (extraModels.length || extraChains.length) {
+            findings.push({
+                severity: "warning", check: "model",
+                message: "More than one model or patch chain is present, and this report covers "
+                    + `only ${relative(options.cwd, modelPath)}`
+                    + `${patchDir ? ` and ${relative(options.cwd, patchDir)}` : ""}.`,
+                detail: "Also found "
+                    + [...extraModels, ...extraChains]
+                        .map(entry => relative(options.cwd, entry)).join(", ")
+                    + ". Run this once per pair with --model and --patches. `revision` refuses to "
+                    + "guess between them, because a check that covered only one would pass while "
+                    + "the other had drifted.",
+            });
+        }
         try {
             model = loadModel(modelPath);
             findings.push({

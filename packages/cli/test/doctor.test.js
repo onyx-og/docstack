@@ -319,6 +319,32 @@ test("what a missing model means depends on whether there are patches", () => {
     assert.match(chain.detail, /revision --autogenerate/);
 });
 
+test("reports a partial view rather than refusing, when a project has two pairs", () => {
+    const root = project({
+        "src/model.ts": HEALTHY_MODEL,
+        "src/patches/0.1.0.ts": HEALTHY_PATCH,
+        // A second stack's pair, which the conventions do not pick.
+        "src/model.workspace.ts": HEALTHY_MODEL,
+        "src/patches-ws/0.1.0.ts": HEALTHY_PATCH,
+    });
+    const result = doctor({ cwd: root });
+
+    // `revision` refuses here; a report has no reason to stop, so it says what it covered.
+    const partial = result.findings.find(f => f.severity === "warning" && f.check === "model");
+    assert.match(partial.message, /only src\/model\.ts and src\/patches/);
+    assert.match(partial.detail, /src\/model\.workspace\.ts/);
+    assert.match(partial.detail, /src\/patches-ws/);
+    assert.match(partial.detail, /once per pair/);
+
+    // And the rest of the report is still there, for the pair it did look at.
+    assert.ok(of(result, "chain").some(line => line.includes("agree on 1 class")));
+    assert.equal(result.code, 0);
+
+    // Naming the pair is not ambiguous, so nothing is reported.
+    const explicit = doctor({ cwd: root, model: "src/model.ts", patches: "src/patches" });
+    assert.ok(!explicit.findings.some(f => f.message.includes("only src/model.ts")));
+});
+
 test("a model file that exports no model is an error, not an absence", () => {
     const root = project({
         "src/model.ts": "export const notTheModel = 1;\n",

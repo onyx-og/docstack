@@ -4,7 +4,8 @@ import { diffModel, foldPatchChain } from "@docstack/shared";
 import semver from "semver";
 import { renderIndexFile, renderPatchFile } from "./emit.js";
 import {
-    MODEL_CANDIDATES, PATCH_CANDIDATES, listPatchFiles, loadChain, loadModel, resolvePath,
+    MODEL_CANDIDATES, PATCH_CANDIDATES, listPatchFiles, loadChain, loadModel,
+    otherModelCandidates, otherPatchCandidates, refuseAmbiguous, resolvePath,
 } from "./load.js";
 
 /** What `revision` was asked to do. */
@@ -113,6 +114,13 @@ const defaultTarget = (cwd: string): string => {
  */
 export const revision = (options: RevisionOptions): RevisionResult => {
     const modelPath = resolvePath(options.cwd, options.model, MODEL_CANDIDATES, "model");
+    // Only when the path was guessed: an explicit `--model` is the author saying which
+    // one they mean, and a project with several pairs says it once per invocation.
+    if (!options.model) {
+        refuseAmbiguous(
+            options.cwd, modelPath, otherModelCandidates(options.cwd, modelPath), "--model"
+        );
+    }
     const model = loadModel(modelPath);
 
     let patchDir: string;
@@ -127,6 +135,12 @@ export const revision = (options: RevisionOptions): RevisionResult => {
         } else {
             throw error;
         }
+    }
+
+    if (!options.patches) {
+        refuseAmbiguous(
+            options.cwd, patchDir, otherPatchCandidates(options.cwd, patchDir), "--patches"
+        );
     }
 
     const chain = loadChain(patchDir);

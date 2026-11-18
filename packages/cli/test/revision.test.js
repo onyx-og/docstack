@@ -283,6 +283,53 @@ test("the installed bin actually runs, reached through a symlink", () => {
     assert.equal(atLink(["revision"]).code, 2);
 });
 
+test("refuses to guess between two models or two chains", () => {
+    const root = project(TODO_MODEL);
+    // A second stack's model and chain, the shape a project with one database per
+    // workspace has. The conventions pick `src/model.ts`, so a flagless run would check
+    // that pair and say nothing about this one - passing while this one had drifted.
+    writeFileSync(join(root, "src", "model.workspace.ts"), TODO_MODEL, "utf8");
+    mkdirSync(join(root, "src", "patches"), { recursive: true });
+    mkdirSync(join(root, "src", "patches-ws"), { recursive: true });
+
+    for (const mode of ["check", "autogenerate"]) {
+        // Generating into the wrong chain is as wrong as checking the wrong one, so both
+        // refuse rather than only the one CI runs.
+        assert.throws(
+            () => revision({ cwd: root, mode, message: "x" }),
+            /Ambiguous: --model was not given/,
+            `${mode} must refuse`
+        );
+    }
+    // The message names the other candidate, so the fix is visible without hunting.
+    assert.throws(() => revision({ cwd: root, mode: "check" }), /model\.workspace\.ts/);
+
+    // Naming the pair is the author saying which one they mean, and it works as before.
+    const explicit = revision({
+        cwd: root, mode: "autogenerate", message: "the Todo class",
+        model: "src/model.ts", patches: "src/patches",
+    });
+    assert.equal(explicit.code, 0);
+    assert.equal(revision({
+        cwd: root, mode: "check", model: "src/model.ts", patches: "src/patches",
+    }).code, 0);
+});
+
+test("refuses on an ambiguous chain even when the model is explicit", () => {
+    const root = project(TODO_MODEL);
+    mkdirSync(join(root, "src", "patches"), { recursive: true });
+    mkdirSync(join(root, "src", "patches-root"), { recursive: true });
+
+    assert.throws(
+        () => revision({ cwd: root, mode: "check", model: "src/model.ts" }),
+        /Ambiguous: --patches was not given/
+    );
+    // And naming it settles the question.
+    assert.equal(revision({
+        cwd: root, mode: "check", model: "src/model.ts", patches: "src/patches-root",
+    }).code, 1);
+});
+
 test("the source printer is deterministic and readable", () => {
     assert.equal(toSource({ b: 1, a: 2 }), "{\n    b: 1,\n    a: 2,\n}");
     assert.equal(toSource({ "~class": "class" }), "{\n    \"~class\": \"class\",\n}");

@@ -122,6 +122,28 @@ never seen it (`tokido`, 2026-11-18) - which is the only way this kind of defect
 - **A failed model load no longer drags a second error behind it.** "No patch directory"
   was reported on top of "this file exports no model", burying the real one.
 
+### Fixed - the conventions no longer guess between two models or two chains
+
+A project with **two stacks** - a root database plus one per workspace, which a real
+consumer runs - has two models and two chains. The conventions pick the first candidate
+that exists, so a flagless `revision --check` checked that pair, reported agreement and
+exited 0 **while the other pair's chain had drifted**: a green CI run over a broken schema.
+The missing feature was not the problem; the false pass was.
+
+Where the path was guessed rather than given, `revision` now refuses and names the other
+candidates, for `--autogenerate` as well as `--check` - generating a patch into the wrong
+chain is as wrong as checking the wrong one. `doctor`, being a report, says which pair it
+covered and which it did not, and carries on. An explicit `--model` / `--patches` is the
+author saying which pair they mean and behaves exactly as before, which is how a
+multi-stack project runs this: once per pair.
+
+The detection is a heuristic - the conventional locations, plus files named `model*` or
+`*.model.*` beside the chosen one, plus sibling directories matching `patches`. A false
+refusal is therefore possible, and costs one flag, which is also the fix; a missed second
+model costs a false pass, which is worse. A single run that covers every pair wants a
+`docstack.config.ts` declaring them, which is recorded as a nice-to-have in
+`proposal.md` §9 rather than guessed at.
+
 Not yet, and listed in `proposal.md` §12.2: `docs [topic]`. `create-docstack` waits on
 nothing now that `init` exists, and the "Start here" line of §12.3 goes in whichever change
 first publishes either package.

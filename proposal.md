@@ -414,11 +414,29 @@ why each went the way it did.
    does not fit: it runs a **root** stack for identity and the workspace registry, plus
    one stack per workspace, and declares `ROOT_PATCHES` and `WORKSPACE_PATCHES` as two
    chains for two kinds of database. Nothing about the declaration layer prevents that -
-   two `defineModel` calls and two directories - but the CLI would need to know about both
-   (`--model`/`--patches` already accept paths, so two invocations work today; one
-   `--check` run that covers the project does not). Worth deciding before `init` grows a
-   multi-stack mode, since the shape of the answer decides whether a project configures
-   the CLI or just passes flags.
+   two `defineModel` calls and two directories - and two invocations with `--model` and
+   `--patches` cover such a project today.
+
+   **The dangerous half is fixed (2026-11-18): the tool no longer guesses.** The failure
+   was not the missing feature but a *false pass*: with two pairs present, a flagless
+   `revision --check` picked the conventional one, reported agreement and exited 0 while
+   the other pair's chain had drifted - a green CI run over a broken schema. Where the
+   path was guessed rather than given, `revision` now refuses and names the other
+   candidates; `doctor`, being a report, says which pair it covered instead of stopping.
+   An explicit `--model` / `--patches` is the author saying which pair they mean, and is
+   unaffected. The detection is a heuristic (conventional locations, plus files named
+   `model*` or `*.model.*` beside the chosen one, plus sibling directories matching
+   `patches`), so a false refusal is possible and costs exactly one flag - which is also
+   the fix. A missed second model costs a false pass, which is worse.
+
+   **Still open, as a nice-to-have: a `docstack.config.ts` (or `.js`).** It would declare
+   the pairs - `{ model, patches, target }` per stack - so one flagless `--check` covers
+   the whole project, which is what a multi-stack project actually wants in CI. It is more
+   than a file format: `init` has to decide which pair it scaffolds (or scaffold several),
+   `--autogenerate` has to be told which chain a new patch joins, and the §12.4 agent
+   section has to describe the set rather than the one. Worth designing against a real
+   project that is adopting the declared model with more than one stack, rather than
+   against a fixture - the refusal above means nothing silently breaks while that waits.
 10. Should a typed **read** reject an undeclared field? `InferDoc` intersects `Document`,
    which carries `[key: string]: any`, so `doc.titel` is `any` rather than an error. The
    index signature is there because documents really do hold fields no class declares -
