@@ -87,24 +87,22 @@ class Domain extends Domain_ {
         Domain.logger.info("setModel - model after processing", { model: model })
     }
 
-    build = (): Promise<Domain> => {
-        return new Promise(async (resolve, reject) => {
-            let stack = this.getStack();
-            if (stack) {
-                let domainModel = await stack.addDomain(this);
-                if (domainModel) {
-                    // Hydrate model
-                    this.setModel(domainModel);
-                    Domain.logger.info("build - domainModel", { domainModel });
-                    this.setId(domainModel._id);
-                    resolve(this)
-                } else {
-                    reject("Unable to get create domainModel. Check logs.");
-                }
-            } else {
-                reject("Missing stack assignment");
-            }
-        })
+    build = async (): Promise<Domain> => {
+        // A plain `async` body rather than `new Promise(async (resolve, reject) => ...)`,
+        // which swallowed every failure from the awaited call: the promise never settled,
+        // so the caller hung, and the error escaped as an unhandled rejection. See
+        // `Class.build` for the full note; all four sites are fixed together.
+        const stack = this.getStack();
+        if (!stack) throw new Error("Missing stack assignment");
+
+        const domainModel = await stack.addDomain(this);
+        if (!domainModel) throw new Error("Unable to get create domainModel. Check logs.");
+
+        // Hydrate model
+        this.setModel(domainModel);
+        Domain.logger.info("build - domainModel", { domainModel });
+        this.setId(domainModel._id);
+        return this;
     }
 
     init = (

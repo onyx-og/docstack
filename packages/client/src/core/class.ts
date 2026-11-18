@@ -136,26 +136,31 @@ class Class extends Class_ {
         }
     } */
 
-    build = (): Promise<Class> => {
-        return new Promise(async (resolve, reject) => {
-            let stack = this.getStack();
-            if (stack) {
-                // if (parentClassName) this.setParentClass(parentClassName);
-                let classModel = await stack.addClass(this);
-                // Hydrate model
-                if (classModel) {
-                    this.setModel(classModel)
-                    Class.logger.info("build - classModel", { classModel: classModel })
-                    this.setId(classModel._id);
-                    resolve(this);
-                } else {
-                    reject("unable to get classModel. Check logs");
-                }
+    build = async (): Promise<Class> => {
+        // A plain `async` body, NOT `new Promise(async (resolve, reject) => ...)`.
+        //
+        // That shape was here and silently swallowed every failure: a rejection from an
+        // awaited call inside an async executor is not forwarded to `reject`, so the
+        // promise never settled - the caller's `await` hung forever - and the error
+        // escaped as an unhandled rejection. A hang is worse than a throw, because there
+        // is nothing to catch and nothing in a log to read. `updateCard`,
+        // `addOrUpdateCard` and `Domain.build` had the same shape; all four are plain
+        // async bodies now, where a throw is simply a rejection.
+        //
+        // The failures themselves are unchanged, except that they reject with an `Error`
+        // rather than a bare string - which is what the rest of the engine throws, and
+        // the only form a caller can read a message or a stack off.
+        const stack = this.getStack();
+        if (!stack) throw new Error("Missing stack assignment");
 
-            } else {
-                reject("Missing stack assignment");
-            }
-        })
+        const classModel = await stack.addClass(this);
+        if (!classModel) throw new Error("unable to get classModel. Check logs");
+
+        // Hydrate model
+        this.setModel(classModel);
+        Class.logger.info("build - classModel", { classModel: classModel });
+        this.setId(classModel._id);
+        return this;
     }
 
     init = (
@@ -778,23 +783,21 @@ class Class extends Class_ {
 
     addOrUpdateCard = async (params: { [key: string]: any }, cardId?: string): Promise<Document | null> => {
         const fnLogger = this.logger.child({ method: "addOrUpdateCard", args: { params, cardId } });
-        const document = await new Promise<Document | null>(async (resolve, reject) => {
-            if (cardId) {
-                fnLogger.info("Provided document's id, performing an update");
-                const res = await this.updateCard(cardId, params);
-                resolve(res);
-            } else {
-                fnLogger.info("No document id provided, checking for PKs");
-                const card = await this.getByPrimaryKeys(params);
-                if (card == null) {
-                    const res = await this.addCard(params);
-                    resolve(res);
-                } else {
-                    fnLogger.error("Duplicate card by keys");
-                    reject("Duplicate card by keys");
-                }
+        // Plain awaits rather than an async `new Promise` executor; see `build` above for
+        // what that shape did to a failure. A conflict from `updateCard` used to hang here.
+        let document: Document | null;
+        if (cardId) {
+            fnLogger.info("Provided document's id, performing an update");
+            document = await this.updateCard(cardId, params);
+        } else {
+            fnLogger.info("No document id provided, checking for PKs");
+            const card = await this.getByPrimaryKeys(params);
+            if (card != null) {
+                fnLogger.error("Duplicate card by keys");
+                throw new Error("Duplicate card by keys");
             }
-        });
+            document = await this.addCard(params);
+        }
         fnLogger.warn("Updated document", { document })
         return document;
 
@@ -820,15 +823,16 @@ class Class extends Class_ {
      * @returns The updated document, or `null` if stack is not defined
      */
     updateCard = async (cardId: string, params: { [key: string]: any }): Promise<Document | null> => {
-        return new Promise<Document | null>(async (resolve, reject) => {
-            if (this.stack) {
-                const res = await this.stack.createDoc(cardId, this.getName(), this, params);
-                resolve(res)
-            } else {
-                Class.logger.info("no stack defined");
-                resolve(null);
-            }
-        })
+        // Plain awaits rather than an async `new Promise` executor; see `build` above.
+        // This was the worst of the four: `createDoc` rejects a write that conflicts
+        // (ADR-0023), and that rejection never reached the caller - two concurrent updates
+        // to one document left one of them hanging forever and crashed the page with an
+        // unhandled rejection.
+        if (!this.stack) {
+            Class.logger.info("no stack defined");
+            return null;
+        }
+        return await this.stack.createDoc(cardId, this.getName(), this, params);
     }
 
     /**
