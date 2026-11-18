@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { revision, RevisionOptions } from "./revision.js";
 
 /** What the tool prints when asked, and when misused. */
@@ -126,10 +127,33 @@ export const run = (argv: readonly string[], cwd: string): number => {
     }
 };
 
-// Only when this module IS the entry point, so it stays importable by tests. Compared
-// as resolved URLs rather than by matching the path: a substring test matched any path
-// that happened to contain the project's name, and running the CLI inside a test run is
-// the one failure that looks like the test itself exiting.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+/**
+ * Whether this module is the process entry point.
+ *
+ * It has to be asked, because the module stays importable by tests and running the CLI
+ * inside a test run is the one failure that looks like the test itself exiting.
+ *
+ * Both sides are **real** paths, which is the whole subtlety. `npm` installs a bin as a
+ * symlink - `node_modules/.bin/docstack` pointing at this file - so `process.argv[1]` is
+ * the link while `import.meta.url` is already the resolved target. Comparing them as
+ * URLs therefore said "not the entry point" for every installed invocation: the tool
+ * parsed nothing, ran nothing, printed nothing and exited 0. A `revision --check` in CI
+ * passed without checking anything, which is worse than a failing check. (The version
+ * before that matched on the path containing the project's name, which was wrong the
+ * other way.)
+ *
+ * @returns `true` when this file was invoked directly, however it was reached.
+ */
+const isEntryPoint = (): boolean => {
+    if (!process.argv[1]) return false;
+    try {
+        return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+    } catch {
+        // An argv[1] that does not exist on disk is not this file.
+        return false;
+    }
+};
+
+if (isEntryPoint()) {
     process.exit(run(process.argv.slice(2), process.cwd()));
 }

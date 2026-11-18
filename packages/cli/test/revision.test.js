@@ -1,4 +1,5 @@
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -237,6 +238,49 @@ test("a hand-written patch joins the chain and does not provoke a revision", () 
     revision({ cwd: root, mode: "autogenerate", message: "add done" });
     const index = readFileSync(join(dir, "index.ts"), "utf8");
     assert.match(index, /patch_0_1_0,\n    patch_0_2_0,\n    patch_0_3_0,/);
+});
+
+test("the installed bin actually runs, reached through a symlink", () => {
+    // Everything else here calls `revision()` directly, which cannot see whether the
+    // command line in front of it works. `npm` installs a bin as a symlink, so
+    // `process.argv[1]` is the link and `import.meta.url` is the resolved target; a guard
+    // comparing the two as URLs decided this file was not the entry point and the tool
+    // exited 0 having done nothing. A silent pass is worse than a failure, and only
+    // invoking it the way an installed copy is invoked can tell the difference.
+    const root = project(TODO_MODEL);
+    const cli = join(dirname(fileURLToPath(import.meta.url)), "..", "lib", "index.js");
+    const link = join(root, "docstack-bin.mjs");
+    symlinkSync(cli, link);
+
+    const atLink = (args) => {
+        try {
+            return {
+                code: 0,
+                out: execFileSync(process.execPath, [link, ...args], {
+                    cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+                }),
+            };
+        } catch (error) {
+            return { code: error.status, out: `${error.stdout ?? ""}${error.stderr ?? ""}` };
+        }
+    };
+
+    // Nothing states the model yet, so a check must fail - and must say so.
+    const missing = atLink(["revision", "--check"]);
+    assert.equal(missing.code, 1);
+    assert.match(missing.out, /disagree on 1 class\(es\): Todo/);
+
+    // And the generate/check cycle has to work through the same entry point.
+    const generated = atLink(["revision", "--autogenerate", "-m", "the Todo class"]);
+    assert.equal(generated.code, 0);
+    assert.match(generated.out, /Wrote /);
+
+    const agreeing = atLink(["revision", "--check"]);
+    assert.equal(agreeing.code, 0);
+    assert.match(agreeing.out, /agree on 1 class\(es\): Todo/);
+
+    // Misuse still reports itself rather than passing quietly.
+    assert.equal(atLink(["revision"]).code, 2);
 });
 
 test("the source printer is deterministic and readable", () => {

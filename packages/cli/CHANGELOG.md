@@ -38,6 +38,19 @@ client uses too, so the tool and the engine cannot disagree (`proposal.md` §6).
   them, is picked up by the index, and `--check` stays quiet about it because it carries
   no class documents. `examples/react-todo` has one of each.
 
+### Fixed
+
+- **The installed `docstack` bin did nothing and exited 0.** `npm` installs a bin as a
+  symlink, so `process.argv[1]` is the link while `import.meta.url` is already the
+  resolved target; the entry-point guard compared the two as URLs and therefore decided
+  this file was never the entry point. Every installed invocation parsed nothing, ran
+  nothing and printed nothing, with a success code - so `revision --check` in CI would
+  have passed without checking anything, which is worse than a check that fails. Both
+  sides are compared as real paths now. Found by running the example's
+  `npm run revision:check` through the installed bin rather than by path, and covered by
+  a test that invokes the built `lib/index.js` through a symlink the way `npm` does;
+  reverting the guard fails that test and only that test.
+
 Not yet, and listed in `proposal.md` §12.2: `init`, `doctor` and `docs`. `doctor` is
 where the report for documents predating the integer and default-value changes belongs.
 `create-docstack` waits on `init`, and the "Start here" line of §12.3 goes in whichever
