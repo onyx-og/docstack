@@ -112,12 +112,17 @@ breaking for data already stored, which is why they land in a major release (`2.
 - `@docstack/cli` is a new package. It owns paths, versions and files and nothing else;
   every decision about what a patch contains comes from `@docstack/shared`, which the
   client uses too.
-- **The typed surface re-reads after a write**, because `createDoc` returns the
-  pre-pipeline draft with the real `_id` and `_rev` stamped on it rather than the document
-  the pipeline wrote. Filled defaults, the `~createdBy` / `~updatedBy` attribution and
-  encryption are all absent from that draft. The untyped API has always returned it;
-  typing it made the gap a lie. Having the write path return what it wrote is open, and
-  would remove the extra read.
+- **The write path returns what it wrote**, which typing it is what forced. `createDoc`
+  returned the pre-pipeline draft, so filled defaults and the `~createdBy` / `~updatedBy`
+  attribution were missing from it; the untyped API had always returned that draft, and
+  typing it made the gap a lie. The typed surface read the document back as a stopgap, and
+  the real cause turned out to be one call: `pouchdb-core`'s `put` **clones** before
+  handing the document on, while `bulkDocs` passes the caller's objects through and the
+  pipeline enriches them in place. `createDocs` had always used `bulkDocs` and so never had
+  the defect; `createDoc` uses it now, the read-back is gone, and no extra I/O replaced it.
+  Encryption stays absent from the returned value by design - it seals a clone, so an
+  `encrypted` attribute reads back as the plaintext supplied, which is what decrypting the
+  stored document yields.
 - Mixing runtime class edits with a declared model is unsound by construction, and the
   model hash is the only thing that could detect it. Runtime edits stay supported and stay
   untyped.
@@ -125,9 +130,8 @@ breaking for data already stored, which is why they land in a major release (`2.
   `Document` and `Document` carries `[key: string]: any` - documents legitimately hold
   fields no class declares. Writes are exact in both directions.
 - Still open, and recorded in `proposal.md` §9: branded ids for `foreign_key`, typing
-  Mango selector keys, whether `StackOptions.model` eventually replaces `patches`, whether
-  the write path should return what it wrote, and whether a typed read should reject an
-  undeclared field.
+  Mango selector keys, whether `StackOptions.model` eventually replaces `patches`, and
+  whether a typed read should reject an undeclared field.
 
 ## Alternatives rejected
 

@@ -262,17 +262,31 @@ Escape hatches, deliberately untyped:
 A typed wrapper over a class whose stored model has drifted from the code model (by
 runtime edits) is unsound. Mitigation: §8 hash check in dev mode.
 
-**The wrapper reads back after a write, and should not have to.** `createDoc` returns the
-pre-pipeline draft with the real `_id` and `_rev` stamped on it, not the document the
-pipeline wrote: PouchDB hands the pipeline its own copy, so a declared `defaultValue`, the
-`~createdBy` / `~updatedBy` attribution and encryption are all absent from the value the
-caller receives. The untyped API has always returned that draft; typing it made the gap a
-lie, since `InferDoc` promises the stored shape. `typedClass` therefore re-reads by id
-after `addCard` and `updateCard`, at the cost of one extra read per typed write.
+**~~The wrapper reads back after a write, and should not have to.~~ Fixed 2026-11-18, and
+the read-back is gone.** `createDoc` returned the pre-pipeline draft with the real `_id`
+and `_rev` stamped on it, not the document the pipeline wrote, so a declared
+`defaultValue` and the `~createdBy` / `~updatedBy` attribution were absent from the value
+the caller received. The untyped API had always returned that draft; typing it made the gap
+a lie, since `InferDoc` promises the stored shape, and `typedClass` worked around it by
+re-reading by id.
 
-**Open:** have the write path return what it wrote, after which the re-read goes away. It
-is a change in the core write path with a cost on every create, so it is recorded rather
-than taken.
+The cause was one line, and not the one the note above assumed. `pouchdb-core`'s **`put`
+clones** the document before handing it on (`put` → `clone` → `this.bulkDocs`), while
+`bulkDocs` passes the caller's objects straight through - and the pipeline enriches
+documents **in place**. `createDoc` used `put`; `createDocs`, its batch sibling, has
+always used `bulkDocs` and therefore never had the defect. So the fix was to take the same
+route, not to add a read: no extra I/O anywhere, and the two methods now agree.
+
+Switching away from `put` meant reimplementing what it did with a failed result
+(`yankError`): for a single-document write, a per-document error in the results array is a
+rejection. Tested at both halves - that `bulkDocs` really reports a conflict as an entry
+rather than a throw, and that the returned document carries the filled defaults at the
+revision storage holds.
+
+Encryption remains absent from the returned value, deliberately: it seals a *clone*, so an
+`encrypted` attribute comes back as the plaintext the caller supplied - which is what
+reading the document back decrypts it to. The value is the one a subsequent read returns,
+which is what the types promise.
 
 **Verified 2026-11-15, open behaviour question: the runtime path has no encryption
 precondition, and its failure handling hides that.** `addAttribute` mutates the live

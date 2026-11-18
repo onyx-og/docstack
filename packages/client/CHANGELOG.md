@@ -31,9 +31,9 @@
   by name; each exposes `addCard`, `updateCard`, `get`, `getCards` and `validate` typed by
   the declaration, and `untyped()` for anything the wrapper does not cover. Additive: the
   `Class` API is unchanged, which is what runtime-created and `simple` classes still need.
-  A projected read widens to partial documents rather than claiming whole ones. Writes
-  re-read the document by id, because the write path returns a pre-pipeline draft that
-  omits filled defaults and attribution; `proposal.md` §7 records the better fix.
+  A projected read widens to partial documents rather than claiming whole ones. A write
+  returns the stored document directly - the write path was fixed to return what it wrote,
+  under **Fixed** below, so there is no extra read behind these methods.
 - **`useClassDocs(stack, Todo)`** in `@docstack/react` types the documents it returns when
   given a class declared in code. `useClassDocs(stack, "Todo")` is untouched and still
   returns `Document[]`, which is what a runtime-created class needs. One implementation
@@ -68,6 +68,29 @@
 
 Not yet: `defineHandler` and the `handler?: string` references on `TriggerModel` and
 `PatchJob` (`proposal.md` §13), `defineDomain`.
+
+### Fixed - a write returns the document it wrote (DocStack 2.0, `2.0.md`)
+
+- **`createDoc` returned a draft the write pipeline had never touched.** Filled defaults,
+  the `~createdBy` / `~updatedBy` attribution and before-trigger output were all missing
+  from the value a caller got back, while the write itself was fine - so `addCard` reported
+  a document that did not match the one in the database, and anything using the return value
+  instead of re-reading was working from stale data.
+
+  The cause: `pouchdb-core`'s **`put` clones** the document before passing it on, so the
+  pipeline enriched a copy the caller never saw. `bulkDocs` passes the caller's objects
+  through and the pipeline enriches them in place, which is why `createDocs` - the batch
+  sibling - never had the defect. `createDoc` takes the same route now, so there is no
+  extra read anywhere and the two methods agree.
+
+  Switching off `put` meant reimplementing what it did with a failed result (`yankError`):
+  for a single-document write, a per-document error in the results array is a rejection,
+  not a value. A conflict still rejects rather than handing back something
+  document-shaped (ADR-0023).
+
+  An `encrypted` attribute still comes back as the plaintext that was supplied, because
+  encryption seals a clone - and that is what reading the document back decrypts it to, so
+  the returned value is the one a subsequent read gives.
 
 ### Changed - the attribute mapping is one function, in shared (DocStack 2.0, `2.0.md`)
 

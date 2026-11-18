@@ -4111,7 +4111,11 @@ class ClientStack extends Stack {
      * @param type - The class name (e.g., 'Task', 'User')
      * @param classObj - The Class instance or schema definition for validation
      * @param params - The document data to save
-     * @returns The created or updated document
+     * @returns The document **as written**: the caller's data plus everything the write
+     * pipeline added - filled defaults, the `~createdBy` / `~updatedBy` attribution,
+     * before-trigger output - with the stored `_id` and `_rev`. An `encrypted` attribute
+     * reads back as the plaintext that was supplied, which is what decrypting the stored
+     * document yields, so the value is the one a subsequent read returns.
      * @throws Error if policy check fails or document type conflicts
      * 
      * @example
@@ -4193,13 +4197,31 @@ class ClientStack extends Stack {
                 // console.log("Doc after merge", { doc_ })
             }
             fnLogger.info("Doc AFTER elaboration (i.e. merge)", { doc_ });
-            let response = await db.put(doc_, writeOptions as PouchDB.Core.PutOptions);
-            // Stamped from the response, not left as the pre-put draft. A caller cannot
+            // `bulkDocs` rather than `put`, which is what makes the returned document
+            // the one that was written. `pouchdb-core`'s `put` clones the document
+            // before handing it on, so the pipeline - filled defaults, the `~createdBy`
+            // and `~updatedBy` attribution, before-triggers - enriched a copy the caller
+            // never saw, and this method returned a draft that was missing all of it.
+            // `bulkDocs` passes the objects through, and the pipeline enriches them in
+            // place, so `doc_` below IS the stored document. `createDocs` has always
+            // taken this route, which is why the batch path did not share the defect.
+            //
+            // Encryption stays absent on purpose: it seals a clone, so an `encrypted`
+            // attribute comes back as the plaintext the caller supplied - which is
+            // exactly what reading the document back would decrypt it to.
+            const results = await db.bulkDocs([doc_], writeOptions as PouchDB.Core.BulkDocsOptions);
+            const response = results[0] as PouchDB.Core.Response & Partial<PouchDB.Core.Error>;
+            // What `put` used to do for us (`yankError`): for a single-document write, a
+            // per-document failure in the results array is a rejection, not a value. It
+            // is thrown raw so the catch below reports a conflict as a conflict.
+            if (!response) throw new Error("createDoc - the write returned no result");
+            if (response.error) throw response;
+            // Stamped from the response, not left as the pre-write draft. A caller cannot
             // otherwise tell a document that landed from one that did not - which is
             // exactly the ambiguity that made a colliding id look like a success. See
             // ADR-0023.
             doc = { ...doc_, _id: response.id, _rev: response.rev } as Document;
-            fnLogger.info("Response after put", { "response": response });
+            fnLogger.info("Response after write", { "response": response });
             if (response.ok && isNewDoc) {
                 await this.incrementLastDocId();
                 docId = response.id;

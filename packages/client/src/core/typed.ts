@@ -118,27 +118,19 @@ export const typedClass = <C extends ClassDefinition>(
     };
 
     /**
-     * Returns the document as stored, given whatever a write handed back.
+     * Types what a write returned.
      *
-     * `createDoc` returns the pre-pipeline draft with the real `_id` and `_rev` stamped
-     * on it, not the document the pipeline wrote: PouchDB hands the pipeline its own
-     * copy, so everything added there - a declared `defaultValue`, the `~createdBy` and
-     * `~updatedBy` attribution, encryption - is absent from the value the caller gets.
-     * This surface promises the stored shape, so it reads it back rather than returning
-     * a draft that the types would describe incorrectly.
-     *
-     * The cost is one extra read per typed write. The better fix is for the write path
-     * to return what it wrote, after which this can go (`proposal.md` §7).
+     * This used to read the document back, because `createDoc` returned a draft the
+     * pipeline had never touched - `pouchdb-core`'s `put` clones, so filled defaults and
+     * the `~createdBy` / `~updatedBy` attribution landed on a copy the caller never saw.
+     * The write path returns the stored document now, so the extra read is gone and this
+     * is a cast rather than a round trip.
      *
      * @param written - Whatever the untyped write returned.
      * @returns The stored document, or `null` when the write produced none.
      */
-    const readBack = async (written: Document | null): Promise<InferDoc<C> | null> => {
-        const id = (written as { _id?: string } | null)?._id;
-        if (!id) return null;
-        const classObj = await resolve();
-        return await classObj.get(id) as InferDoc<C> | null;
-    };
+    const asStored = (written: Document | null): InferDoc<C> | null =>
+        written ? written as unknown as InferDoc<C> : null;
 
     const getCards = (async (
         selector?: { [key: string]: any },
@@ -156,11 +148,11 @@ export const typedClass = <C extends ClassDefinition>(
         untyped: resolve,
         addCard: async (input: InferInput<C>) => {
             const classObj = await resolve();
-            return await readBack(await classObj.addCard(input as { [key: string]: any }));
+            return asStored(await classObj.addCard(input as { [key: string]: any }));
         },
         updateCard: async (id: string, patch: Partial<InferInput<C>>) => {
             const classObj = await resolve();
-            return await readBack(await classObj.updateCard(id, patch as { [key: string]: any }));
+            return asStored(await classObj.updateCard(id, patch as { [key: string]: any }));
         },
         get: async (id: string) => {
             const classObj = await resolve();

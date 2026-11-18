@@ -131,6 +131,42 @@ model and the patch chain disagree, which is where by-hand drift starts.
   0.1.8 should be treated as having held plaintext for encrypted attributes and be
   re-created or purged.
 
+## Found 2026-11-18, not yet diagnosed
+
+### Two concurrent writes to the same document crash the renderer
+
+Two read-modify-writes to one document, started without awaiting the first, destroy the
+browser's execution context - the page is gone, not the write. Localised, in the client's
+Playwright harness:
+
+- sequential writes to the same document: fine;
+- concurrent writes to **different** documents: fine;
+- concurrent writes to the **same** document: the context is destroyed.
+
+```typescript
+const created = await classObj.addCard({ title: "first" });
+await Promise.allSettled([
+    classObj.updateCard(created._id, { title: "A" }),
+    classObj.updateCard(created._id, { title: "B" }),
+]);   // "Execution context was destroyed, most likely because of a navigation"
+```
+
+Pre-existing and not caused by the write-path change of ADR-0048: it reproduces
+identically with `createDoc` on its old `put` route. A conflict *itself* is handled
+correctly - a stale revision written through the pipeline comes back as a result entry
+with `error: true`, and the single-document path turns that into a rejection - so the
+crash is something about the second write's path rather than about the conflict result.
+
+Unverified lead, recorded so it is not re-derived: the failure handler logs through
+`fnLogger.error`, and the log sink is itself a database write. A write that fails while
+logging a failed write is the shape a stack overflow would take. Worth testing first with
+`logLevel: "silent"`, which the Playwright fixture does not currently expose.
+
+What a fix needs: a decision about what concurrent writes to one document should *do*.
+Last-write-wins needs a retry on conflict; refusing needs the rejection to be
+distinguishable from a crash. The transaction engine (ADR-0039) answers this for staged
+writes and says nothing about two direct ones.
+
 ## Older flags, still unactioned
 
 - Class/domain name-collision ids (ADR-0021 discussion).
