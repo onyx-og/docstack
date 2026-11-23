@@ -10,8 +10,15 @@
  *
  * They deliberately resolve `@docstack/shared` through its built declarations, so what
  * is asserted is what a consumer actually sees.
+ *
+ * The classes come from `../model-agreement/fixtures.ts` rather than being declared here,
+ * because `../model-agreement.test.ts` builds its runtime validator from the same two
+ * declarations and runs the same values through Zod. That is `proposal.md` §11's
+ * agreement criterion: one shared fixture set, two readers. Declaring them twice would
+ * let the type and the validator drift apart while both tests went on passing.
  */
-import { a, defineClass, defineModel, InferDoc, InferInput } from "@docstack/shared";
+import { defineModel, InferDoc, InferInput } from "@docstack/shared";
+import { Mods, Row } from "../model-agreement/fixtures.js";
 
 /** Compiles only when `T` is exactly `true`. */
 type Expect<T extends true> = T;
@@ -23,22 +30,8 @@ type Equal<A, B> =
 /** Whether `K` may be omitted from `T`. */
 type IsOptional<T, K extends keyof T> = {} extends Pick<T, K> ? true : false;
 
-// One attribute per row of the mapping table, each mandatory so the value type is the
-// only thing under test.
-const Row = defineClass("Row", {
-    attributes: {
-        text: a.string({ mandatory: true }),
-        whole: a.integer({ mandatory: true }),
-        fraction: a.decimal({ mandatory: true, precision: 2 }),
-        flag: a.boolean({ mandatory: true }),
-        blob: a.object({ mandatory: true }),
-        when: a.date({ mandatory: true }),
-        day: a.date({ mandatory: true, format: "date" }),
-        owner: a.foreignKey({ mandatory: true, targetClass: "User" }),
-        link: a.reference({ mandatory: true, domain: "Ownership" }),
-        priority: a.enum(["low", "mid", "high"], { mandatory: true }),
-    },
-});
+// `Row` declares one attribute per row of the mapping table, each mandatory so the value
+// type is the only thing under test. Its fixture values live beside the declaration.
 type RowInput = InferInput<typeof Row>;
 
 export type _string = Expect<Equal<RowInput["text"], string>>;
@@ -54,19 +47,7 @@ export type _reference = Expect<Equal<RowInput["link"], string>>;
 // An enum narrows to its members, which is the whole point of declaring it in code.
 export type _enum = Expect<Equal<RowInput["priority"], "low" | "mid" | "high">>;
 
-// Modifiers, in the order the validator applies them.
-const Mods = defineClass("Mods", {
-    attributes: {
-        tags: a.string({ mandatory: true, isArray: true }),
-        maybeTags: a.string({ isArray: true }),
-        loose: a.string(),
-        withDefault: a.boolean({ defaultValue: false }),
-        mandatoryWithDefault: a.boolean({ mandatory: true, defaultValue: true }),
-        required: a.string({ mandatory: true }),
-        arrayWithDefault: a.string({ mandatory: true, isArray: true, defaultValue: "x" }),
-        optionalArrayWithDefault: a.string({ isArray: true, defaultValue: "x" }),
-    },
-});
+// `Mods` declares every modifier combination, in the order the validator applies them.
 type ModsInput = InferInput<typeof Mods>;
 type ModsDoc = InferDoc<typeof Mods>;
 
@@ -88,10 +69,11 @@ export type _mandatoryWithDefaultIsPresentOnDoc =
 export type _defaultIsOptionalOnInput = Expect<Equal<IsOptional<ModsInput, "withDefault">, true>>;
 export type _defaultIsPresentOnDoc = Expect<Equal<IsOptional<ModsDoc, "withDefault">, false>>;
 
-// The array exception, verified against Zod itself: modifiers apply `defaultValue`
-// before `isArray`, so the default belongs to the members. A mandatory array with a
-// default still rejects `undefined`, so it stays required on a write and present on a
-// read; an optional one is filled by nothing, so the key may be absent.
+// The array exception: modifiers apply `defaultValue` before `isArray`, so the default
+// belongs to the members. A mandatory array with a default still rejects `undefined`, so
+// it stays required on a write and present on a read; an optional one is filled by
+// nothing, so the key may be absent. Both halves are asserted against the real validator
+// and a real write in `../model-agreement.test.ts`, which reads the same declaration.
 export type _mandatoryArrayWithDefaultStaysRequired =
     Expect<Equal<IsOptional<ModsInput, "arrayWithDefault">, false>>;
 export type _optionalArrayWithDefaultIsNotFilled =

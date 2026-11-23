@@ -183,6 +183,12 @@ over the class/stack). Add a type-level test (`expectTypeOf` / `tsd`) per row of
 table and a runtime test asserting that the zod built from `toClassModel()` accepts and
 rejects the same fixtures as the static type.
 
+**Done 2026-11-23**, with "the same fixtures" taken literally: one module declares the
+classes and the values, the type tests and a browser test both read it, and the three
+fixture groups separate what both sides agree on from what only the validator can enforce
+(§11). No assertion library was needed - `Equal<>` plus `@ts-expect-error` is what the
+type side uses, since `@ts-expect-error` fails when the error it suppresses goes away.
+
 ## 6. Patch emission and `autogenerate`
 
 ### 6.1 Baseline = folded chain
@@ -538,7 +544,16 @@ builds automatically.
   *undeclared* field still gives `any`, because `Document` carries
   `[key: string]: any` - documents legitimately hold fields no class declares. Narrowing
   that on the typed read path is open (§9.9).
-- Changing an attribute in the model without regenerating fails `revision --check`.
+- ~~Changing an attribute in the model without regenerating fails `revision --check`.~~ -
+  **met 2026-11-23.** It was covered only for a class the chain has never seen and a class
+  the model stopped declaring; an *edit* to an attribute both sides already know reached
+  `--check` only through `diffModel`'s own unit tests. `revision.test.js` now drives the
+  command through five kinds of edit - a config flag, a constraint, the type, `mandatory`
+  dropped, and the description alone - asserting for each that the project starts agreeing,
+  that the edit makes `--check` exit 1 naming the class and the command to run, and that
+  generating closes it with a merge carrying only the changed attribute. The
+  description-only case is there because it reads as cosmetic and is not: a patch has to
+  carry a changed description or the stored model never gets it.
 - ~~A generated patch adding an attribute behaves identically to a hand-written ADR-0038
   delta patch, including on a locked stack with deferral and replay.~~ - **met
   2026-11-23.** `packages/client/src-test/generated-patch-equivalence.test.ts` drives three
@@ -570,8 +585,31 @@ builds automatically.
   the type describes the documented shape (`<target>-<version>`, which is what the
   generator emits), the engine tolerates its absence through `db.post`, and the gap is now
   asserted rather than assumed.
-- The Zod schema built at runtime from `toClassModel()` and the static type agree on a
-  shared fixture set for every attribute type and modifier combination.
+- ~~The Zod schema built at runtime from `toClassModel()` and the static type agree on a
+  shared fixture set for every attribute type and modifier combination.~~ - **met
+  2026-11-23.** There were two fixture sets, not one: the type tests declared their own
+  classes and the runtime round-trip test declared others, covering six of the nine types
+  and none of the modifier combinations. Since `attributeSpecToZod` was extracted into
+  shared so that one definition answers both the validator and the inference, what was
+  missing was any check that the two reach the same *verdict*.
+
+  `src-test/model-agreement/fixtures.ts` is now the shared set: two declarations - one
+  attribute per type, and every modifier combination - read by
+  `types/model-inference.types.ts` for the static side and by `model-agreement.test.ts`,
+  which builds the class from `toClassModel()` in a real stack, for Zod's. Three fixture
+  groups, because the two sides are not symmetric: values the type admits and Zod accepts,
+  values the type refuses (each `@ts-expect-error` *is* that assertion - an unused one is a
+  compile error) and Zod rejects, and values the type cannot refuse because TypeScript
+  cannot express `maxLength`, integer-ness, decimal precision, bounds, an ISO-8601 shape or
+  "a document that exists". That third group states the asymmetry instead of hiding it.
+
+  It closed two claims the type tests asserted and nothing verified: that `mandatory` with
+  a `defaultValue` is *not* required on a write, because Zod applies the default while
+  parsing; and the array exception, where `defaultValue` applies before `isArray` so the
+  default belongs to the members - a mandatory array with a default stays required, and an
+  optional one is absent from a read. Both now hold against the real validator and a real
+  write. `foreign_key` is covered too, including the half that needs a live stack: an id
+  that resolves is accepted, one that does not is rejected.
 - ~~The 1.x → 2.0 migration guide (`2.0.md` §5) covers every §8 defect actually fixed, with
   the `docstack doctor` check an app runs before upgrading.~~ — **met 2026-11-23.**
   `packages/docs/docs/upgrade-to-2.0.md`: the stored-data strictness as a table (all five

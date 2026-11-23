@@ -1,5 +1,5 @@
 {
-  "//": "Typechecks the type-level tests in src-test/types, plus the equivalence fixture in src-test/equivalence, which is application-shaped source that has to compile the way an app's would - a generated patch against `Patch`, a declared model against the builders. Nothing is emitted; failure to compile IS the failure. Strict on purpose: the inference under test is about optionality and nullability, which a loose config would hide.",
+  "//": "Typechecks the type-level tests in src-test/types, the shared model-agreement fixture they read, and the equivalence fixture in src-test/equivalence - application-shaped source that has to compile the way an app's would: a generated patch against `Patch`, a declared model against the builders. Nothing is emitted; failure to compile IS the failure. Strict on purpose: the inference under test is about optionality and nullability, which a loose config would hide. In src-test/model-agreement/fixtures.ts the `@ts-expect-error` directives ARE the assertions - an unused one is an error, so a type that started admitting a bad value fails here.",
   "//2": "The fixture imports `@docstack/client/model`, so this needs `npm run build:client` first (as the type tests already need shared built). CI builds both before running it.",
   "compilerOptions": {
     // Empty, deliberately, and load-bearing. An application that sets `types` gets no
@@ -18,5 +18,5 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src-test/types/**/*.ts", "src-test/equivalence/**/*.ts"]
+  "include": ["src-test/types/**/*.ts", "src-test/model-agreement/**/*.ts", "src-test/equivalence/**/*.ts"]
 }

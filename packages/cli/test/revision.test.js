@@ -431,3 +431,45 @@ test("the committed equivalence fixture is still what the generator emits", () =
     // different patch than the one the browser suite drives.
     assert.equal(revision({ cwd: root, mode: "check" }).code, 0);
 });
+
+test("changing an attribute without regenerating fails --check, whatever changed", () => {
+    // `proposal.md` §11, and ADR-0037's failure mode: "edited the model, forgot the
+    // patch". The failures already covered are a class the chain has never seen and a
+    // class the model stopped declaring; an *edit* to an attribute that both sides
+    // already know is the one that happens every week, and it reached `--check` only
+    // through the diff's own unit tests.
+    const edits = {
+        "a config flag": 'title: a.string({ mandatory: true, maxLength: 200, primaryKey: true }),',
+        "a constraint": "title: a.string({ mandatory: true, maxLength: 120 }),",
+        "the type": "title: a.integer({ mandatory: true }),",
+        "mandatory, dropped": "title: a.string({ maxLength: 200 }),",
+        // Cosmetic to a reader, not to the stored model: a patch has to carry a changed
+        // description or the stored schema never gets it, so `--check` has to notice.
+        "only the description": 'title: a.string({ mandatory: true, maxLength: 200, description: "The title" }),',
+    };
+
+    for (const [what, replacement] of Object.entries(edits)) {
+        const root = project(TODO_MODEL);
+        // Generated and agreeing, which is the state CI is normally in.
+        revision({ cwd: root, mode: "autogenerate", message: "the Todo class" });
+        assert.equal(revision({ cwd: root, mode: "check" }).code, 0, `${what}: agreeing first`);
+
+        writeFileSync(join(root, "src", "model.ts"), TODO_MODEL.replace(
+            "title: a.string({ mandatory: true, maxLength: 200 }),", replacement
+        ), "utf8");
+
+        const drifted = revision({ cwd: root, mode: "check" });
+        assert.equal(drifted.code, 1, `${what}: must fail`);
+        assert.match(drifted.output.join("\n"), /disagree on 1 class\(es\): Todo/, what);
+        // And it names the way out, rather than only reporting.
+        assert.match(drifted.output.join("\n"), /--autogenerate/, what);
+
+        // Generating closes it, and the patch carries the one attribute as a merge.
+        const written = revision({ cwd: root, mode: "autogenerate", message: `change ${what}` });
+        const patch = readFileSync(written.written, "utf8");
+        assert.match(patch, /_rev: "auto"/, what);
+        assert.match(patch, /title:/, what);
+        assert.doesNotMatch(patch, /priority:/, `${what}: only the changed attribute`);
+        assert.equal(revision({ cwd: root, mode: "check" }).code, 0, `${what}: agreeing again`);
+    }
+});
