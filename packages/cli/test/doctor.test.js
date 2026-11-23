@@ -257,6 +257,104 @@ test("the ambient PouchDB namespace counts from either package that declares it"
         && line.includes("Neither @types/pouchdb nor @types/pouchdb-core")));
 });
 
+test("an app with no declared model still gets the pre-upgrade data list, from its chain", () => {
+    // The 1.x shape: hand-written patches, no declared model. This is the application
+    // that most needs to know which stored values 2.0 would newly reject, and the list
+    // has to come from the chain, because there is no model to read it from.
+    const legacyPatch = `const patch = {
+    _id: "legacy-1.0.0", "~class": "patch", target: "legacy", version: "1.0.0",
+    docs: [{ _id: "Invoice", "~class": "class", name: "Invoice", active: true, schema: {
+        reference: { name: "reference", type: "string", config: { mandatory: true } },
+        quantity: { name: "quantity", type: "integer", config: {} },
+        issuedOn: { name: "issuedOn", type: "date", config: {} },
+        status: { name: "status", type: "enum", config: { values: [{ value: "draft" }] } },
+    } }],
+};
+export default patch;
+`;
+    const result = doctor({ cwd: project({ "src/patches/1.0.0.ts": legacyPatch }) });
+    const data = result.findings.filter(f => f.check === "data");
+
+    assert.equal(data.length, 1);
+    assert.match(data[0].detail, /Invoice\.quantity \(integer/);
+    assert.match(data[0].detail, /Invoice\.issuedOn \(date/);
+    assert.match(data[0].detail, /Invoice\.status \(enum/);
+    // Not every attribute: a string was never made stricter.
+    assert.doesNotMatch(data[0].detail, /Invoice\.reference/);
+    // Nothing is known to be wrong, so it does not fail the command.
+    assert.equal(result.code, 0);
+});
+
+test("lists the attributes an upgrade has to backfill", () => {
+    // The other half of an upgrade: a declared default is written on create since 2.0, so
+    // documents stored before that carry no value and a read gives `undefined` where the
+    // types promise one. Planning that needs the list as much as the rejections do.
+    const withDefaults = `const patch = {
+    _id: "legacy-1.0.0", "~class": "patch", target: "legacy", version: "1.0.0",
+    docs: [{ _id: "Invoice", "~class": "class", name: "Invoice", active: true, schema: {
+        reference: { name: "reference", type: "string", config: { mandatory: true } },
+        archived: { name: "archived", type: "boolean", config: { defaultValue: false } },
+        tags: { name: "tags", type: "string", config: { isArray: true, defaultValue: "none" } },
+    } }],
+};
+export default patch;
+`;
+    const result = doctor({ cwd: project({ "src/patches/1.0.0.ts": withDefaults }) });
+    const backfill = result.findings.find(f => f.check === "data"
+        && f.message.includes("declare a default that older documents do not carry"));
+
+    assert.ok(backfill, "the backfill list must be reported");
+    assert.match(backfill.detail, /Invoice\.archived \(default: false\)/);
+    assert.match(backfill.detail, /postApply/);
+    // An array's default is a MEMBER default: the engine fills nothing, so there is
+    // nothing to backfill and listing it would send someone looking for a value that
+    // was never meant to exist.
+    assert.doesNotMatch(backfill.detail, /Invoice\.tags/);
+    assert.doesNotMatch(backfill.detail, /Invoice\.reference/);
+    assert.equal(result.code, 0);
+});
+
+test("reads a chain from a module, and refuses to pick between two of them", () => {
+    // What a 1.x application has: the chain as an array in source. Checking it must not
+    // require restructuring the project first - that is the project being asked to plan
+    // an upgrade.
+    const one = `const a = { _id: "x-1.0.0", "~class": "patch", target: "x", version: "1.0.0",
+    docs: [{ _id: "Note", "~class": "class", name: "Note", active: true, schema: {
+        quantity: { name: "quantity", type: "integer", config: {} },
+    } }] };
+export const patches = [a];
+`;
+    const single = doctor({ cwd: project({ "src/legacy.ts": one }), patches: "src/legacy.ts" });
+    assert.ok(of(single, "chain").some(line => line.includes("1 patch(es)")));
+    assert.match(single.findings.find(f => f.check === "data").detail, /Note\.quantity/);
+
+    // Two chains in one module - a root database and a per-workspace one - is a real
+    // shape. Picking the first would cover one and say nothing about the other, so it
+    // refuses and shows how to name one.
+    const two = `${one}
+const b = { _id: "y-1.0.0", "~class": "patch", target: "y", version: "1.0.0",
+    docs: [{ _id: "Task", "~class": "class", name: "Task", active: true, schema: {
+        due: { name: "due", type: "date", config: {} },
+    } }] };
+export const WORKSPACE_PATCHES = [b];
+`;
+    const root = project({ "src/legacy.ts": two });
+    const ambiguous = doctor({ cwd: root, patches: "src/legacy.ts" });
+    const refusal = of(ambiguous, "chain").join("\n");
+    // Sorted, so the message does not depend on the order a module's exports enumerate
+    // in. `localeCompare`, so the order is case-insensitive: `patches` before
+    // `WORKSPACE_PATCHES`.
+    assert.match(refusal, /exports 2 arrays of patches: patches, WORKSPACE_PATCHES/);
+    assert.match(refusal, /#patches/);
+    assert.equal(ambiguous.code, 1);
+
+    // And naming one settles it, per chain.
+    const named = doctor({ cwd: root, patches: "src/legacy.ts#WORKSPACE_PATCHES" });
+    assert.ok(of(named, "chain").some(line => line.includes("folds to 1 class(es): Task")));
+    assert.match(named.findings.find(f => f.check === "data").detail, /Task\.due \(date/);
+    assert.equal(named.code, 0);
+});
+
 test("warns about a tsconfig that restricts types, which silently weakens them", () => {
     const root = project({
         "src/model.ts": HEALTHY_MODEL,

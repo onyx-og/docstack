@@ -5,6 +5,7 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docs: [
     'intro',
+    'upgrade-to-2.0',
     {
       type: 'category',
       label: 'Get started',

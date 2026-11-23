@@ -122,6 +122,29 @@ never seen it (`tokido`, 2026-11-18) - which is the only way this kind of defect
 - **A failed model load no longer drags a second error behind it.** "No patch directory"
   was reported on top of "this file exports no model", burying the real one.
 
+### Added - the pre-upgrade checks work on an application that has not adopted the model
+
+Serving the 1.x → 2.0 migration guide (`packages/docs/docs/upgrade-to-2.0.md`), because the
+application that guide addresses is exactly the one `doctor` could not help:
+
+- **The data scan falls back to the folded patch chain** when no model is declared. It read
+  its list from a declared model, which a 1.x application does not have - and that is the
+  application being asked to plan an upgrade.
+- **`--patches` accepts a module, not only a directory.** A chain written before the
+  generator existed is `export const PATCHES = [...]` in source, so checking it no longer
+  requires restructuring the project first.
+- **`<path>#EXPORT` names one chain** in a module that holds several, which is what a
+  project with a root database and per-workspace ones has. With no name given it refuses
+  and lists the exports, sorted so the message does not depend on enumeration order -
+  picking the first would cover one chain and say nothing about the rest.
+- **The backfill half is reported too**: the attributes whose declared `defaultValue` older
+  documents do not carry, so a read returns `undefined` where the types promise a value.
+  Array attributes are excluded, because their default is a member default and fills
+  nothing - listing them would send someone looking for a value that never existed.
+
+Verified against a real pre-2.0 application: two chains in one module, 3 and 11 classes, 8
+and 39 at-risk attributes, 6 needing a backfill.
+
 ### Fixed - the conventions no longer guess between two models or two chains
 
 A project with **two stacks** - a root database plus one per workspace, which a real

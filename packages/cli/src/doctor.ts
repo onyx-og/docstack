@@ -234,6 +234,18 @@ const checkChain = (loaded: LoadedPatch[]): Finding[] => {
     const byVersion = new Map<string, string[]>();
 
     for (const entry of loaded) {
+        // A patch from an exported array has no file name of its own, so the two checks
+        // that compare a name against the version inside it do not apply.
+        if (entry.fromArray) {
+            if (!semver.valid(entry.version)) {
+                findings.push({
+                    severity: "error", check: "chain",
+                    message: `A patch in '${entry.path}' declares version '${entry.version}', which is not semver.`,
+                    detail: "The chain has no order without it: the engine sorts patches by version.",
+                });
+            }
+            continue;
+        }
         if (!semver.valid(entry.version)) {
             findings.push({
                 severity: "error", check: "chain",
@@ -490,27 +502,60 @@ const checkEnvironment = (cwd: string, modelRelative?: string): Finding[] => {
  * which this process can open. Rather than pretend, the report names the attributes at
  * risk so the check can be run where the data is.
  *
- * @param model - The loaded model.
+ * Takes schemas by class name rather than a model, so it can read either source: a
+ * declared model when there is one, and the **folded patch chain** when there is not.
+ * That second case is the one that matters for an upgrade - an application still on 1.x
+ * has hand-written patches and no declared model, and it is exactly the application that
+ * needs this list.
+ *
+ * @param schemas - Class schemas by class name.
  * @returns One note per at-risk attribute type, or none.
  */
-const checkStoredData = (model: ModelDefinition): Finding[] => {
+const checkStoredData = (schemas: Record<string, ClassModel["schema"]>): Finding[] => {
     const atRisk: string[] = [];
-    for (const classObj of model.classes) {
-        const schema = (classObj.toClassModel().schema ?? {}) as Record<string, AttributeModel>;
+    for (const className of Object.keys(schemas).sort()) {
+        const schema = (schemas[className] ?? {}) as Record<string, AttributeModel>;
         for (const [name, attribute] of Object.entries(schema)) {
             if (NEWLY_STRICT[attribute.type]) {
-                atRisk.push(`${classObj.name}.${name} (${attribute.type}: ${NEWLY_STRICT[attribute.type]})`);
+                atRisk.push(`${className}.${name} (${attribute.type}: ${NEWLY_STRICT[attribute.type]})`);
             }
         }
     }
-    if (!atRisk.length) return [];
-    return [{
-        severity: "note", check: "data",
-        message: `${atRisk.length} attribute(s) are stricter in 2.0 than when existing documents were written.`,
-        detail: "This process cannot read your data - it lives where the application runs - so "
-            + "check these where it does, before upgrading. A document that fails is still "
-            + "readable; it is the next WRITE that is refused.\n  - " + atRisk.join("\n  - "),
-    }];
+    // The other half of an upgrade: attributes whose declared default the engine now
+    // writes. Nothing is rejected, but a document stored before that happened has no
+    // value for them, so a read gives `undefined` where the types promise one. That is a
+    // backfill - a `postApply` job in the next patch - and it needs the same list.
+    const unfilled: string[] = [];
+    for (const className of Object.keys(schemas).sort()) {
+        const schema = (schemas[className] ?? {}) as Record<string, AttributeModel>;
+        for (const [name, attribute] of Object.entries(schema)) {
+            const config = (attribute.config ?? {}) as { defaultValue?: unknown; isArray?: boolean };
+            if (config.defaultValue === undefined || config.isArray === true) continue;
+            unfilled.push(`${className}.${name} (default: ${JSON.stringify(config.defaultValue)})`);
+        }
+    }
+
+    const findings: Finding[] = [];
+    if (atRisk.length) {
+        findings.push({
+            severity: "note", check: "data",
+            message: `${atRisk.length} attribute(s) are stricter in 2.0 than when existing documents were written.`,
+            detail: "This process cannot read your data - it lives where the application runs - so "
+                + "check these where it does, before upgrading. A document that fails is still "
+                + "readable; it is the next WRITE that is refused.\n  - " + atRisk.join("\n  - "),
+        });
+    }
+    if (unfilled.length) {
+        findings.push({
+            severity: "note", check: "data",
+            message: `${unfilled.length} attribute(s) declare a default that older documents do not carry.`,
+            detail: "A declared `defaultValue` is written on a document's first write since 2.0, so "
+                + "documents stored before that have no value for these and a read returns "
+                + "`undefined` where the types promise one. Backfill them in a `postApply` job on "
+                + "your next patch, or treat them as optional in code.\n  - " + unfilled.join("\n  - "),
+        });
+    }
+    return findings;
 };
 
 /**
@@ -529,6 +574,7 @@ export const doctor = (options: DoctorOptions): DoctorResult => {
     let modelPath: string | null = null;
     let patchDir: string | null = null;
     let modelError: string | null = null;
+    let foldedClasses: Record<string, ClassModel> | null = null;
 
     // Resolved before anything is reported, because what the absence of one MEANS depends
     // on the other. A project with neither has not adopted the code-defined model, which
@@ -620,6 +666,7 @@ export const doctor = (options: DoctorOptions): DoctorResult => {
             findings.push(...checkChain(loaded));
 
             const folded = foldPatchChain(chain);
+            foldedClasses = folded.classes;
             if (!model) {
                 // No declared model to compare against, so the fold is reported for what
                 // it is worth on its own: the classes a device ends up with.
@@ -659,8 +706,18 @@ export const doctor = (options: DoctorOptions): DoctorResult => {
 
     if (model) {
         findings.push(...checkModel(model));
-        findings.push(...checkStoredData(model));
     }
+    // From the declared model when there is one, and from the folded chain otherwise, so
+    // an application still on 1.x gets the list it needs to plan an upgrade.
+    const schemas: Record<string, ClassModel["schema"]> = {};
+    if (model) {
+        for (const classObj of model.classes) schemas[classObj.name] = classObj.toClassModel().schema ?? {};
+    } else if (foldedClasses) {
+        for (const [name, classModel] of Object.entries(foldedClasses)) {
+            schemas[name] = classModel.schema ?? {};
+        }
+    }
+    findings.push(...checkStoredData(schemas));
     findings.push(...checkEnvironment(
         options.cwd,
         modelPath ? relative(options.cwd, modelPath) : undefined

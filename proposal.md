@@ -537,8 +537,24 @@ builds automatically.
   delta patch, including on a locked stack with deferral and replay.
 - The Zod schema built at runtime from `toClassModel()` and the static type agree on a
   shared fixture set for every attribute type and modifier combination.
-- The 1.x → 2.0 migration guide (`2.0.md` §5) covers every §8 defect actually fixed, with
-  the `docstack doctor` check an app runs before upgrading.
+- ~~The 1.x → 2.0 migration guide (`2.0.md` §5) covers every §8 defect actually fixed, with
+  the `docstack doctor` check an app runs before upgrading.~~ — **met 2026-11-23.**
+  `packages/docs/docs/upgrade-to-2.0.md`: the stored-data strictness as a table (all five
+  §8 items), the API changes with the one that can surface as a new error in working code
+  called out, the packaging changes, how to adopt the declared model, and what is planned
+  but not in these releases.
+
+  Writing it found that `doctor` could not serve the application the guide is addressed to.
+  The pre-upgrade scan derived its list from a **declared model**, which a 1.x application
+  does not have, and read a chain only from a **directory of files**, which a 1.x
+  application does not have either - its chain is `export const PATCHES = [...]` in source.
+  Both are fixed: the scan falls back to the folded chain, `--patches` accepts a module,
+  and `path.ts#EXPORT` names one chain in a module holding several (refusing to pick, as
+  elsewhere). `doctor` also lists the attributes whose declared defaults older documents do
+  not carry, which is the backfill half of an upgrade and was missing entirely.
+
+  Verified against a real pre-2.0 application (tokido): two chains, 3 and 11 classes, 8 and
+  39 attributes whose stored values 2.0 would newly reject, and 6 needing a backfill.
 - ~~`docstack revision --check` runs in CI for `examples/react-todo`, so the guard is
   demonstrated and not just documented.~~ — **met 2026-11-18.**
   `.github/workflows/tests.yml` is the repository's first test workflow: the `shared`,

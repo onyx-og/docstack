@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { ModelDefinition, Patch } from "@docstack/shared";
@@ -58,9 +58,13 @@ export const resolvePath = (
     what: string
 ): string => {
     if (given) {
-        const absolute = isAbsolute(given) ? given : resolve(cwd, given);
+        // A `#name` suffix selects one export from a module holding several chains, so it
+        // is split off before the path is checked and re-attached afterwards: the file has
+        // to exist, the fragment is for whoever loads it.
+        const [givenPath, fragment] = given.split("#", 2) as [string, string | undefined];
+        const absolute = isAbsolute(givenPath) ? givenPath : resolve(cwd, givenPath);
         if (!existsSync(absolute)) throw new Error(`No ${what} at '${absolute}'.`);
-        return absolute;
+        return fragment ? `${absolute}#${fragment}` : absolute;
     }
     for (const candidate of candidates) {
         const absolute = join(cwd, candidate);
@@ -213,6 +217,16 @@ export const listPatchFiles = (directory: string): PatchFile[] => {
 export type LoadedPatch = PatchFile & {
     /** The patch the module exported. */
     patch: Patch;
+    /**
+     * True when the patch came from a module exporting an **array**, rather than from a
+     * file named for its version.
+     *
+     * The checks that compare a file name against the version inside it do not apply to
+     * these: there is no per-patch file name to compare. This is the shape a 1.x
+     * application has - `export const PATCHES = [...]` - and reading it is what lets
+     * `doctor` tell such an application what an upgrade would newly reject.
+     */
+    fromArray?: boolean;
 };
 
 /**
@@ -227,8 +241,60 @@ export type LoadedPatch = PatchFile & {
  * @returns One entry per patch file, unordered; `foldPatchChain` owns the ordering.
  * @throws If a file exports no patch, naming the file.
  */
-export const loadPatchFiles = (directory: string): LoadedPatch[] => {
-    return listPatchFiles(directory).map(file => {
+export const loadPatchFiles = (source: string): LoadedPatch[] => {
+    // A module rather than a directory: one file exporting an array of patches, which is
+    // how an application wrote its chain before the generator existed. Accepted so the
+    // pre-upgrade checks work on a 1.x project without first restructuring it.
+    // `path/to/file.ts#EXPORT_NAME` selects one export, for a module holding more than
+    // one chain - which is what a project with a root database and per-workspace ones has.
+    const [filePath, exportName] = source.split("#", 2) as [string, string | undefined];
+    if (existsSync(filePath) && statSync(filePath).isFile()) {
+        const exported = loadModule(filePath);
+        const isChain = (value: unknown): value is Patch[] =>
+            Array.isArray(value) && value.length > 0 && value.every(entry =>
+                entry && typeof entry === "object" && "version" in (entry as object));
+
+        let array: Patch[] | undefined;
+        if (exportName) {
+            const named = exported[exportName];
+            if (!isChain(named)) {
+                throw new Error(
+                    `'${filePath}' has no export '${exportName}' holding an array of patches. `
+                    + `Found: ${Object.keys(exported).join(", ") || "nothing"}.`
+                );
+            }
+            array = named;
+        } else {
+            // Sorted, so the message is the same on every run and in every runtime: the
+            // order a module's exports enumerate in is not something to expose.
+            const chains = Object.entries(exported)
+                .filter(([, value]) => isChain(value))
+                .sort(([left], [right]) => left.localeCompare(right));
+            if (!chains.length) {
+                throw new Error(
+                    `'${filePath}' exports no array of patches. Export one as \`patches\` or as `
+                    + "the default, or pass a directory of patch files instead. Found: "
+                    + `${Object.keys(exported).join(", ") || "nothing"}.`
+                );
+            }
+            if (chains.length > 1) {
+                // The same refusal as for two models, for the same reason: picking the
+                // first would cover one chain and say nothing about the rest.
+                throw new Error(
+                    `'${filePath}' exports ${chains.length} arrays of patches: `
+                    + `${chains.map(([name]) => name).join(", ")}. `
+                    + `Name the one you mean, as '${filePath}#${chains[0][0]}', and run once per `
+                    + "chain - a run covering only one of them would pass while another had drifted."
+                );
+            }
+            array = chains[0][1] as Patch[];
+        }
+
+        return array.map(patch => ({
+            version: patch.version, path: filePath, patch, fromArray: true,
+        }));
+    }
+    return listPatchFiles(source).map(file => {
         const exported = loadModule(file.path);
         const patch = (exported.default ?? exported.patch) as Patch | undefined;
         if (!patch || typeof patch !== "object" || !("version" in patch)) {
