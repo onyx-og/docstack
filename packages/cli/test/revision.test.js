@@ -393,3 +393,41 @@ test("a chain exported from a module loads whether the array is frozen, and coun
         cwd: root, mode: "check", model: "src/model.ts", patches: "frozen.ts#default",
     }).code, 0);
 });
+
+/**
+ * Where the equivalence fixture lives.
+ *
+ * In the client package, because its primary consumer is the browser suite that drives
+ * the generated patch through a real stack - the one `proposal.md` §11 criterion that
+ * needs an engine. Only this side can run the generator, so the comparison below is what
+ * keeps the committed output from going stale.
+ */
+const EQUIVALENCE = join(
+    dirname(fileURLToPath(import.meta.url)), "..", "..", "client", "src-test", "equivalence"
+);
+
+test("the committed equivalence fixture is still what the generator emits", () => {
+    const root = project(readFileSync(join(EQUIVALENCE, "model.ts"), "utf8"));
+    mkdirSync(join(root, "src", "patches"), { recursive: true });
+    writeFileSync(
+        join(root, "src", "patches", "1.0.0.ts"),
+        readFileSync(join(EQUIVALENCE, "baseline.ts"), "utf8"),
+        "utf8"
+    );
+
+    const result = revision({
+        cwd: root, mode: "autogenerate", message: "seal the note body",
+        target: "equivalence-app", version: "1.1.0",
+    });
+    assert.equal(result.code, 0, result.output.join("\n"));
+    assert.equal(
+        readFileSync(result.written, "utf8"),
+        readFileSync(join(EQUIVALENCE, "generated.ts"), "utf8"),
+        "packages/client/src-test/equivalence/generated.ts is no longer what the generator "
+        + "writes. Regenerate it - its README.md has the command - and re-run the client suite."
+    );
+    // And the chain it leaves states the model, which is the other half of the fixture:
+    // a baseline the diff would have had more to say about would make the delta a
+    // different patch than the one the browser suite drives.
+    assert.equal(revision({ cwd: root, mode: "check" }).code, 0);
+});

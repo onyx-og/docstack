@@ -233,6 +233,12 @@ deferral on a locked stack (ADR-0041). The generator needs no special handling, 
 test suite must cover one generated patch with an encrypted attribute through the
 locked → unlock → replay path (reuse `locked-sync.test.ts` patterns).
 
+**Covered 2026-11-23** by `generated-patch-equivalence.test.ts` (§11), against the same
+patch in three forms. The generator did need no special handling, and the deferral
+predicate did not care that the patch was generated: `patchNeedsDocumentKey` sees a class
+document whose predecessor exists and whose delta declares an encrypted attribute, which
+is true whoever wrote it.
+
 ### 6.4 Data-migration jobs
 `PatchJob.content` is today a **string** evaluated as a `~Job`-style body
 (`execute(stack, params, job)`). **Decided:** generated patches reference jobs **by
@@ -533,8 +539,37 @@ builds automatically.
   `[key: string]: any` - documents legitimately hold fields no class declares. Narrowing
   that on the typed read path is open (§9.9).
 - Changing an attribute in the model without regenerating fails `revision --check`.
-- A generated patch adding an attribute behaves identically to a hand-written ADR-0038
-  delta patch, including on a locked stack with deferral and replay.
+- ~~A generated patch adding an attribute behaves identically to a hand-written ADR-0038
+  delta patch, including on a locked stack with deferral and replay.~~ - **met
+  2026-11-23.** `packages/client/src-test/generated-patch-equivalence.test.ts` drives three
+  forms of one schema change - verbatim `revision --autogenerate` output, the hand-written
+  shape the patch guide documents, and the same without the patch's own `_id` - through
+  the real upgrade path: the baseline applies, a document is written under it, and the
+  database is *reopened* with the delta on top, so the propagation sweep runs over
+  existing data. All three produce the same stored schema (with the baseline's attribute
+  surviving the merge), the same propagated and sealed value, the same fresh write, the
+  same refusal, and the same armed ledger entry. The locked case is §6.3's requirement:
+  the delta adds an `encrypted` attribute, so on a keyless open it defers as a dormant
+  ledger entry with the document untouched, and `unlock` replays it into a propagation
+  that fills the default and seals it - identically for all three. The fixture is in
+  `src-test/equivalence/`, with its provenance and its three staleness guards in that
+  directory's `README.md`.
+
+  The test also pins something `--check` had only ever asserted about itself: that
+  `foldPatchChain` of the chain equals the class model the engine really stored. The CLI
+  compares the model against the fold, so a fold that predicted the wrong baseline would
+  make `--check` pass on a lie.
+
+  Writing it found two defects. `jiti`'s `interopDefault` returns the default export and
+  copies the other exports onto it non-enumerably - and not at all when the default is
+  frozen - so **a model or a chain exported as the default never loaded**, although the
+  tool's own help text and error messages invite exactly that (`a418bc9`). Every
+  `defineModel` result is frozen, so `export default model` failed with "exports no model"
+  while listing the model's own internal keys. And typechecking the fixture as application
+  source showed `Patch` requires `_id` while this repository's own test patches omit it -
+  the type describes the documented shape (`<target>-<version>`, which is what the
+  generator emits), the engine tolerates its absence through `db.post`, and the gap is now
+  asserted rather than assumed.
 - The Zod schema built at runtime from `toClassModel()` and the static type agree on a
   shared fixture set for every attribute type and modifier combination.
 - ~~The 1.x → 2.0 migration guide (`2.0.md` §5) covers every §8 defect actually fixed, with

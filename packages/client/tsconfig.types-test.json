@@ -1,5 +1,6 @@
 {
-  "//": "Typechecks the type-level tests in src-test/types. Nothing is emitted; failure to compile IS the failure. Strict on purpose: the inference under test is about optionality and nullability, which a loose config would hide.",
+  "//": "Typechecks the type-level tests in src-test/types, plus the equivalence fixture in src-test/equivalence, which is application-shaped source that has to compile the way an app's would - a generated patch against `Patch`, a declared model against the builders. Nothing is emitted; failure to compile IS the failure. Strict on purpose: the inference under test is about optionality and nullability, which a loose config would hide.",
+  "//2": "The fixture imports `@docstack/client/model`, so this needs `npm run build:client` first (as the type tests already need shared built). CI builds both before running it.",
   "compilerOptions": {
     // Empty, deliberately, and load-bearing. An application that sets `types` gets no
     // ambient @types at all, and the Vite React template sets it to ["vite/client"]. A
@@ -17,5 +18,5 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src-test/types/**/*.ts"]
+  "include": ["src-test/types/**/*.ts", "src-test/equivalence/**/*.ts"]
 }
