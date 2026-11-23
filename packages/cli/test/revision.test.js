@@ -338,3 +338,58 @@ test("the source printer is deterministic and readable", () => {
     const rendered = renderPatchFile({ version: "1.0.0", target: "t", changelog: "c", docs: [] });
     assert.equal(rendered, renderPatchFile({ version: "1.0.0", target: "t", changelog: "c", docs: [] }));
 });
+
+test("a model exported as the default loads - frozen or not, named as well or not", () => {
+    // `jiti` with `interopDefault` returns the *default export* and copies the other
+    // exports onto it with `defineProperty` - which throws, swallowed, on a frozen
+    // object, and every `defineModel` result is frozen. So a model exported as the
+    // default used to arrive with neither `.default` nor `.model` reachable, and the
+    // command refused it with "exports no model" while listing the model's own internal
+    // keys - against its own error message, which invites exactly this shape.
+    const shapes = {
+        "default only": TODO_MODEL.replace(
+            "export const model = defineModel({ classes: [Todo] });",
+            "export default defineModel({ classes: [Todo] });"
+        ),
+        "both, default last": `${TODO_MODEL}\nexport default model;\n`,
+    };
+    for (const [shape, source] of Object.entries(shapes)) {
+        const root = project(source);
+        const generated = revision({ cwd: root, mode: "autogenerate", message: "the Todo class" });
+        assert.equal(generated.code, 0, `${shape}: autogenerate`);
+        const checked = revision({ cwd: root, mode: "check" });
+        assert.equal(checked.code, 0, `${shape}: check`);
+        assert.match(checked.output.join("\n"), /agree on 1 class\(es\): Todo/, shape);
+    }
+});
+
+test("a chain exported from a module loads whether the array is frozen, and counts once", () => {
+    const root = project(TODO_MODEL);
+    // The chain itself is the generated one, re-exported as a module: this test is about
+    // how the array is *loaded*, so restating its documents here would only risk them
+    // drifting from the model and failing for the wrong reason.
+    revision({ cwd: root, mode: "autogenerate", message: "the Todo class" });
+    const reexport = (body) => `import patch from "./src/patches/0.1.0.js";\nexport default ${body};\n`;
+
+    // A plain default export: jiti attaches `default` to the array, but *not
+    // enumerably*, so the reader - which enumerates - could not see it. This shape is
+    // what the error message's "or as the default" means, and it never worked.
+    writeFileSync(join(root, "plain.ts"), reexport("[patch]"), "utf8");
+    // Frozen: jiti cannot attach anything at all, so the array is reachable only as the
+    // module value itself.
+    writeFileSync(join(root, "frozen.ts"), reexport("Object.freeze([patch])"), "utf8");
+    // Named *and* default - one array under two names. The reader has to count it once:
+    // reporting two chains here would refuse a single-chain module as ambiguous.
+    writeFileSync(join(root, "both.ts"),
+        'import patch from "./src/patches/0.1.0.js";\n'
+        + "export const patches = [patch];\nexport default patches;\n", "utf8");
+
+    for (const file of ["plain.ts", "frozen.ts", "both.ts"]) {
+        const result = revision({ cwd: root, mode: "check", model: "src/model.ts", patches: file });
+        assert.equal(result.code, 0, `${file}: ${result.output.join(" ")}`);
+    }
+    // And `#default` names it, which is the only name a default-exported chain has.
+    assert.equal(revision({
+        cwd: root, mode: "check", model: "src/model.ts", patches: "frozen.ts#default",
+    }).code, 0);
+});

@@ -12,8 +12,23 @@ import type { ModelDefinition, Patch } from "@docstack/shared";
  *
  * Pattern: Adapter.
  *
+ * **What comes back is not always a namespace object.** With `interopDefault`, jiti
+ * returns the module's *default export* and copies the other exports onto it with
+ * `Object.defineProperty`, which has two consequences the readers below have to allow
+ * for:
+ *
+ * - The copied keys - `default` among them - are **not enumerable**, so `Object.keys`
+ *   and `Object.entries` do not see them, though `in` and direct access do. A reader
+ *   that enumerates the module cannot find a default-exported value at all.
+ * - On a **frozen** default the copy throws and is swallowed, so not even direct access
+ *   finds them. Every `defineModel` result is frozen, so a module exporting its model as
+ *   the default hands back the model with neither `default` nor `model` reachable on it.
+ *
+ * Both readers therefore treat the module value *itself* as a candidate, rather than
+ * trusting `.default` to be there or enumerating for it.
+ *
  * @param path - Absolute path to the module.
- * @returns The module's exports.
+ * @returns The module's exports, or - see above - the default export itself.
  */
 const loadModule = (path: string): Record<string, unknown> => {
     const require = createRequire(import.meta.url);
@@ -86,7 +101,13 @@ export const resolvePath = (
  */
 export const loadModel = (path: string): ModelDefinition => {
     const exported = loadModule(path);
-    const candidates = [exported.model, exported.default, exported.MODEL];
+    // `exported` itself is last and is not a typo: a model exported as the default
+    // arrives *as* the module value, with nothing attached, because jiti cannot write to
+    // a frozen object (see {@link loadModule}). Without it, `export default model` -
+    // which this function's own error message invites - fails with "exports no model"
+    // while listing the model's own internal keys. The test is structural, so a
+    // namespace object that merely holds a model is never mistaken for one.
+    const candidates = [exported.model, exported.default, exported.MODEL, exported];
     for (const candidate of candidates) {
         const maybe = candidate as ModelDefinition | undefined;
         if (maybe && Array.isArray(maybe.classes) && typeof maybe.toClassModels === "function") {
@@ -256,7 +277,11 @@ export const loadPatchFiles = (source: string): LoadedPatch[] => {
 
         let array: Patch[] | undefined;
         if (exportName) {
-            const named = exported[exportName];
+            // `#default` on a module whose default is frozen: the array arrived *as* the
+            // module value, so there is no `default` key to read (see {@link loadModule}).
+            const named = exportName in exported ? exported[exportName]
+                : exportName === "default" ? exported
+                    : undefined;
             if (!isChain(named)) {
                 throw new Error(
                     `'${filePath}' has no export '${exportName}' holding an array of patches. `
@@ -265,10 +290,21 @@ export const loadPatchFiles = (source: string): LoadedPatch[] => {
             }
             array = named;
         } else {
+            // One entry per *distinct* chain, keyed by identity, and the module value
+            // itself considered last. Enumerating alone finds no default-exported chain
+            // at all - jiti's copied keys are not enumerable (see {@link loadModule}) -
+            // and keying by identity is what stops `export const patches` plus
+            // `export default patches` from being reported as two chains when it is one
+            // array under two names.
+            const byChain = new Map<unknown, string>();
+            for (const [name, value] of Object.entries(exported)) {
+                if (isChain(value) && !byChain.has(value)) byChain.set(value, name);
+            }
+            if (isChain(exported) && !byChain.has(exported)) byChain.set(exported, "default");
             // Sorted, so the message is the same on every run and in every runtime: the
             // order a module's exports enumerate in is not something to expose.
-            const chains = Object.entries(exported)
-                .filter(([, value]) => isChain(value))
+            const chains = [...byChain]
+                .map(([value, name]) => [name, value] as [string, unknown])
                 .sort(([left], [right]) => left.localeCompare(right));
             if (!chains.length) {
                 throw new Error(
@@ -296,7 +332,10 @@ export const loadPatchFiles = (source: string): LoadedPatch[] => {
     }
     return listPatchFiles(source).map(file => {
         const exported = loadModule(file.path);
-        const patch = (exported.default ?? exported.patch) as Patch | undefined;
+        // `exported` last, for the same reason as in `loadModel`: a frozen patch object
+        // exported as the default arrives as the module value with no `default` on it.
+        // `"version" in` keeps the fallback honest.
+        const patch = (exported.default ?? exported.patch ?? exported) as Patch | undefined;
         if (!patch || typeof patch !== "object" || !("version" in patch)) {
             throw new Error(`'${file.path}' exports no patch as its default.`);
         }
