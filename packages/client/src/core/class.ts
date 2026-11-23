@@ -261,29 +261,49 @@ class Class extends Class_ {
     }
 
     /**
-     * Builds a Class instance from an existing ClassModel document.
+     * Builds a Class instance from a ClassModel document.
      * Hydrates attributes and triggers from the model.
-     * 
+     *
+     * A model carrying a `_rev` is one the database already holds, so the instance is
+     * built detached. A rev-less model is one the stack has never stored, and this
+     * **writes it**: a caller handing over a model the stack does not have is asking for
+     * the class to exist. The engine's own internals deliberately do not come through
+     * here for that - `transaction-engine/sweep.ts` and `plugins/pouchdb.ts` build
+     * detached with `Class.get` + `setModel`, because a write would conflict with the
+     * batch's own insert (ADR-0043) - so the callers that reach the write are the ones
+     * that want it.
+     *
      * @param stack - The parent stack instance
-     * @param classModel - The ClassModel document from the database
+     * @param classModel - The ClassModel document, stored or not
+     * @param options - See {@link ClassBuildOptions}
      * @returns The hydrated Class instance
      */
     static buildFromModel = async (stack: Stack, classModel: ClassModel, options?: ClassBuildOptions) => {
         Class.logger.info("buildFromModel - Instantiate from model", { classModel });
 
-        if (classModel._rev) {
-            let classObj: Class = Class.get(
-                stack, classModel._id, classModel.name,
-                classModel["~class"], classModel.description,
-                classModel.schema, options
-            )
-            classObj.setModel(classModel);
-            return classObj;
-        } else {
-            let classObj: Class = await Class.create(stack, classModel.name, classModel["~class"], classModel["~class"], classModel.schema);
-            classObj.setModel(classModel);
-            return classObj;
-        }
+        let classObj: Class = Class.get(
+            stack, classModel._id, classModel.name,
+            classModel["~class"], classModel.description,
+            classModel.schema, options
+        )
+        classObj.setModel(classModel);
+        // The rev-less half: persist what the caller stated.
+        //
+        // Both halves instantiate the same way now. The write used to go through
+        // `Class.create(stack, name, type, description, schema)` with
+        // `classModel["~class"]` where the description belongs, so a class built from a
+        // declared model was stored with the literal description "class" - and since
+        // `create` takes neither the model nor the options, its `triggers` were dropped
+        // too and `subscribe: false` was ignored, leaving a live feed the caller had
+        // asked not to open.
+        //
+        // `setModel` before `build`, because `build` persists whatever `getModel()`
+        // reports and then re-reads the stored result. With it after, the write carried
+        // the model `init` synthesizes from the positional arguments rather than the one
+        // the caller passed, which is what made the loss invisible: the instance ended up
+        // correct while the document did not.
+        if (!classModel._rev) await classObj.build();
+        return classObj;
     }
 
     /**
