@@ -12,6 +12,14 @@ WebView directly.
 is frozen and spec 04 is superseded: a host with no WebView gets the Rust core's
 Kotlin/JVM binding (`../ports.md`), never a JS engine.
 
+**The WebView integration is moving above the document seam** (`../ports.md` §3.3,
+decided 2026-11-23). A host attaches at the DocStack API surface - `addCard`, `updateCard`,
+`getCards` - rather than at the PouchDB adapter, because a WebView operates by messaging
+and the write pipeline turns one logical write into several document-level calls. Specs 02
+and 03 carry notes; `specs/adr/0001-document-level-seam.md` has the amendment. Until the
+Rust core's Kotlin binding can answer those calls, `docstack-permetic` stays where it is -
+so this changes what to build next, not what is built.
+
 Permetic and `docstack-permetic` are **unaffected and stay in the plan** — specs 01, 03
 and 05 are current, and the WebView carrier is now the only carrier. The one thing that
 changed for them: DocStack's native-host story is not built on Permetic, so do not

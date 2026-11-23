@@ -3,6 +3,16 @@
 Status: **draft, awaiting review** · Owner: Onyx
 Package: npm `@docstack/pouchdb-adapter-native`
 
+> **2026-11-23 — the WebView integration is moving above this seam.** The maintainer's
+> decision (`../../ports.md` §3.3) attaches a host at the DocStack API surface -
+> `addCard`, `updateCard`, `getCards` - rather than at the PouchDB adapter, because a
+> WebView operates by messaging and the write pipeline turns one logical write into
+> several document-level calls. This spec stays current until the Rust core's Kotlin
+> binding can answer those calls (`adr/0001-document-level-seam.md`, amendment), and the
+> adapter remains the document-level path for anything that still wants one. Nothing in
+> the contract below changes; what changes is how much of it the WebView carrier will end
+> up using.
+
 ## Goal
 
 One PouchDB adapter that talks to the native document store through the envelope

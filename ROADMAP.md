@@ -113,6 +113,27 @@ pairing rule of difficulty (1) remain the unbuilt half. Note also that a *declar
 model narrows the gap by itself, since `docstack revision --check` fails CI when the code
 model and the patch chain disagree, which is where by-hand drift starts.
 
+### Integrations attach at the DocStack API seam
+
+**Decided 2026-11-23, nothing built** (`ports.md` §3.3, goal 6; the amendment to
+`android/specs/adr/0001-document-level-seam.md`). A host or remote may attach at the API
+surface - `addCard`, `updateCard`, `getCards`, `query` - rather than at the PouchDB adapter
+or `trait DocumentStore`. One logical operation crosses as one call, and the integration
+needs no PouchDB, so it works on whichever backend a stack runs.
+
+- **Google Drive gains a sibling at that seam**; the document-level adapter stays, because
+  replication speaks revision trees and a changes feed and nothing above the seam can.
+- **The Permetic/WebView integration moves there entirely** - a WebView operates by
+  messaging, and the write pipeline turns one logical write into several document-level
+  calls. It stays on the document seam until the Rust core's Kotlin binding can answer API
+  calls, so this changes what to build next rather than what is built.
+- **Goal 6 becomes statable**: several stores or remotes coordinated under one stack
+  (balancing, redistribution, role-based placement). A goal, not a design - `ports.md` §1
+  lists the questions any design owes.
+
+`RemoteStack` (specs/03-server.md §8) is already this shape, which is the argument that it
+is a seam and not a special case.
+
 ## Deferred, owned by existing ADRs
 
 - **Engine sessions v2** (ADR-0046 consequences): decrypt once and redact per

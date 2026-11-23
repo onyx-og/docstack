@@ -24,6 +24,15 @@ Out of scope for this app: `permetic`, `permetic-web`, `permetic-push`,
 `permetic-billing`, `docstack-permetic`. Auth is a direct Google Sign-In /
 Credential Manager flow in Kotlin, not the `auth` capability.
 
+> **2026-11-23 — where the integration attaches is changing.** The WebView integration
+> moves to the DocStack API seam (`../ports.md` §3.3,
+> `specs/adr/0001-document-level-seam.md` amendment): `addCard` and `updateCard` cross as
+> one message each, instead of the several document-level calls one logical write becomes.
+> Phases 0-2 below are unaffected and still the path - the store and its contract carry
+> across unchanged, and `docstack-permetic` stays on the document seam until the Rust
+> core's Kotlin binding exists to answer API calls. Read this before planning anything
+> *past* phase 2.
+
 ## Phase 0 — De-risking spikes (parallel, timeboxed ~2–3 days)
 
 - [x] `docstack-headless` boot spike (spec 04 task 1): bundle `pouchdb-core` +

@@ -32,6 +32,18 @@ in §9 pass. Items marked **VERIFY** were not confirmed while drafting.
    any PouchDB adapter (`googledrive`, IndexedDB, LevelDB…), must keep working.
 5. **Serverless stays first-class**: browser ↔ Google Drive replication with no server, as
    `@docstack/client` does today.
+6. **Several backends under one stack** (goal, added 2026-11-23): it must become possible to
+   coordinate more than one store or remote behind a single stack - spreading load across
+   them, redistributing data between them, or placing documents by role - without each
+   integration reimplementing the engine to do it. **Stated as a goal, not a design.**
+   Several shapes would work and none is chosen here; what §3.3 buys is that the goal is
+   expressible at all, because a coordinator sitting above that seam routes whole
+   operations rather than the fragments of one. Distinct from the hub architecture
+   (ADR-0030), which coordinates *complete databases by replication* - each realm owning a
+   whole one - where this is about one logical database served by several backends. Any
+   design for it has to answer what consistency holds across them, which one the changes
+   feed speaks for, and how replication sees the set; those are open, and listing them is
+   not a start on them.
 
 Goal 1 is normative, not aspirational: the embedded-JS track is **dropped rather than
 parked** (`2.0.md` §4). A host either gets a compiled binding or gets nothing new — never a
@@ -108,7 +120,62 @@ engine (now Rust instead of `pouchdb-merge`).
   build), a Kotlin/Swift class (UniFFI foreign trait), a C# class. The existing Kotlin
   `docstack-store` (RocksDB) plugs in this way without changes to its contract.
 
-### 3.3 Layers that move **above** `trait Database`
+### 3.3 Top seam — the DocStack API (`addCard`, `updateCard`, `getCards`, `query`)
+
+**Decided 2026-11-23 (maintainer).** A host or a remote may attach at the **API surface**
+rather than at `trait Database` or `trait DocumentStore`. One logical operation crosses as
+one call: `addCard`, `updateCard`, `getCards`, `query`, `subscribeClassDocs`.
+
+Two reasons, and they are the same two that `trait DocumentStore` was chosen over a
+key/value seam for (android ADR-0001), one level further up.
+
+**Crossings.** The write pipeline turns one logical write into several `Database` calls -
+read the class model, resolve a foreign key, write, read back for a trigger, write again.
+A seam *below* the pipeline therefore multiplies crossings per operation, while a seam
+above it is one. On a transport where a crossing is a **message** rather than a function
+call - a WebView bridge - that difference is the whole cost model. ADR-0001's own
+arithmetic (`allDocs` is one crossing at document level, 10k at key level) is what carries
+the argument here: the pipeline is the next layer where the count collapses.
+
+**No PouchDB required.** An integration written at the adapter seam *is* a PouchDB
+adapter, so it needs PouchDB wherever it runs. At the API seam it needs none, which is
+what lets the same integration serve whichever backend §4.1 selects. This is goal 2
+(integrate without going upstream) and goal 4 (PouchDB stays optional, not required) in
+one seam.
+
+**This shape already exists**: `RemoteStack` (spec 03 §8) is an API-seam client - the same
+contract `Class` and the React hooks use, over an HTTP surface and one event feed. A
+WebView carrier or a Drive integration at this seam is the same idea over a different
+transport, which is the argument that it is a seam and not a special case.
+
+What follows for the two integrations in flight:
+
+- **Google Drive gains a second implementation here; the existing one stays.** The
+  document-level `@docstack/pouchdb-adapter-googledrive` is what *replication* speaks
+  (revision trees, `bulk_get`, `revs_diff`, a changes feed - §3.1 implementation ②, the
+  passive-node topology), and nothing at the API seam can replace that. So the two
+  coexist: the adapter for sync against a Drive folder, the API-seam integration for an
+  application whose operations go to Drive directly.
+- **The Permetic integration moves here entirely.** A WebView operates by messaging, so
+  many small reads and writes are the wrong granularity for it; `@docstack/pouchdb-adapter-native`
+  is the document-level path and the carrier does not need to stay on it. See android
+  ADR-0001's amendment.
+
+**It is also what makes goal 6 statable.** A coordinator placing or distributing
+operations across several backends has to see an operation whole: below this seam a single
+write is several calls, and routing them independently would split one operation's reads
+and writes across backends, which is not a load-balancing strategy but a correctness bug.
+Above it, `addCard` is one thing that can be sent somewhere. That is the whole of the claim
+here - no routing design is implied, and none is chosen.
+
+**Open**, and deliberately not decided here: what runs the pipeline on the far side of an
+API-seam crossing (for Android, the Rust core's Kotlin binding, with `docstack-store`
+underneath it as a foreign `DocumentStore` per §3.2 - which is where that module was
+already heading); whether this seam gets a written contract of its own, as the other two
+have; and how a live subscription is expressed across it, since `subscribeClassDocs` is a
+stream rather than a call.
+
+### 3.4 Layers that move **above** `trait Database`
 
 - **Crypto.** Today encryption is a PouchDB plugin that intercepts `get`/`bulkDocs`, with
   the pristine-handle and revision-addressed-read rules (ADR-0032, ADR-0040 "junction 0")

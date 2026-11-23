@@ -3,6 +3,13 @@
 Status: **draft, awaiting review** · Owner: Onyx
 Modules: `docstack-store`, `docstack-permetic`
 
+> **2026-11-23 — unaffected by the seam move, on purpose.** The WebView integration moves
+> to the DocStack API surface (`../../ports.md` §3.3,
+> `adr/0001-document-level-seam.md`'s amendment), which changes what calls *arrive* at this
+> module, not what it is: the 14-method contract and the semantics below it are what carry
+> across, with the Rust core above them instead of a JS adapter. `docstack-permetic`'s role
+> is the part that moves.
+
 ## Goal
 
 A native document store that answers the `storage` capability, plus one envelope

@@ -206,6 +206,15 @@ the replication without the application reaching into DocStack. Counters and
 
 ## Adapter contract
 
+> **2026-11-23 — a second Drive integration is planned, and this contract is not it.**
+> `@docstack/pouchdb-adapter-googledrive` gains a sibling at the **DocStack API seam** -
+> `addCard`, `updateCard`, `getCards` - rather than being replaced by one
+> (`../ports.md` §3.3). The two coexist because they answer different questions: an API-seam
+> integration carries one logical operation per call and needs no PouchDB, while
+> *replication* speaks revision trees, `bulkGet`, `revsDiff` and a changes feed, which is
+> this contract and cannot be expressed above it. So everything below stays binding for the
+> adapter, and a Drive folder used as a passive replication node stays the adapter's job.
+
 An adapter that replaces PouchDB's *public* methods rather than implementing the
 `_`-prefixed hooks — as the Drive adapter does with `api.bulkDocs = api._bulkDocs`,
 for the reasons permetic spec 03 records — inherits obligations `AbstractPouchDB`

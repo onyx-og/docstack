@@ -1,6 +1,6 @@
 # ADR-0001 — The native seam is document-level
 
-Status: accepted · Date: 2026-08-08
+Status: accepted · Date: 2026-08-08 · **Amended 2026-11-23** (the WebView integration moves above this seam; see the amendment at the end)
 
 ## Decision
 
@@ -45,3 +45,37 @@ database on this same adapter, and encodes emitted keys with `toIndexableString`
 before they get there. Every key reaching native is a byte-ordered string, so
 CouchDB collation never becomes native's problem and views need no work on the
 Kotlin side.
+
+## Amendment 2026-11-23 — the carrier moves to the API seam
+
+**The decision below holds for what it decides**: a *document store* is the right shape
+for a document store, revision trees stay opaque, and a key/value seam is still the wrong
+answer. What changes is where the **WebView integration** attaches, which this ADR settled
+by implication rather than on purpose.
+
+`docstack-permetic` and `@docstack/pouchdb-adapter-native` put the bridge at the document
+seam, so the web app's PouchDB talks to the native store. The maintainer's decision
+(`../../../ports.md` §3.3) moves it to the **DocStack API seam** - `addCard`, `updateCard`,
+`getCards` - and this ADR's own argument is why: the write pipeline turns one logical write
+into several document-level calls (class model, foreign key, write, trigger read-back), so
+a seam below the pipeline multiplies messages per operation exactly as a key/value seam
+multiplied them per document. A WebView operates by messaging; many small reads and writes
+are the wrong granularity for it.
+
+The "Crossings" section is therefore not overturned, it is extended: the count collapses
+once more, one layer up.
+
+What this does **not** change:
+
+- The 14-method `DocumentStore` contract and spec 02's semantics. They carry across
+  unchanged, now beneath the Rust core rather than beneath a JS adapter
+  (`../../../ports.md` §3.2), which is where ADR-0002's amendment already put them for a
+  host with no WebView.
+- Opaque revision trees, and merge living in the engine.
+- The adapter itself, which remains the document-level path for anything that still wants
+  one.
+
+**Open**: what answers an API-seam call on the native side. The expectation is the Rust
+core's Kotlin binding with `docstack-store` under it, which makes this amendment a
+consolidation rather than a new component - but the binding does not exist yet, so
+`docstack-permetic` stays on the document seam until it does.
