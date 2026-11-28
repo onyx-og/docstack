@@ -4,6 +4,7 @@ import semver from "semver";
 import { diff } from "jsondiffpatch";
 import createLogger from "../utils/logger/index.js";
 import { applySchemaDelta } from "../utils/index.js";
+import Attribute from "./attribute.js";
 import Class from "./class.js";
 import Domain from "./domain.js";
 import PouchDBFind from 'pouchdb-find';
@@ -1730,6 +1731,12 @@ class ClientStack extends Stack {
         const fnLogger = logger.child({ method: "applyConsumerPatchChain" });
         this.deferredPatches = [];
 
+        // Before the transaction opens, so a refusal persists nothing and no part of the
+        // chain lands. Every patch is checked up front rather than as its turn comes:
+        // staging patch N and then refusing N+1 would discard N anyway, and the whole
+        // point is that the author hears about it before anything is written.
+        for (const patch of patches) this.assertPatchAttributes(patch);
+
         const t = this.transactionEngine.beginInternal();
         // How the deferral barrier sees the chain: a class staged by an earlier
         // patch counts as existing, so patch N+1 defers exactly as it would have
@@ -2379,6 +2386,72 @@ class ClientStack extends Stack {
     }
 
     /**
+     * Checks that every attribute a patch's class documents declare can be built.
+     *
+     * Not a new set of rules: it runs the engine's own construction - the same
+     * `new Attribute(...)` that building the class will do - and refuses the patch if it
+     * throws. The checks already existed and already had good messages; what was wrong
+     * was *when* they ran.
+     *
+     * Without this, a patch declaring an attribute the engine cannot build applies
+     * silently and leaves a state the patch system cannot get out of:
+     *
+     * - The class document is stored, so the class exists and cannot be built. Reads,
+     *   writes and queries against it fail, and `getClasses` - the whole class list, for
+     *   every class - fails with it.
+     * - A write that does not go through the class API, which is what replication and
+     *   jobs do, is refused as `Class '<name>' not found`, which is untrue and sends the
+     *   reader looking for a document that is present.
+     * - **Any later patch touching that class fails to apply**, because propagation
+     *   builds the *previous* class model to diff against and the previous model is the
+     *   broken one. A patch repairing the attribute cannot be applied; neither can one
+     *   dropping it. Shipping the fix is what finally stops the application from opening.
+     *
+     * That last point is why this refuses rather than warns: the state is reachable only
+     * through a patch, and once reached only hand-editing the database gets out of it.
+     * An application already in it is not rescued by this check - the broken model is
+     * already stored - and needs its class document and ledger entry removed by hand.
+     *
+     * The attributes *stated by this patch* are what is checked, not the merged result: a
+     * delta is responsible for what it writes (ADR-0038), and holding it responsible for
+     * a predecessor's fault is what would make a repair patch unappliable.
+     *
+     * @param patch - The patch about to be applied.
+     * @throws Naming the class, the attribute and the reason, if one cannot be built.
+     */
+    private assertPatchAttributes(patch: Patch): void {
+        for (const doc of patch.docs ?? []) {
+            if (!isClassModel(doc)) continue;
+            const className = (doc as any).name ?? doc._id;
+            const schema = ((doc as ClassModel).schema ?? {}) as Record<string, any>;
+            for (const [key, model] of Object.entries(schema)) {
+                // `null` is ADR-0038's drop marker, not an attribute to build.
+                if (model === null || model === undefined) continue;
+                const where = `Attribute '${className}.${key}' in patch '${patch.version}'`;
+                if (typeof model !== "object" || Array.isArray(model)) {
+                    throw new Error(`${where} is not an attribute model: ${JSON.stringify(model)}.`);
+                }
+                // The key and the model's own `name` have to agree. The class registers
+                // an attribute under the model's `name`, so a mismatch does not fail -
+                // it silently delivers an attribute under a name nobody wrote in the
+                // schema, and the key is ignored.
+                if (model.name !== undefined && model.name !== key) {
+                    throw new Error(
+                        `${where} names itself '${model.name}'. The class registers an ` +
+                        "attribute under its model's own 'name', so the key would be " +
+                        `ignored and '${model.name}' is what would arrive. Make the two agree.`
+                    );
+                }
+                try {
+                    new Attribute(null, model.name ?? key, model.type, model.description, model.config);
+                } catch (error: any) {
+                    throw new Error(`${where} cannot be built: ${error?.message ?? error}`);
+                }
+            }
+        }
+    }
+
+    /**
      * The ADR-0038 half of patch hydration: `schema` does not ride the shallow
      * merge, which would replace it wholesale - it merges attribute by attribute.
      * A patch states only the attributes it changes, an absent attribute stays as
@@ -2396,6 +2469,7 @@ class ClientStack extends Stack {
         const fnLogger = logger.child({ method: "applyPatch", args: { patch } });
         // The same references the chain validates, for the one-off path.
         this.assertPatchHandlers(patch);
+        this.assertPatchAttributes(patch);
         if (patch.preApply || patch.postApply) {
             // Jobs stage through the chain transaction; this path has none, and
             // silently ignoring them would apply the model without its migration.
