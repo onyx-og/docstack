@@ -369,20 +369,58 @@ class DocStack extends EventTarget {
     }
 
     private initStacks = async (configs: StackConfig[]) => {
+        const fnLogger = this.logger.child({ method: "initStacks" });
+
+        // One turn before anything is announced. With no stacks to open there is no
+        // `await` in the loop below, so this body used to run to completion - `ready`
+        // dispatched included - *inside* the constructor, before the caller could attach
+        // a listener. An event nobody can observe is the same as no event.
+        await Promise.resolve();
+
         // TODO: Consider changing to Promise.all for concurrency
+        const failed: { name: string; error: Error }[] = [];
         for (const config of configs) {
-            await this.addStack(config);
+            try {
+                await this.addStack(config);
+            } catch (error: any) {
+                // Caught per stack, which is two fixes in one.
+                //
+                // The rejection used to leave this function - called from a constructor,
+                // which cannot await it - so nothing handled it: `ready` never fired, a
+                // caller awaiting it waited for an event that would not arrive, and the
+                // only trace was an unhandled rejection in the console. A hang with
+                // nothing to catch is worse than a throw, and it is the same shape as the
+                // async-executor hangs fixed elsewhere in this engine.
+                //
+                // And aborting the loop meant one unopenable database cost the
+                // application every stack listed after it - which for a workspace
+                // registry naming several is most of them.
+                const { connection, options } = DocStack.resolveStackConfig(config);
+                const name = options.name || connection;
+                const asError = error instanceof Error ? error : new Error(String(error));
+                failed.push({ name, error: asError });
+                fnLogger.error("Stack failed to open", { name, error: asError });
+                // The same `error` event shape the sync handle uses, for a consumer that
+                // wants the cause; `ready`'s own detail carries it too, for the common
+                // case of one listener.
+                this.dispatchEvent(new CustomEvent("error", {
+                    detail: { name, config, error: asError },
+                }));
+            }
         }
 
         this.readyState = true;
         // Readiness means "usable for what it currently permits", not "fully keyed": a
         // locked stack must still signal ready, or consumers wait forever on the event -
         // including the one that was about to supply the key. `locked` names the stacks
-        // still waiting for one. See ADR-0018.
+        // still waiting for one. See ADR-0018. A stack that failed to open reads the same
+        // way: the instance is usable for the ones that did, and `failed` names the rest
+        // rather than withholding the event from everybody.
         this.dispatchEvent(new CustomEvent("ready", {
             detail: {
                 stacks: this.stacks,
                 locked: this.stacks.filter(stack => stack.isLocked()).map(stack => stack.name),
+                failed,
             }
         }))
     }
@@ -630,7 +668,10 @@ class DocStack extends EventTarget {
         const fnLogger = this.logger.child({ method: "constructor" });
 
         this.config = config;
-        this.initStacks(config);
+        // Not awaited, because a constructor cannot be - and not left bare either:
+        // `initStacks` handles every failure itself and always reaches its `ready`
+        // dispatch, which is the event this whole API is waited on through.
+        void this.initStacks(config);
         this.addEventListener("ready", () => fnLogger.info("DocStack client successfully initialized"));
     }
 
