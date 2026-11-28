@@ -132,12 +132,10 @@ describe("compiled handlers", () => {
                 triggers: [{ name: "stamp", order: "before", handler: "test.missing" }],
             };
 
-            // Opened through `addStack` rather than the constructor: `addStack` returns
-            // the open as a promise, so a refusal is something a caller can catch. The
-            // constructor cannot - it calls `initStacks` without awaiting it - so a
-            // failed open there is an unhandled rejection and `ready` simply never
-            // fires. That is a gap in how any open failure is reported, not one about
-            // handlers, and it is why this uses the API that reports.
+            // Opened through `addStack`, which returns the open as a promise, so a
+            // refusal is something a caller can catch. The constructor path reports the
+            // same refusal as an `error` event and in `ready`'s `failed` detail - see the
+            // case after this one.
             // No ready wait: constructed with no stacks, `initStacks` reaches its own
             // dispatch with nothing to await, so "ready" has already fired by the time
             // the constructor returns. `addStack` is awaited below, which is the signal
@@ -220,5 +218,55 @@ describe("compiled handlers", () => {
         // Exactly one of handler/run/jobId.
         expect(result.bothStated.opened).toBe(false);
         expect(result.bothStated.message).toContain("exactly one");
+    });
+
+    it("report an unresolved reference through the constructor path too", async ({ docStackPage }) => {
+        const result = await docStackPage.evaluate(async () => {
+            const { DocStack } = (window as any).docstack;
+            const name = `handlers-ctor-${Date.now()}`;
+            // The path every application uses: construct, then wait for `ready`. The
+            // check throws from `ClientStack.create`, which the constructor cannot
+            // report by returning - so what a consumer gets is an `error` event and a
+            // `failed` entry beside `ready`.
+            const docStack = new DocStack({
+                name, documentKey: "0".repeat(64),
+                patches: [{
+                    _id: "test-1.0.0", "~class": "patch", target: "test", version: "1.0.0",
+                    changelog: "a trigger naming nothing",
+                    docs: [{
+                        _id: "Orphan", "~class": "class", active: true, name: "Orphan",
+                        description: "Entries",
+                        schema: { label: { name: "label", type: "string", config: { mandatory: true } } },
+                        triggers: [{ name: "stamp", order: "before", handler: "test.missing" }],
+                    }],
+                }],
+            });
+
+            let errorMessage: string | null = null;
+            docStack.addEventListener("error", (event: any) => {
+                errorMessage = String(event?.detail?.error?.message ?? event?.detail?.error);
+            });
+            const detail: any = await Promise.race([
+                new Promise(resolve => docStack.addEventListener("ready", (e: any) => resolve(e?.detail))),
+                new Promise(resolve => setTimeout(() => resolve("hung"), 15000)),
+            ]);
+
+            return {
+                hung: detail === "hung",
+                errorMessage,
+                failedNames: detail === "hung" ? [] : (detail?.failed ?? []).map((f: any) => f.name),
+                failedMessage: detail === "hung" ? "" : String(detail?.failed?.[0]?.error?.message ?? ""),
+                stackAbsent: docStack.getStack(name) === undefined,
+            };
+        });
+
+        // `ready` still arrives, so a consumer waiting on it is not left hanging.
+        expect(result.hung).toBe(false);
+        // And the refusal is readable from either side.
+        expect(result.errorMessage).toContain("test.missing");
+        expect(result.failedNames.length).toBe(1);
+        expect(result.failedMessage).toContain("test.missing");
+        // The stack is not usable, which is the point of failing closed.
+        expect(result.stackAbsent).toBe(true);
     });
 });

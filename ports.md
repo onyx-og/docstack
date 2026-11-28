@@ -339,6 +339,12 @@ resolution in both execution paths, and the fail-closed check at open plus the s
 at build time in `revision --check`. §5.1's resolution order holds as written - compiled
 first, runtime second - and the exactly-one rule of §5.3 is enforced where a patch writes.
 
+The "error when the stack opens" half of §5.3's table needed one more thing to be worth
+anything: a `DocStack` constructor could not report a failed open at all - the rejection
+was unhandled and `ready` simply never fired - so the error existed and no application
+could see it. Fixed alongside, as an `error` event and a `failed` entry in `ready`'s
+detail.
+
 What is **not** built, and does not block anything above: §5.2's optional runtime plugin.
 The client still evaluates `run` and `content` itself with `new Function`, so rule 1's
 "refuse writes when no runtime plugin is installed" has nothing to fire on yet - this host
