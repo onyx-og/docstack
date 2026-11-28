@@ -21,15 +21,24 @@
 export {
     defineClass,
     defineModel,
+    defineHandler,
     a,
     attributeSpecToZod,
     foldPatchChain,
     diffModel,
     mergePatchSchema,
     canonicalJson,
+    assertTriggerReference,
+    assertJobReference,
 } from "@docstack/shared";
 
 export type {
+    Handler,
+    HandlerKind,
+    TriggerHandler,
+    TriggerHandlerContext,
+    JobHandler,
+    DeclaredTrigger,
     AttributeSpec,
     AttributeShape,
     AttributeValue,

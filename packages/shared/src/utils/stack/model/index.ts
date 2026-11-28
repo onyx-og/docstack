@@ -13,6 +13,14 @@ export type {
 export { canonicalJson, sha256Hex } from "./canonical.js";
 export { defineClass, defineModel } from "./define.js";
 export type { ClassDefinition, ClassDefinitionInput, ModelDefinition } from "./define.js";
+export {
+    assertJobReference, assertTriggerReference, collectHandlers, defineHandler,
+    isDeclaredTrigger, toTriggerModel,
+} from "./handlers.js";
+export type {
+    DeclaredTrigger, Handler, HandlerKind, JobHandler, JobHandlerInput, TriggerHandler,
+    TriggerHandlerContext, TriggerHandlerInput, TriggerInput,
+} from "./handlers.js";
 export { diffModel } from "./diff.js";
 export type { ModelDiff } from "./diff.js";
 export { foldPatchChain, mergePatchSchema } from "./fold.js";

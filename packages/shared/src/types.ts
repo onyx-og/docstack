@@ -1,3 +1,4 @@
+import type { Handler } from "./utils/stack/model/handlers.js";
 import Domain from "./utils/stack/domain.js";
 import Stack from "./utils/stack/index.js";
 import type Class from "./utils/stack/class/index.js";
@@ -268,8 +269,24 @@ export interface SystemDoc {
  */
 export type PatchJob = {
     name: string;
-    /** Job body, `~Job`-style: must define `execute(stack, params, job)`. */
-    content: string;
+
+    /**
+     * Job body, `~Job`-style: must define `execute(stack, params, job)`.
+     *
+     * The **runtime** half, evaluated from source. Optional since the compiled layer
+     * landed: exactly one of `content` and `handler` may be set.
+     */
+    content?: string;
+
+    /**
+     * A **compiled** handler, by name: declared in code with `defineHandler` and
+     * registered on the stack (`proposal.md` §13).
+     *
+     * A compiled job's `requiresKey` comes from its declaration when the patch does not
+     * state one, so the lock barrier reads the same answer either way (ADR-0044).
+     */
+    handler?: string;
+
     params?: { [key: string]: any };
     /**
      * Whether the job needs the document key. Defaults to `true`: an undeclared
@@ -308,6 +325,16 @@ export type StackOptions = {
     name?: string,
     plugins?: PouchDB.Plugin[],
     patches?: Patch[];
+    /**
+     * The compiled handlers this build registers, by name - `model.handlers` from
+     * `defineModel` (`proposal.md` §13).
+     *
+     * A stored trigger or patch job naming a `handler` resolves against this. A name that
+     * does not resolve fails when the stack opens rather than at the first write, so a
+     * build missing a handler is a startup error and not a write that quietly skipped its
+     * trigger (`ports.md` §5.3).
+     */
+    handlers?: Readonly<Record<string, Handler>>;
     credentials?: ClientCredentials;
     /**
      * Disable the client-side crypto engine for this stack. This flag is persisted on
@@ -406,9 +433,29 @@ export interface ClassModelPropagationComplete {
 // Interfaces for the Trigger's data model and hydrated function signature.
 export interface TriggerModel {
     name: string;
+
     order: "before" | "after";
+
+    /**
+     * A **runtime** handler: JavaScript source, evaluated when the trigger fires.
+     *
+     * Resolved only where a runtime layer exists - which today's JS client effectively is
+     * (`ports.md` §5.4). Exactly one of `handler`, `run` and `jobId` may be set.
+     */
     run?: string;
+
+    /** A `~Job` document to run, by id. */
     jobId?: string;
+
+    /**
+     * A **compiled** handler, by name: declared in code with `defineHandler` and
+     * registered on the stack (`proposal.md` §13).
+     *
+     * Nothing is evaluated from a string for this one, so it works on a host with no
+     * interpreter. An unregistered name fails when the stack opens, not at the first
+     * write (`ports.md` §5.3).
+     */
+    handler?: string;
 }
 
 /**

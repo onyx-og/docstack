@@ -468,9 +468,9 @@ why each went the way it did.
    with per-class hashes. Type-level tests cover every mapping row and modifier
    (`packages/client/tsconfig.types-test.json`, `npm run test:types`); the round-trip
    test drives `defineClass → toClassModel → Class.buildFromModel → validate` over
-   accept and reject fixtures and checks the hash ignores descriptions. Deferred within
-   this phase: `defineHandler` and the `handler?: string` schema change (§13), and
-   `defineDomain`.
+   accept and reject fixtures and checks the hash ignores descriptions. `defineHandler`
+   and the `handler?: string` schema change (§13) followed on 2026-11-28; `defineDomain`
+   is still deferred.
 3. ~~**Fold + diff library**~~ — **landed 2026-11-15**. `foldPatchChain(patches)` and
    `diffModel(folded, model)` in shared, with the ADR-0038 merge extracted from the
    client as `mergePatchSchema` so the engine and the fold cannot diverge. Tested
@@ -794,3 +794,37 @@ export const backfillPriority = defineHandler("todo.backfillPriority", {
 
 Implementation goes in phase 2 (builders) and phase 5 (client resolution) of §10; the
 runtime extraction itself is tracked in `ports.md` (spike S9).
+
+**Landed 2026-11-28**, all of the above except the runtime extraction, which is a
+different track (`ports.md` §5.2) and not needed for the compiled layer to be useful.
+
+- `defineHandler` in `@docstack/shared`, overloaded per kind, with the trigger form
+  generic in the document type and the job form carrying `requiresKey`. Handler names must
+  be namespaced: the registry is one flat namespace shared with every library's handlers,
+  and a collision would replace one silently.
+- `TriggerModel.handler` and `PatchJob.handler`, with `PatchJob.content` now optional.
+  `defineClass` accepts `{ name, order, handler }` and `toClassModel()` emits the name.
+  `defineModel({ classes, handlers })` collects the explicit list *and* what the classes'
+  triggers reference, so a trigger handler is never mentioned twice.
+- `StackOptions.handlers`, `stack.getHandler(name)`, and resolution in both execution
+  paths - `Trigger` resolves per invocation rather than at construction, because a Class
+  is routinely built before it is attached to a stack.
+- Fail-closed at open, in two places: every handler reference in the pending chain is
+  checked *before* anything stages, so a patch naming a missing handler cannot land its
+  schema and fail on the way out, and the stored class models are checked as the backstop
+  §5.3 describes. `revision --check` runs the same check at build time.
+- The exactly-one rule, as `assertTriggerReference` / `assertJobReference` in shared,
+  enforced where a patch writes and *not* where a stored document is read: a trigger
+  stating both `run` and `jobId` - which the engine used to resolve silently in favour of
+  `jobId`, so the visible `run` body never executed - is now refused, but history already
+  holding one still opens.
+- Handler names and kinds join the model hash; bodies do not. The key is omitted when a
+  model declares no handlers, so an existing model's hash is unchanged.
+
+Two things worth recording from building it. The generated patch's job stub now
+references a handler by name rather than carrying `content: ""`, which changed the
+emitter's output and was caught by the equivalence fixture's byte-identity guard - the
+drift check doing exactly its job. And `diffModel` does not compare triggers at all, so a
+handler renamed in code produces no patch and `--check`'s diff keeps reporting agreement;
+the handler check is what notices, which makes it a guard against a real gap rather than a
+restatement of the diff.

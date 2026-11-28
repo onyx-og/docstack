@@ -473,3 +473,100 @@ test("changing an attribute without regenerating fails --check, whatever changed
         assert.equal(revision({ cwd: root, mode: "check" }).code, 0, `${what}: agreeing again`);
     }
 });
+
+const HANDLER_MODEL = `
+import { defineClass, defineHandler, defineModel, a } from "@docstack/shared";
+
+export const stamp = defineHandler("todo.stamp", {
+    kind: "trigger",
+    run: (doc) => doc,
+});
+
+export const Todo = defineClass("Todo", {
+    attributes: {
+        title: a.string({ mandatory: true, maxLength: 200 }),
+        priority: a.enum(["low", "high"]),
+    },
+    triggers: [{ name: "stamp", order: "before", handler: stamp }],
+});
+
+export const model = defineModel({ classes: [Todo] });
+`;
+
+test("a declared handler is emitted as a reference, and --check accepts it", () => {
+    const root = project(HANDLER_MODEL);
+    const written = revision({ cwd: root, mode: "autogenerate", message: "the Todo class" });
+    const patch = readFileSync(written.written, "utf8");
+
+    // The name, never the function: a handler body is code, versioned by the app build.
+    assert.match(patch, /handler: "todo\.stamp"/);
+    assert.doesNotMatch(patch, /run:/);
+    assert.equal(revision({ cwd: root, mode: "check" }).code, 0);
+});
+
+test("--check fails when a chain references a handler the model does not register", () => {
+    const root = project(HANDLER_MODEL);
+    revision({ cwd: root, mode: "autogenerate", message: "the Todo class" });
+
+    // Renamed in code, with the chain left alone - which is the usual way a reference
+    // goes stale. `diffModel` cannot see it: it compares schemas and the class's own
+    // fields, and triggers are in neither, so the diff keeps saying the two agree. The
+    // engine would refuse to open; this is that refusal moved to CI.
+    writeFileSync(join(root, "src", "model.ts"),
+        HANDLER_MODEL.replace(/todo\.stamp/g, "todo.stamped"), "utf8");
+
+    const result = revision({ cwd: root, mode: "check" });
+    assert.equal(result.code, 1);
+    const output = result.output.join("\n");
+    assert.match(output, /names the handler 'todo\.stamp'/);
+    assert.match(output, /model registers: todo\.stamped/);
+    assert.match(output, /refuses to open/);
+    // Said plainly: the diff itself is content.
+    assert.doesNotMatch(output, /disagree on/);
+});
+
+test("--check fails on a handler of the wrong kind, and on a reference stating two things", () => {
+    const wrongKind = project(HANDLER_MODEL.replace(
+        'kind: "trigger",\n    run: (doc) => doc,',
+        'kind: "job",\n    execute: async () => undefined,'
+    ));
+    // A job handler where a trigger is needed is as unusable as a missing one.
+    const kindResult = revision({ cwd: wrongKind, mode: "check" });
+    assert.equal(kindResult.code, 1);
+    assert.match(kindResult.output.join("\n"), /needs a 'trigger' handler, but 'todo\.stamp' is declared as 'job'/);
+
+    // Exactly one of handler/run/jobId: two is not a precedence question.
+    const both = project(HANDLER_MODEL);
+    revision({ cwd: both, mode: "autogenerate", message: "the Todo class" });
+    const file = join(both, "src", "patches", "0.1.0.ts");
+    writeFileSync(file, readFileSync(file, "utf8").replace(
+        'handler: "todo.stamp",',
+        'handler: "todo.stamp",\n                    run: "return document;",'
+    ), "utf8");
+    const bothResult = revision({ cwd: both, mode: "check" });
+    assert.equal(bothResult.code, 1);
+    assert.match(bothResult.output.join("\n"), /exactly one of 'handler', 'run' or 'jobId'/);
+});
+
+test("--check fails on a patch job naming an unregistered handler", () => {
+    const root = project(HANDLER_MODEL);
+    revision({ cwd: root, mode: "autogenerate", message: "the Todo class" });
+
+    // The shape the generator's own stub suggests, with the handler never declared.
+    writeFileSync(join(root, "src", "patches", "0.2.0.ts"), [
+        'const patch = {',
+        '    _id: "todo-app-0.2.0",',
+        '    "~class": "patch",',
+        '    target: "todo-app",',
+        '    version: "0.2.0",',
+        '    changelog: "backfill",',
+        '    docs: [],',
+        '    preApply: { name: "backfill", handler: "todo.backfillPriority" },',
+        '};',
+        'export default patch;',
+    ].join("\n"), "utf8");
+
+    const result = revision({ cwd: root, mode: "check" });
+    assert.equal(result.code, 1);
+    assert.match(result.output.join("\n"), /preApply job of patch '0\.2\.0' names the handler 'todo\.backfillPriority'/);
+});

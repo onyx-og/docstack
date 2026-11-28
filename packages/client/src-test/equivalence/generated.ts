@@ -32,8 +32,9 @@ const patch_1_1_0: Patch = {
     ],
 };
 
-// A data migration goes here, by handler name rather than as source (proposal.md §6.4):
-// patch_1_1_0.preApply = { name: "app.someBackfill", content: "", requiresKey: false };
-// patch_1_1_0.postApply = { name: "app.someBackfill", content: "" };
+// A data migration goes here, as a handler declared with `defineHandler` and registered
+// on the model, never as source (proposal.md §6.4):
+// patch_1_1_0.preApply = { name: "backfill", handler: "app.backfillSomething" };
+// patch_1_1_0.postApply = { name: "reindex", handler: "app.reindexSomething" };
 
 export default patch_1_1_0;

@@ -28,8 +28,9 @@ A trigger model has four fields:
 | `order` | `'before'` runs on the incoming document, ahead of validation and storage; `'after'` runs on the stored document, revision included. |
 | `run` | The function body as a string. Receives `document`, `classObj`, `stack` and `session`; must return the document. |
 | `jobId` | Instead of `run`: the id of a `~Job` to execute with `{ document }` as its parameters. |
+| `handler` | Instead of either: the name of a compiled handler declared in your code. See [below](#compiled-handlers-a-trigger-with-no-body-in-the-document). |
 
-Exactly one of `run` or `jobId` is required. `classObj.addTrigger(name, model)` appends the trigger to the class model and writes the class document; `removeTrigger(name)` drops it from the in-memory class.
+Exactly one of `handler`, `run` or `jobId` is required. `classObj.addTrigger(name, model)` appends the trigger to the class model and writes the class document; `removeTrigger(name)` drops it from the in-memory class.
 
 ## How a trigger runs
 
@@ -103,3 +104,84 @@ The `jobId` form passes `{ document }` as the job's runtime parameters and recor
 ## What a trigger is not
 
 `new Function` is not a sandbox. A trigger body runs with the same authority as your application code, against the real stack. Class documents replicate, so a trigger written on one device runs on every device that receives the class. Treat write access to class documents as administrative access, and treat a class model arriving over sync from a peer you do not control as code you are about to run.
+
+## Compiled handlers: a trigger with no body in the document
+
+The section above is the reason this one exists. A `run` string is code travelling in a replicated document, and it needs an interpreter at the other end. A **compiled handler** is the same logic declared in your own source, with only its *name* stored on the class:
+
+```typescript
+import { defineClass, defineHandler, defineModel, a, type InferDoc } from '@docstack/client/model';
+
+type PostDoc = InferDoc<typeof Post>;
+
+export const generateSlug = defineHandler('blog.generateSlug', {
+    kind: 'trigger',
+    run: (doc: PostDoc, ctx) => ({
+        ...doc,
+        slug: doc.title.toLowerCase().replace(/\s+/g, '-'),
+        slugAt: ctx.now(),
+    }),
+});
+
+export const Post = defineClass('Post', {
+    attributes: { title: a.string({ mandatory: true }), slug: a.string() },
+    triggers: [{ name: 'generate-slug', order: 'before', handler: generateSlug }],
+});
+
+export const model = defineModel({ classes: [Post] });
+```
+
+The class document gets `{ name: 'generate-slug', order: 'before', handler: 'blog.generateSlug' }`. The function stays in your bundle, where TypeScript checks it against the document type and your build versions it.
+
+Hand the registry over when the stack opens:
+
+```typescript
+const docstack = new DocStack({ name: 'blog', patches, handlers: model.handlers });
+```
+
+`defineModel` collects the handlers its classes' triggers reference, so a trigger handler needs no second mention. A job handler, referenced by a patch rather than a class, is listed explicitly: `defineModel({ classes, handlers: [backfillSlugs] })`.
+
+### What you get, and what it costs
+
+| | `run` string | `handler` name |
+| :--- | :--- | :--- |
+| Where the code lives | in the class document, replicated | in your application build |
+| Checked by | nothing | TypeScript, against `InferDoc` |
+| Needs an interpreter | yes | no |
+| Changeable at runtime | yes, by anyone who can write the class | no, it ships with the app |
+| End users can define it | yes | no |
+
+Neither replaces the other. End users define triggers, and a `run` string is how they do it; a compiled handler is for logic *you* wrote and would rather have checked. Mixing the two on one class is fine - the two forms are resolved separately, per trigger.
+
+### A reference that resolves nowhere fails at open
+
+A handler name that this build does not register is an error **when the stack opens**, not when a write first touches the class:
+
+```
+Trigger 'generate-slug' on class 'Post' (Patch '1.1.0') names the compiled handler
+'blog.generateSlug', which this build does not register. Pass it in `handlers` when the
+stack opens - `defineModel({ classes, handlers })` collects them - or write the trigger's
+`run` inline instead. Registered: blog.publish.
+```
+
+Failing early and loudly is deliberate: the alternative is a write that silently skipped its trigger, and then two devices deriving different data from the same input. `docstack revision --check` runs the same check against your patch chain, so CI catches a handler renamed in code without a patch to match - which the model diff cannot see, because it compares schemas and triggers are not part of one.
+
+### Jobs too
+
+A patch's one-shot migration takes the same form, which is what the generated stub suggests:
+
+```typescript
+export const backfillSlugs = defineHandler('blog.backfillSlugs', {
+    kind: 'job',
+    // No encrypted attribute is touched, so it may run on a locked stack (ADR-0044).
+    requiresKey: false,
+    execute: async (stack) => {
+        const { rows } = await stack.query('SELECT _id, title FROM Post WHERE slug IS NULL;');
+        // ...
+    },
+});
+
+patch_1_1_0.postApply = { name: 'backfill', handler: 'blog.backfillSlugs' };
+```
+
+`requiresKey` belongs on the handler, where the code is, rather than on every patch that calls it. A patch stating its own value still wins.

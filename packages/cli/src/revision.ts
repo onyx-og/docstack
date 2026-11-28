@@ -1,6 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { diffModel, foldPatchChain } from "@docstack/shared";
+import {
+    assertJobReference, assertTriggerReference, diffModel, foldPatchChain,
+    type ClassModel, type ModelDefinition, type Patch,
+} from "@docstack/shared";
 import semver from "semver";
 import { renderIndexFile, renderPatchFile } from "./emit.js";
 import {
@@ -81,6 +84,99 @@ export const nextVersion = (
 };
 
 /**
+ * Whether a folded document describes a class.
+ *
+ * Shape-based, like the fold's own test: this runs over patch JSON with no stack to ask.
+ *
+ * @param doc - A document from a patch.
+ * @returns `true` when it is a class model.
+ */
+const isClassDoc = (doc: { [key: string]: any }): boolean =>
+    doc["~class"] === "class" || doc["~class"] === "~self";
+
+/**
+ * Every handler reference in a chain and a model that the model cannot answer.
+ *
+ * The build-time half of `ports.md` §5.3's fail-closed rule. The engine refuses to open
+ * on an unresolvable reference, which is correct and also late: the mistake is usually a
+ * handler renamed in code, or one declared but never passed to `defineModel`, and that is
+ * a `--check` away from being caught in CI instead of in an application that will not
+ * start.
+ *
+ * The exactly-one rule (`proposal.md` §13) is checked here too, for the same reason: the
+ * engine enforces it when a patch applies, and a patch stating both a `handler` and a
+ * `run` is worth failing a build over rather than shipping.
+ *
+ * @param chain - The patch chain, as loaded.
+ * @param model - The declared model, whose `handlers` is the registry.
+ * @returns One line per problem, in the order found; empty when every reference resolves.
+ */
+const handlerProblems = (chain: readonly Patch[], model: ModelDefinition): string[] => {
+    const problems: string[] = [];
+    const registered = model.handlers ?? {};
+    const check = (name: string, kind: "trigger" | "job", where: string): void => {
+        const handler = registered[name];
+        if (!handler) {
+            const known = Object.keys(registered).sort();
+            problems.push(
+                `${where} names the handler '${name}', which the model does not register. ` +
+                (known.length
+                    ? `The model registers: ${known.join(", ")}.`
+                    : "The model registers no handlers - pass them as " +
+                      "`defineModel({ classes, handlers })`.")
+            );
+            return;
+        }
+        if (handler.kind !== kind) {
+            problems.push(
+                `${where} needs a '${kind}' handler, but '${name}' is declared as '${handler.kind}'.`
+            );
+        }
+    };
+
+    const checkClass = (doc: ClassModel, where: string): void => {
+        for (const trigger of (doc.triggers ?? [])) {
+            try {
+                assertTriggerReference(trigger, where);
+            } catch (error) {
+                problems.push((error as Error).message);
+                continue;
+            }
+            if (trigger.handler) {
+                check(trigger.handler, "trigger", `Trigger '${trigger.name}' on ${where}`);
+            }
+        }
+    };
+
+    for (const patch of chain) {
+        const where = `patch '${patch.version}'`;
+        for (const doc of (patch.docs ?? [])) {
+            if (isClassDoc(doc)) checkClass(doc as unknown as ClassModel, `class '${doc.name ?? doc._id}' of ${where}`);
+        }
+        for (const phase of ["preApply", "postApply"] as const) {
+            const job = patch[phase];
+            if (!job) continue;
+            try {
+                assertJobReference(job, `${where} ${phase}`);
+            } catch (error) {
+                problems.push((error as Error).message);
+                continue;
+            }
+            if (job.handler) check(job.handler, "job", `The ${phase} job of ${where}`);
+        }
+    }
+
+    // The declared model too: a trigger written as `{ name, order, handler: "a.name" }` -
+    // a string rather than a `defineHandler` result - is not collected into the registry,
+    // so it can name something nothing declares.
+    for (const doc of model.toClassModels()) {
+        checkClass(doc, `declared class '${doc.name}'`);
+    }
+
+    return problems;
+};
+
+/**
  * Reads the project's own package name, for the default patch target.
  *
  * @param cwd - Project root.
@@ -148,6 +244,19 @@ export const revision = (options: RevisionOptions): RevisionResult => {
     const diff = diffModel(folded, model);
     const output: string[] = [];
     for (const warning of diff.warnings) output.push(`warning: ${warning}`);
+
+    // Before anything else is reported: a chain the engine will refuse to open is a
+    // failure whatever the diff says, and generating another patch on top of it would
+    // only add to what cannot be applied.
+    const handlers = handlerProblems(chain, model);
+    if (handlers.length) {
+        for (const problem of handlers) output.push(`error: ${problem}`);
+        output.push(
+            "A handler reference has to resolve in the model this build registers, or the " +
+            "stack refuses to open (`ports.md` §5.3)."
+        );
+        return { code: 1, output };
+    }
 
     if (!diff.docs.length && !diff.warnings.length) {
         output.push(

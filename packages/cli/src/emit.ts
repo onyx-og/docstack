@@ -69,6 +69,13 @@ export type PatchFileInput = {
  * migration is the common reason to hand-edit a generated patch, and a stub names the
  * shape it has to take (ADR-0044).
  *
+ * The stub references a **handler by name** rather than carrying a body, which is what a
+ * generated patch should do (`proposal.md` §6.4, §13): a function serialized with
+ * `fn.toString()` loses its closures and its imports silently, and a compiled handler
+ * also runs on a host with no interpreter. `requiresKey` is left out of the stub because
+ * the handler's own declaration is the better place for it - it is a property of the
+ * code, not of the revision that calls it.
+ *
  * @param input - See {@link PatchFileInput}.
  * @returns The module source, newline-terminated.
  */
@@ -91,9 +98,10 @@ const ${identifier}: Patch = ${toSource({
         docs: input.docs,
     })};
 
-// A data migration goes here, by handler name rather than as source (proposal.md §6.4):
-// ${identifier}.preApply = { name: "app.someBackfill", content: "", requiresKey: false };
-// ${identifier}.postApply = { name: "app.someBackfill", content: "" };
+// A data migration goes here, as a handler declared with \`defineHandler\` and registered
+// on the model, never as source (proposal.md §6.4):
+// ${identifier}.preApply = { name: "backfill", handler: "app.backfillSomething" };
+// ${identifier}.postApply = { name: "reindex", handler: "app.reindexSomething" };
 
 export default ${identifier};
 `;

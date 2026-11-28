@@ -333,6 +333,18 @@ plugin is installed (the current JS client effectively *is* that plugin). New co
 handlers are opt-in. This track can start now in the TS codebase and pays off even if the
 Rust core is never built.
 
+**The compiled layer landed in the TS codebase on 2026-11-28** (`proposal.md` §13):
+`defineHandler`, `handler` on `TriggerModel` and `PatchJob`, `StackOptions.handlers`,
+resolution in both execution paths, and the fail-closed check at open plus the same check
+at build time in `revision --check`. §5.1's resolution order holds as written - compiled
+first, runtime second - and the exactly-one rule of §5.3 is enforced where a patch writes.
+
+What is **not** built, and does not block anything above: §5.2's optional runtime plugin.
+The client still evaluates `run` and `content` itself with `new Function`, so rule 1's
+"refuse writes when no runtime plugin is installed" has nothing to fire on yet - this host
+always has one. Extracting the evaluator into a sandboxed package per platform is the
+remaining work, and §5.3's table is already written for the day it exists.
+
 ## 6. Postgres store — requirements that must hold
 
 - **Sequence ordering.** Spec 02 forbids reordering because replication checkpoints on

@@ -27,6 +27,7 @@ import {
 } from "@docstack/shared";
 
 import { SystemDoc, Patch, PatchJob, ClassModel, Document, RelationDocument, AccessScopeModel, isRelation, StackSession } from "@docstack/shared";
+import { assertJobReference, assertTriggerReference, Handler } from "@docstack/shared";
 import { createSessionView } from "./session.js";
 import type { SessionView } from "./session.js";
 import { mergePatchSchema } from "@docstack/shared";
@@ -78,6 +79,7 @@ const DOCSTACK_OPTION_KEYS: readonly string[] = [
     "transactions",
     "accessKeys",
     "logLevel",
+    "handlers",
 ];
 
 /**
@@ -230,6 +232,14 @@ class ClientStack extends Stack {
     connection!: string;
     /** Configuration options provided during stack creation. */
     options?: StackOptions;
+    /**
+     * The compiled handlers this build registered (`proposal.md` §13).
+     *
+     * Empty by default, which is what an application that declares none has. A stored
+     * trigger or patch job naming a handler resolves here first; a name that resolves
+     * nowhere is refused when the stack opens (`ports.md` §5.3).
+     */
+    private handlers: Readonly<Record<string, Handler>> = Object.freeze({});
     /** The current application version string. */
     appVersion: string = "0.0.1";
     /**
@@ -377,6 +387,7 @@ class ClientStack extends Stack {
         // Store the connection string and options
         this.connection = conn;
         this.options = options;
+        this.handlers = Object.freeze({ ...(options?.handlers ?? {}) });
         this.cryptoEngineDisabled = Boolean(options?.disableCryptoEngine);
         // An explicit name wins: a stack opened on a connection string that is not
         // `db-<name>` (a URL, an adapter-specific handle) has no name to derive.
@@ -1447,14 +1458,22 @@ class ClientStack extends Stack {
                 selector: { "~class": "patch" },
                 limit: 2 ** 31 - 1,
             } as any);
-            await stack.applyConsumerPatches(options.patches.filter(
+            const pending = options.patches.filter(
                 p => !(ledger.docs as unknown as (Patch & { active?: boolean })[]).find(
                     existing => existing.version === p.version
                     && existing.target === p.target
                     && existing.active !== false
                 )
-            ));
+            );
+            // Before anything stages: a patch naming a handler this build does not have
+            // must not land its schema and fail on the way out (`ports.md` §5.3).
+            for (const patch of pending) (stack as any).assertPatchHandlers(patch);
+            await stack.applyConsumerPatches(pending);
         }
+        // And the models already stored, which a patch chain says nothing about: a class
+        // pulled from a device ahead of this build, or a handler renamed in code without
+        // a patch to match.
+        await (stack as any).assertStoredTriggerHandlers();
         // Scope material is attempted AFTER patches: a consumer patch may carry
         // the very `~AccessScope` docs the key opens, and a patch deferred on a
         // sealed scope replays inside `unlockScopes`. Adoption discipline is the
@@ -1650,7 +1669,7 @@ class ClientStack extends Stack {
      */
     private async runPatchJob(t: TransactionHandle, patch: Patch, phase: "preApply" | "postApply"): Promise<void> {
         const job = patch[phase]!;
-        const shortPhase = phase === "preApply" ? "pre" : "post";
+        const shortPhase: "pre" | "post" = phase === "preApply" ? "pre" : "post";
         const startTime = Date.now();
         const receipt: any = {
             _id: `JobRun-${this.cryptoEngine.generateRandomString(12)}`,
@@ -1667,9 +1686,25 @@ class ClientStack extends Stack {
         };
         try {
             const facade = this.createPatchJobStack(t);
-            // The ~Job convention, verbatim: content defines execute(stack, params, job).
-            const fn = new Function("stack", "params", "job", `"use strict"; ${job.content}; return execute(stack, params, job);`);
-            await fn(facade, job.params ?? {}, { name: job.name, phase: shortPhase, version: patch.version });
+            const context = { name: job.name, phase: shortPhase, version: patch.version };
+            if (job.handler) {
+                // Compiled: the function this build registered, called directly. The
+                // reference was checked when the patch was accepted, so a miss here is a
+                // registry that changed underneath an open stack rather than a bad patch.
+                const handler = this.handlers[job.handler];
+                if (!handler || handler.kind !== "job") {
+                    throw new Error(
+                        `Job '${job.name}' names the compiled handler '${job.handler}', which is ` +
+                        `${handler ? `declared as a '${handler.kind}' handler` : "not registered"}.`
+                    );
+                }
+                await handler.fn(facade as any, job.params ?? {}, context);
+            } else {
+                // Runtime: the ~Job convention, verbatim - content defines
+                // execute(stack, params, job).
+                const fn = new Function("stack", "params", "job", `"use strict"; ${job.content}; return execute(stack, params, job);`);
+                await fn(facade, job.params ?? {}, context);
+            }
             receipt.status = "SUCCESS";
         } catch (error: any) {
             receipt.errorMessage = String(error?.message ?? error);
@@ -1953,7 +1988,19 @@ class ClientStack extends Stack {
         // flag costs latency (the job runs at unlock), never correctness. An
         // explicit `requiresKey: false` opts into locked execution (ADR-0044).
         const jobs = [patch.preApply, patch.postApply].filter(Boolean) as PatchJob[];
-        if (jobs.some(job => job.requiresKey !== false)) return true;
+        // A compiled job may declare `requiresKey` on the handler instead of on the
+        // patch, which is the better place for it: the answer is a property of the code,
+        // not of the revision that happens to call it. The patch still wins when it
+        // states one, and "unstated anywhere" still means "needs the key".
+        const needsKey = (job: PatchJob): boolean => {
+            if (job.requiresKey !== undefined) return job.requiresKey !== false;
+            const declared = job.handler ? this.handlers[job.handler] : undefined;
+            if (declared && declared.kind === "job" && declared.requiresKey !== undefined) {
+                return declared.requiresKey !== false;
+            }
+            return true;
+        };
+        if (jobs.some(needsKey)) return true;
 
         const hasEncryptedAttribute = (schema?: ClassModel["schema"]) =>
             !!schema && Object.values(schema).some((attribute: any) => attribute?.config?.encrypted === true);
@@ -2222,6 +2269,116 @@ class ClientStack extends Stack {
     }
 
     /**
+     * Looks up a compiled handler by name.
+     *
+     * The resolver the compiled layer resolves *first* (`ports.md` §5.1). A name that
+     * finds nothing here falls through to the runtime layer - a `run` or `content`
+     * string - and the open-time check below is what stops a reference from finding
+     * neither.
+     *
+     * @param name - The handler name a trigger or job states.
+     * @returns The handler, or `undefined` when this build does not register it.
+     */
+    public getHandler = (name: string): Handler | undefined => this.handlers[name];
+
+    /**
+     * Checks that a named handler is registered, and is the right kind.
+     *
+     * @param name - The name the reference states.
+     * @param kind - What the reference needs it to be.
+     * @param where - What to name in the error.
+     * @throws If nothing is registered under the name, or the wrong kind is.
+     */
+    private assertHandlerRegistered(name: string, kind: Handler["kind"], where: string): void {
+        const handler = this.handlers[name];
+        if (!handler) {
+            const known = Object.keys(this.handlers).sort();
+            throw new Error(
+                `${where} names the compiled handler '${name}', which this build does not ` +
+                `register. Pass it in \`handlers\` when the stack opens - ` +
+                `\`defineModel({ classes, handlers })\` collects them - or write the ` +
+                `${kind === "trigger" ? "trigger's `run`" : "job's `content`"} inline instead. ` +
+                (known.length ? `Registered: ${known.join(", ")}.` : "Nothing is registered.")
+            );
+        }
+        if (handler.kind !== kind) {
+            throw new Error(
+                `${where} needs a '${kind}' handler, but '${name}' is declared as ` +
+                `'${handler.kind}'.`
+            );
+        }
+    }
+
+    /**
+     * Validates every handler reference a patch carries, before any of it is applied.
+     *
+     * Two separate checks, both fail-closed and both here rather than at the first write:
+     * that each trigger and job states exactly one thing to run (`proposal.md` §13), and
+     * that a compiled name resolves in this build (`ports.md` §5.3). Running before the
+     * chain stages is what keeps a patch naming a missing handler from landing its schema
+     * and failing afterwards.
+     *
+     * @param patch - The patch about to be applied.
+     * @throws Naming the patch, the class or the phase at fault.
+     */
+    private assertPatchHandlers(patch: Patch): void {
+        const label = `Patch '${patch.version}'`;
+        for (const doc of patch.docs ?? []) {
+            if (!isClassModel(doc)) continue;
+            const className = (doc as any).name ?? doc._id;
+            for (const trigger of ((doc as ClassModel).triggers ?? [])) {
+                assertTriggerReference(trigger, `class '${className}' of ${label.toLowerCase()}`);
+                if (trigger.handler) {
+                    this.assertHandlerRegistered(
+                        trigger.handler, "trigger",
+                        `Trigger '${trigger.name}' on class '${className}' (${label})`
+                    );
+                }
+            }
+        }
+        for (const phase of ["preApply", "postApply"] as const) {
+            const job = patch[phase];
+            if (!job) continue;
+            assertJobReference(job, `${label} ${phase}`);
+            if (job.handler) {
+                this.assertHandlerRegistered(job.handler, "job", `${label}'s ${phase} job`);
+            }
+        }
+    }
+
+    /**
+     * Checks the handler references in the class models already stored.
+     *
+     * The backstop ADR-0040's sync gate is meant to make unnecessary: a class whose
+     * trigger names a handler this build lacks should never have arrived, because a
+     * device behind on consumer patches does not pull. This catches the local mistakes
+     * that gate cannot see - a handler renamed in code without a patch, or a build
+     * started without its registry - at open, where it is one error, rather than at the
+     * next write to that class, where it is a refused write with no obvious cause.
+     *
+     * Stored history is read, not rewritten: a trigger that states both `run` and
+     * `jobId` - which the engine used to resolve silently in favour of `jobId` - is left
+     * alone here. Only what a patch is about to write is held to the exactly-one rule.
+     *
+     * @throws Naming the class and the handler, if a reference resolves nowhere.
+     */
+    private async assertStoredTriggerHandlers(): Promise<void> {
+        const stored = await this.db.find({
+            selector: { "~class": "class" },
+            limit: 2 ** 31 - 1,
+        } as any).catch(() => ({ docs: [] as any[] }));
+        for (const doc of stored.docs as unknown as ClassModel[]) {
+            for (const trigger of (doc.triggers ?? [])) {
+                if (!trigger.handler) continue;
+                this.assertHandlerRegistered(
+                    trigger.handler, "trigger",
+                    `Trigger '${trigger.name}' on stored class '${doc.name ?? doc._id}'`
+                );
+            }
+        }
+    }
+
+    /**
      * The ADR-0038 half of patch hydration: `schema` does not ride the shallow
      * merge, which would replace it wholesale - it merges attribute by attribute.
      * A patch states only the attributes it changes, an absent attribute stays as
@@ -2237,6 +2394,8 @@ class ClientStack extends Stack {
 
     applyPatch = async (patch: Patch): Promise<string> => {
         const fnLogger = logger.child({ method: "applyPatch", args: { patch } });
+        // The same references the chain validates, for the one-off path.
+        this.assertPatchHandlers(patch);
         if (patch.preApply || patch.postApply) {
             // Jobs stage through the chain transaction; this path has none, and
             // silently ignoring them would apply the model without its migration.

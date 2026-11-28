@@ -15,8 +15,9 @@ Stored in a class document's `triggers` array.
 | `order` | `"before"` or `"after"` | Before the document is stored (on the validated document), or after (on the stored document with its `_rev`). |
 | `run` | string, optional | The function body. Hydrated with `new Function('document', 'classObj', 'stack', 'session', …)` inside an async IIFE; must return the document. `session` is the [session](../guides/sessions.md) of the write, or `undefined`. |
 | `jobId` | string, optional | Instead of `run`: the `~Job` to execute with `{ document }` as runtime parameters and `triggerType: "event"`. |
+| `handler` | string, optional | Instead of either: the name of a **compiled** handler declared with `defineHandler` and registered on the stack. Nothing is evaluated from a string. See [Compiled handlers](../guides/triggers.md#compiled-handlers-a-trigger-with-no-body-in-the-document). |
 
-Exactly one of `run` and `jobId` must be present; the class refuses to build a trigger with neither.
+Exactly one of `handler`, `run` and `jobId` must be present. A patch writing a trigger that states none, or more than one, is refused when it applies; the class refuses to build a trigger with none.
 
 ## `JobModel` (`~Job`)
 

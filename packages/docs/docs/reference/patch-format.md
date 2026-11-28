@@ -49,11 +49,14 @@ Refused at stage time, with an error that names the document: `_local/` document
 ```typescript
 type PatchJob = {
     name: string;
-    content: string;        // defines execute(stack, params, job)
+    content?: string;       // defines execute(stack, params, job)
+    handler?: string;       // instead of `content`: a compiled handler's name
     params?: Record<string, any>;
     requiresKey?: boolean;  // default true
 };
 ```
+
+Exactly one of `content` and `handler` must be present. `handler` names a job handler declared with `defineHandler` and registered on the stack, which is what a generated patch should carry: a function serialized into `content` loses its closures and its imports silently. A compiled job may declare `requiresKey` on the handler instead of on the patch, and the patch's own value wins when it states one.
 
 `preApply` runs before the patch's documents stage; its writes are staged into the chain transaction. `postApply` runs after the chain commits, in a second staged transaction. Both leave a `~JobRun` receipt without a `jobId`, carrying `patchVersion`, `patchTarget`, `phase` (`"pre"` or `"post"`) and `jobName` in `runtimeArgs`. A patch that carries a job cannot go through `applyPatch`; it applies through the open-time chain only.
 

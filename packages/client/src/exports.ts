@@ -180,6 +180,10 @@ export { defineClass, defineModel, a, attributeSpecToZod } from "@docstack/share
  * No database is involved, and the fold applies the engine's own merge rules.
  */
 export { foldPatchChain, diffModel, mergePatchSchema, canonicalJson } from "@docstack/shared";
+export { defineHandler, assertTriggerReference, assertJobReference } from "@docstack/shared";
+export type {
+    Handler, HandlerKind, TriggerHandler, TriggerHandlerContext, JobHandler, DeclaredTrigger,
+} from "@docstack/shared";
 export type { FoldedChain, ModelDiff } from "@docstack/shared";
 
 /**

@@ -1,8 +1,25 @@
-import { Class, Document, Trigger as Trigger_, TriggerModel, TriggerRunFunction, StackSession } from "@docstack/shared";
+import {
+    Class, Document, Handler, Trigger as Trigger_, TriggerModel, TriggerRunFunction,
+    StackSession,
+} from "@docstack/shared";
 
 /**
- * The Trigger class dynamically hydrates a function from a string.
- * This allows for declarative, data-driven logic to be executed at runtime.
+ * A trigger, resolved from its model.
+ *
+ * Three forms, in the order `ports.md` §5.1 resolves them:
+ *
+ * - `handler`, a **compiled** handler declared with `defineHandler` and registered on the
+ *   stack. Nothing is evaluated from a string, so this is the form that works on a host
+ *   with no interpreter.
+ * - `jobId`, a `~Job` document run through the job engine.
+ * - `run`, the **runtime** form: JavaScript source hydrated with `new Function`. Kept
+ *   because end users define triggers, and this client is effectively the runtime plugin
+ *   `ports.md` §5.2 describes.
+ *
+ * A model states exactly one of the three - enforced when a patch writes it
+ * (`ClientStack.assertPatchHandlers`). Stored history is read leniently here, in the
+ * precedence this constructor has always used, because a document written before that
+ * rule cannot be rejected at read time without making the class unopenable.
  */
 export class Trigger extends Trigger_ {
     /** The declarative model for the trigger. */
@@ -27,11 +44,42 @@ export class Trigger extends Trigger_ {
             throw new Error("Trigger model's 'run' field must be a string representation of a function.");
         }
 
-        if (!model.run && !model.jobId) {
-            throw new Error("Trigger requires either a 'run' script or a 'jobId'.");
+        if (!model.run && !model.jobId && !model.handler) {
+            throw new Error("Trigger requires a 'handler' name, a 'run' script or a 'jobId'.");
         }
 
-        if (model.jobId) {
+        if (model.handler) {
+            const handlerName = model.handler;
+            // Resolved per invocation, like the `jobId` branch, not captured here: a
+            // Class is often built before it is attached to a stack (`Class.get` with a
+            // model, the detached builds in the sweep and the write pipeline), and a
+            // registry read at construction would be read from whatever stack - or none -
+            // happened to be in hand then.
+            this.run = async (document, callClass, callStack, session) => {
+                const stack: any = callStack ?? this.classObj?.getStack();
+                const handler = stack?.getHandler?.(handlerName) as Handler | undefined;
+                if (!handler) {
+                    throw new Error(
+                        `Trigger '${model.name}' names the compiled handler '${handlerName}', ` +
+                        "which is not registered on this stack. Pass it in `handlers` when the " +
+                        "stack opens."
+                    );
+                }
+                if (handler.kind !== "trigger") {
+                    throw new Error(
+                        `Trigger '${model.name}' names '${handlerName}', which is declared as a ` +
+                        `'${handler.kind}' handler.`
+                    );
+                }
+                const result = await handler.fn(document, {
+                    classObj: callClass ?? this.classObj,
+                    stack,
+                    session,
+                    now: () => Date.now(),
+                });
+                return (result ?? document) as Document;
+            };
+        } else if (model.jobId) {
             this.run = async (document, _classObj, stack, session) => {
                 if (!stack || !stack.jobEngine) {
                     throw new Error(`Stack does not expose a job engine for trigger '${model.name}'.`);

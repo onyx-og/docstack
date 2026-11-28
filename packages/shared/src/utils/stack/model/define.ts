@@ -1,6 +1,9 @@
 import { ClassModel, TriggerModel } from "../../../types.js";
 import { AttributeSpec } from "./attributes.js";
 import { canonicalJson, sha256Hex } from "./canonical.js";
+import {
+    collectHandlers, Handler, isDeclaredTrigger, toTriggerModel, TriggerInput,
+} from "./handlers.js";
 
 /**
  * What `defineClass` accepts beside its name.
@@ -18,12 +21,13 @@ export type ClassDefinitionInput<TAttributes extends Record<string, AttributeSpe
     /** The attributes, keyed by name. */
     attributes: TAttributes;
     /**
-     * Triggers, as the stored model carries them.
+     * Triggers, either as the stored model carries them or as a handler reference.
      *
-     * Declared handlers (`defineHandler`, `proposal.md` §13) are a later slice; until
-     * then a trigger is written the way the engine already accepts it.
+     * `{ name, order, handler }` with a `defineHandler` result is the compiled form: the
+     * stored model gets the handler's *name*, and the handler itself travels through the
+     * model's registry, since a function cannot be written to a document.
      */
-    triggers?: readonly TriggerModel[];
+    triggers?: readonly TriggerInput[];
 };
 
 /**
@@ -38,7 +42,15 @@ export type ClassDefinition<
     readonly parentClass?: string;
     readonly ephemeral?: boolean;
     readonly attributes: TAttributes;
+    /** The triggers, normalized to what the engine stores. */
     readonly triggers: readonly TriggerModel[];
+    /**
+     * The compiled handlers this class's triggers reference.
+     *
+     * Exposed so `defineModel` can register them without the author listing every one
+     * twice - once on the trigger that uses it, once in `handlers`.
+     */
+    readonly handlers: readonly Handler[];
     /**
      * The class document the engine consumes, exactly as a patch would carry it.
      *
@@ -75,10 +87,13 @@ const semanticClass = (definition: {
             return [name, { type: spec.type, config }];
         })
     ),
+    // A trigger contributes its reference, never its body: `handler` and `jobId` name
+    // something, `run` *is* code and is versioned by the app build.
     triggers: definition.triggers.map(trigger => ({
         name: trigger.name,
         order: trigger.order,
         jobId: trigger.jobId,
+        handler: trigger.handler,
     })),
 });
 
@@ -115,7 +130,11 @@ export const defineClass = <
     name: TName,
     definition: ClassDefinitionInput<TAttributes>
 ): ClassDefinition<TName, TAttributes> => {
-    const triggers = Object.freeze([...(definition.triggers ?? [])]);
+    const declared = definition.triggers ?? [];
+    const triggers = Object.freeze(declared.map(toTriggerModel));
+    const handlers = Object.freeze(
+        declared.filter(isDeclaredTrigger).map(trigger => trigger.handler) as Handler[]
+    );
     const canonical = () => canonicalJson(semanticClass({
         name,
         parentClass: definition.parentClass,
@@ -130,6 +149,7 @@ export const defineClass = <
         ephemeral: definition.ephemeral,
         attributes: Object.freeze({ ...definition.attributes }) as TAttributes,
         triggers,
+        handlers,
         toClassModel: (): ClassModel => {
             const model = {
                 _id: name,
@@ -157,6 +177,13 @@ export type ModelDefinition<TClasses extends readonly ClassDefinition[] = readon
     readonly classes: TClasses;
     /** The declared classes by name, for lookup without scanning. */
     readonly byName: Readonly<Record<string, ClassDefinition>>;
+    /**
+     * The compiled handlers this model registers, by name.
+     *
+     * What `StackOptions.handlers` is given. Holds the ones listed in `handlers` and the
+     * ones the classes' triggers reference, so neither has to be repeated.
+     */
+    readonly handlers: Readonly<Record<string, Handler>>;
     /** Every class document, in declaration order. */
     readonly toClassModels: () => ClassModel[];
     /** The canonical serialization of every class, class names sorted. */
@@ -174,12 +201,14 @@ export type ModelDefinition<TClasses extends readonly ClassDefinition[] = readon
  * unit when two clients legitimately hold different class *sets*, which is difficulty
  * (3) of the datamodel-hash gate in `ROADMAP.md`.
  *
- * @param definition - The classes making up the model. Domains are a later addition.
+ * @param definition - The classes making up the model, and any handlers not already
+ * referenced by a class's triggers - a patch job's, typically. Domains are a later
+ * addition.
  * @returns A frozen {@link ModelDefinition}.
- * @throws If two classes share a name.
+ * @throws If two classes share a name, or two different handlers share one.
  */
 export const defineModel = <const TClasses extends readonly ClassDefinition[]>(
-    definition: { classes: TClasses }
+    definition: { classes: TClasses; handlers?: readonly Handler[] }
 ): ModelDefinition<TClasses> => {
     const byName: Record<string, ClassDefinition> = {};
     for (const declared of definition.classes) {
@@ -188,14 +217,33 @@ export const defineModel = <const TClasses extends readonly ClassDefinition[]>(
         }
         byName[declared.name] = declared;
     }
-    const canonical = () => canonicalJson(
-        Object.fromEntries(
+    const handlers = collectHandlers([
+        ...definition.classes.flatMap(declared => declared.handlers),
+        ...(definition.handlers ?? []),
+    ]);
+    const canonical = () => {
+        const classes = Object.fromEntries(
             Object.keys(byName).sort().map(name => [name, JSON.parse(byName[name].canonical())])
-        )
-    );
+        );
+        const names = Object.keys(handlers).sort();
+        // Handler *names* are semantic - a reference the stored model carries, and a
+        // capability this build either has or does not (`ports.md` §5.3) - so the hash
+        // notices them. Bodies are code, versioned by the app build, and never appear.
+        //
+        // The key is omitted entirely when there are none, rather than written as `{}`:
+        // a model that declares no handlers hashes to what it always did, so adopting
+        // this release does not change an existing model's hash.
+        return names.length
+            ? canonicalJson({
+                classes,
+                handlers: Object.fromEntries(names.map(name => [name, handlers[name].kind])),
+            })
+            : canonicalJson(classes);
+    };
     return Object.freeze({
         classes: definition.classes,
         byName: Object.freeze(byName),
+        handlers,
         toClassModels: () => definition.classes.map(declared => declared.toClassModel()),
         canonical,
         hash: () => sha256Hex(canonical()),
